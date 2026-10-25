@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="560" viewBox="0 0 920 560" font-family="PingFang SC, Helvetica, Arial, sans-serif">
+  <rect width="920" height="560" fill="#ffffff"/>
+  <text x="40" y="42" font-size="22" font-weight="700" fill="#1f2328">火盆的三层格子（bounds = [0,0,0, 3,3,3]）</text>
+  <text x="40" y="70" font-size="14" fill="#57606a">每个小格是一个 LatticePoint；同一 (x,z) 在三层里重复出现。JSON 的 box 用 origin+size，运行时是半开 Cuboid(min,max)。</text>
+
+  <!-- y = 0 -->
+  <text x="80" y="112" font-size="16" font-weight="600" fill="#1f2328">y = 0 底层</text>
+  <g transform="translate(80,130)">
+    <g fill="#e6e8ea" stroke="#8c959f" stroke-width="1.5">
+      <rect x="0" y="0" width="150" height="150" fill="none"/>
+      <rect x="50" y="0" width="50" height="50"/><rect x="100" y="0" width="50" height="50"/>
+      <rect x="0" y="50" width="50" height="50"/><rect x="100" y="50" width="50" height="50"/>
+      <rect x="0" y="100" width="50" height="50"/><rect x="50" y="100" width="50" height="50"/><rect x="100" y="100" width="50" height="50"/>
+    </g>
+    <rect x="50" y="50" width="50" height="50" fill="#f4a261" stroke="#c2410c" stroke-width="2"/>
+    <text x="75" y="80" font-size="12" text-anchor="middle" fill="#7c2d12">火</text>
+    <text x="0" y="-6" font-size="11" fill="#57606a">x →</text>
+    <text x="-30" y="12" font-size="11" fill="#57606a">z</text>
+    <text x="-30" y="26" font-size="11" fill="#57606a">↓</text>
+  </g>
+  <text x="80" y="302" font-size="12" fill="#57606a">(1,0,1) 营火 · bay “fire”</text>
+
+  <!-- y = 1 -->
+  <text x="360" y="112" font-size="16" font-weight="600" fill="#1f2328">y = 1 中层</text>
+  <g transform="translate(360,130)">
+    <g fill="#e6e8ea" stroke="#8c959f" stroke-width="1.5">
+      <rect x="0" y="0" width="50" height="50"/><rect x="50" y="0" width="50" height="50"/><rect x="100" y="0" width="50" height="50"/>
+      <rect x="0" y="50" width="50" height="50"/><rect x="100" y="50" width="50" height="50"/>
+      <rect x="0" y="100" width="50" height="50"/><rect x="50" y="100" width="50" height="50"/><rect x="100" y="100" width="50" height="50"/>
+    </g>
+    <rect x="50" y="50" width="50" height="50" fill="#ffffff" stroke="#0969da" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="75" y="80" font-size="12" text-anchor="middle" fill="#0969da">空</text>
+  </g>
+  <text x="360" y="302" font-size="12" fill="#57606a">(1,1,1) 空腔 · bay “hollow”</text>
+
+  <!-- y = 2 -->
+  <text x="640" y="112" font-size="16" font-weight="600" fill="#1f2328">y = 2 顶层</text>
+  <g transform="translate(640,130)">
+    <g fill="#e6e8ea" stroke="#8c959f" stroke-width="1.5">
+      <rect x="0" y="0" width="50" height="50"/><rect x="50" y="0" width="50" height="50"/><rect x="100" y="0" width="50" height="50"/>
+      <rect x="0" y="50" width="50" height="50"/><rect x="50" y="50" width="50" height="50"/><rect x="100" y="50" width="50" height="50"/>
+      <rect x="0" y="100" width="50" height="50"/><rect x="50" y="100" width="50" height="50"/><rect x="100" y="100" width="50" height="50"/>
+    </g>
+  </g>
+  <text x="640" y="302" font-size="12" fill="#57606a">全部是外壳 · 由 shell 展开</text>
+
+  <!-- mapping notes -->
+  <g transform="translate(80,352)">
+    <rect x="0" y="0" width="760" height="150" rx="10" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="18" y="26" font-size="14" font-weight="600" fill="#1f2328">三个 JSON 表面，落到三层不同的格子集合</text>
+    <text x="18" y="52" font-size="13" fill="#57606a">shell / cavity / fills → 合成 bay（或匿名 box），先展开；命名 bay 的格子会被挖走</text>
+    <text x="18" y="74" font-size="13" fill="#57606a">bays[].box → bay.cells（一个 Cuboid）；coverage 决定“要判定多少格”，scope 决定“拥有多少格”</text>
+    <text x="18" y="96" font-size="13" fill="#57606a">checks[].focus.cell → 具体某格；checks[].bay 指回它属于哪个 bay</text>
+    <text x="18" y="118" font-size="13" fill="#57606a">computations[].region → 计算读取的格子集合，与 bay.cells 可以不同</text>
+    <text x="18" y="140" font-size="13" fill="#57606a">bounds 只是包围盒，不自动等于任何 bay；没有 bay 覆盖的格子只会得到 SC-CLM-0104 警告</text>
+  </g>
+
+  <!-- legend -->
+  <g transform="translate(80,520)">
+    <rect x="0" y="-12" width="18" height="12" fill="#e6e8ea" stroke="#8c959f"/>
+    <text x="26" y="-2" font-size="12" fill="#57606a">外壳（shell）</text>
+    <rect x="140" y="-12" width="18" height="12" fill="#f4a261" stroke="#c2410c"/>
+    <text x="166" y="-2" font-size="12" fill="#57606a">营火（bay fire · owned）</text>
+    <rect x="340" y="-12" width="18" height="12" fill="#ffffff" stroke="#0969da" stroke-dasharray="4 3"/>
+    <text x="366" y="-2" font-size="12" fill="#57606a">空腔（bay hollow · air）</text>
+  </g>
+</svg>

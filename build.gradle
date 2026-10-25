@@ -1,0 +1,226 @@
+import net.ltgt.gradle.errorprone.CheckSeverity
+
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    id 'net.neoforged.moddev' version '2.0.122'
+    id 'dev.vfyjxf.cloudlib.lang'
+    id 'dev.vfyjxf.cloudlib.style'
+    id 'dev.vfyjxf.cloudlib.pmd'
+    id "net.ltgt.errorprone" version "4.4.0"
+}
+
+cloudLang {
+    modId = 'structurecumulus'
+    packageName = 'dev.vfyjxf.cumulus.data.lang'
+    className = 'CumulusLang'
+    constantNameStyle = 'camel'
+    entryClass = 'dev.vfyjxf.cumulus.data.lang.LangEntry'
+}
+
+spotless {
+    java {
+        targetExclude 'build/generated/sources/langKeys/**'
+    }
+}
+
+// the cloudstyle plugin unpacks its JDT formatter profile into build/cloudstyle at configuration
+// time — a plain file write during configuration, not a task output — so a clean that wiped
+// build/ wholesale would leave spotless reading a profile the clean step had just deleted. The
+// profile survives; everything else under build/ is discarded as before
+tasks.named('clean', Delete) {
+    setDelete(fileTree('build') { exclude 'cloudstyle/**' })
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+// The kernel is a separate source set with no Minecraft on its compile classpath. That is the
+// primary purity gate; kernelPurity below is the textual backstop for names the compiler cannot see.
+sourceSets {
+    kernel {
+        java.srcDir 'src/kernel/java'
+    }
+    kernelTest {
+        java.srcDir 'src/kernelTest/java'
+        compileClasspath += sourceSets.kernel.output
+        runtimeClasspath += sourceSets.kernel.output
+    }
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+neoForge {
+    version = project.neo_version
+    accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    mods {
+        structurecumulus {
+            sourceSet(sourceSets.main)
+        }
+    }
+
+    unitTest {
+        enable()
+        testedMod = mods.structurecumulus
+        loadedMods.add(mods.structurecumulus)
+    }
+
+    runs {
+        client {
+            client()
+            gameDirectory = project.file('runs/client')
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            gameDirectory = project.file('runs/server')
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+            systemProperty('terminal.jline', 'true')
+        }
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url = "https://maven.parchmentmc.org" }
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // the kernel compiles on its own classpath and is consumed by the mod source set
+    implementation sourceSets.kernel.output
+    kernelCompileOnly 'org.jspecify:jspecify:1.0.1'
+    kernelTestImplementation sourceSets.kernel.output
+    kernelTestImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+    kernelTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    kernelTestCompileOnly 'org.jspecify:jspecify:1.0.1'
+
+    // JSpecify is what the sources annotate with. The test set declares its own copy rather than
+    // inheriting compileOnly, so the annotation is present on the classpath that reads it.
+    compileOnly 'org.jspecify:jspecify:1.0.1'
+    testCompileOnly 'org.jspecify:jspecify:1.0.1'
+
+    // NullAway 0.12.15 is built and tested against Error Prone 2.42.0
+    errorprone 'com.uber.nullaway:nullaway:0.12.15'
+    errorprone 'com.google.errorprone:error_prone_core:2.42.0'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        exceptionFormat = 'full'
+        events 'failed'
+        showStackTraces = true
+    }
+}
+
+tasks.register('kernelTest', Test) {
+    description = 'Runs the kernel tests, which carry no Minecraft.'
+    testClassesDirs = sourceSets.kernelTest.output.classesDirs
+    classpath = sourceSets.kernelTest.runtimeClasspath
+    useJUnitPlatform()
+    testLogging {
+        exceptionFormat = 'full'
+        events 'failed'
+        showStackTraces = true
+    }
+}
+
+tasks.register('kernelPurity') {
+    description = 'Fails if a kernel source names Minecraft, NeoForge or Mojang.'
+    def sources = fileTree('src/kernel/java') { include '**/*.java' }
+    inputs.files(sources)
+    doLast {
+        def banned = ['net.minecraft', 'net.neoforged', 'com.mojang']
+        def offenders = []
+        sources.each { file ->
+            file.eachLine { line, number ->
+                if (banned.any { line.contains(it) }) {
+                    offenders << "${file}:${number}: ${line.trim()}"
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException('kernel purity violated:\n' + offenders.join('\n'))
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'kernelTest', 'kernelPurity'
+}
+
+tasks.named('jar', Jar) {
+    from sourceSets.kernel.output
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            neo_version_range      : neo_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_version            : mod_version
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = 21
+}
+
+// NullAway runs as an Error Prone plugin over every source set (main and test). OnlyNullMarked
+// restricts the analysis to code carrying @NullMarked, which keeps Minecraft, NeoForge and
+// third-party boundaries out of it — those carry no JSpecify annotations to reason about.
+// disableAllChecks keeps Error Prone's stock checks off: this wiring is a null-safety pass.
+tasks.withType(JavaCompile).configureEach {
+    // javac caps diagnostics at 100 by default; a NullAway sweep needs the whole list
+    options.compilerArgs.addAll(['-Xmaxwarns', '2000', '-Xmaxerrs', '2000'])
+    options.errorprone {
+        disableAllChecks = true
+        option("NullAway:OnlyNullMarked", "true")
+        option("NullAway:CastToNonNullMethod", "dev.vfyjxf.cumulus.util.Checks.checkNotNull")
+        check("NullAway", CheckSeverity.ERROR)
+    }
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

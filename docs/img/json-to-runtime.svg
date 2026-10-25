@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="640" viewBox="0 0 1120 640" font-family="PingFang SC, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#57606a"/>
+    </marker>
+  </defs>
+  <rect width="1120" height="640" fill="#ffffff"/>
+  <text x="40" y="40" font-size="22" font-weight="700" fill="#1f2328">文档只是入口：每个字段都变成一个有名有姓的对象</text>
+  <text x="40" y="66" font-size="13" fill="#57606a">运行时没有 JSON。读文档 = 调 builder；之后的执行只认对象。</text>
+
+  <text x="30" y="104" font-size="14" font-weight="600" fill="#1f2328">文档里的四组字段</text>
+  <text x="330" y="104" font-size="14" font-weight="600" fill="#1f2328">运行时对象（以及一句话定义）</text>
+  <text x="760" y="104" font-size="14" font-weight="600" fill="#1f2328">谁在用</text>
+
+  <!-- left -->
+  <g>
+    <rect x="30" y="120" width="240" height="92" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="44" y="144" font-size="13" font-weight="600" fill="#1f2328">几何</text>
+    <text x="44" y="166" font-size="12" fill="#57606a">bounds · shell · cavity</text>
+    <text x="44" y="184" font-size="12" fill="#57606a">fills · bays[].box</text>
+    <text x="44" y="202" font-size="11" fill="#8c959f">→ 一堆格子</text>
+
+    <rect x="30" y="230" width="240" height="92" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="44" y="254" font-size="13" font-weight="600" fill="#1f2328">断言</text>
+    <text x="44" y="276" font-size="12" fill="#57606a">coverage · mode · scope</text>
+    <text x="44" y="294" font-size="12" fill="#57606a">expect · checks[]</text>
+    <text x="44" y="312" font-size="11" fill="#8c959f">→ 谓词与配对</text>
+
+    <rect x="30" y="340" width="240" height="92" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="44" y="364" font-size="13" font-weight="600" fill="#1f2328">数据流</text>
+    <text x="44" y="386" font-size="12" fill="#57606a">computations[] · context[]</text>
+    <text x="44" y="404" font-size="12" fill="#57606a">phase · output · merge</text>
+    <text x="44" y="422" font-size="11" fill="#8c959f">→ 键与计算</text>
+
+    <rect x="30" y="450" width="240" height="92" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="44" y="474" font-size="13" font-weight="600" fill="#1f2328">放置</text>
+    <text x="44" y="496" font-size="12" fill="#57606a">anchors[] · orientation</text>
+    <text x="44" y="514" font-size="12" fill="#57606a">运行前解析一次</text>
+    <text x="44" y="532" font-size="11" fill="#8c959f">→ 一个 Siting</text>
+  </g>
+
+  <!-- middle -->
+  <g>
+    <rect x="330" y="120" width="390" height="88" rx="8" fill="#ddf4ff" stroke="#0969da"/>
+    <text x="346" y="146" font-size="14" font-weight="700" fill="#0a3069">Blueprint</text>
+    <text x="346" y="168" font-size="12" fill="#0a3069">结构的根：bounds、bays、anchors、derivations。</text>
+    <text x="346" y="188" font-size="12" fill="#0a3069">它不知道世界，也不知道 stage。</text>
+
+    <rect x="330" y="222" width="390" height="96" rx="8" fill="#ffffff" stroke="#8c959f"/>
+    <text x="346" y="248" font-size="14" font-weight="700" fill="#1f2328">Bay</text>
+    <text x="346" y="270" font-size="12" fill="#57606a">一段长方体 + 断言多少格 + 拥有多少格</text>
+    <text x="346" y="288" font-size="12" fill="#57606a">+ 它的 Requirement（Check 与 Computation）。</text>
+    <text x="346" y="308" font-size="11" fill="#8c959f">为什么不是整个结构：不同部分的主体、阶段、归属都不同。</text>
+
+    <rect x="330" y="332" width="390" height="82" rx="8" fill="#ffffff" stroke="#8c959f"/>
+    <text x="346" y="358" font-size="14" font-weight="700" fill="#1f2328">Check&lt;T&gt;</text>
+    <text x="346" y="380" font-size="12" fill="#57606a">Focus 取主体，Expectation 判主体，编译期同 T。</text>
+    <text x="346" y="400" font-size="12" fill="#57606a">它只判一件事；复杂结构由多个 Check 分担。</text>
+
+    <rect x="330" y="428" width="390" height="82" rx="8" fill="#ffffff" stroke="#8c959f"/>
+    <text x="346" y="454" font-size="14" font-weight="700" fill="#1f2328">Computation&lt;T&gt;</text>
+    <text x="346" y="476" font-size="11" fill="#57606a">读世界/上下文，产出一个 ContextKey 的值；</text>
+    <text x="346" y="494" font-size="11" fill="#57606a">SECTION 贡献，AGGREGATE 单写。</text>
+    <text x="346" y="496" font-size="12" fill="#57606a">它不判真假，只生产可被多个谓词共享的值。</text>
+
+    <rect x="330" y="524" width="390" height="82" rx="8" fill="#ffffff" stroke="#8c959f"/>
+    <text x="346" y="550" font-size="14" font-weight="700" fill="#1f2328">ContextKey&lt;T&gt;</text>
+    <text x="346" y="572" font-size="12" fill="#57606a">值的类型化名字：id、type、Retention、可选 Merge、可选 whenAbsent。</text>
+    <text x="346" y="592" font-size="12" fill="#57606a">有 Merge = 允许区段贡献；没有 = 单写者。</text>
+  </g>
+
+  <!-- right -->
+  <g>
+    <rect x="760" y="120" width="320" height="96" rx="8" fill="#fff8c5" stroke="#bf8700"/>
+    <text x="776" y="146" font-size="13" font-weight="700" fill="#7d4e00">Blueprint.expand(stage)</text>
+    <text x="776" y="168" font-size="12" fill="#7d4e00">把 Bay 里的 Check/Computation 摊平成有序计划。</text>
+    <text x="776" y="188" font-size="12" fill="#7d4e00">它只读对象，不读文档。</text>
+
+    <rect x="760" y="232" width="320" height="140" rx="8" fill="#ffffff" stroke="#8c959f"/>
+    <text x="776" y="258" font-size="13" font-weight="700" fill="#1f2328">MatchSession</text>
+    <text x="776" y="280" font-size="12" fill="#57606a">按计划跑：区段贡献 → 屏障折叠</text>
+    <text x="776" y="298" font-size="12" fill="#57606a">→ aggregate → Check → publish。</text>
+    <text x="776" y="320" font-size="12" fill="#57606a">它持有世界快照与预算，不持有文档。</text>
+    <text x="776" y="342" font-size="12" fill="#0a3069">输出 MatchResult：</text>
+    <text x="776" y="360" font-size="12" fill="#0a3069">Admitted / Formed / Failed / Undecided。</text>
+
+    <rect x="760" y="390" width="320" height="96" rx="8" fill="#dafbe1" stroke="#1a7f37"/>
+    <text x="776" y="416" font-size="13" font-weight="700" fill="#0a3622">ClaimPlanner → ClaimRow</text>
+    <text x="776" y="438" font-size="12" fill="#0a3622">Bay 的格子与 Footprint → 一格格归属。</text>
+    <text x="776" y="458" font-size="12" fill="#0a3622">SETTLE 时交给 ClaimMatrix / 账本。</text>
+
+    <rect x="760" y="504" width="320" height="102" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="776" y="530" font-size="13" font-weight="700" fill="#1f2328">一句话记住</text>
+    <text x="776" y="552" font-size="12" fill="#57606a">几何 → 格子；断言 → 谓词；</text>
+    <text x="776" y="572" font-size="12" fill="#57606a">数据流 → 键与计算；放置 → Siting。</text>
+    <text x="776" y="592" font-size="12" fill="#57606a">没有第五种东西。</text>
+  </g>
+
+  <!-- arrows -->
+  <path d="M270 166 L326 164" stroke="#57606a" stroke-width="1.5" marker-end="url(#d)"/>
+  <path d="M270 276 L326 268" stroke="#57606a" stroke-width="1.5" marker-end="url(#d)"/>
+  <path d="M270 386 L326 372" stroke="#57606a" stroke-width="1.5" marker-end="url(#d)"/>
+  <path d="M270 496 L326 564" stroke="#57606a" stroke-width="1.5" marker-end="url(#d)"/>
+  <path d="M720 164 L756 164" stroke="#57606a" stroke-width="1.5" marker-end="url(#d)"/>
+  <path d="M720 300 L756 300" stroke="#57606a" stroke-width="1.5" marker-end="url(#d)"/>
+  <path d="M920 376 L920 386" stroke="#57606a" stroke-width="1.5" marker-end="url(#d)"/>
+</svg>

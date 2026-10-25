@@ -1,0 +1,20 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+    // the vendored cloudlang build — resolves 'dev.vfyjxf.cloudlib.lang', '.style' and '.pmd'
+    includeBuild('build-logic')
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
+// the vendored build again, this time for dependency substitution: the includeBuild in
+// pluginManagement above only serves plugin resolution, so 'dev.vfyjxf:cloudpmd:0.1.0' — the
+// module the pmd plugin puts on PMD's classpath — would otherwise have to come from a repository
+includeBuild('build-logic')
+
+rootProject.name = 'StructureCumulus'

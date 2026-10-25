@@ -1,0 +1,13 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'cloudlang-plugin'
+
+// the PMD 7 rule artifacts behind the 'dev.vfyjxf.cloudlib.pmd' plugin; the plugin asks for
+// 'dev.vfyjxf:cloudpmd:0.1.0', which composite substitution maps onto this subproject in the
+// projects that include this build
+include 'cloudpmd'

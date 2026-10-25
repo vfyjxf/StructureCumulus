@@ -1,0 +1,36 @@
+plugins {
+    id 'java-library'
+}
+
+group = 'dev.vfyjxf'
+version = '0.1.0'
+description = 'CloudLib PMD 7 gate: the custom rules and the ruleset the pmd plugin unpacks'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // the rules compile against PMD 7 only — the consuming build puts pmd-java on PMD's own
+    // classpath, so this must not become a dependency of this library
+    compileOnly 'net.sourceforge.pmd:pmd-java:7.28.0'
+
+    testImplementation 'net.sourceforge.pmd:pmd-java:7.28.0'
+    testImplementation 'org.jspecify:jspecify:1.0.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}

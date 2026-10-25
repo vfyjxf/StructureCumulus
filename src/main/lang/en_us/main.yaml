@@ -1,0 +1,15 @@
+# Distributed lang sources: one directory per locale under src/main/lang, nested mappings
+# flattening to dotted keys (structurecumulus.meta.name). A leaf may carry an explicit constant
+# name instead of the derived one:
+#
+#   structurecumulus:
+#     meta:
+#       name:
+#         value: StructureCumulus
+#         $field: displayName
+#
+# The generated key class (CumulusLang, under build/generated/sources/langKeys) mirrors this
+# structure; code references its constants, never a raw key.
+structurecumulus:
+  meta:
+    name: StructureCumulus

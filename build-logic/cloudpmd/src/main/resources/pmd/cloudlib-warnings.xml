@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================================
+  CloudLib PMD 7 gate — WARN ruleset (pmdAdvisory).
+  ============================================================================================
+
+  Derived from the authoritative rule catalogue pmd-evidence/style-extraction/_catalog.md
+  (workspace root of CloudMods-Inworld). The catalogue, not this file, decides what is in here.
+
+  WHY THIS IS SPLIT IN TWO FILES
+    Gradle's `Pmd` task fails the build on *any* violation; it has no notion of severity and
+    `ignoreFailures` is all-or-nothing. The catalogue (section F-24) layers the rules into
+    "error" (build fails) and "warn" (report only), so the layering is implemented as two
+    rulesets driven by two tasks:
+      * pmd/cloudlib-ruleset.xml               -> task `pmdMain`     -> ignoreFailures = false
+      * pmd/cloudlib-warnings.xml (this file)  -> task `pmdAdvisory` -> ignoreFailures = true
+    Both files ship inside the `cloudpmd` jar; the `dev.vfyjxf.cloudlib.pmd` plugin unpacks
+    them into the consuming build (there is deliberately no second copy among its resources).
+
+  WHAT BELONGS HERE
+    Catalogue F-24: a rule whose current state is not clean, or was never measured, is a warning;
+    only rules measured clean become errors. So this file holds exactly the rules that report
+    against today's sources or cannot yet be trusted to fail a build, and it is the buffer from
+    which rules graduate into the error ruleset once their existing hits are cleared.
+
+  SCOPE
+    Same as the error ruleset: `main` source sets only, file-level exclusions live in the Gradle
+    plugin's task configuration. `pmdAdvisory` analyses exactly the same sources as `pmdMain`
+    and reports to build/reports/pmd/advisory.{html,xml}.
+
+  RULE REFERENCES
+    As in the error ruleset: standard rules keep their PMD message and description, with an XML
+    comment carrying the catalogue id and the reason.
+
+  [implementation check] items resolved here:
+    * NonStaticWildcardImport and OptionalOutsideApi are XPath rules (catalogue section B); all
+      their attribute names were verified against real AST dumps of PMD 7.28.0:
+      ImportDeclaration carries @Static, @ImportOnDemand and @ImportedName; PackageDeclaration
+      carries @Name; ClassOrInterfaceType carries @SimpleName.
+    * PMD 7.28.0 gained a standard rule `OnDemandImport` (category/java/bestpractices.xml,
+      since 7.28.0) whose `allowStaticImportsFrom` / `allowTypeImportsFrom` properties can
+      express the same "non-static wildcard only" policy that catalogue D-27 says AvoidStarImport
+      cannot. It is deliberately NOT used: the catalogue defines B-02 as a section-B inline rule,
+      and the inline rule has the narrower, fully-verified behaviour.
+    * UnusedFormalParameter `checkAll` is a Boolean defaulting to false (private methods only);
+      the catalogue's value is set explicitly.
+    * DanglingJavadoc is in category/java/documentation.xml in 7.28.0, not in errorprone as the
+      catalogue's table says. It is a warning because it was never measured (catalogue C-19).
+    * C-04 FormalParameterNamingConventions, C-05 LocalVariableNamingConventions,
+      C-06 TypeParameterNamingConventions, C-11 MissingOverride and B-04
+      PublicNonFinalInstanceField briefly sat here: PMD 7.28.0 really does report them, contrary
+      to the catalogue's "current state" column. Their sites have since been fixed (see the
+      error ruleset's resolved item 15) and all five now run as errors in `pmdMain`.
+    * S-2 UnusedAssignment, A-2 ConstructorCallsOverridableMethod and A-3
+      AvoidReassigningLoopVariables are the three rules the sweep report
+      (lint-tools-research/05-pmd-sweep.md, grade S/A) puts in the warning layer rather than the
+      error one; their measured hit counts and the reason each stays a warning are on the rules
+      themselves. The report's other S/A picks are errors in `pmdMain` (see the error ruleset).
+
+  ============================================================================================
+  THIRD SOURCE — pmd-evidence/framework-rules/_framework-catalog.md
+  ============================================================================================
+  The same framework contract the error ruleset draws on. Two of its sixteen rules stay warnings,
+  because both still report against today's sources and both remedies are framework-side work
+  rather than call-site discipline — the rule is not weak, the code it looks at is not yet fixed:
+    * A-11 FrameworkIdMustBeRegistered — three `ExposeChannel.of(...)` declarations in the main
+      sources have no `ExposeChannelRegistry.register(...)` in their file (catalogue E-5). They are
+      latent rather than broken: each channel is served through a binding, which carries the channel
+      itself, so the registry lookup only starts to matter once the channel is offered to a viewer
+      that never asked for it. Wrapping them in `register(...)` is deliberately NOT done: every one
+      of the three sites builds a fresh channel per call, and the registry throws
+      IllegalArgumentException on a duplicate id, so the one-line wrap the catalogue suggests would
+      turn a latent fault into a startup crash. The catalogue's own fix for this (its D-2.3) is a
+      public declaration gate on CloudLib's side, so the rule stays a warning until that exists.
+    * B-05 NoInternalPackageReference — one downstream import of `cloudlib.internal.StyleConfig`
+      (NimbusConfig.java:5, catalogue E-6), because the public API has no equivalent for persisting
+      the theme selection. The catalogue's remedy is again a public CloudLib entry point (its
+      D-2.5). The finding is left visible on purpose: suppressing a warning whose fix is pending
+      would hide the signal that the fix is pending.
+
+  [implementation check] B-05's XPath is the only section-B rule in this file:
+    * `ImportDeclaration/@ImportedName` holds the fully qualified name (already relied on by the
+      `IllegalImport` rule in the error ruleset) and `PackageDeclaration/@Name` the package, both
+      re-verified with `pmd ast-dump` on 7.28.0.
+    * The catalogue asks for the rule to be excluded from the CloudLib project. It is expressed in
+      XPath instead — "the compilation unit's own package is not `dev.vfyjxf.cloudlib.**`" — which
+      is the same predicate without a per-build file exclusion, so the one ruleset keeps working
+      for both projects and for third-party consumers. Verified: Nimbus reports the one known
+      site, CloudLib reports none.
+-->
+<ruleset name="cloudlib-pmd-warnings"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+
+    <description>
+        CloudLib PMD 7 gate (warnings ruleset). Run as `pmdAdvisory`, which records violations
+        but never fails the build. Derived from pmd-evidence/style-extraction/_catalog.md and,
+        for the S/A picks, from lint-tools-research/05-pmd-sweep.md; the error layer lives in
+        pmd/cloudlib-ruleset.xml and runs as `pmdMain`.
+    </description>
+
+    <!-- ======================================================================================
+         B - inline XPath rules, severity warn
+         ====================================================================================== -->
+
+    <!-- B-02: `import a.b.*;` is a violation; `import static a.b.*;` is not. The catalogue's
+         sketch is used verbatim — @Static and @ImportOnDemand on ImportDeclaration were
+         verified with `pmd ast-dump` on 7.28.0. Seven non-static wildcards exist today in
+         api/ui and api/plugin (catalogue E-18), hence a warning rather than an error.
+         Catalogue F-03; D-27 explains why AvoidStarImport cannot be used instead. -->
+    <rule name="NonStaticWildcardImport"
+          language="java"
+          message="Use explicit imports; only `import static a.b.*` may be on demand"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports on-demand (wildcard) imports that are not static. `import static a.b.*` is
+            allowed.
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportDeclaration[@Static = false() and @ImportOnDemand = true()]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- B-03: java.util.Optional must not be used in the implementation packages
+         (dev.vfyjxf.cloudlib.{ui,network,internal} and dev.vfyjxf.nimbus.{content,internal});
+         the api subtrees are explicitly allowed, because the api layer returns Optional from
+         12 files that are legitimate consumers of it. Only the import is checked; the optional
+         type-use clause of the catalogue sketch is dropped because the type cannot be named by
+         its simple name without that import, so the import clause already covers every use, and
+         a fully qualified use is caught by A-03 NoFullyQualifiedNames anyway. (That sketch also
+         names a node that does not exist in PMD 7: `ClassOrInterfaceType` was renamed
+         `ClassType`.) Neither project has a hit today, so this is a warning that guards against
+         regressions. Catalogue F-04. -->
+    <rule name="OptionalOutsideApi"
+          language="java"
+          message="java.util.Optional is not allowed outside the api packages"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports `import java.util.Optional` inside dev.vfyjxf.cloudlib.{ui,network,internal}
+            and dev.vfyjxf.nimbus.{content,internal}. The api packages are exempt.
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportDeclaration[@ImportedName = 'java.util.Optional']
+  [ancestor::CompilationUnit/PackageDeclaration
+     [matches(@Name, '^(dev\.vfyjxf\.cloudlib\.(ui|network|internal)|dev\.vfyjxf\.nimbus\.(content|internal))')]]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- ======================================================================================
+         C - standard rules, severity warn
+         ====================================================================================== -->
+
+    <!-- C-12 bestpractices: single-abstract-method interfaces should carry @FunctionalInterface.
+         At least six are missing the annotation today (catalogue E-19). -->
+    <rule ref="category/java/bestpractices.xml/ImplicitFunctionalInterface"/>
+
+    <!-- C-13 bestpractices: switches over enums should be exhaustive. Clean today. -->
+    <rule ref="category/java/bestpractices.xml/NonExhaustiveSwitch"/>
+
+    <!-- C-14 bestpractices: no unused private fields (0-2 expected). -->
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+
+    <!-- C-15 bestpractices: no unused private methods (0-2 expected). -->
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+
+    <!-- C-16 bestpractices: no unused local variables (0-2 expected). -->
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+
+    <!-- C-17 bestpractices: no unused formal parameters. checkAll stays false so that interface
+         implementations and overrides, whose parameters are fixed by the signature, are not
+         reported. -->
+    <rule ref="category/java/bestpractices.xml/UnusedFormalParameter">
+        <properties>
+            <property name="checkAll" value="false"/>
+        </properties>
+    </rule>
+
+    <!-- C-19 documentation: javadoc that belongs to nothing. Never measured, so a warning for
+         now; if the first runs show zero hits the catalogue allows promoting it to the error
+         ruleset. -->
+    <rule ref="category/java/documentation.xml/DanglingJavadoc"/>
+
+    <!-- C-22 design: a class with only static members must not be instantiable. About eleven
+         CloudLib classes lack a private constructor (catalogue E-11..E-16) and BuiltinKeys is a
+         deliberate exception, so this stays a warning. Catalogue F-06: the rule was called
+         `UseUtilityClass` before PMD 7.27.0. -->
+    <rule ref="category/java/design.xml/InstantiableUtilityClass"/>
+
+    <!-- C-24 bestpractices: a caught exception must not be swallowed when wrapping it into
+         another one. Expected clean; kept as a warning so an eventual regression is visible.
+         The catalogue files this under errorprone, but 7.28.0 has it in bestpractices. -->
+    <rule ref="category/java/bestpractices.xml/PreserveStackTrace"/>
+
+    <!-- ======================================================================================
+         Null-check rules — DEMOTED error -> warn (user directive 2026-09-28: external null
+         annotations can be wrong, so a flagged check must always have a way to be kept).
+         They run here through pmdAdvisory and never fail the build. Two escape hatches work
+         out of the box, applied by PMD's reporting layer to every rule:
+           * `// NOPMD` on the offending line;
+           * `@SuppressWarnings("PMD.RedundantNullCheck")` / `@SuppressWarnings("PMD.DuplicateNullCheck")`
+             on the enclosing declaration.
+         Both are exercised by regression tests (see the rules' test classes).
+         ====================================================================================== -->
+
+    <!-- A-05: a null check whose checked expression is provably non-null is redundant, whatever
+         the shape of the check: == / != (yoda included), Objects.isNull/nonNull, an assert
+         condition, a ternary or compound condition, a `case null` label, and
+         Objects.requireNonNull / Checks.checkNotNull applied to an already-provable expression.
+         The proof itself is a fixed, conservative ladder — syntactic constants (this, super, new,
+         literals, enum constants, concatenation, requireNonNull/checkNotNull/valueOf/getClass/
+         Optional.orElseThrow, and orElse of a provable argument); locals whose declaration and
+         every assignment in their method are provable; fields declared non-null in this file (by
+         simple name or through this.); and calls that resolve to a same-file declaration that
+         returns non-null and cannot be overridden from another file (private, static, final, or
+         in a final/record/enum/anonymous type).
+         EXEMPT BY DESIGN (miss-before-error, so no false positives): parameters, array accesses,
+         foreach/resource/pattern/catch/lambda variables, lambdas and method references, @Nullable
+         declarations, inherited and cross-file fields and methods, reads through a receiver other
+         than this, library calls, unresolvable chains, and Optional.orElse of an unknown argument
+         (it can return that null).
+         Landed as error on 2026-09-28 and demoted to warn the same day: even the conservative
+         ladder leans on in-file nullness declarations, and an annotation that is simply wrong
+         (in this file or upstream) must not cost the build — the check stays as advice.
+         依据 用户指令 2026-09-28：扫 null check / 判源 nullable / 禁冗余；同日降级 warn。 -->
+    <rule name="RedundantNullCheck"
+          language="java"
+          message="Do not check an expression for null whose source is provably non-null"
+          class="dev.vfyjxf.cloudlib.pmd.rules.RedundantNullCheckRule">
+        <description>
+            Reports every shape of null check whose checked expression the rule can prove
+            non-null: a syntactic constant, a local assigned only from provable sources, a field
+            declared non-null in the same file, or a same-file method declared to return non-null.
+            Anything the ladder cannot prove is left alone. Suppress a wrong finding with
+            `// NOPMD` or `@SuppressWarnings("PMD.RedundantNullCheck")`.
+        </description>
+        <priority>3</priority>
+    </rule>
+
+    <!-- A-06: a variable whose nullness is already established must not be null-checked again.
+         Knowledge comes only from unconditional places: an executed
+         Objects.requireNonNull(x) / Checks.checkNotNull(x) (statement, initializer, or assignment
+         right-hand side), a guard `if (x == null) return/throw/break/continue;` and its
+         `if (x != null) ... else leave;` mirror, a guard holding inside its then-branch, and the
+         left null check of a condition pinning the variable for its right operand
+         (x != null && x != null, x == null || x == null).
+         EXEMPT BY DESIGN: branches merge by intersection, so a guard that holds in only one branch
+         never survives the join; loops, switches and try blocks drop everything gained inside; an
+         assignment anywhere in between clears the variable; assertions pin nothing (they may be
+         disabled); only locals and parameters are tracked, because nothing outside the method can
+         reassign those (fields and lambda bodies are deliberately out); and a labelled
+         break/continue escaping a statement keeps only what was known before it.
+         Demoted error -> warn together with A-05 (same directive): wrong upstream nullness can
+         make a second check the only correct line of defense, so this reports, never blocks.
+         依据 用户指令 2026-09-28：扫 null check / 判源 nullable / 禁冗余；同日降级 warn。 -->
+    <rule name="DuplicateNullCheck"
+          language="java"
+          message="Do not check a variable for null whose nullness is already established"
+          class="dev.vfyjxf.cloudlib.pmd.rules.DuplicateNullCheckRule">
+        <description>
+            Reports a null check (== / != / isNull / nonNull) on a local or parameter that a
+            requireNonNull/checkNotNull call or a leaving null guard in the same method has
+            already pinned down, with no assignment to the variable in between. Suppress a wrong
+            finding with `// NOPMD` or `@SuppressWarnings("PMD.DuplicateNullCheck")`.
+        </description>
+        <priority>3</priority>
+    </rule>
+
+    <!-- ======================================================================================
+         S/A - the three 05-pmd-sweep.md picks that stay warnings
+         (lint-tools-research/05-pmd-sweep.md; ids below are that report's)
+         ====================================================================================== -->
+
+    <!-- S-2 bestpractices: a value stored and then overwritten or never read (dead store),
+         including `this` and static fields. All 11 current hits are real leftovers from a
+         refactor: SliderBlueprint's three field initialisers are overwritten immediately,
+         InworldCoordinator's `zoneLayout`, CssValues' `aIndex` twice, Nimbus DashEnvelope /
+         NameplateLayouter x2 / TargetDwell. It stays a warn because the rule's own
+         documentation warns it can misfire on timing-sensitive concurrency, and both projects
+         keep volatile hot-path snapshots (catalogue D-23) — the 11 must be read by a human
+         before this could ever gate. Hits: CloudLib 7 + Nimbus 4. -->
+    <rule ref="category/java/bestpractices.xml/UnusedAssignment"/>
+
+    <!-- A-2 errorprone: a constructor calling an overridable method through `this` — the
+         subclass's fields are still uninitialised at that point. The 31 CloudLib hits are all
+         the Widget tree (ButtonWidget/ChipWidget/LabelWidget/ItemStripWidget/PartNode/
+         ProgressBarWidget/RichTextWidget calling onMount/setFocusable/stylePart in their
+         constructors), i.e. a systematic design of the UI layer rather than 31 slips, and
+         removing them means deferring those calls to a post-mount lifecycle hook — an
+         architecture change the gate should not force. Hits: CloudLib 31 + Nimbus 1
+         (Nimbus.java:38). -->
+    <rule ref="category/java/errorprone.xml/ConstructorCallsOverridableMethod"/>
+
+    <!-- A-3 bestpractices: a loop variable reassigned inside the loop body, which makes the
+         loop's bounds implicit and is the hardest off-by-one to read in the layout / grid
+         routing algorithms. Hits: CloudLib 5 (CssTokenizer:93, Events:376,
+         FloatingPositioning:109, LeaderGridRouter:729, VanillaHudSampler:147), Nimbus 0. A warn
+         rather than an error because the reassignments are deliberate skip-a-step loops; the
+         `foreachReassign`/`forReassign` properties are the dial if this is ever promoted. -->
+    <rule ref="category/java/bestpractices.xml/AvoidReassigningLoopVariables"/>
+
+    <!-- ======================================================================================
+         FRAMEWORK - the two catalogue rules that stay warnings (severity warn)
+         See the THIRD SOURCE block in the header for why each one is not an error yet.
+         ====================================================================================== -->
+
+    <!-- A-11 Framework: a declared expose channel or kind must be registered in the same file.
+         Catalogue A-11. Per compilation unit, because that is the scope a PMD rule can see: an
+         ExposeChannel.of / ExposeLayerChannel.of / ExposeKind.of call is fine when it is the
+         argument of the matching registry's register(...), or when the file registers anything
+         through that registry at all. Otherwise the declared identity is one nobody can resolve,
+         and RuntimeExposeSession.channelOf finds no codec for it — serve() then returns false
+         without a word (RuntimeExposeSession.java:277-290).
+         Stock: 3 sites in CloudLib (BlockEntitySync.expose x2, BasicMenu.serve), 0 in Nimbus
+         (catalogue E-5). See the header for why they stay. The escape hatch is the marker
+         `framework-id-unregistered-ok` on the offending line, in the rule; PMD's own `// NOPMD`
+         works as well. -->
+    <rule name="FrameworkIdMustBeRegistered"
+          language="java"
+          message="A declared expose channel or kind must be registered in the same file"
+          class="dev.vfyjxf.cloudlib.pmd.rules.FrameworkIdMustBeRegisteredRule">
+        <description>
+            Reports an ExposeChannel.of, ExposeLayerChannel.of or ExposeKind.of declaration in a
+            compilation unit that never registers through the matching registry. Catalogue A-11.
+        </description>
+        <priority>3</priority>
+    </rule>
+
+    <!-- B-05 Framework: a consumer must not import dev.vfyjxf.cloudlib.internal.**.
+         Catalogue B-05. The internal subtree is an implementation package with no annotation to
+         mark it, so the boundary is the package name and only a consumer can cross it: CloudLib's
+         own references to its internals are legitimate, which is what the package test in the
+         XPath expresses.
+         Stock: 1 site, NimbusConfig.java:5 (catalogue E-6) — the import exists because the public
+         API has no way to persist the theme selection, so the fix belongs to CloudLib (catalogue
+         D-2.5) and the finding stays visible until then. -->
+    <rule name="NoInternalPackageReference"
+          language="java"
+          message="A consumer must not import dev.vfyjxf.cloudlib.internal"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports an import of dev.vfyjxf.cloudlib.internal.** from a compilation unit whose own
+            package is not dev.vfyjxf.cloudlib.**; CloudLib's internal references are exempt.
+            Catalogue B-05.
+        </description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportDeclaration[starts-with(@ImportedName, 'dev.vfyjxf.cloudlib.internal.')]
+  [not(ancestor::CompilationUnit/PackageDeclaration[starts-with(@Name, 'dev.vfyjxf.cloudlib')])]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+</ruleset>

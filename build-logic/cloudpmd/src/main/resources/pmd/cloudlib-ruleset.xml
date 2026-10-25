@@ -1,0 +1,1067 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ============================================================================================
+  CloudLib PMD 7 gate — ERROR ruleset (pmdMain).
+  ============================================================================================
+
+  Derived from the authoritative rule catalogue pmd-evidence/style-extraction/_catalog.md
+  (workspace root of CloudMods-Inworld). The catalogue, not this file, decides what is in here.
+
+  WHY THIS IS SPLIT IN TWO FILES
+    Gradle's `Pmd` task fails the build on *any* violation; it has no notion of severity and
+    `ignoreFailures` is all-or-nothing. The catalogue (section F-24) layers the rules into
+    "error" (build fails) and "warn" (report only), so the layering is implemented as two
+    rulesets driven by two tasks:
+      * pmd/cloudlib-ruleset.xml  (this file)  -> task `pmdMain`     -> ignoreFailures = false
+      * pmd/cloudlib-warnings.xml              -> task `pmdAdvisory` -> ignoreFailures = true
+    Both files ship inside the `cloudpmd` jar; the `dev.vfyjxf.cloudlib.pmd` plugin unpacks
+    them into the consuming build (there is deliberately no second copy among its resources).
+
+  SCOPE
+    `main` source sets only — src/test/java is out of the gate. File-level exclusions (the demo
+    screens) belong to the Gradle plugin's task configuration, not to this ruleset, so that the
+    ruleset stays reusable.
+
+  OWNERSHIP (see the catalogue's header)
+    A - build wiring and the placeholder this file replaces
+    B - the custom rule classes under dev.vfyjxf.cloudlib.pmd.rules
+    C - every rule below, and the two-file split
+    D - the existing sources listed in the catalogue's section E
+
+  RULE REFERENCES
+    Standard rules are referenced as <rule ref="category/java/<category>.xml/<RuleName>"/>;
+    their PMD message and description are kept as-is and an XML comment above each one carries
+    the catalogue id and the reason it is here. Inline rules (section B, and the two standard
+    rules PMD 7 removed — see below) state name/message/description themselves.
+
+  Everything under "[implementation check]" records what was verified against the real
+  PMD 7.28.0 artifacts while this file was written (pmd-java-7.28.0.jar category resources,
+  pmd-java-7.28.0-sources.jar, and `pmd` 7.28.0 run over probe sources).
+
+  ============================================================================================
+  RESOLVED [implementation check] ITEMS  (catalogue section F-20)
+  ============================================================================================
+   1. RegexpSinglelineJava (catalogue C-26) — DOES NOT EXIST in PMD 7.28.0. It is in no
+      category of pmd-java 7.28.0 and no class of that name is in the distribution; PMD 7
+      removed the regexp family (the PMD 7 migration guide lists no replacement). The
+      catalogue's fallback therefore applies: a custom rule that reads the source text
+      (dev.vfyjxf.cloudlib.pmd.rules.CjkTextRule, referenced below as `CjkText`). An XPath rule
+      cannot do this job:
+        * XPath sees only the AST, and PMD 7's Java AST has no comment nodes — which is where
+          every CJK occurrence in these projects lives;
+        * reading the file instead (`unparsed-text(pmd:fileName())`) only appeared to work from
+          a shell whose working directory happened to be the source directory. Under Gradle the
+          PMD worker's working directory is ~/.gradle/workers, PMD sets no static base URI, and
+          `pmd:fileName()` returns the bare file name, so every file failed to load.
+      The covered range and the `format` property name are the catalogue's; only the rule name
+      differs, because a class rule carrying a removed standard rule's name would mislead.
+      The catalogue's relaxed alternative `[^\x00-\x7F]` is NOT usable on these sources:
+      both projects use em dashes (U+2014) and arrows (U+2192) in javadoc throughout
+      (~300 files in CloudLib, ~240 in Nimbus), so banning non-ASCII would report them all.
+   2. IllegalImport (catalogue C-25) — DOES NOT EXIST in PMD 7.28.0 either (same evidence).
+      Implemented here as an inline XPath rule with the catalogue's rule name: the banned
+      imports are matched through ImportDeclaration/@ImportedName, which was verified to hold
+      the fully qualified name. The catalogue's warning holds — only the five specific
+      annotation types are banned, never the whole `org.jetbrains.annotations` package.
+   3. DoNotCallSystemExit (catalogue C-20) — removed in PMD 7; renamed to DoNotTerminateVM
+      (category/java/errorprone.xml). Confirmed in the PMD 7 migration guide ("errorprone.xml/
+      DoNotCallSystemExit (deleted) -> use DoNotTerminateVM") and in the 7.28.0 category file.
+   4. TypeParameterNamingConventions (catalogue C-06) — exists in codestyle; the PMD 6 name
+      `GenericsNaming` still exists but is deprecated. The catalogue's name is the right one.
+      Its single property is `typeParameterPattern`.
+   5. UnnecessaryImport (catalogue C-08) — exists in codestyle. `UnusedImports` is indeed gone.
+   6. InstantiableUtilityClass (catalogue C-22) — exists in design; it was named
+      `UseUtilityClass` before PMD 7.27.0 (the old name survives as a deprecated alias with no
+      properties). It has no configurable properties.
+   7. MethodNamingConventions violationSuppressXPath (catalogue C-03) — available; PMD applies
+      it at the violation node, so `self::MethodDeclaration[...]` works. Verified on a probe
+      source: an instance method named `BadName` is still reported while a PascalCase static
+      factory is not. The suppression is deliberately narrowed to PascalCase static methods
+      (`@Static = true() and matches(@Name, '^[A-Z]')`) rather than the catalogue's blanket
+      `self::*[@Static = true()]`, so ordinary static methods keep being checked — on both
+      projects that is equivalent (all 54 blueprint DSL entries are the PascalCase statics
+      the catalogue wanted exempted).
+   8. MutableStaticState (catalogue C-21) — exists in design, as an XPath rule; no properties.
+   9. PreserveStackTrace (catalogue C-24) and DanglingJavadoc (catalogue C-19) — the catalogue
+      files both under errorprone, but in 7.28.0 PreserveStackTrace is in
+      category/java/bestpractices.xml and DanglingJavadoc is in category/java/documentation.xml.
+      This file uses the real categories.
+  10. EmptyCatchBlock properties (catalogue C-18) — `allowCommentedBlocks` (Boolean, default
+      false) and `allowExceptionNameRegex` (Regex, default `^(ignored|expected)$`) both exist;
+      the defaults of the regex already match the catalogue, they are set explicitly anyway.
+  11. UnusedFormalParameter `checkAll` (catalogue C-17) — exists, Boolean, default false
+      (private methods only). Set explicitly in the warnings ruleset.
+  12. MissingOverride (catalogue C-11) — the class of false positive the catalogue worried about
+      was not observed: no record or anonymous-class site is reported. It was briefly a warning
+      (see resolved item 15) and returned to the error layer once its seven misses were annotated.
+  13. AvoidThrowingRawExceptionTypes default types (catalogue D-18) — the rule is excluded, so
+      the uncertainty is moot; recorded only in the excluded-rules list below.
+  14. CommentRequired / ProperLogger / NeedsBraces / OneDeclarationPerFile and the other D
+      names — excluded or non-existent, no reference is emitted for any of them.
+  15. Five rules that the catalogue's "current state" column calls clean were NOT clean once
+      PMD 7.28.0 actually ran over the two projects' main sources (C-04 `int W, int H`
+      parameters, C-05 `int R` locals, C-06 `F1`/`F2` type parameters, C-11 seven missing
+      @Override, B-04 PanelRuntime's mutable public `stabilization` field). Catalogue F-24 made
+      them warnings first; all their sites were then fixed (renames, annotations, and the field
+      moved behind an accessor), and the five rules now sit in THIS ruleset as errors. With
+      catalogue E-01..E-10 also landed, `pmdMain` over both projects is clean.
+  16. The 36 standard rules the sweep report grades S/A (see the second-source block below) were
+      each verified to fire, not just to load. The five with hits in these sources — InternalApiUsage
+      (Nimbus 2), OverrideBothEqualsAndHashCodeOnComparable (CloudLib 1), UnusedNullCheckInEquals
+      (Nimbus 4), TypeNameMismatch (CloudLib 21), UnnecessaryFullyQualifiedName (CloudLib 13 +
+      Nimbus 14) — proved themselves by reporting, and all their sites are now fixed or annotated.
+      The other 31 have no hit, so each was run against a compiling counter-example probe with the
+      real auxiliary classpath (including the two that need type resolution, RelianceOnDefaultCharset
+      and UseStandardCharsets, plus InvalidLogMessageFormat, UseTryWithResources,
+      MethodReturnsInternalArray, CollectionTypeMismatch, ConfusingArgumentToVarargsMethod,
+      SuspiciousOctalEscape, DoNotThrowExceptionInFinally and the rest): all 31 reported. The
+      0-hit rules are therefore a measured "clean", not a silent rule.
+
+  ============================================================================================
+  EXCLUDED ON PURPOSE — the catalogue's section D (38 entries)
+  ============================================================================================
+  These are NOT referenced anywhere, and because the rulesets never include a whole category
+  they need no <exclude> element. Listed here so the catalogue's decisions stay greppable.
+
+   D-01 ControlStatementBraces        - single-statement if/for without braces is the house
+                                        style (89 hits in one shard alone); would be noise.
+   D-02 LocalVariableCouldBeFinal     - the projects deliberately do not put `final` on locals.
+   D-03 MethodArgumentCouldBeFinal    - same, for parameters.
+   D-04 ShortVariable                 - default min=3 would hit thousands of x/y/w/h/i names.
+   D-05 ShortClassName                - would hit Pos/Rect/Size in api/math.
+   D-06 BooleanGetMethodName          - accessors are bare adjectives (visible(), hovered()).
+   D-07 UselessOverridingMethod       - the pure super.*() forwards in WidgetGroup/CompositeWidget
+                                        are intentional.
+   D-08 UnnecessaryThis               - constructors/setters always write `this.x = x;`.
+   D-09 UnnecessaryModifier           - nested types deliberately spell out `public static final`.
+   D-10 ForLoopCanBeForeach           - conflicts with the explicit-index loop style.
+   D-11 AvoidLiteralsInIfCondition    - the numeric literals in conditions are meaningful.
+   D-12 OneDeclarationPerLine         - coordinate pairs are deliberately declared on one line.
+   D-13 FieldDeclarationsShouldBeAtStartOfClass - constants are allowed to sit next to their use.
+   D-14 CommentDefaultAccessModifier  - package-private members are everywhere, the marker
+                                        comment is nowhere.
+   D-15 AvoidCatchingGenericException - the 27 broad catches sit on plugin/event isolation
+                                        boundaries on purpose.
+   D-16 AvoidCatchingThrowable        - the two `catch (Throwable)` sites are debug/dispatch
+                                        boundaries that log.
+   D-17 AvoidThrowingNullPointerException - api/text record constructors deliberately throw
+                                        NullPointerException (12 sites); the rule loses globally.
+   D-18 AvoidThrowingRawExceptionTypes - 5 `new RuntimeException(msg, cause)` are transport-
+                                        boundary wrappers that keep the cause; also the default
+                                        type set is unverified, but the rule is out either way.
+   D-19 AvoidUncheckedExceptionsInSignatures - unchecked exceptions are deliberately documented
+                                        in signatures.
+   D-20 ProperLogger                  - only recognises commons-logging and would hit the 12
+                                        string-based loggers plus `public static final Logger log`.
+   D-21 MoreThanOneLogger             - Debugs deliberately keeps two loggers.
+   D-22 DoNotUseThreads               - the named daemon file watcher and the ForkJoinPool are
+                                        intentional.
+   D-23 AvoidUsingVolatile            - the volatile snapshot fields are the hot-path design.
+   D-24 UseUnderscoresInNumericLiterals - the 100/50/10/5/0 priorities are readable as they are.
+   D-25 AtLeastOneConstructor / UnnecessaryConstructor / UncommentedEmptyConstructor -
+                                        conflicts with the 185 empty private constructors.
+   D-26 UseExplicitTypes              - `var` is used freely in both projects; neither banning
+                                        nor mandating it matches the current code.
+   D-27 AvoidStarImport               - cannot ban only the non-static wildcard; it would also
+                                        hit the three legitimate `import static ...*`. B-02
+                                        covers exactly the non-static case (warnings ruleset).
+   D-28 ExhaustiveSwitchHasDefault    - exhaustive enum switches are written inconsistently.
+   D-29 AvoidDuplicateLiterals        - the style-state vocabulary repeats by nature.
+   D-30 TodoComment                   - CloudLib has 20 TODO/FIXME, Nimbus 0 — no rule fits both.
+   D-31 CommentSize                   - the default 30/80 limits misfire on long javadoc.
+   D-32 CommentRequired               - javadoc coverage is 79.8% in CloudLib and 99.2% in
+                                        Nimbus, and PMD has no "public top-level types only" mode.
+   D-33 ClassWithOnlyPrivateConstructorsShouldBeFinal - would hit Events and PanelEventBus;
+                                        "concrete defaults to final" holds only ~82%.
+   D-34 TooManyStaticImports          - StyleWatcher has four static imports on purpose.
+   D-35 ExcessiveImports              - RichTextWidget (45) and others are already over 30.
+   D-36 TooManyMethods / TooManyFields / ExcessiveClassLength / ExcessiveMethodLength /
+        NcssCount / CyclomaticComplexity / CognitiveComplexity - SceneCanvas alone is 2316
+                                        lines; raising the limits until they pass means the rules
+                                        constrain nothing.
+   D-37 ExcessiveParameterList        - the shards contradict each other and record components are
+                                        not method parameters.
+   D-38 UncommentedEmptyMethodBody / DataClass / ImmutableField / SingularField /
+        LawOfDemeter / LooseCoupling / CouplingBetweenObjects / UseObjectForClearerAPI /
+        AvoidFieldNameMatchingMethodName - no shard evidence, and DataClass/ImmutableField would
+                                        misfire on Builder/record usage.
+
+  Not excluded but not referenced either: `NeedsBraces` (that is an Error Prone rule name, the
+  PMD equivalent is D-01 ControlStatementBraces), `OneDeclarationPerFile` (does not exist in
+  PMD 7), and `JUnit5TestShouldBePackagePrivate` (test sources only, and the gate runs main).
+
+  ============================================================================================
+  SECOND SOURCE — lint-tools-research/05-pmd-sweep.md (the S and A grades)
+  ============================================================================================
+  The catalogue left 288 of PMD 7.28.0's standard rules unreferenced. Those were then run over
+  both projects' main sources (`lint-tools-research/05-pmd-sweep.md`, with the aux classpath the
+  Gradle plugin supplies, so type-resolution rules really resolved) and graded: S = real-defect
+  rules whose current hit count is 0 or near 0, A = worth having once a handful of existing hits
+  are cleared. The rules below are that report's S and A picks that this file keeps as ERRORS;
+  the three it puts in the warning layer (S-2 UnusedAssignment, A-2
+  ConstructorCallsOverridableMethod, A-3 AvoidReassigningLoopVariables) live in
+  pmd/cloudlib-warnings.xml. Rule ids in the comments are the report's, not the catalogue's.
+  The report's B grade (the rules it recommends against, with its reasons) and its
+  "already duplicated by an existing rule" list are deliberately not referenced.
+  Category check: each ref below was verified against the real category file inside
+  lib/pmd-java-7.28.0.jar. The report's own per-hit table groups some rules under the category
+  of the rule they alias; where the real home differs, the comment says so.
+
+  ============================================================================================
+  THIRD SOURCE — pmd-evidence/framework-rules/_framework-catalog.md
+  ============================================================================================
+  The style catalogue never wrote down the framework's own usage contract. That contract is
+  pmd-evidence/framework-rules/_framework-catalog.md, which merged the eight fw-* shards into one
+  authority and lists eleven custom Java rules in its section A and five XPath rules in its
+  section B. This file keeps A-01..A-10 and B-01..B-04 as ERRORS; A-11
+  (FrameworkIdMustBeRegistered) and B-05 (NoInternalPackageReference) sit in
+  pmd/cloudlib-warnings.xml, because both still report against today's sources — the catalogue
+  measured three unregistered `ExposeChannel.of(...)` declarations (E-5) and one downstream import
+  of `cloudlib.internal` (E-6), and both remedies are framework-side work rather than call-site
+  discipline. The eleven rule classes live in dev.vfyjxf.cloudlib.pmd.rules and are referenced as
+  `<rule class="...">`; they need the auxiliary classpath the Gradle plugin already sets, because
+  FrameworkAnchors resolves a receiver through the type mirror first and falls back to the file's
+  single-type imports.
+
+  [implementation check] PMD 7.28.0 items resolved while writing the section-B XPath. Each was
+  verified with `pmd ast-dump` or a real `pmd check` run on 7.28.0 — and the first one is a
+  divergence from the catalogue's sketch, not a confirmation of it:
+   1. `ArgumentList`'s direct children ARE the argument expressions, so a position test must read
+      `ArgumentList/*[2][self::...]`. The catalogue's `ArgumentList/StringLiteral[1]` is WRONG: a
+      positional predicate on a *named* child means "the first child that is a StringLiteral", so
+      it happily matched `Namespace.of(Constants.namespace, "title")` — a literal in the SECOND
+      position. Measured on CloudLib's main sources, the naive form produced 13 false positives.
+   2. `Literal` is NOT an XPath node name in PMD 7.28.0: a rule using `self::Literal` silently
+      matches nothing. The concrete names are StringLiteral, NumericLiteral, BooleanLiteral,
+      CharLiteral and NullLiteral.
+   3. `(short) 0` parses as `CastExpression > NumericLiteral`, not as a literal, so a "do not write
+      the id" test has to accept both shapes. The catalogue's B-01 sketch has only the first, and
+      would therefore have missed exactly the shape its own unit-test note names.
+   4. A constructor call is `ConstructorCall` in PMD 7.28.0 — `AllocationExpression` no longer
+      exists; the constructed type is the node's first `ClassType` child.
+   5. `StringLiteral` carries both `@Image` (with the quotes) and `@ConstValue` (without them).
+      The section-B rules compare `@ConstValue`, which is why no quote juggling appears anywhere.
+   6. `pmd-java:typeIs(...)` on a MethodCall tests the call's RETURN type and on a ConstructorCall
+      the constructed type. Both were run over the two projects' real main sources with the Gradle
+      aux classpath and report exactly the sites the catalogue lists. A name that is not on the aux
+      classpath — B-03's Nimbus-only AttributeKey while CloudLib is being analysed, which cannot
+      see Nimbus — makes typeIs return false without failing the rule, so the one shared ruleset is
+      safe for both builds. Resolution is only available when the project's own compiled output is
+      on the classpath, which the plugin's `main.getOutput() + main.getCompileClasspath()` aux
+      classpath provides.
+   7. The catalogue's B-04 escape hatch is an inline `// namespace-ok` comment. XPath cannot see
+      comments in PMD 7 (see resolved item 1 in the style block above), so the escapes are PMD's
+      own, which the reporting layer applies to every rule: `// NOPMD` on the line, or
+      `@SuppressWarnings("PMD.<RuleName>")` on the enclosing declaration. B-05 needs no escape at
+      all: its CloudLib self-exemption is expressed in XPath as "the compilation unit's own package
+      is not dev.vfyjxf.cloudlib.**", so it needs no per-project file exclusion and the ruleset
+      stays reusable.
+
+  ============================================================================================
+  STOCK CLEARED BEFORE THE FRAMEWORK ERROR RULES WERE WIRED (catalogue section E)
+  ============================================================================================
+  The framework error rules went in only after their measured stock was cleared, so `pmdMain`
+  never went red for them:
+    E-1 DevToolsWindow.ToolBar.tick()      - super.tick() restored; without it the widget's
+                                             onTick listeners were permanently silent (A-01).
+    E-2 StoresPresenter.itemGroup()        - NimbusLang.Content.items.key() -> .get(), so the row
+                                             lands on KVRowWidget.of(Component, RichText) instead
+                                             of painting the bare key nimbus.content.items (A-02).
+    E-3 MenuProviderType.createId()        - `"provider_type"` was not this mod's namespace at all
+                                             (ids read provider_type:block_entity); now
+                                             Constants.namespace (B-04, a real bug).
+    E-4 Theme.stack / StyleLoader.standard - `"cloudlib"` literals replaced by Constants.namespace
+                                             so a modId change cannot drift (B-04).
+    E-8 UIStyle javadoc                    - the example taught `style.apply(widget.style())`, which
+                                             enters neither codeStyles nor the dirty flag and is
+                                             lost on the next theme refresh; it now shows
+                                             `useStyle` (catalogue D-2.2).
+    E-11 SceneManagement                   - the commented-out dead @EventBusSubscriber removed.
+  B-04's coverage also includes `new InworldGroup(...)`, which the catalogue records as an optional
+  extension. It found two more hardcoded namespaces in InworldProfile (now Constants.namespace) and
+  one deliberate sentinel in GroupFacet.none(): `"ungrouped"` is an identity no element declares,
+  never a mod namespace, so that single line carries a `// NOPMD` naming the reason rather than a
+  wrong `Constants.namespace`.
+-->
+<ruleset name="cloudlib-pmd"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+
+    <description>
+        CloudLib PMD 7 gate (error ruleset). A violation fails `pmdMain`. Derived from
+        pmd-evidence/style-extraction/_catalog.md and, for the S/A picks, from
+        lint-tools-research/05-pmd-sweep.md; the warnings layer lives in
+        pmd/cloudlib-warnings.xml and runs as `pmdAdvisory`.
+    </description>
+
+    <!-- ======================================================================================
+         A - custom rule classes (severity error), implemented in this project
+         ====================================================================================== -->
+
+    <!-- A-01: explicit `static final` fields and enum constants must be lowerCamelCase
+         (enum constants additionally allow underscores). Fields declared in an interface are
+         exempt because they are implicitly public static final. -->
+    <rule name="ConstantNaming"
+          language="java"
+          message="Constant names must be lowerCamelCase"
+          class="dev.vfyjxf.cloudlib.pmd.rules.ConstantNamingRule">
+        <description>
+            An explicitly `static final` field must match `constantPattern` and an enum constant
+            must match `enumConstantPattern`; fields declared inside an interface are exempt.
+            Single-letter upper-case constants such as `H` are reported.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-02: the imports of a compilation unit must be a monotonically non-decreasing three-rank
+         sequence (other types, then java./javax., then static imports), strictly sorted inside
+         each rank. Blank lines between groups are not checked (Spotless owns formatting). -->
+    <rule name="ImportOrder"
+          language="java"
+          message="Imports must be grouped (other types, java./javax., static) and sorted inside each group"
+          class="dev.vfyjxf.cloudlib.pmd.rules.ImportOrderRule">
+        <description>
+            Imports must appear in three ranks — non-`java.`/`javax.` non-static first, then
+            `java.`/`javax.`, then static — and each rank must be strictly increasing by fully
+            qualified name (`import static a.b.*` belongs to the static rank and is legal).
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-03: a dotted type name in code (`java.util.Map.Entry`) must become an import plus the
+         simple name. Javadoc and string literals are ignored, as are import/package lines,
+         package-info.java, uses that disambiguate a same-named type, and lines carrying the
+         `// fqn-ok` escape hatch. -->
+    <rule name="NoFullyQualifiedNames"
+          language="java"
+          message="Use an import plus the simple name instead of a fully qualified type name"
+          class="dev.vfyjxf.cloudlib.pmd.rules.FqnRule">
+        <description>
+            Reports dotted type references in code. Import and package declarations, javadoc,
+            string literals, `package-info.java`, uses that disambiguate an imported or declared
+            same-named type, and lines with `// fqn-ok` are exempt.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-04: a compilation unit without a type declaration (a package-info.java) must carry
+         @NullMarked, written either fully qualified or as an import plus the simple name.
+         Class-level and member-level @NullMarked are not checked. The "every package has a
+         package-info.java" half is a file-system check in the Gradle plugin, because PMD cannot
+         report a missing file. -->
+    <rule name="PackageNullMarked"
+          language="java"
+          message="A package-info.java must be annotated with @NullMarked"
+          class="dev.vfyjxf.cloudlib.pmd.rules.PackageNullMarkedRule">
+        <description>
+            A compilation unit that declares no type must carry @NullMarked, written as
+            `@org.jspecify.annotations.NullMarked` or as an import plus `@NullMarked`.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- ======================================================================================
+         B - inline XPath rules, severity error
+         ====================================================================================== -->
+
+    <!-- B-01: only arrow switch branches are allowed; a colon branch (`case X:` / `default:`)
+         is a violation. `SwitchFallthroughBranch` is the PMD 7.28.0 node that represents a
+         colon branch (verified with `pmd ast-dump`), so it needs no attribute test.
+         Catalogue F-19. An empty `default -> {}` stays legal. -->
+    <rule name="SwitchArrowOnly"
+          language="java"
+          message="Use an arrow switch branch; `case X:` and `default:` are not allowed"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports every colon-style switch branch. Arrow branches (`case X ->` / `default ->`)
+            are the only accepted form, in both statement and expression switches.
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//SwitchFallthroughBranch
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- B-05: annotations named NotNull / Nonnull / NonNull / CheckForNull are banned — JSpecify
+         has none of them, so matching on the name is safe. `Nullable` is deliberately absent:
+         it is the legitimate JSpecify type-use annotation, and its non-JSpecify origins are
+         caught by the banned-import rule below.
+         PMD 7.28.0 unifies the annotation AST into `Annotation` with @SimpleName (there is no
+         MarkerAnnotation/Name node any more — verified with `pmd ast-dump`), and @SimpleName
+         holds the last segment, so the fully qualified spelling is covered too. -->
+    <rule name="BannedNullabilityAnnotation"
+          language="java"
+          message="Use JSpecify @Nullable; @NotNull/@Nonnull/@NonNull/@CheckForNull are banned"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports the annotations NotNull, Nonnull, NonNull and CheckForNull. @Nullable is
+            allowed.
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//Annotation[
+    @SimpleName = 'NotNull'
+    or @SimpleName = 'Nonnull'
+    or @SimpleName = 'NonNull'
+    or @SimpleName = 'CheckForNull'
+  ]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- B-04: no public, non-final instance field. Promoted from the warnings ruleset after its
+         only hit was fixed: NimbusProjection .../internal/panel/PanelRuntime.java exposed the
+         mutable `stabilization` field, which is now private behind the stabilization() accessor —
+         every remaining public instance field in both projects is final, matching the Nimbus
+         convention F-05 documented. `FieldDeclaration` carries @Static and @Visibility but NO
+         @Final in PMD 7.28.0 (verified with `pmd ast-dump`) — finality lives on the VariableId,
+         hence `not(VariableDeclarator/VariableId[@Final = true()])`.
+         `dev.vfyjxf.cloudlib.api.math` stays exempt: FloatPos/MutablePos are deliberate mutable
+         value types. -->
+    <rule name="PublicNonFinalInstanceField"
+          language="java"
+          message="A public field must be final; use an accessor for mutable state"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports public instance fields that are not final. The `dev.vfyjxf.cloudlib.api.math`
+            package is exempt (deliberately mutable geometry values).
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//FieldDeclaration[
+    @Visibility = 'public'
+    and @Static = false()
+    and not(VariableDeclarator/VariableId[@Final = true()])
+  ]
+  [not(ancestor::CompilationUnit/PackageDeclaration[@Name = 'dev.vfyjxf.cloudlib.api.math'])]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- ======================================================================================
+         C - standard rules, severity error
+         ====================================================================================== -->
+
+    <!-- C-01 codestyle: package names are all lowercase. Default pattern, no override. -->
+    <rule ref="category/java/codestyle.xml/PackageCase"/>
+
+    <!-- C-02 codestyle: types are UpperCamelCase. Default, no override. -->
+    <rule ref="category/java/codestyle.xml/ClassNamingConventions"/>
+
+    <!-- C-03 codestyle: methods are lowerCamelCase. The blueprint DSL exposes PascalCase static
+         factories, so PascalCase static methods are suppressed (see resolved item 7 above);
+         everything else keeps the default check. Without the suppression this rule reports 54
+         entries. Catalogue C-03 (see resolved item 7 above). -->
+    <rule ref="category/java/codestyle.xml/MethodNamingConventions">
+        <properties>
+            <property name="violationSuppressXPath"
+                      value="self::MethodDeclaration[@Static = true() and matches(@Name, '^[A-Z]')]"/>
+        </properties>
+    </rule>
+
+    <!-- C-04 codestyle: formal parameters are lowerCamelCase. Promoted from the warnings ruleset
+         after its only hits were renamed (ScreenChromeTracer's `int W, int H` parameters). -->
+    <rule ref="category/java/codestyle.xml/FormalParameterNamingConventions"/>
+
+    <!-- C-05 codestyle: local variables are lowerCamelCase. Promoted from the warnings ruleset
+         after ContainerScan's `int R` scan-radius locals were renamed. -->
+    <rule ref="category/java/codestyle.xml/LocalVariableNamingConventions"/>
+
+    <!-- C-06 codestyle: type parameters are a single upper-case letter. Promoted from the
+         warnings ruleset after the `F1`/`F2` type parameters of api/unit were renamed to `F`/`T`.
+         `GenericsNaming` still exists but is deprecated. -->
+    <rule ref="category/java/codestyle.xml/TypeParameterNamingConventions"/>
+
+    <!-- C-07 codestyle: no dollar signs in names. -->
+    <rule ref="category/java/codestyle.xml/AvoidDollarSigns"/>
+
+    <!-- C-08 codestyle: no unused, duplicated or same-package imports. -->
+    <rule ref="category/java/codestyle.xml/UnnecessaryImport"/>
+
+    <!-- C-09 bestpractices: no System.out/err printing. Javadoc examples are AST-invisible, and
+         the demo screens that do print are excluded by the Gradle task. -->
+    <rule ref="category/java/bestpractices.xml/SystemPrintln"/>
+
+    <!-- C-10 bestpractices: no printStackTrace. -->
+    <rule ref="category/java/bestpractices.xml/AvoidPrintStackTrace"/>
+
+    <!-- C-11 bestpractices: overrides carry @Override. Promoted from the warnings ruleset after
+         the seven honest misses were annotated (Snapshot.value(), FlowDecoder.decode,
+         FlowEncoder.encode, CompositeWidget.tick, Widget.onEvent, BorderTexture.isEmpty,
+         CompositeTexture.isEmpty). The class of false positive the catalogue worried about
+         (records, anonymous classes) was never observed, so no suppression is used. -->
+    <rule ref="category/java/bestpractices.xml/MissingOverride"/>
+
+    <!-- C-18 errorprone: empty catch blocks must name the exception `ignored` (or `expected`)
+         or contain a comment. Both properties are set explicitly; the regex value is already
+         the PMD default. -->
+    <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+        <properties>
+            <property name="allowCommentedBlocks" value="true"/>
+            <property name="allowExceptionNameRegex" value="^(ignored|expected)$"/>
+        </properties>
+    </rule>
+
+    <!-- C-20 errorprone: no System.exit/Runtime.exit/Runtime.halt outside a main method.
+         The catalogue's name for this rule, `DoNotCallSystemExit`, was removed in PMD 7 and
+         renamed to `DoNotTerminateVM` (see resolved item 3 above). -->
+    <rule ref="category/java/errorprone.xml/DoNotTerminateVM"/>
+
+    <!-- C-21 design: no non-private non-final static fields. The five EventContexts factories
+         are the only current hits and must be made final (catalogue E-04). Catalogue F-16. -->
+    <rule ref="category/java/design.xml/MutableStaticState"/>
+
+    <!-- C-23 design: no `throws Exception` / `throws Throwable` in signatures. -->
+    <rule ref="category/java/design.xml/SignatureDeclareThrowsException"/>
+
+    <!-- C-25 errorprone, implemented inline: the standard `IllegalImport` was removed in PMD 7
+         (see resolved item 2 above), so the catalogue's banned import list is matched through
+         ImportDeclaration/@ImportedName. Only these five specific types are banned — the
+         `org.jetbrains.annotations` package as a whole stays legal, because @ApiStatus,
+         @Contract and @Unmodifiable are used widely. -->
+    <rule name="IllegalImport"
+          language="java"
+          message="Import a JSpecify annotation instead of this one"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Catalogue C-25. Bans the imports javax.annotation.Nullable, javax.annotation.Nonnull,
+            javax.annotation.CheckForNull, org.jetbrains.annotations.Nullable and
+            org.jetbrains.annotations.NotNull.
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//ImportDeclaration[
+    @ImportedName = 'javax.annotation.Nullable'
+    or @ImportedName = 'javax.annotation.Nonnull'
+    or @ImportedName = 'javax.annotation.CheckForNull'
+    or @ImportedName = 'org.jetbrains.annotations.Nullable'
+    or @ImportedName = 'org.jetbrains.annotations.NotNull'
+  ]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- C-26, implemented as a custom rule: no CJK text in a source file. The standard
+         `RegexpSinglelineJava` was removed in PMD 7 (see resolved item 1 above), so this follows
+         the catalogue's own fallback — a rule that reads the source text and matches line by
+         line. The catalogue's relaxed non-ASCII variant is unusable here: em dashes and arrows
+         appear in javadoc throughout both projects. -->
+    <rule name="CjkText"
+          language="java"
+          message="Source files must not contain CJK text"
+          class="dev.vfyjxf.cloudlib.pmd.rules.CjkTextRule">
+        <description>
+            Catalogue C-26. Reports every line of a source file that contains a CJK Unified
+            Ideograph (U+4E00..U+9FFF). A custom rule because PMD 7 removed RegexpSinglelineJava.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- ======================================================================================
+         S/A - the 05-pmd-sweep.md picks, severity error
+         ====================================================================================== -->
+
+    <!-- S-1 design (7.28.0 new): calling a member annotated `@ApiStatus.Internal` (or
+         `@VisibleForTesting`/`@TestOnly`) from outside its base package — the base package is the
+         first three segments, so `dev.vfyjxf.cloudlib` and `dev.vfyjxf.nimbus` are two bases and
+         this is the only mechanical enforcement of the CloudLib -> Nimbus `@ApiStatus.Internal`
+         boundary (catalogue F-23 leaves that gap to a GuardTest, which can only see import
+         prefixes, not annotations).
+         Hits: Nimbus 2, CloudLib 0. Neither has a public alternative — ExposeChannelRegistry is
+         the declaration sink and CloudShaders is the shader registry, both marked Internal on
+         purpose — so both sites carry `// NOPMD` naming the API they reach into. -->
+    <rule ref="category/java/design.xml/InternalApiUsage"/>
+
+    <!-- S-3 errorprone: a slf4j/log4j call whose `{}` placeholders do not match its argument
+         count — a silent logging downgrade (wrong text or a dropped stack trace) that neither
+         javac nor CI notices. Hits: 0 + 0. Needs the aux classpath to pick the right overload,
+         which the Gradle plugin already hands the task. -->
+    <rule ref="category/java/errorprone.xml/InvalidLogMessageFormat"/>
+
+    <!-- S-4 errorprone: equals/hashCode contract. `OverrideBothEqualsAndHashcode` (one without
+         the other) hits 0 + 0. `OverrideBothEqualsAndHashCodeOnComparable` hits CloudLib 1:
+         MergeablePerformer.PerformerEntry implements Comparable without either — the entry is
+         only ever held in a FastList sorted with `sort(PerformerEntry::compareTo)`, never in a
+         TreeSet/TreeMap, and same-priority entries are deliberately distinct, so the site is
+         annotated `// NOPMD` rather than given an identity-based equals/hashCode that would
+         change the sort's tie semantics. -->
+    <rule ref="category/java/errorprone.xml/OverrideBothEqualsAndHashcode"/>
+    <rule ref="category/java/errorprone.xml/OverrideBothEqualsAndHashCodeOnComparable"/>
+
+    <!-- S-5 bestpractices: array encapsulation. `ArrayIsStoredDirectly` hits Nimbus 1
+         (EnumOption stores the caller's `E[] universe` directly); its constructor now stores
+         `universe.clone()`. `MethodReturnsInternalArray` hits 0 + 0. Both were probe-verified
+         against the real classpath. -->
+    <rule ref="category/java/bestpractices.xml/ArrayIsStoredDirectly"/>
+    <rule ref="category/java/bestpractices.xml/MethodReturnsInternalArray"/>
+
+    <!-- S-6 errorprone: the inner loop of a nested `for` increments the OUTER loop's variable.
+         The projects keep explicit-index loops everywhere (catalogue D-10), so this is the
+         lock for that style's classic hand-slip. Hits: 0 + 0. -->
+    <rule ref="category/java/errorprone.xml/JumbledIncrementer"/>
+
+    <!-- S-7 multithreading: double-checked locking on a non-volatile field publishes a partially
+         constructed object. Probe-verified to report the broken shape and to leave the volatile
+         one alone, so 0 + 0 is a real signal. Does not conflict with D-23 (which is about
+         AvoidUsingVolatile, the opposite direction). -->
+    <rule ref="category/java/multithreading.xml/DoubleCheckedLocking"/>
+
+    <!-- S-8 errorprone: `B.equals(A)` where A was just proven non-null — the check is wasted and
+         B == null throws. Hits: Nimbus 4 (PointingService, LayoutInputs, TargetDwell x2), all
+         fixed by swapping the receiver. -->
+    <rule ref="category/java/errorprone.xml/UnusedNullCheckInEquals"/>
+
+    <!-- S-9 bestpractices: encoding. `RelianceOnDefaultCharset` (String.getBytes(), new
+         String(byte[]), FileReader/FileWriter) really breaks across Windows (GBK/CP1252) and
+         Linux/macOS (UTF-8); `UseStandardCharsets` wants StandardCharsets.UTF_8 instead of
+         Charset.forName("UTF-8"). Hits: 0 + 0, both probe-verified. -->
+    <rule ref="category/java/bestpractices.xml/RelianceOnDefaultCharset"/>
+    <rule ref="category/java/bestpractices.xml/UseStandardCharsets"/>
+
+    <!-- S-10 bestpractices: a resource closed by hand in `finally` should be try-with-resources
+         (correct suppression semantics). Deliberately precise where `CloseResource` is not: it
+         only reports a resource the code itself closes. Hits: 0 + 0. -->
+    <rule ref="category/java/bestpractices.xml/UseTryWithResources"/>
+
+    <!-- S-11 errorprone/design: the classic NPE / control-flow guard family. Every one of the 21
+         is a textbook deterministic defect, every one hits 0 + 0, and probe or semantic
+         verification confirmed it does report when fed a real counter-example. Free insurance.
+         `ImplicitSwitchFallThrough` doubles as the backstop for B-01 SwitchArrowOnly: if a PMD
+         upgrade ever renames `SwitchFallthroughBranch`, the colon switches it catches would still
+         be reported here. `UnusedReturnValue` (7.27.0 new) is the lock for the Snapshot/RichText
+         style of returning a new instance instead of mutating.
+         `AvoidRethrowingException` only reports a catch that rethrows its own exception
+         unchanged, so it does not collide with D-15's deliberate broad catches.
+         AvoidLosingExceptionInformation is left out on purpose: it is deprecated and its ability
+         already sits in the enabled PreserveStackTrace. -->
+    <rule ref="category/java/errorprone.xml/BrokenNullCheck"/>
+    <rule ref="category/java/errorprone.xml/MisplacedNullCheck"/>
+    <rule ref="category/java/errorprone.xml/EqualsNull"/>
+    <rule ref="category/java/errorprone.xml/ComparisonWithNaN"/>
+    <rule ref="category/java/errorprone.xml/ConfusingArgumentToVarargsMethod"/>
+    <rule ref="category/java/errorprone.xml/CollectionTypeMismatch"/>
+    <rule ref="category/java/errorprone.xml/ClassCastExceptionWithToArray"/>
+    <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
+    <rule ref="category/java/errorprone.xml/DoNotThrowExceptionInFinally"/>
+    <rule ref="category/java/errorprone.xml/UnconditionalIfStatement"/>
+    <rule ref="category/java/errorprone.xml/IdempotentOperations"/>
+    <rule ref="category/java/errorprone.xml/DontUseFloatTypeForLoopIndices"/>
+    <rule ref="category/java/errorprone.xml/LongLiteralEndingWithLowercaseL"/>
+    <rule ref="category/java/errorprone.xml/AvoidUsingOctalValues"/>
+    <rule ref="category/java/errorprone.xml/SuspiciousOctalEscape"/>
+    <rule ref="category/java/errorprone.xml/ImplicitSwitchFallThrough"/>
+    <rule ref="category/java/design.xml/AvoidThrowingNewInstanceOfSameException"/>
+    <rule ref="category/java/design.xml/AvoidRethrowingException"/>
+    <rule ref="category/java/errorprone.xml/UnusedReturnValue"/>
+    <rule ref="category/java/errorprone.xml/UseEqualsToCompareStrings"/>
+    <rule ref="category/java/errorprone.xml/UnnecessaryCaseChange"/>
+
+    <!-- A-1 bestpractices (7.28.0 new): a top-level type must match its file name AND the file's
+         directory must match its package. Hits: CloudLib 21, all fixed — the 19 sources of
+         `dev.vfyjxf.cloudlib.api.css` that sat one directory too deep (`api/css/css/**`) were
+         `git mv`-ed up into `api/css/` (package unchanged, so no import moved), and the two
+         extra top-level types (`EventChannelImpl`, `SimpleDraggableElement`) were split into
+         their own files. The report notes the (a) half conflicts with the catalogue's recorded
+         multi-top-level-type style; splitting was chosen over a file-level exclusion because the
+         alternative is the inbox file name being the only record of which type is the "real" one. -->
+    <rule ref="category/java/bestpractices.xml/TypeNameMismatch"/>
+
+    <!-- A-4 codestyle: a member already in scope (own static member, static import) written with
+         a redundant qualifier. This is the half of the house style that A-03
+         NoFullyQualifiedNames structurally cannot see: A-03 bans dotted *type* names, this bans
+         `Opcodes.ARETURN` / `Nimbus.logger`. Hits: CloudLib 13 + Nimbus 14, all fixed by
+         dropping the prefix. Does not collide with D-34 TooManyStaticImports — static wildcards
+         stay legal, only the redundant prefix goes. -->
+    <rule ref="category/java/codestyle.xml/UnnecessaryFullyQualifiedName"/>
+
+    <!-- A-5 codestyle: an empty control-statement body. Hits: CloudLib 1, the dead
+         `if (serializer == null) {}` in SerializerManager (the method throws
+         UnsupportedOperationException right after it), now removed. Empty catch blocks are NOT
+         in this rule's range — those belong to the enabled C-18 EmptyCatchBlock. -->
+    <rule ref="category/java/codestyle.xml/EmptyControlStatement"/>
+
+    <!-- ======================================================================================
+         FRAMEWORK A - custom rule classes (severity error)
+         Catalogue section A; the classes are framework-rule machinery, not style rules.
+         ====================================================================================== -->
+
+    <!-- A-01 Framework: an override of a @MustBeInvokedByOverriders method must call super of it.
+         Catalogue A-01. The annotation is CLASS-retained, so PMD cannot read it off the classpath;
+         the rule anchors on the (superclass, method) pairs the catalogue measured instead. The
+         legitimate counter-examples stay legal on purpose: BasicScreen.init() overrides the
+         Minecraft Screen method, not the annotated Widget one, and InspectController.tick() is not
+         on a Widget at all.
+         Stock: DevToolsWindow's inner ToolBar.tick() (catalogue E-1) never called super.tick(), so
+         the widget's onTick listeners were silent — `super.tick();` is now the body's first line
+         and this is a clean error rule. -->
+    <rule name="MustCallSuperOnAnnotatedOverride"
+          language="java"
+          message="An override of a @MustBeInvokedByOverriders method must call super of it"
+          class="dev.vfyjxf.cloudlib.pmd.rules.MustCallSuperOnAnnotatedOverrideRule">
+        <description>
+            Reports an @Override of tick(), collectInspectionInfo() or init() declared on a subtype
+            of Widget, CompositeWidget, WidgetGroup, BasicScreen or BasicMenuScreen whose body never
+            calls super of the same method. The annotated (superclass, method) pairs are the rule's
+            `annotatedMethods` property. Catalogue A-01.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-02 Framework: a LangEntry raw exit must not land in a text slot.
+         Catalogue A-02. Needs type resolution: the two projects contain 121 `.key()` calls and 91
+         of them belong to unrelated types (profile.key(), PanelRuntime.key(), StyleValue.key()), so
+         the rule keys on the receiver's static type being dev.vfyjxf.cloudlib.data.lang.LangEntry
+         and on the outer call not being a key position. Both directions of the same two-by-two
+         table are reported (`.key()` into a text slot, `.string()` out of a key slot).
+         Stock: StoresPresenter.itemGroup() (catalogue E-2) passed `NimbusLang.Content.items.key()`
+         to KVRowWidget.of, which selected the String overload and painted the bare key
+         nimbus.content.items on screen; it now calls `.get()` and lands on the Component overload.
+         The ten already-correct sibling sites in StoresPresenter and HarvestPresenter stay legal.
+         One false positive showed up that the catalogue did not list: RichText.of(LangEntry, args)
+         builds `new TranslatableNode(entry.key(), args)`, and TranslatableNode's first parameter is
+         documented as "the translation key" — its constructor is a key slot, so the raw key is
+         exactly right there. The rule's KEY_SINKS list has no TranslatableNode entry, so the site
+         carries a `// NOPMD` naming the reason rather than a rule change: widening that list is a
+         rule edit with its own regression test, not wire-up work, and narrowing detection until
+         the build goes green is what this gate must not do. -->
+    <rule name="LangKeyAsLiteralText"
+          language="java"
+          message="A LangEntry raw exit went into a slot that wants the other kind of string"
+          class="dev.vfyjxf.cloudlib.pmd.rules.LangKeyAsLiteralTextRule">
+        <description>
+            Reports a LangEntry key given where literal text is wanted (RichText.of, Builder.text,
+            KVRowWidget.of(String, ...), setText/setLabel/setTitle(String),
+            TextFieldWidget.setPlaceholder, SectionHeaderWidget.of) and a LangEntry translated value
+            given where a key is wanted (KeyMapping, OptionSpec, Component.translatable,
+            Builder.translatable, LangFile.add, Map#get). Catalogue A-02.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-03 Framework: a @PluginMarker class must be a shape AnnotationPluginLookup can build.
+         Catalogue A-03. Failing any clause means the lookup logs and drops the plugin, so the
+         plugin silently does not exist — the most expensive failure mode to debug.
+         Stock: 0 (all three @PluginMarker classes are conformant); this is a forward guard. The
+         inverse shape (a ModPlugin subtype without the marker) is reported too, with
+         NimbusEnginePlugin exempt because the entry point injects it by hand. -->
+    <rule name="PluginMarkerClassShape"
+          language="java"
+          message="@PluginMarker classes must be instantiable by AnnotationPluginLookup"
+          class="dev.vfyjxf.cloudlib.pmd.rules.PluginMarkerClassShapeRule">
+        <description>
+            A class annotated @PluginMarker must implement a ModPlugin subtype, must be public with
+            a public no-argument constructor (declaring none is fine), must be static when nested and
+            must not be abstract; a concrete ModPlugin subtype without the marker is reported as
+            well. The `exemptClasses` property lists the hand-injected entry-point plugins.
+            Catalogue A-03.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-04 Framework: a lifecycle listener must not read a mounted-gate accessor.
+         Catalogue A-04. Widget.mount() sets `lifecycle = mounted` only AFTER onMount returns, and
+         unmount() clears scene/context before onUnmount fires, so an unqualified scene()/context()/
+         path()/layout()/applyLayout()/needsLayout() read inside the listener throws
+         "Widget is not mounted!" 100% of the time. Deliberately exempt: nodeId() (assigned before
+         onMount), the listener's own scene/context/handle parameters, and qualified calls such as
+         handle.scene(); same-named methods on BasicScreen/SceneHandle are excluded by type
+         resolution rather than by name.
+         Stock: 0 across both projects — a forward guard on a hard runtime failure. -->
+    <rule name="NoMountedAccessorInLifecycleListener"
+          language="java"
+          message="A lifecycle listener reads a mounted-gate accessor of its own widget"
+          class="dev.vfyjxf.cloudlib.pmd.rules.NoMountedAccessorInLifecycleListenerRule">
+        <description>
+            Reports an unqualified call to scene(), context(), path(), layout(), applyLayout() or
+            needsLayout() on the enclosing widget from inside an onInit/onMount/onUnmount/onDestroy
+            listener body. Catalogue A-04.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-05 Framework: a registration handle must not escape its dispatch window.
+         Catalogue A-05. DispatchRegister closes itself after apply() and throws
+         IllegalStateException on any later use, so storing the handle — in a field, a static, an
+         async callback — is a guaranteed future crash. Transparent forwarding to a static helper in
+         the same file and the *Register implementation classes themselves stay legal.
+         Stock: 0 (no main field has a *Register type) — a forward guard on the first thing a
+         third-party integration gets wrong. -->
+    <rule name="RegisterHandleMustNotEscape"
+          language="java"
+          message="A registration handle must not survive the dispatch it belongs to"
+          class="dev.vfyjxf.cloudlib.pmd.rules.RegisterHandleMustNotEscapeRule">
+        <description>
+            Reports a *Register-typed parameter stored into a field, assigned to a field access, or
+            captured by a lambda handed to CompletableFuture/Executor/ForkJoinPool. Catalogue A-05.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-06 Framework: no call to the two unimplemented public API stubs.
+         Catalogue A-06. Widget.setDraggable(boolean) (Widget.java:1730) and Widgets.grid()
+         (Widgets.java:36) both throw UnsupportedOperationException("Not Implemented")
+         unconditionally. The rule carries a stub list rather than scanning for the exception
+         literal, because ItemHandlers/FluidHandlers throw from legitimate utility guards; drop an
+         entry from `stubs` when the stub is implemented.
+         Stock: 0 calls in either project — a forward guard. -->
+    <rule name="NoCallToUnimplementedStub"
+          language="java"
+          message="This call targets an unimplemented framework stub"
+          class="dev.vfyjxf.cloudlib.pmd.rules.NoCallToUnimplementedStubRule">
+        <description>
+            Reports a call to a public framework API that only throws
+            UnsupportedOperationException. The `stubs` property holds the owner/method pairs; the
+            two current entries are Widget#setDraggable and Widgets#grid. Catalogue A-06.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-07 Framework: a receive hook must apply, not set or load.
+         Catalogue A-07. Handle has three write modes: set is the server-authoritative change
+         (store + dirty + fire), apply is the client receive path (store + fire) and load is the NBT
+         path (store only). Passing handle::set into whenReceive echoes every received value back,
+         and handle::load makes the listener never fire — both silent.
+         Type resolution is what keeps this rule honest: AtomicReference::set and
+         ModConfigSpec.DoubleValue::set are same-named and must stay legal.
+         Stock: 0 — the four main-source receive hooks all pass handle::apply. -->
+    <rule name="ReceiveHookUsesApply"
+          language="java"
+          message="A receive hook must apply, not set or load"
+          class="dev.vfyjxf.cloudlib.pmd.rules.ReceiveHookUsesApplyRule">
+        <description>
+            Reports a method reference or lambda passed to whenReceive/whenReceiveFromClient that
+            calls Handle.set or Handle.load. handle::apply is the correct receive path. Catalogue
+            A-07.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-08 Framework: deserialization must not go through a Handle setter.
+         Catalogue A-08. Serialize.create(name, getter, setter, codec) with a Handle::set or
+         Handle::apply in the setter slot turns "load from disk" into "local change": the value is
+         marked dirty on load and every listener fires. The three-argument
+         Serialize.create(name, Handle, Codec) overload does handle::load internally. The rule fires
+         only on the four-argument overload, because a plain field's getter/setter pair is the
+         legitimate use of it.
+         Stock: 0 — both main calls (BasicSyncedBlockEntity.java:80,87) already use the Handle
+         overload. -->
+    <rule name="SerializeLoadsSilently"
+          language="java"
+          message="Serialize.create with a Handle must use the Handle overload, not a setter"
+          class="dev.vfyjxf.cloudlib.pmd.rules.SerializeLoadsSilentlyRule">
+        <description>
+            Reports a four-argument Serialize.create whose third argument is a Handle::set or
+            Handle::apply, or a lambda doing the same; use the (name, Handle, Codec) overload
+            instead. Catalogue A-08.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-09 Framework: unregister/isRegistered cannot match an inline listener.
+         Catalogue A-09. The event layer identifies listeners by reference equality, so
+         unregister(x -> {}) / unregister(this::m) / unregister(new X()) is a guaranteed no-op, and
+         a listener wrapped by registerManaged(listener, int) can never be removed by passing the
+         original back. Shape 1 has no legitimate exception at all, hence an error rule. The
+         receiver must resolve to EventDefinition/Event/EventChannel/EventHandler/SimpleEvent, so
+         AtomicReference::set and friends are not touched.
+         Stock: 0 — all 30+ call sites pass a stable reference, and registerManaged has no
+         main-source caller. -->
+    <rule name="ListenerUnregisterIdentity"
+          language="java"
+          message="The event layer identifies listeners by reference, and this call cannot match"
+          class="dev.vfyjxf.cloudlib.pmd.rules.ListenerUnregisterIdentityRule">
+        <description>
+            Reports an inline lambda, method reference or `new` expression passed to unregister/
+            isRegistered on the event layer, and an unregister of a raw listener that
+            registerManaged(listener, int) already wrapped. Catalogue A-09.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- A-10 Framework: an event definition must be evaluated exactly once.
+         Catalogue A-10. EventDefinitionImpl has no equals, and EventChannelImpl uses the definition
+         as a map key, so defining an event inside a method or lambda yields two mutually unrelated
+         events: the registration and the invoker never meet, silently. The result must therefore be
+         a type-body field initialiser (interface fields included).
+         Type anchoring is mandatory here: ModConfigSpec.Builder.define(String) has the same name
+         and the two projects call it 12 times in main; matching on the name alone would be all red.
+         Stock: 0 — all 45+ define() calls in main are field initialisers. -->
+    <rule name="EventDefinitionMustBeEvaluatedOnce"
+          language="java"
+          message="An event definition must be evaluated once, in a field initializer"
+          class="dev.vfyjxf.cloudlib.pmd.rules.EventDefinitionMustBeEvaluatedOnceRule">
+        <description>
+            Reports Events.define(...), Events.createGeneric(...), Event.create(...) and
+            SimpleEvent.create(...) evaluated inside a method, constructor or lambda body instead of
+            a field initialiser. Catalogue A-10.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- ======================================================================================
+         FRAMEWORK B - inline XPath rules (severity error)
+         Catalogue section B. The four error-layer rules below were each verified with real
+         `pmd ast-dump` output and a real `pmd check` run over both projects' main sources with the
+         Gradle aux classpath; B-05 is the fifth section-B rule and lives in
+         pmd/cloudlib-warnings.xml. See the THIRD SOURCE block in the header for the places where
+         PMD 7.28.0 differs from the catalogue's XPath sketch.
+         ====================================================================================== -->
+
+    <!-- B-01 Framework: the second argument of an Expose-family factory is a stream key.
+         Catalogue B-01. Expose.create / LayerExpose.create / ReversedOnly.create /
+         UnaryReversed.create take `short id`, which must come from management.nextId(): a written
+         constant collides with the Short.MIN_VALUE terminator (ExposeFrame.java:43) or makes the
+         receiving ExposeFrame.read look up the wrong entry. Only written literals are reported —
+         nextId(), an index from a table and any other expression pass, so the check is on the shape
+         the catalogue names.
+         Note the two shapes a "literal" has here: `(short) 0` is a CastExpression wrapping a
+         NumericLiteral, which is why the predicate accepts both (implementation check item 3).
+         Stock: 0 — every one of the 20 main-source factory calls passes nextId() or a table index.
+         Escape: `// NOPMD` on the line. -->
+    <rule name="ExposeIdMustComeFromNextId"
+          language="java"
+          message="An Expose id must come from management.nextId(), not a written constant"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports a call to Expose.create, LayerExpose.create, ReversedOnly.create or
+            UnaryReversed.create whose second argument is a written literal (a cast literal counts).
+            Catalogue B-01.
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//MethodCall[@MethodName = 'create']
+  [ArgumentList/*[2][self::StringLiteral or self::NumericLiteral or self::BooleanLiteral
+                     or self::CharLiteral or self::NullLiteral
+                     or self::CastExpression[NumericLiteral or CharLiteral or StringLiteral or BooleanLiteral]]]
+  [pmd-java:typeIs('dev.vfyjxf.cloudlib.api.network.expose.Expose')
+   or pmd-java:typeIs('dev.vfyjxf.cloudlib.api.network.expose.LayerExpose')
+   or pmd-java:typeIs('dev.vfyjxf.cloudlib.api.network.expose.ReversedOnly')
+   or pmd-java:typeIs('dev.vfyjxf.cloudlib.api.network.expose.UnaryReversed')]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- B-02 Framework: a StyleVar name must be a CSS custom property.
+         Catalogue B-02. StyleVar's constructor throws unless the name opens with a double hyphen
+         (StyleVar.java:47), and the factories run during class initialisation, so a malformed name
+         makes the whole holder class (InworldKeys and friends) fail to initialise — the exception
+         then surfaces as a render crash far from the cause.
+         The literal test compares @ConstValue, not @Image, so both quote styles are covered and no
+         quote juggling is needed (implementation check item 5). Only literal names are checked: a
+         name arriving as a variable or a parameter is left alone.
+         Stock: 0 — all 27 literal call sites in the two projects already carry the prefix.
+         Escape: `// NOPMD` on the line. -->
+    <rule name="StyleVarNameHasCustomPropertyPrefix"
+          language="java"
+          message="A StyleVar name must start with `--` (it is a CSS custom property)"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports a StyleVar factory call (of/color/number/integer/bool/ident/tokens/texture)
+            whose literal first argument does not start with `--`. Catalogue B-02.
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//MethodCall[@MethodName = ('of', 'color', 'number', 'integer', 'bool', 'ident', 'tokens', 'texture')]
+  [pmd-java:typeIs('dev.vfyjxf.cloudlib.api.ui.style.StyleVar')]
+  [ArgumentList/*[1][self::StringLiteral][not(starts-with(@ConstValue, '--'))]]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- B-03 Framework: an AttributeKey is an identity, so it must be a shared constant.
+         Catalogue B-03. AttributeKey compares by identity (AttributeKey.java:7) and the class
+         javadoc already asks for a static final constant; building one in place means the producer
+         and the consumer hold two keys that are never equal, so the read silently finds nothing.
+         The rule reports `of` calls outside a static final field initialiser. Interface fields need
+         no special case: PMD marks their VariableId final and static, so the same test passes
+         (verified with `pmd ast-dump`).
+         Stock: 0 — all 23 main-source calls are initialisers of PanelAttributes' public static
+         final constants, single-line and wrapped onto a continuation line alike.
+         Cross-project note: AttributeKey is a Nimbus type, so when this ruleset runs over CloudLib
+         the type is absent from the aux classpath and typeIs returns false — verified not to throw,
+         which is what lets one shared ruleset serve both builds. -->
+    <rule name="AttributeKeySharedConstant"
+          language="java"
+          message="An AttributeKey must be a static final constant shared by both sides"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports AttributeKey.of(...) outside a static final field initialiser: the key would
+            compare unequal to every other instance of the same name. Catalogue B-03.
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//MethodCall[@MethodName = 'of']
+  [pmd-java:typeIs('dev.vfyjxf.nimbus.api.panel.AttributeKey')]
+  [not(ancestor::FieldDeclaration[@Static = true() and VariableDeclarator/VariableId[@Final = true()]])]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- B-04 Framework: a namespace argument must come from a constant.
+         Catalogue B-04. A written namespace is either wrong outright or drifts the moment the mod
+         id changes; `minecraft` and `c` are exempt because they are the vanilla and common-tag
+         namespaces. Covered factories: ResourceLocation.fromNamespaceAndPath, the
+         ResourceLocation constructor, Namespace.of, and the InworldGroup namespace — the last one
+         because InworldGroup's first component is documented as "the owning namespace, typically
+         the mod id".
+         The three shapes live in one XPath union because they are three different node types
+         (implementation check item 4). Commands.literal("cloudlib") is deliberately NOT covered:
+         a command root name is a name, not a namespace.
+         Stock: 5 sites, all in CloudLib, all cleared — MenuProviderType.createId (E-3, a real bug:
+         the id came out as provider_type:block_entity), Theme.stack and StyleLoader.standard (E-4),
+         and InworldProfile's two InworldGroup namespaces (now Constants.namespace). One further hit
+         is a deliberate sentinel, GroupFacet.none()'s `"ungrouped"`, and carries a `// NOPMD`.
+         Escape: `// NOPMD` on the line (an inline comment escape cannot be read by XPath — see the
+         THIRD SOURCE block). -->
+    <rule name="NamespaceLiteralMustUseConstants"
+          language="java"
+          message="A namespace argument must come from Constants/CloudNamespaces, not a literal"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>
+            Reports ResourceLocation.fromNamespaceAndPath, `new ResourceLocation`, Namespace.of and
+            `new InworldGroup` given a written namespace other than `minecraft` or `c`. Catalogue
+            B-04.
+        </description>
+        <priority>1</priority>
+        <properties>
+            <property name="xpath">
+                <value><![CDATA[
+//MethodCall[@MethodName = 'fromNamespaceAndPath']
+  [pmd-java:typeIs('net.minecraft.resources.ResourceLocation')]
+  [ArgumentList/*[1][self::StringLiteral][not(@ConstValue = 'minecraft') and not(@ConstValue = 'c')]]
+| //MethodCall[@MethodName = 'of']
+    [pmd-java:typeIs('dev.vfyjxf.cloudlib.api.util.Namespace')]
+    [ArgumentList/*[1][self::StringLiteral][not(@ConstValue = 'minecraft') and not(@ConstValue = 'c')]]
+| //ConstructorCall
+    [pmd-java:typeIs('net.minecraft.resources.ResourceLocation')
+     or pmd-java:typeIs('dev.vfyjxf.cloudlib.api.ui.inworld.group.InworldGroup')]
+    [ArgumentList/*[1][self::StringLiteral][not(@ConstValue = 'minecraft') and not(@ConstValue = 'c')]]
+]]></value>
+            </property>
+        </properties>
+    </rule>
+
+</ruleset>

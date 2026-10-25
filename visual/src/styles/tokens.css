@@ -1,0 +1,257 @@
+/* ============================================================
+   NASA-punk Technical Visualization Suite — tokens v1.0
+   Normative source: visual/design/nasa-punk-spec.md §2, §3, §9.
+   No @font-face: system fallback chain only (§3.4).
+   ============================================================ */
+
+:root {
+  /* ---- surfaces / ink (paper) ---- */
+  --np-paper: #f2efe6;
+  --np-paper-deep: #e6e2d4;
+  --np-ink: #14160f;
+  --np-ink-muted: #5c5b50;
+
+  /* ---- lines ---- */
+  --np-grid: #c6c0ae;
+  --np-rule-soft: #b6af9c;
+  --np-rule: #7e7a6a;
+
+  /* ---- signal ---- */
+  --np-signal: #ff8200;
+  --np-signal-ink: #a84600;
+  --np-safety: #ffd100;
+  --np-ok-ink: #00683f;
+  --np-alert: #ce1126;
+  --np-alert-ink: #b30e20;
+  --np-caution: #0072ce;
+  --np-caution-ink: #005faf;
+  --np-warn-ink: #7a4e00;
+
+  /* ---- flat tints ---- */
+  --np-tint-signal: #f7e3cc;
+  --np-tint-safety: #f6edc6;
+  --np-tint-alert: #f0d8da;
+  --np-tint-caution: #d8e3ee;
+  --np-tint-ok: #d8e5da;
+  --np-tint-neutral: #e3dfd1;
+
+  /* ---- semantic aliases (components use these, not raw hues) ---- */
+  --np-bg: var(--np-paper);
+  --np-surface: var(--np-paper-deep);
+  --np-fg: var(--np-ink);
+  --np-fg-muted: var(--np-ink-muted);
+  --np-line: var(--np-rule);
+  --np-line-soft: var(--np-rule-soft);
+  --np-accent: var(--np-signal-ink);
+  --np-status-ok: var(--np-ok-ink);
+  --np-status-warn: var(--np-warn-ink);
+  --np-status-fail: var(--np-alert-ink);
+  --np-status-info: var(--np-caution-ink);
+  --np-status-unknown: var(--np-ink-muted);
+
+  /* ---- type ---- */
+  --np-font-display: "Inter", "Helvetica Neue", Helvetica, "Nimbus Sans", Arial,
+    "PingFang SC", "Noto Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --np-font-body: "Public Sans", "Inter", "Helvetica Neue", Helvetica, Arial,
+    "PingFang SC", "Noto Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --np-font-mono: "DM Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Noto Sans Mono CJK SC", "PingFang SC", monospace;
+
+  --np-fs-micro: 10px;
+  --np-lh-micro: 14px;
+  --np-tr-micro: 0.12em;
+  --np-fs-label: 11px;
+  --np-lh-label: 16px;
+  --np-tr-label: 0.08em;
+  --np-fs-body-s: 12px;
+  --np-lh-body-s: 18px;
+  --np-fs-body: 13px;
+  --np-lh-body: 20px;
+  --np-fs-body-l: 15px;
+  --np-lh-body-l: 24px;
+  --np-fs-title: 18px;
+  --np-lh-title: 24px;
+  --np-fs-h2: 22px;
+  --np-lh-h2: 28px;
+  --np-fs-h1: 28px;
+  --np-lh-h1: 32px;
+  --np-fs-readout: 32px;
+  --np-lh-readout: 32px;
+  --np-fs-display: 44px;
+  --np-lh-display: 44px;
+
+  /* ---- spacing / grid ---- */
+  --np-u: 4px;
+  --np-sp-1: 4px;
+  --np-sp-2: 8px;
+  --np-sp-3: 12px;
+  --np-sp-4: 16px;
+  --np-sp-6: 24px;
+  --np-sp-8: 32px;
+  --np-sp-12: 48px;
+  --np-sp-16: 64px;
+  --np-cols: 12;
+  --np-gutter: 16px;
+  --np-margin: 32px;
+  --np-sheet-max: 1440px;
+  --np-panel-header: 28px;
+  --np-header: 72px;
+  --np-footer: 32px;
+
+  /* ---- strokes / radius ---- */
+  --np-stroke-hair: 1px;
+  --np-stroke: 1.5px;
+  --np-stroke-heavy: 3px;
+  --np-radius: 0px;
+  --np-radius-chip: 2px;
+
+  /* ---- motion ---- */
+  --np-dur-fast: 120ms;
+  --np-dur: 200ms;
+  --np-dur-micro: 80ms;
+  --np-dur-state: 140ms;
+  --np-dur-panel: 220ms;
+  --np-dur-view: 320ms;
+  --np-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --np-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --np-ease-linear: linear;
+
+  --np-shadow: none;
+}
+
+[data-theme="crt"] {
+  --np-paper: #0a0d0a;
+  --np-paper-deep: #111711;
+  --np-void: #0a0d0a;
+  --np-void-deep: #111711;
+  --np-ink: #d6e6cc;
+  --np-ink-muted: #8c9c86;
+  --np-lit: #d6e6cc;
+  --np-lit-muted: #8c9c86;
+
+  --np-grid: #22301f;
+  --np-rule-soft: #2c3a29;
+  --np-rule: #546b4e;
+
+  --np-signal: #ff9a3c;
+  --np-signal-ink: #ff9a3c;
+  --np-safety: #ffd84d;
+  --np-phosphor: #4bff87;
+  --np-ok-ink: #4bff87;
+  --np-alert: #ff5a5a;
+  --np-alert-ink: #ff5a5a;
+  --np-caution: #4fb0ff;
+  --np-caution-ink: #4fb0ff;
+  --np-warn-ink: #ffc24d;
+
+  --np-tint-signal: #2a1b0c;
+  --np-tint-safety: #2a2212;
+  --np-tint-alert: #2a1315;
+  --np-tint-caution: #0e1d2c;
+  --np-tint-ok: #10241a;
+  --np-tint-neutral: #1a2118;
+
+  color-scheme: dark;
+}
+
+/* ---- reusable primitives ---- */
+
+.np-num {
+  font-family: var(--np-font-mono);
+  font-variant-numeric: tabular-nums slashed-zero;
+  font-feature-settings: "zero" 1;
+}
+
+.np-label {
+  font-family: var(--np-font-body);
+  font-size: var(--np-fs-label);
+  line-height: var(--np-lh-label);
+  font-weight: 500;
+  letter-spacing: var(--np-tr-label);
+  text-transform: uppercase;
+  color: var(--np-fg-muted);
+}
+
+.np-label-zh {
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--np-fg-muted);
+}
+
+.np-focusable:focus-visible {
+  outline: 1px solid var(--np-signal-ink);
+  outline-offset: 2px;
+}
+
+.np-hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--np-safety) 0 8px,
+    var(--np-ink) 8px 16px
+  );
+  border-block: 1px solid var(--np-ink);
+}
+
+.np-hatch-fail {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--np-alert) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.np-scanline {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 60;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--np-lit) 0 1px,
+    transparent 1px 3px
+  );
+  opacity: 0.05;
+}
+
+.np-scanline::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 100%;
+  border-top: 1px solid var(--np-lit);
+  animation: np-sweep 8s linear infinite;
+}
+
+@keyframes np-sweep {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  .np-scanline {
+    display: none;
+  }
+  .np-token,
+  .np-playback-fill,
+  .np-fold-bar-fill {
+    transition: none !important;
+  }
+}

@@ -1,0 +1,55 @@
+plugins {
+    id 'java-gradle-plugin'
+    id 'com.gradle.plugin-publish' version '1.3.1'
+}
+
+group = 'dev.vfyjxf'
+version = '0.1.0'
+description = 'Distributed yaml-based translation system for Minecraft mods'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.yaml:snakeyaml:2.2'
+    implementation 'com.diffplug.spotless:spotless-plugin-gradle:7.0.4'
+    compileOnly 'org.jspecify:jspecify:1.0.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+gradlePlugin {
+    website = 'https://github.com/vfyjxf/CloudLib'
+    vcsUrl = 'https://github.com/vfyjxf/CloudLib.git'
+    plugins {
+        cloudLang {
+            id = 'dev.vfyjxf.cloudlib.lang'
+            implementationClass = 'dev.vfyjxf.cloudlib.gradle.lang.CloudLangPlugin'
+            displayName = 'CloudLib CloudLang'
+            description = 'Distributed yaml translation system: per-locale multi-file yaml sources are packed into vanilla lang json at build time, together with a generated typed key class (configurable name, package and naming style).'
+            tags.set(['minecraft', 'neoforge', 'translation', 'lang', 'yaml'])
+        }
+        cloudStyle {
+            id = 'dev.vfyjxf.cloudlib.style'
+            implementationClass = 'dev.vfyjxf.cloudlib.gradle.style.CloudStylePlugin'
+            displayName = 'CloudLib Style'
+            description = 'Shared Spotless rules for CloudLib-family projects: the Eclipse JDT formatter (bundled profile, one parameter per line when a list wraps), import order, unused-import removal and the lowerCamelCase constant naming lint.'
+            tags.set(['style', 'spotless', 'formatting'])
+        }
+        cloudPmd {
+            id = 'dev.vfyjxf.cloudlib.pmd'
+            implementationClass = 'dev.vfyjxf.cloudlib.gradle.pmd.CloudPmdPlugin'
+            displayName = 'CloudLib PMD'
+            description = 'The CloudLib PMD 7 gate: PMD pinned to 7.28.0, the shared ruleset unpacked from the cloudpmd artifact (custom rules included) instead of PMD defaults, main sources only and generated sources excluded.'
+            tags.set(['pmd', 'static-analysis', 'quality'])
+        }
+    }
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
