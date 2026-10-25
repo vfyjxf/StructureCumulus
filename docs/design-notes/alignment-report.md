@@ -41,6 +41,8 @@
 
 ## 3. 需要你裁决的十二项
 
+> 本节是初版。K/L 复查后的裁定清单见 §8，以 §8 为准；本节的 D-1、D-4、D-5、D-7、D-8、D-11 都存在捆绑或不可写的选项。
+
 ### D-1 `base` 的边界与包图
 
 三个分片独立命中（A1/A4/A5、B-6、H-R1/H3）。文档说 `base` 不依赖任何包（`03` §3、`02` §2），但代码里 `base` 持有 `ReadScope`（其成员是 `ContextKey`、`EntityWindow`、`OccupantRef`）、`Outcome`、整个诊断模型和 `Locus` 族，并 import `space`/`occupant`/`context`。同时文档给 U9 一个不存在的包 `kernel.finding`。
@@ -244,7 +246,7 @@
 - §3 `ClaimView`（E D10）：改记录形态，补 `unavailable()` 与"不可用视图不持有行"。
 - §3 `ClaimSet`（E D15）：写明"按 `ClaimRow.ordered` 排序"，不是 `List.copyOf`。
 - §4.5 `ClaimLedger`（E D14）：补 `world()`、`release`；`23` §5 已有语义。
-- §4.8/§7 的 `SC-CLM` 表（E D4/E D6）：与 `13` 合一，见 D-13 之后的一节。
+- §4.8/§7 的 `SC-CLM` 表（E D4/E D6）：与 `13` 合一，见 §8 的 R12。
 - §5 参考草图（D15 相关）：`ClaimPlanner.derive(...).rows()` 与 `ClaimRow.ordered` 的调用顺序要能编译。
 
 ### `09-blueprints`
@@ -362,3 +364,139 @@
 - A6 说 `04` 的 `Budget.of(4_096, 64)` 不存在：`engine/Budget.java:14` 有 `static Budget of(int, int)`（〔已核〕）。成立的是归属问题，不是方法缺失。
 - A11 说 `UNREADABLE_CELL` 没有类型：它存在，位于 `predicate/Focuses.java:35`（〔已核〕），只是不叫 `Codes.UNREADABLE_CELL`。文档需要的是一个统一的码持有者，或改用 `FindingCode.of(...)`。
 - C-1 说文档的陈旧引用检测失去载体：方向相反，文档（R8）是对的，缺载体的是代码（`OccupantRef` 用 `InstanceId`，〔已核〕）。
+
+（这三条的措辞在 §8.4 里被推翻了两条，见下。）
+
+## 8. 复查后的裁定清单
+
+三份复查报告：`recheck-coverage.md`（J）、`recheck-k-consistency.md`（K）、`recheck-L.md`（L）。**本节取代 §3。**
+
+### 8.1 证据已经定下的，不需要你选
+
+| 项 | 结论 | 依据 |
+| --- | --- | --- |
+| `check` 是否发布上下文帧 | `check` 不发布；发布只属于 `settle` 或引擎的收尾步骤 | `19` R27、`I-10`、`G9` |
+| 内部舱位重叠 | 是缺陷，不是静默去重 | `I-10` 禁止静默覆盖、`D-4` |
+| `DecisionKind` 与 `Coverage` | 只留一个枚举 | `RULE-D2`、`F7` |
+| `PrescreenIndex`/`Census`/`AnchorCandidate`/`Fingerprint` | 删除（`11` §8 自己说被取代，代码没有） | `G12` |
+| `UndecidedReason` | 以 `01` 的八值为准，代码补 `LEDGER_UNAVAILABLE` | `G11`、L（该值已在 `01`） |
+| 两个二参 `Locus` 工厂 | 删除（无调用者） | `H-R5(A)`、L |
+| `SC-CTX-0109` | 只保留 draft 侧的异常通道 | `H-R3(A)`、L（draft 无法携带带标签的诊断） |
+| `anyOf()` 空子数组 | 要求 `n ≥ 1` | `RULE-D1(c)`、L（`atLeast` 不以异常拒绝） |
+| U6 `kernel.document` | 建包（不并入 `blueprint`） | `F1`、L |
+| `OccupantRef` | 带 `SnapshotId`，去掉 `footprint` | `19` R8 〔已核〕 |
+| `NestedView` 的粒度 | 不是完整 `WorldView`，按代码的 `NestedLevelSnapshot` | `C-14(b)` |
+
+L 另外指出四句引用需要改口径（方向不变）：`Reply.combine` 是包私有；`Bay.java` 里的 CHK/BAY 码是异常消息文本而非诊断；九个操作里实际存在的是三个（`check`、`derive`、`ledger`，`settle` 是 `check` 内的内联路径）；`20` §4.2 没有 `CaptureLimits`。
+
+### 8.2 需要你逐项定
+
+**R1 `Outcome` 与分层底座**（这是 D-1 的真正根，也是 K/L 都判错的那一处）
+
+〔已核〕`Outcome.Found(value, subjects: List<OccupantRef>, notes: FindingBundle)`、`Outcome.Missing(FindingBundle)`，位于 `base`；被 `predicate`(5 个文件)、`context`(6)、`spi`(1)、`engine`(4) 使用。于是 `Outcome` 必须位于 `OccupantRef` 与 `FindingBundle` 之上，而 `context`、`predicate` 又都在它之上。
+
+- (a) `Outcome` 移入 `kernel.finding`；`OccupantRef` 移入 `kernel.space`（它是 id + 坐标 + 种类，纯值）；`base` 回到 ids/`SourceSpan`/`Stage`/`Budget`/`CancelToken`。
+- (b) `Outcome` 移入 `kernel.occupant`；诊断值随之下沉到 `occupant`。
+- (c) 拆开：`base` 只有 `Maybe<T>`（无载荷），携带 subjects+notes 的 `FocusOutcome` 放在 `predicate`。
+- (d) 承认 `base` 是"值底座"：`OccupantRef`、`FindingBundle`、`Locus` 都进 `base`，删掉"不依赖任何包"，改为"只依赖 JDK"。
+
+建议 (a)。(b) 让诊断挂在占据物下，语义错位；(c) 会把一个结果类型拆成两个，所有调用点都要改；(d) 最小改动，但 `base` 会继续膨胀，且 `base→space` 的边仍在（`OccupantRef` 持有 `LatticePoint`/`Cuboid`）。
+
+**R2 `ReadScope` 的归属**（依赖 R1 的答案）
+
+〔已核〕`ReadScope(cells, keys: Set<ContextKey<?>>, entities: List<EntityWindow>)`，在 `base`，因此 `base→context`、`base→occupant`。R1(a) 之后它仍无处安放。
+
+- (a) 留在 `base` 并允许三分量（等于 R1(d)）。
+- (b) 移入 `kernel.context`，`context` 依赖 `space`/`occupant`，`predicate` 依赖 `context`。
+- (c) 拆成 `CellScope`/`KeyScope`/`WindowScope`，由 `predicate` 的 `Check.reads` 组合。
+
+建议 (b)：`ReadScope` 是读闭包，键是主分量，格子与窗口只是计量。
+
+**R3 阶段承载**（F2、H-R6、K 的合并项）
+
+- (a) 不要阶段：撤 `I-6`/`R-08` 的检查点说法，`expand()` 不带参数。
+- (b) 单元声明：撤回 `23` §7。
+- (c) 目录工厂声明：`Check`/`Computation`/`DerivationSpec` 无阶段，注册时给出，`expand(S)` 按目录分组。
+- (d) 由输出键的 tier 推导（`Deriver.tier()` 已有）。
+
+建议 (c)。若你不想保留"按阶段分组的计划"，选 (d) 并删 `expand(S)` 的参数。
+
+**R4 视图模型**（C-2/C-13）
+
+- (a) 区段模型为准，`06` 重写，补 `sectionOf(cell)` 与 `snapshotId()`。
+- (b) 逐格模型为准，代码与 `20`/`22` 大改。
+- (c) 两层并存，逐格作为区段的便捷外壳。
+
+建议 (a)。
+
+**R5 `OccupantRef` 的连锁**：确认 `SnapshotId` 补进代码（R8），并处理 L 指出的涟漪：`SnapshotId` 目前属于 `engine`，而 `occupant` 要用它，需下移到 `base` 或 `space`。
+
+**R6 捕获 SPI**（L 指出我的 D-7(a) 与 C-15(a) 相反）
+
+- (a) 以 `06` §3.4 三臂 `CaptureResult` 为准。
+- (b) 以 `16` §47/§64"返回快照+租约+issues"为准，改写 `06`。
+
+建议 (b)（L 推荐 C-15→`16`）：租约必须与快照同时产出，否则调用方要自己拼装。
+
+**R7 门面与端口**（原 D-8 的四问，分开答）
+
+- 端口：`Host` 唯一 + `create(Catalogs, ClaimLedger)` 重载，还是只有账本形态。
+- `derive`：文档形态（`Formed, List<DerivationSpec>, Budget`）还是代码形态（外加 `ContextStore`）。
+- `ContextKeys.register`：留在 `context` 并允许 `spi→context`，还是按 `15` 放到 `Catalogs.Builder`。
+- 缺失的五个操作（`document`、`compile`、`siting`、`solve`、`explain`）：列入迁移清单还是从门面删除。
+
+建议：`Host` 唯一加账本重载；`derive` 取文档形态；`register` 留 `context`；五个操作列入迁移。
+
+**R8 `LocusMap`**（B-1/B-2）：建（并定 `DEFINITION` 是否携带作者格子）或删（连同 `05`/`13` 的帧转换要求）。
+
+建议建，否则诊断无法在作者坐标与世界坐标之间换算。
+
+**R9 `Placement.inverse`**（B-3，L 修正了我的选项）
+
+(a) 限制定义域不可行：`MIN_XZ` 取反越界，合法摆放也可以没有逆。
+
+- (b) 把 §4.6 的定律改成"当 `inverse()` 非空时成立"。
+- (c) 让 `inverse` 返回 `Outcome`/`Optional`，强制调用方处理。
+
+建议 (b)：`@Nullable` 已在代码里，改文档最小；`(c)` 更安全但改动面大。
+
+**R10 `DecisionKind` 与 `Coverage` 合一**（L 注：会作废 `24` §9.1 第 1 条）
+
+(a) 只留 `Coverage`，值名为 `EVERY_CELL`/`ONE_SUBJECT`/`ANY_SUBJECT`；`Focus.decisionKind()` 删除或返回 `Coverage`。
+(b) 保留两个类型并规定映射。
+
+建议 (a)，同时修订 `24` §9.1 第 1 条。
+
+**R11 `Reply`**：密封族 + MATCH 备注通道 + 包私有的 `combine`；删 `Verdict`。
+
+**R12 码表与生产者**（初版遗漏的一项）
+
+- 谁拥有注册表：`13` 唯一，还是各族在自己的文件里。
+- DESIGN 期违规是异常还是诊断：`SC-DOC`/`SC-OCC`/`SC-RMD` 三族的现状互相矛盾。
+- 每个已分配码必须有且只有一个生产者；当前 `SC-OCC-01xx/02xx`、`SC-RMD-02xx–0601`、`SC-ENG-0104`、`SC-CTX-0202` 都没有。
+
+建议 `13` 唯一注册表，各族文件只引用；DESIGN 期一律异常（`IAE`/`ISE`），SETTLE 期一律诊断。
+
+**R13 U10 修葺的归属**（J 发现）：补一个分片审 `14` 与 `22` §11–§15，或在文档里明确标注"未建、不参与重生成"。
+
+**R14 设计面文档的接收方**（J 发现，初版缺失）：`00` 的 I-4/I-10 与代码相反；`22` §11.1 九族 vs 十五族；`19` 有 12 条 R 记录无人审、其中 R16/R29 与代码树矛盾；`guide.zh`、`README.md`、`_translation-guide` 各有多处失真。这些要一并修，否则重生成后文档仍会误导。
+
+### 8.3 覆盖缺口（均需补审或明确排除）
+
+- `14-remedies.md`（U10）无主：约 20 个类型、十条试运行规则、七种编辑未与代码对照；`22` §11.2/§11.3/§12/§13/§14/§15 无人读。
+- `RMD` 码表：`14` 提议 `0201–0206`/`0301–0309`/`0401–0404`/`0601`，`13` 只登记 `0001` 与 `0309`；`0206` 被用却不在自己的区间。
+- `00` 的表未按表审：`I-4`、`I-10` 与代码相反；`I-5`/`R-04` 提到无载体的 `OrientationPolicy`/`AnchorCandidate`；`_index.md` 的门禁 2 与 4 不可满足。
+- `19` 的 12 条未审 R 记录；`R16`（仍写 `StructureKernel.match`）、`R29`（`MatchCompletion` 无代码）与代码树矛盾。
+- `docs/guide.zh.md`（新人入口，零分片读过）约十处失真，包括"31 个编译错误 / 测试应保持红"与实测 162 测试 0 失败相反。
+- `docs/README.md:21` 指向不存在的适配器目录；`:26-27` 的"没有差距台账"与源码里的三处缺口标记矛盾。
+- `zh/_translation-guide.md` §3 说不变量止于 I-15，而 `00` 已有 I-16。
+
+### 8.4 我上一版附录的三处，两处纠错纠反
+
+- A6 的原话是"`04` §7 要求 `Budget` 由 U0 提供，而唯一的 `Budget` 是 `engine` 的请求级类型"，不是"`Budget.of` 不存在"。我的"纠正"打错了靶。
+- A11 的原话是"`Codes` 只在 `15-spi.md:32` 声明、词汇表无行，所以 `04` §11.1 的自检失败"，不是"`UNREADABLE_CELL` 没有实现"。我答的常量存在与否，不是它问的问题。
+- C-1 那条方向正确：文档（R8）对，代码缺载体。
+
+### 8.5 被我在上一版丢掉、仍然有效的条目
+
+`A3`（`claim` 缺 `finding` 依赖）、`A8`（`Checks` 不在内核类路径）、`A10`（`Finding` 例外于"值类型"规则）、`C-6`/`C-8`/`C-9`/`C-10`/`C-11`（占据物过滤、`Refused` 记录、枚举常量数、`contentDigest`、覆盖格的读状态）、`E RULE-2`/`RULE-3`（自洽检查与修订校验的先后、重叠诊断的产出者）、`F9`/`F10`（`Overlap` 的位置、重复键的生产者）、`G15`（`InstanceBudget` 的位置）、`H14`/`H15`（`at(tier)` 的语义、`ContextKeys` 与 `SC-CTX-0102`）、`I` 的 U6/U10 单元表行。逐条见九个分片报告。
