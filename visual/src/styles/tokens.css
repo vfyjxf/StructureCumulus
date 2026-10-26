@@ -1,257 +1,96 @@
-/* ============================================================
-   NASA-punk Technical Visualization Suite — tokens v1.0
-   Normative source: visual/design/nasa-punk-spec.md §2, §3, §9.
-   No @font-face: system fallback chain only (§3.4).
-   ============================================================ */
-
 :root {
-  /* ---- surfaces / ink (paper) ---- */
-  --np-paper: #f2efe6;
-  --np-paper-deep: #e6e2d4;
-  --np-ink: #14160f;
-  --np-ink-muted: #5c5b50;
-
-  /* ---- lines ---- */
-  --np-grid: #c6c0ae;
-  --np-rule-soft: #b6af9c;
-  --np-rule: #7e7a6a;
-
-  /* ---- signal ---- */
-  --np-signal: #ff8200;
-  --np-signal-ink: #a84600;
-  --np-safety: #ffd100;
-  --np-ok-ink: #00683f;
-  --np-alert: #ce1126;
-  --np-alert-ink: #b30e20;
-  --np-caution: #0072ce;
-  --np-caution-ink: #005faf;
-  --np-warn-ink: #7a4e00;
-
-  /* ---- flat tints ---- */
-  --np-tint-signal: #f7e3cc;
-  --np-tint-safety: #f6edc6;
-  --np-tint-alert: #f0d8da;
-  --np-tint-caution: #d8e3ee;
-  --np-tint-ok: #d8e5da;
-  --np-tint-neutral: #e3dfd1;
-
-  /* ---- semantic aliases (components use these, not raw hues) ---- */
-  --np-bg: var(--np-paper);
-  --np-surface: var(--np-paper-deep);
-  --np-fg: var(--np-ink);
-  --np-fg-muted: var(--np-ink-muted);
-  --np-line: var(--np-rule);
-  --np-line-soft: var(--np-rule-soft);
-  --np-accent: var(--np-signal-ink);
-  --np-status-ok: var(--np-ok-ink);
-  --np-status-warn: var(--np-warn-ink);
-  --np-status-fail: var(--np-alert-ink);
-  --np-status-info: var(--np-caution-ink);
-  --np-status-unknown: var(--np-ink-muted);
-
-  /* ---- type ---- */
-  --np-font-display: "Inter", "Helvetica Neue", Helvetica, "Nimbus Sans", Arial,
-    "PingFang SC", "Noto Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --np-font-body: "Public Sans", "Inter", "Helvetica Neue", Helvetica, Arial,
-    "PingFang SC", "Noto Sans SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --np-font-mono: "DM Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
-    "Noto Sans Mono CJK SC", "PingFang SC", monospace;
-
-  --np-fs-micro: 10px;
-  --np-lh-micro: 14px;
-  --np-tr-micro: 0.12em;
-  --np-fs-label: 11px;
-  --np-lh-label: 16px;
-  --np-tr-label: 0.08em;
-  --np-fs-body-s: 12px;
-  --np-lh-body-s: 18px;
-  --np-fs-body: 13px;
-  --np-lh-body: 20px;
-  --np-fs-body-l: 15px;
-  --np-lh-body-l: 24px;
-  --np-fs-title: 18px;
-  --np-lh-title: 24px;
-  --np-fs-h2: 22px;
-  --np-lh-h2: 28px;
-  --np-fs-h1: 28px;
-  --np-lh-h1: 32px;
-  --np-fs-readout: 32px;
-  --np-lh-readout: 32px;
-  --np-fs-display: 44px;
-  --np-lh-display: 44px;
-
-  /* ---- spacing / grid ---- */
-  --np-u: 4px;
-  --np-sp-1: 4px;
-  --np-sp-2: 8px;
-  --np-sp-3: 12px;
-  --np-sp-4: 16px;
-  --np-sp-6: 24px;
-  --np-sp-8: 32px;
-  --np-sp-12: 48px;
-  --np-sp-16: 64px;
-  --np-cols: 12;
-  --np-gutter: 16px;
-  --np-margin: 32px;
-  --np-sheet-max: 1440px;
-  --np-panel-header: 28px;
-  --np-header: 72px;
-  --np-footer: 32px;
-
-  /* ---- strokes / radius ---- */
-  --np-stroke-hair: 1px;
-  --np-stroke: 1.5px;
-  --np-stroke-heavy: 3px;
-  --np-radius: 0px;
-  --np-radius-chip: 2px;
-
-  /* ---- motion ---- */
-  --np-dur-fast: 120ms;
-  --np-dur: 200ms;
-  --np-dur-micro: 80ms;
-  --np-dur-state: 140ms;
-  --np-dur-panel: 220ms;
-  --np-dur-view: 320ms;
-  --np-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --np-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
-  --np-ease-linear: linear;
-
-  --np-shadow: none;
+  --paper: #f1ecdf;
+  --paper-2: #e7e0d0;
+  --paper-3: #d9d1bf;
+  --panel: #f7f3e9;
+  --panel-2: #eee8db;
+  --ink: #141719;
+  --ink-2: #34383a;
+  --muted: #6d6a60;
+  --faint: #989284;
+  --line: rgba(20, 23, 25, 0.14);
+  --line-mid: rgba(20, 23, 25, 0.3);
+  --line-strong: rgba(20, 23, 25, 0.66);
+  --accent: #d4482c;
+  --accent-ink: #a62f1a;
+  --accent-soft: #f0d8cd;
+  --blue: #2450c4;
+  --blue-soft: #d9e0f3;
+  --green: #1d7357;
+  --green-soft: #d5e4db;
+  --ochre: #a8751b;
+  --ochre-soft: #efe3c3;
+  --stone: #b7b1a2;
+  --stone-deep: #918b7c;
+  --air: #d4e2dc;
+  --fire: #df6538;
+  --cube-stone-top: #b9b3a4;
+  --cube-stone-left: #918b7c;
+  --cube-stone-right: #a29c8c;
+  --cube-air-top: #d8e7e0;
+  --cube-air-left: #aac8be;
+  --cube-air-right: #c1d9d0;
+  --cube-fire-top: #e36b3d;
+  --cube-fire-left: #b64c27;
+  --cube-fire-right: #cc5a31;
+  --code-bg: #171b1d;
+  --code-ink: #e9e4d7;
+  --code-muted: #8e968f;
+  --scene: #171b1c;
+  --scene-2: #202628;
+  --scene-ink: #eee8da;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  --rail: 238px;
+  --max: 1320px;
+  --shadow: 0 24px 70px rgba(20, 23, 25, 0.1);
+  --shadow-soft: 0 8px 24px rgba(20, 23, 25, 0.06);
+  color-scheme: light;
 }
 
-[data-theme="crt"] {
-  --np-paper: #0a0d0a;
-  --np-paper-deep: #111711;
-  --np-void: #0a0d0a;
-  --np-void-deep: #111711;
-  --np-ink: #d6e6cc;
-  --np-ink-muted: #8c9c86;
-  --np-lit: #d6e6cc;
-  --np-lit-muted: #8c9c86;
-
-  --np-grid: #22301f;
-  --np-rule-soft: #2c3a29;
-  --np-rule: #546b4e;
-
-  --np-signal: #ff9a3c;
-  --np-signal-ink: #ff9a3c;
-  --np-safety: #ffd84d;
-  --np-phosphor: #4bff87;
-  --np-ok-ink: #4bff87;
-  --np-alert: #ff5a5a;
-  --np-alert-ink: #ff5a5a;
-  --np-caution: #4fb0ff;
-  --np-caution-ink: #4fb0ff;
-  --np-warn-ink: #ffc24d;
-
-  --np-tint-signal: #2a1b0c;
-  --np-tint-safety: #2a2212;
-  --np-tint-alert: #2a1315;
-  --np-tint-caution: #0e1d2c;
-  --np-tint-ok: #10241a;
-  --np-tint-neutral: #1a2118;
-
+[data-theme="night"] {
+  --paper: #101416;
+  --paper-2: #171d1f;
+  --paper-3: #21282a;
+  --panel: #171d20;
+  --panel-2: #1d2427;
+  --ink: #ebe5d7;
+  --ink-2: #c9c3b5;
+  --muted: #989487;
+  --faint: #76786f;
+  --line: rgba(235, 229, 215, 0.12);
+  --line-mid: rgba(235, 229, 215, 0.26);
+  --line-strong: rgba(235, 229, 215, 0.6);
+  --accent: #ff6b45;
+  --accent-ink: #ff8b6b;
+  --accent-soft: #3a221c;
+  --blue: #7b93ff;
+  --blue-soft: #1b2544;
+  --green: #58c39b;
+  --green-soft: #153128;
+  --ochre: #e1b35c;
+  --ochre-soft: #332915;
+  --stone: #4a5150;
+  --stone-deep: #6a716e;
+  --air: #1f4644;
+  --fire: #ff6f3d;
+  --cube-stone-top: #4d5553;
+  --cube-stone-left: #303736;
+  --cube-stone-right: #3e4644;
+  --cube-air-top: #2a5d58;
+  --cube-air-left: #163c39;
+  --cube-air-right: #1e4b47;
+  --cube-fire-top: #ff6f3d;
+  --cube-fire-left: #b63c1c;
+  --cube-fire-right: #d5532c;
+  --code-bg: #0a0d0e;
+  --code-ink: #e9e4d7;
+  --code-muted: #77827c;
+  --scene: #0b0f10;
+  --scene-2: #141a1b;
+  --scene-ink: #e9e4d7;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.28);
   color-scheme: dark;
-}
-
-/* ---- reusable primitives ---- */
-
-.np-num {
-  font-family: var(--np-font-mono);
-  font-variant-numeric: tabular-nums slashed-zero;
-  font-feature-settings: "zero" 1;
-}
-
-.np-label {
-  font-family: var(--np-font-body);
-  font-size: var(--np-fs-label);
-  line-height: var(--np-lh-label);
-  font-weight: 500;
-  letter-spacing: var(--np-tr-label);
-  text-transform: uppercase;
-  color: var(--np-fg-muted);
-}
-
-.np-label-zh {
-  font-size: 11px;
-  line-height: 18px;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--np-fg-muted);
-}
-
-.np-focusable:focus-visible {
-  outline: 1px solid var(--np-signal-ink);
-  outline-offset: 2px;
-}
-
-.np-hatch {
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--np-safety) 0 8px,
-    var(--np-ink) 8px 16px
-  );
-  border-block: 1px solid var(--np-ink);
-}
-
-.np-hatch-fail {
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--np-alert) 0 4px,
-    transparent 4px 8px
-  );
-}
-
-.np-scanline {
-  position: fixed;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 60;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--np-lit) 0 1px,
-    transparent 1px 3px
-  );
-  opacity: 0.05;
-}
-
-.np-scanline::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 100%;
-  border-top: 1px solid var(--np-lit);
-  animation: np-sweep 8s linear infinite;
-}
-
-@keyframes np-sweep {
-  from {
-    transform: translateY(-100%);
-  }
-  to {
-    transform: translateY(100%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    animation-delay: 0ms !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0ms !important;
-    scroll-behavior: auto !important;
-  }
-  .np-scanline {
-    display: none;
-  }
-  .np-token,
-  .np-playback-fill,
-  .np-fold-bar-fill {
-    transition: none !important;
-  }
 }

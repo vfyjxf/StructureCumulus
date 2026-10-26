@@ -1,266 +1,207 @@
-import { useEffect, useState } from 'react';
-import { PAGES } from './data/pages';
-import type { PageId } from './data/types';
-import { HeaderBlock } from './components/HeaderBlock';
-import { FooterBlock } from './components/FooterBlock';
-import { TabNav } from './components/TabNav';
-import { Segmented } from './components/Controls';
-import { PatternDefs } from './components/Diagram';
-import { ExplainProvider, useExplain } from './components/ExplainDrawer';
-import { LangProvider, useLang, useT } from './i18n/LangContext';
-import type { Lang } from './i18n/dict';
-import { OverviewView } from './views/Overview';
-import { MissionView } from './views/Mission';
-import { SpaceView } from './views/Space';
-import { AuthoringView } from './views/Authoring';
-import { AnatomyView } from './views/Anatomy';
-import { VoxelView } from './views/Voxel';
-import { SliceView } from './views/Slice';
-import { PredicatesView } from './views/Predicates';
-import { ContextView } from './views/ContextView';
-import { PipelineView } from './views/Pipeline';
-import { ClaimsView } from './views/Claims';
-import { ResultsView } from './views/Results';
-import { GlossaryView } from './views/Glossary';
+import { useCallback, useEffect, useState } from 'react';
+import { NAV, type ModuleId, type SectionId } from './data/site';
+import { Hero } from './components/Hero';
+import { CommandPalette } from './components/CommandPalette';
+import { Thesis } from './sections/Thesis';
+import { Lattice } from './sections/Lattice';
+import { ObjectModel } from './sections/ObjectModel';
+import { Workbench } from './sections/Workbench';
+import { Ledger } from './sections/Ledger';
+import { Fold } from './sections/Fold';
+import { CodeAtlas } from './sections/CodeAtlas';
+import { Proof } from './sections/Proof';
 
-type Palette = 'print' | 'crt';
+type Theme = 'paper' | 'night';
 
-const VIEWS: Record<PageId, () => React.JSX.Element> = {
-  overview: OverviewView,
-  mission: MissionView,
-  space: SpaceView,
-  authoring: AuthoringView,
-  anatomy: AnatomyView,
-  voxel: VoxelView,
-  slice: SliceView,
-  predicates: PredicatesView,
-  context: ContextView,
-  pipeline: PipelineView,
-  claims: ClaimsView,
-  results: ResultsView,
-  glossary: GlossaryView,
-};
-
-const isLang = (value: string | null): value is Lang => value === 'zh' || value === 'en';
-
-const pageFromLocation = (): PageId => {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get('page') ?? window.location.hash.replace('#', '');
-    if (PAGES.some((page) => page.id === id)) return id as PageId;
-  } catch {
-    /* file:// has no search params */
-  }
-  return 'overview';
-};
-
-const initialLang = (): Lang => {
-  try {
-    const param = new URLSearchParams(window.location.search).get('lang');
-    if (isLang(param)) return param;
-    const stored = window.localStorage.getItem('structurecumulus.lang');
-    if (isLang(stored)) return stored;
-  } catch {
-    /* storage is optional */
-  }
-  return 'zh';
-};
+const isSection = (value: string | null): value is SectionId => NAV.some((entry) => entry.id === value);
 
 export default function App() {
-  const [palette, setPalette] = useState<Palette>('print');
-  const [active, setActive] = useState<PageId>(pageFromLocation);
-  const [lang, setLangState] = useState<Lang>(initialLang);
+  const [active, setActive] = useState<SectionId>('thesis');
+  const [theme, setTheme] = useState<Theme>('paper');
+  const [palette, setPalette] = useState(false);
+  const [moduleFocus, setModuleFocus] = useState<ModuleId | null>(null);
 
   useEffect(() => {
     try {
       const param = new URLSearchParams(window.location.search).get('theme');
-      const stored = window.localStorage.getItem('structurecumulus.palette');
-      if (param === 'crt' || param === 'print') setPalette(param);
-      else if (stored === 'crt' || stored === 'print') setPalette(stored);
+      const stored = window.localStorage.getItem('sc.review.theme');
+      if (param === 'night' || param === 'paper') setTheme(param);
+      else if (stored === 'night' || stored === 'paper') setTheme(stored);
     } catch {
-      /* storage is optional */
+      /* optional */
+    }
+    const hash = window.location.hash.replace('#', '');
+    if (isSection(hash)) {
+      window.setTimeout(() => document.getElementById(hash)?.scrollIntoView({ block: 'start' }), 10);
     }
   }, []);
 
   useEffect(() => {
-    const syncFromLocation = () => {
-      const params = new URLSearchParams(window.location.search);
-      const param = params.get('page');
-      const id = param ?? window.location.hash.replace('#', '');
-      if (PAGES.some((p) => p.id === id)) setActive(id as PageId);
-      const langParam = params.get('lang');
-      if (isLang(langParam)) setLangState(langParam);
-    };
-    syncFromLocation();
-    window.addEventListener('hashchange', syncFromLocation);
-    window.addEventListener('popstate', syncFromLocation);
-    return () => {
-      window.removeEventListener('hashchange', syncFromLocation);
-      window.removeEventListener('popstate', syncFromLocation);
-    };
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = palette === 'crt' ? 'crt' : 'paper';
+    document.documentElement.dataset.theme = theme;
     try {
-      window.localStorage.setItem('structurecumulus.palette', palette);
+      window.localStorage.setItem('sc.review.theme', theme);
     } catch {
-      /* storage is optional */
+      /* optional */
     }
-  }, [palette]);
+  }, [theme]);
 
   useEffect(() => {
-    document.documentElement.dataset.lang = lang;
-    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
-    try {
-      window.localStorage.setItem('structurecumulus.lang', lang);
-    } catch {
-      /* storage is optional */
-    }
-  }, [lang]);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' });
-  }, [active]);
-
-  const writeUrl = (page: PageId, next: Lang, keepPlayback = false) => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      params.set('page', page);
-      params.set('lang', next);
-      if (!keepPlayback) {
-        params.delete('scenario');
-        params.delete('step');
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPalette((open) => !open);
       }
-      const query = params.toString();
-      window.history.replaceState(null, '', `?${query}`);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const offset = 120;
+      let current: SectionId = 'thesis';
+      for (const entry of NAV) {
+        const node = document.getElementById(entry.id);
+        if (node && node.getBoundingClientRect().top <= offset) current = entry.id;
+      }
+      setActive(current);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  const go = useCallback((id: SectionId) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    try {
+      window.history.replaceState(null, '', `#${id}`);
     } catch {
-      /* file:// may refuse history */
+      /* optional */
     }
-  };
+  }, []);
 
-  const selectPage = (id: PageId) => {
-    setActive(id);
-    writeUrl(id, lang, false);
-  };
+  const goModule = useCallback((id: ModuleId) => {
+    setModuleFocus(id);
+    go('lattice');
+  }, [go]);
 
-  const setLang = (next: Lang) => {
-    setLangState(next);
-    writeUrl(active, next, true);
-  };
-
-  const page = PAGES.find((p) => p.id === active) ?? PAGES[0];
-  const View = VIEWS[page.id];
+  const activeIndex = NAV.findIndex((entry) => entry.id === active);
+  const progress = ((activeIndex + 1) / NAV.length) * 100;
+  const activeEntry = NAV[activeIndex] ?? NAV[0];
 
   return (
-    <LangProvider lang={lang} setLang={setLang}>
-      <ExplainProvider>
-        <Suite palette={palette} setPalette={setPalette} active={active} page={page} View={View} selectPage={selectPage} />
-      </ExplainProvider>
-    </LangProvider>
-  );
-}
+    <div className="app">
+      <a className="skip" href="#thesis">Skip to the review</a>
 
-interface SuiteProps {
-  palette: Palette;
-  setPalette: (palette: Palette) => void;
-  active: PageId;
-  page: (typeof PAGES)[number];
-  View: () => React.JSX.Element;
-  selectPage: (id: PageId) => void;
-}
-
-function Suite({ palette, setPalette, active, page, View, selectPage }: SuiteProps) {
-  const t = useT();
-  const { lang, setLang } = useLang();
-  const { open } = useExplain();
-
-  return (
-    <>
-      {palette === 'crt' ? <div className="np-scanline" aria-hidden="true" /> : null}
-      <PatternDefs />
-      <div className="sheet-frame">
-        <span className="reg-mark reg-mark--tl" aria-hidden="true" />
-        <span className="reg-mark reg-mark--tr" aria-hidden="true" />
-        <span className="reg-mark reg-mark--bl" aria-hidden="true" />
-        <span className="reg-mark reg-mark--br" aria-hidden="true" />
-        <div className="zones-top" aria-hidden="true">
-          {Array.from({ length: 8 }, (_, i) => (
-            <span key={i}>{i + 1}</span>
-          ))}
+      <aside className="rail" aria-label="Review index">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          <div>SC<span>//</span><br />REVIEW</div>
         </div>
-        <div className="zones-left" aria-hidden="true">
-          {['A', 'B', 'C', 'D', 'E', 'F'].map((letter) => (
-            <span key={letter}>{letter}</span>
-          ))}
+        <div className="rail-meta">
+          StructureCumulus<br />
+          design of record / v1.0<br />
+          26 oct 2026
         </div>
-
-        <div className="np-sheet">
-          <div className="masthead">
-            <div className="brand">
-              <span className="brand-name">StructureCumulus</span>
-              <span className="brand-sub">{t.chrome.brandSub}</span>
-            </div>
-            <div className="polarity">
-              <button
-                type="button"
-                className="np-explain-open"
-                onClick={() => open('blueprint')}
-                title={t.explain.openTitle}
-              >
-                <span className="np-explain-open-glyph" aria-hidden="true">
-                  ?
-                </span>
-                {t.explain.open}
-              </button>
-              <span className="polarity-label">{t.chrome.language}</span>
-              <Segmented
-                label={t.chrome.language}
-                hideLabel
-                ariaLabel={t.chrome.langAria}
-                options={[
-                  { value: 'zh', label: t.chrome.zhOption, title: t.chrome.zhTitle },
-                  { value: 'en', label: t.chrome.enOption, title: t.chrome.enTitle },
-                ]}
-                value={lang}
-                onChange={(value) => setLang(value as Lang)}
-              />
-              <span className="polarity-label">{t.chrome.polarity}</span>
-              <Segmented
-                label={t.chrome.palette}
-                hideLabel
-                ariaLabel={t.chrome.paletteAria}
-                options={[
-                  { value: 'print', label: t.chrome.print, title: t.chrome.printTitle },
-                  { value: 'crt', label: t.chrome.crt, title: t.chrome.crtTitle },
-                ]}
-                value={palette}
-                onChange={(value) => setPalette(value as Palette)}
-              />
-            </div>
+        <nav className="rail-nav">
+          {NAV.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className="rail-link"
+              data-active={entry.id === active}
+              onClick={() => go(entry.id)}
+            >
+              <span className="rail-no">{entry.no}</span>
+              <span>
+                <span className="rail-label">{entry.label}</span>
+                <span className="rail-sub">{entry.sub}</span>
+              </span>
+            </button>
+          ))}
+        </nav>
+        <div className="rail-progress">
+          <div className="rail-progress-head">
+            <span>{activeEntry.no} / 07</span>
+            <span>{Math.round(progress)}%</span>
           </div>
-
-          <HeaderBlock page={page} />
-          <TabNav pages={PAGES} active={active} onChange={selectPage} />
-
-          <main
-            id={`panel-${page.id}`}
-            role="tabpanel"
-            aria-labelledby={`tab-${page.id}`}
-            tabIndex={0}
-            key={page.id}
-          >
-            <View />
-          </main>
-
-          <FooterBlock
-            sources={page.sources}
-            pageNo={page.no}
-            pageCount={PAGES.length}
-            date={page.date}
-          />
+          <div className="rail-bar"><span style={{ width: `${progress}%` }} /></div>
+          <div className="rail-gates">
+            <div className="rail-gate">tests<strong>94/94</strong></div>
+            <div className="rail-gate">codes<strong>55</strong></div>
+            <div className="rail-gate">purity<strong>0</strong></div>
+            <div className="rail-gate">gates<strong>4/4</strong></div>
+          </div>
         </div>
+      </aside>
+
+      <div className="shell">
+        <header className="topbar">
+          <div className="topbar-id">
+            <span className="topbar-dot" aria-hidden="true" />
+            <strong>SC//REVIEW</strong>
+            <span className="hide-sm">/ {activeEntry.no} {activeEntry.label}</span>
+            <span className="hide-sm" style={{ color: 'var(--faint)' }}>— {activeEntry.sub}</span>
+          </div>
+          <div className="topbar-actions">
+            <button type="button" className="icon-btn" onClick={() => setPalette(true)}>
+              index <kbd>⌘K</kbd>
+            </button>
+            <button type="button" className="icon-btn" onClick={() => setTheme(theme === 'paper' ? 'night' : 'paper')}>
+              {theme === 'paper' ? 'night' : 'paper'} <span aria-hidden="true">{theme === 'paper' ? '◐' : '◑'}</span>
+            </button>
+          </div>
+        </header>
+
+        <main className="main">
+          <Hero onNavigate={go} />
+          <Thesis />
+          <Lattice focus={moduleFocus} />
+          <ObjectModel />
+          <Workbench />
+          <Ledger />
+          <Fold />
+          <CodeAtlas />
+          <Proof />
+
+          <footer className="footer">
+            <div className="footer-rule rule-strong" />
+            <div className="footer-grid">
+              <h3>
+                The code is generated.<br />
+                The <em>design</em> is the source.
+              </h3>
+              <div className="footer-meta">
+                StructureCumulus / design review 1.0<br />
+                8 design files · 12 module files<br />
+                kernel 11 packages · 55 codes · 94 tests<br />
+                commit 0d1218e
+              </div>
+            </div>
+            <div className="footer-rule rule" />
+            <div className="footer-small">
+              <span>English only · no mirrored spec</span>
+              <span>Adapter specified, not implemented</span>
+              <span>If they disagree, the design wins.</span>
+            </div>
+          </footer>
+        </main>
       </div>
-    </>
+
+      <CommandPalette
+        open={palette}
+        onClose={() => setPalette(false)}
+        onSection={go}
+        onModule={goModule}
+      />
+    </div>
   );
 }
