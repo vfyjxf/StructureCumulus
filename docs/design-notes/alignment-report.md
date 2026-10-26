@@ -373,21 +373,23 @@
 
 ### 8.1 证据已经定下的，不需要你选
 
+> stage-3 复核对本表有四条否决：`check` 不发布（Q5）、内部重叠是缺陷（Q6）、只留一个枚举（Q7）、`SC-CTX-0109` 的生产者方向。以 `open-questions.md` 为准。
+
 | 项 | 结论 | 依据 |
 | --- | --- | --- |
-| `check` 是否发布上下文帧 | `check` 不发布；发布只属于 `settle` 或引擎的收尾步骤 | `19` R27、`I-10`、`G9` |
-| 内部舱位重叠 | 是缺陷，不是静默去重 | `I-10` 禁止静默覆盖、`D-4` |
-| `DecisionKind` 与 `Coverage` | 只留一个枚举 | `RULE-D2`、`F7` |
+| `check` 是否发布上下文帧 | 待定，见 Q5（本行原写"不发布"，复核不成立） | `19` R27、`I-10`、`G9` |
+| 内部舱位重叠 | 待定，见 Q6（`09` §4.2 已允许 `SHARED+SHARED`） | `I-10`、`D-4` |
+| `DecisionKind` 与 `Coverage` | 待定，见 Q7（`RULE-D2` 与 L 建议保留两个） | `RULE-D2`、`F7` |
 | `PrescreenIndex`/`Census`/`AnchorCandidate`/`Fingerprint` | 删除（`11` §8 自己说被取代，代码没有） | `G12` |
 | `UndecidedReason` | 以 `01` 的八值为准，代码补 `LEDGER_UNAVAILABLE` | `G11`、L（该值已在 `01`） |
 | 两个二参 `Locus` 工厂 | 删除（无调用者） | `H-R5(A)`、L |
-| `SC-CTX-0109` | 只保留 draft 侧的异常通道 | `H-R3(A)`、L（draft 无法携带带标签的诊断） |
+| `SC-CTX-0109` | 引擎是唯一生产者，draft 侧抛无码的 `IllegalStateException` | `H-R3(A)`、L |
 | `anyOf()` 空子数组 | 要求 `n ≥ 1` | `RULE-D1(c)`、L（`atLeast` 不以异常拒绝） |
 | U6 `kernel.document` | 建包（不并入 `blueprint`） | `F1`、L |
 | `OccupantRef` | 带 `SnapshotId`，去掉 `footprint` | `19` R8 〔已核〕 |
 | `NestedView` 的粒度 | 不是完整 `WorldView`，按代码的 `NestedLevelSnapshot` | `C-14(b)` |
 
-L 另外指出四句引用需要改口径（方向不变）：`Reply.combine` 是包私有；`Bay.java` 里的 CHK/BAY 码是异常消息文本而非诊断；九个操作里实际存在的是三个（`check`、`derive`、`ledger`，`settle` 是 `check` 内的内联路径）；`20` §4.2 没有 `CaptureLimits`。
+L 另外指出四句引用需要改口径（方向不变）：`Bay.java` 里的 CHK/BAY 码是异常消息文本而非诊断；九个操作里实际存在的是三个（`check`、`derive`、`ledger`，`settle` 是 `check` 内的内联路径）；`20` §4.2 没有 `CaptureLimits`。`Reply.combine` 那条 L 说错了：它是接口静态成员，隐式 `public`（`Reply.java:73`），所以 `MatchSession` 能跨包调用。
 
 ### 8.2 需要你逐项定
 
