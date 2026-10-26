@@ -160,9 +160,9 @@ final class SectionSnapshot {
     SectionKey key(); FrozenStates states(); long captureRevision(); long[] payloadCells();
 }
 sealed interface SectionSlot permits Air, Present, Refused {
-    record Air(SectionKey key, long captureRevision) implements SectionSlot {}
+    record Air(long revision) implements SectionSlot {}
     record Present(SectionSnapshot section) implements SectionSlot {}
-    record Refused(SectionKey key, ReadStatus status, FindingCode code) implements SectionSlot {}
+    record Refused(ReadStatus status, FindingCode code) implements SectionSlot {}
 }
 record CellPayload(LatticeKey cell, OccupantDescriptor descriptor, List<Trait<?>> traits) {}
 final class LevelSnapshot implements WorldView {
@@ -172,15 +172,14 @@ final class LevelSnapshot implements WorldView {
     @Nullable CellPayload payload(LatticePoint cell);
     List<CapturedEntity> entities(Cuboid box);
     List<Finding> findings();
-    @Override default @Nullable OccupancySummary summary(Cuboid box) { ... }
-    @Override ChunkGrid chunkGrid();
-    @Override @Nullable ChunkContent chunk(ChunkKey key);
 }
 final class NestedLevelSnapshot implements NestedView { /* child frame over the same bytes */ }
 
 interface SnapshotLease extends AutoCloseable {     // one owner: InstanceRecord
     SnapshotId id();
-    LevelSnapshot view();
+    WorldView view();
+    long changeCount();                                 // marks since capture; zero means untouched
+    boolean isValid();                                  // the world still exists and this handle is open
     Outcome<SnapshotLease> retain(PinBudget budget);    // Pinned | Missing(SC-MC-0502)
     boolean isOpen();
     @Override void close();                             // releases this handle only
@@ -188,7 +187,7 @@ interface SnapshotLease extends AutoCloseable {     // one owner: InstanceRecord
 ```
 
 - `SectionKey` 是世界 16³ 索引（`x >> 4` 等）；它不是缓存键。
-- `Air` 是可读且为空：`READABLE`，并带一个 `captureRevision` 供脏/缓存检查使用。它不是
+- `Air` 是可读且为空：`READABLE`，并带一个 `revision`（内容纪元）供脏/缓存检查使用。它不是
   `NOT_CAPTURED`。
 - `Refused` 携带一个 `ReadStatus` 与一个诊断码；`occupant` 为 `null`。
 - `CellPayload` 为被监视的方块实体或实体携带已解析的描述符与特征列表；`occupant(cell)` 在读取时
@@ -212,7 +211,7 @@ for each section in y,z,x order:
     chunk = serverChunkCache.getChunkNow(sx, sz)   // never Level.getChunk
     if chunk == null || !chunk.isLoaded()          -> Refused(NOT_CAPTURED, SC-MC-0306)
     if index outside build height                  -> Refused(OUT_OF_BOUNDS, SC-MC-0505)
-    if section.hasOnlyAir()                        -> Air(key, contentEpoch++)
+    if section.hasOnlyAir()                        -> Air(contentEpoch++)
     if section/cap/byte limit exceeded              -> TooLarge or Refused(NOT_CAPTURED, SC-MC-0501)
     else                                            -> Present(store.intern(key, states.copy(), contentEpoch++))
 for each Present section:
@@ -378,17 +377,10 @@ record ChunkGrid(int cellSize, LatticePoint origin) {
     int chunkCount(Cuboid box);
     List<ChunkKey> chunksOf(Cuboid box);
 }
-interface ChunkContent {
-    Cuboid bounds(); ReadStatus status(); boolean allAir();
-    boolean maybeHasBlock(NamespacedId type);
-    int countBlock(NamespacedId type);  // -1 = cannot answer
-    @Nullable OccupantSnapshot occupant(LatticePoint p);
-    ReadStatus readStatus(LatticePoint p);
-}
 ```
 
-`WorldView` 新增 `@Nullable ChunkGrid chunkGrid()`、`@Nullable ChunkContent chunk(ChunkKey)` 与
-`@Nullable OccupancySummary summary(Cuboid)`。`cellSize` 是数据，不是常量；适配器传 16。
+`ChunkGrid`/`ChunkKey` 只确定格阵的尺寸；读取按区段作答，经由 `WorldView.slot(SectionKey)`
+（`06` §3.3）。`WorldView` 上不存在逐区块门面：`cellSize` 是数据，不是常量；适配器传 16。
 `chunkOf` 使用 `floorDiv`，绝不用 `>>` 或 `/`，因此负 `y` 与非零原点都能工作。
 
 ### 6.2 区段遍历与屏障（Section pass and barrier）
@@ -499,7 +491,7 @@ interface AttemptCache {                        // CacheKey is 11 §4.7
 
 | # | 场景 | 要求 |
 | --- | --- | --- |
-| X1 | 箱子在 FORM 运行期间清空，尚未刷新 | 第 4 项对整次尝试不成立：`Dropped(SNAPSHOT_CHANGED)`，不结算 |
+| X1 | 箱子在 FORM 运行期间清空，尚未刷新 | `changeCount` 对整次尝试不成立：`Dropped(SNAPSHOT_CHANGED)`，不结算 |
 | X2 | `/cumulus build` 编辑 40 个单元格，同一 tick 内重检 | 刷新，或 `Deferred`；下一次尝试捕获 |
 | X3 | 红石时钟每秒切换一个方块 20 次 | 一次刷新、零或一次检查；队列不增长 |
 | X4 | 运行中途世界卸载 | `Dropped(CAPTURE_INVALID)`（世界已被替换），不结算 |
@@ -525,10 +517,10 @@ interface AttemptCache {                        // CacheKey is 11 §4.7
   `MatchScheduler`、带窗口索引的 `DirtyIndex`、mixin、冻结声明视图、`AttemptCache`；
   `SavedClaims` 结算保持仅服务器。
 - `02`：服务器/工作线程表；每服务器一个调度器；快照/存储/脏的所有权；无 tick。
-- `06`：`WorldView` 默认 `chunkGrid()`/`chunk()`/`summary()`；`ChunkContent`、
-  `OccupancySummary`；`NestedLevelSnapshot` 命名。
-- `07`：`ProbeSession.claimsAt` 只读取冻结声明视图；`ExpectationMeta.cost` 为工作单元；
-  自定义期望取消契约。
+- `06`：`WorldView` 只是区段模型 —— `slot(SectionKey)` 回答一次读取，而
+  `chunkGrid()`/`chunk()`/`summary()` 这些门面连同 `ChunkContent`/`OccupancySummary` 已被撤回；
+  `NestedLevelSnapshot` 命名。
+- `07`：`ProbeSession.claimsAt` 只读取冻结声明视图；自定义期望取消契约。
 - `08`：声明在匹配之后串行；无逐区段预留；一个 `ClaimMatrix` 谓词。
 - `13`：为缓存诊断项提供 `Finding.withId`；`SC-MC-06xx` 诊断码。
 - `18`：X1–X15 与门禁测试。

@@ -45,10 +45,14 @@ public final class LevelCapture implements WorldCapture {
     public long latestRevision();
 }
 public class LevelSnapshot implements WorldView {
-    public SnapshotId snapshotId();  public Cuboid bounds();  public ReadStatus readStatus(LatticePoint c);
-    public @Nullable OccupantSnapshot occupant(LatticePoint c);  public List<OccupantSnapshot> occupants(Cuboid b);
-    public @Nullable OccupancySummary summary(Cuboid b);  public ChunkGrid chunkGrid();
-    public @Nullable ChunkContent chunk(ChunkKey k);  public long estimatedBytes();
+    public SnapshotId snapshotId();
+    public SectionSlot slot(SectionKey k);
+    public @Nullable OccupantSnapshot occupant(LatticePoint c);
+    public @Nullable OccupantSnapshot occupant(OccupantRef r);
+    public List<OccupantSnapshot> occupants(Cuboid b, OccupantFilter f);
+    public @Nullable NestedLevelSnapshot nested(LatticePoint c);
+    public long contentDigest(SectionKey k);
+    public long estimatedBytes();
     public List<Finding> findings();                       // cap/refusal reports, status unchanged
 }
 public final class NestedLevelSnapshot implements NestedView { /* parent, depth, ancestry, same bytes */ }
@@ -103,7 +107,9 @@ public final class CaptureTool {                            // document capture 
     public static @Nullable DataView capture(CaptureRequest request, IssueSink issues);
 }
 public final class WorldEdits implements EditExecutor {
-    public WorldEdits(ServerLevel l, Gate gate, Options o);  public EditTransaction begin(WorldView v, Siting s);
+    public WorldEdits(ServerLevel l, Gate gate, Options o);
+    public EditTransaction begin(WorldView view, Siting siting, ClaimView claims,
+                                 long ledgerRevision, PlanDigest plan);   // REFUSED when the host declines
     public record Options(int maxCells, boolean loadChunks, int flags) { public static Options defaults(); }
     public interface Gate { boolean allows(CuboidSet cells); }
 }
@@ -250,13 +256,13 @@ NONE/LEFT_RIGHT/FRONT_BACK ↔ `NONE`/`LEFT_RIGHT`/`FRONT_BACK`。
 
 | 阶段 | 规则 |
 | --- | --- |
-| 门控 | 以下情形为 `REFUSED`：不在服务端线程（`BlockableEventLoop.java:35`）、视图不是该 level 的视图、某格在边界之外（`WorldBorder.java:32`）、某格未加载（`Level.java:829`）、门控拒绝，或 `plan.touched().volume() > maxCells` |
+| 门控 | 以下情形为 `REFUSED`：不在服务端线程（`SC-MC-0301`、`BlockableEventLoop.java:35`）、视图不是该 level 的视图、某格在边界之外（`SC-MC-0305`、`WorldBorder.java:32`）、某格未加载（`Level.java:829`）、门控拒绝（`SC-MC-0401`），或 `plan.touched().volume() > maxCells`（`SC-MC-0307`） |
 | 前像（pre-image） | 对每个被写入格的首次触碰：`getBlockState`（`Level.java:406`）+ `BlockEntity.saveWithId`（`BlockEntity.java:106`） |
 | 写入 | `level.setBlock(pos, state, flags)`（`Level.java:228`），带 `UPDATE_ALL`（`Block.java:85`）+ `UPDATE_KNOWN_SHAPE`（`:81`）；`false` = 步骤失败 |
 | 载荷 | 放置的方块实体以空状态开始（`OccupantDescriptor` 没有 NBT）；`SetTrait` 与实体编辑被拒绝（`SC-MC-0304`） |
 | 恢复 | 先设置方块，再 `level.getBlockEntity(pos)`（IMMEDIATE，`Level.java:805-811`）并 `loadWithComponents(tag, regs)`（`BlockEntity.java:82`）—— vanilla 自己的顺序（`StructureTemplate.java:276`）；调用 `markPayload(pos)`，因为 `loadWithComponents` 绕过 `blockEntityChanged` |
 | 回滚 | 逆序，先状态后载荷；恢复失败即 `SC-MC-0405`；`close()` 只回滚 `OPEN`/`FAILED` |
-| 影响范围 | 恰为 `plan.touched()`；`SC-MC-0401` 拒绝，`0402` 步骤失败，`0403` 已回滚 |
+| 影响范围 | 恰为 `plan.touched()`；`SC-MC-0307` 拒绝，`0402` 步骤失败，`0403` 已回滚 |
 
 `UPDATE_KNOWN_SHAPE` 抑制形状级联（shape cascade），但不抑制重力或流体流动；对沙子或水之上的计划可能改变未命名的格。
 
@@ -315,8 +321,9 @@ NONE/LEFT_RIGHT/FRONT_BACK ↔ `NONE`/`LEFT_RIGHT`/`FRONT_BACK`。
 `Undecided(LEDGER_MOVED)`。`onTerminal` 对每种结局都触发；`onSettled` 是仅成功时的便捷回调。
 
 `InstanceRecord` 拥有该捕获。`Formed` 与 `Admitted` 持有指向它的子句柄，`derive` 读取帧而不是
-租约，句柄在终态路径上关闭；`retain(PinBudget)` 可以以 `SC-MC-0502` 拒绝，此时调用方保留实例
-自身的引用。
+租约。从不结算的调用方自己关闭 `Admitted`；`settle` 在每条路径上关闭它，并交给 `Formed` 它自己
+的子句柄，由调用方在 `derive` 之后关闭。`retain(PinBudget)` 可以以 `SC-MC-0502` 拒绝，此时调用
+方保留实例自身的引用。
 
 ## 5. 参考代码（Reference sketch）
 
@@ -369,7 +376,7 @@ ADAPTER.remap(door, Orientation.of(Turn.NONE, Tilt.LEVEL, Flip.LEFT_RIGHT));
 // (4) A wall, then a forced failure: first-touch rollback.
 EditPlan wall = new EditPlan(List.of(place(Cuboid.of(0, 0, 0, 5, 3, 1), "minecraft:stone_bricks"),
         place(Cuboid.of(0, 3, 0, 5, 4, 1), "minecraft:stone_brick_slab")), "raise the casing");
-try (EditTransaction tx = EXECUTOR.begin(view, siting)) {
+try (EditTransaction tx = EXECUTOR.begin(view, siting, claims, ledger.revision(), wall.digest())) {
     tx.apply(wall.steps().get(0));                 // pre-image: states + block entities
     tx.apply(wall.steps().get(1));                 // forced failure (cell outside border)
     if (tx.state() == EditTransaction.State.FAILED) tx.rollback(); else tx.commit();

@@ -313,9 +313,10 @@ public record Explanation(FindingCode code, String summary, String body,
 | `SC-SPC-0001` | ERROR | ✓ | 在该安放位下，`Locus` 无法映射到所请求的坐标系 |
 | `SC-OCC-0001` | ERROR | ✓ | 该格子为 `UNREADABLE`；快照无法回答，且"缺失"不等于"空气" |
 | `SC-OCC-0002` | WARNING | ✓ | 占用体的占地轮廓超出快照；只比较了交集 |
-| `SC-EXP-0001` | ERROR | ✓ | 舱位中缺少必需的占用体 |
-| `SC-EXP-0002` | ERROR | ✓ | 舱位中的占用体类型与声明不符 |
-| `SC-EXP-0003` | ERROR | ✓ | 同一跨格期望的两个部分不一致（门的情形）：一条诊断项，两个标签 |
+| `SC-EXP-0001` | ERROR | ✓ | 某个元素测试失败：主体不是所声明的类型，或在声明为空气处不是空气；这是每个随附测试的默认 `mismatchCode` |
+| `SC-EXP-0002` | ERROR | ✓ | 某个取反测试匹配上了，因此 `not(child)` 构成反驳 |
+| `SC-EXP-0003` | ERROR | ✓ | 同一个检查的两次匹配把同一个键绑定到两个不同的值：这是绑定冲突，绝不是异常 |
+| `SC-EXP-0004` | ERROR | ✓ | 阈值无法满足：`atLeast(k)` 而 `k > n`，或能匹配到的子项少于 `k` |
 | `SC-FOC-0101` | ERROR | ✓ | 焦点在舱位要求主体之处没有找到任何主体；主标签位于该舱位的格子或该键上 |
 | `SC-FOC-0201` | ERROR | ✓ | 不止一个占用体可能是该主体，因此绑定有歧义 |
 | `SC-FOC-0301` | ERROR | ✓ | 该单元区域内有一个区段被拒绝（`Refused(status, code)`）；其值为 `Missing`，绝不是缩短的求和 |
@@ -338,7 +339,7 @@ public record Explanation(FindingCode code, String summary, String body,
 | `SC-CHK-0101` | ERROR | ✓ | 某个检查把焦点与 `subject()` 不一致的期望配成一对 |
 | `SC-CHK-0102` | ERROR | ✓ | 计算／派生 DAG 存在环 |
 | `SC-CHK-0106` | ERROR | ✓ | 自相矛盾的声明：`EXCLUSIVE` 配 `None` 足迹（R1），或检查与覆盖不符（R4） |
-| `SC-CHK-0107` | ERROR | ✓ | 某个检查不属于任何舱位；结构级检查不可表示 |
+| `SC-CHK-0107` | ERROR | ✓ | 某个检查不属于任何舱位，或某个舱位什么都没断言：结构级检查与 `Requirement` 为空的舱位都属于接缝，不是声明 |
 | `SC-CHK-0109` | ERROR | ✓ | 检查读取了更晚阶段才产出的上下文键 |
 | `SC-DOC-0001` | ERROR | ✓ | `schemaVersion` 超出支持范围 |
 | `SC-DOC-0002` | ERROR | ✓ | 必需字段缺失或数据类型错误 |
@@ -357,7 +358,7 @@ public record Explanation(FindingCode code, String summary, String body,
 | `SC-CTX-0109` | ERROR | ✓ | 对某个键用错了动词：`put` 指向由区段贡献的键（`merge != null`），或 `contribute` 指向单写者键；该写入被拒绝 |
 | `SC-CTX-0201` | WARNING | ✓ | 某个计算拒绝产出其键（`SC-CTX` 块归 U8 所有） |
 | `SC-CTX-0202` | ERROR | ✓ | 某读取方要求一个该坐标系不持有的键；该值缺失，绝不是默认值 |
-| `SC-CTX-0301` | WARNING | ✓ | 某个折叠由有限输入产出了非有限总数；该键被省略 |
+| `SC-CTX-0301` | WARNING | – | 某个折叠由有限输入产出了非有限总数；该键被省略 |
 | `SC-DIA-0001` | WARNING | – | 诊断包被截断：诊断项因上限被省略，或因下限被过滤 |
 | `SC-DIA-0002` | WARNING | ✓ | 诊断项的严重级别与其诊断码注册的严重级别不一致 |
 | `SC-DIA-0003` | WARNING | – | 两条诊断项共用了同一个 `FindingId`，因此 `related` 有歧义 |
@@ -495,7 +496,7 @@ U3，`SC-BAY` 归 U5，`SC-RMD` 归 U10。改变既有诊断码*含义*的行为
 | 1 | 严重级别排名 | `ERROR 0 < WARNING 1 < INFO 2` |
 | 2 | 阶段 | `Stage` 声明顺序 `DESIGN, PROBE, FORM, SETTLE` |
 | 3 | 诊断码 | `FindingCode.compareTo`：先族序号，再编号 |
-| 4 | 主定位域 | `(frameRank, a, b, c)`；无标签的诊断项以 `(4,0,0,0)` 排最后；`DEFINITION` 主标签为 `(0, span.start, span.end, 0)`，`LOCAL`/`WORLD` 为规范首格的 `(1|2, y, z, x)`，`KEY` 为 `(3, 0, 0, 0)` |
+| 4 | 主定位域 | `(frameRank, a, b, c)`；无标签的诊断项以 `(4,0,0,0)` 排最后；`DEFINITION` 主标签为 `(0, span.start, span.end, 0)`，`LOCAL`/`WORLD` 为规范首格的 `(1\|2, y, z, x)`，`KEY` 为 `(3, 0, 0, 0)` |
 | 5 | 插入序 | 本次尝试的追加序号，在诊断包内唯一 |
 
 为什么严重级别最先：读者首先按诊断项的分量分诊，而错误散落在世界坐标中的报告无法阅读。为什么
@@ -566,7 +567,7 @@ U3，`SC-BAY` 归 U5，`SC-RMD` 归 U10。改变既有诊断码*含义*的行为
 文本，绝不影响诊断码、标签或结构）。墙不匹配的人类可读块：
 
 ```text
-error[SC-EXP-0002]: expected minecraft:bricks, found minecraft:stone_bricks
+error[SC-EXP-0001]: expected minecraft:bricks, found minecraft:stone_bricks
   --> structurecumulus:huge_furnace 14:21
    |
  14 |         "wall": { "expect": "minecraft:bricks" }

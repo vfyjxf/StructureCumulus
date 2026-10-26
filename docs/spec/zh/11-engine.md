@@ -18,7 +18,7 @@
 ## 2. 术语（Vocabulary）
 
 每个名称只在 `01-glossary.md` §I 定义一次，本单元拥有全部这些名称，且不添加同义词：
-`MatchRequest`（snapshotInfo、blueprint、siting、lease、policy、budget、pins、record、owner）、
+`MatchRequest`（blueprint、siting、lease、policy、budget、pins、record、owner、ticket）、
 `MatchPolicy`、`MatchSession`、`MatchResult` 及 `Admitted` / `Dropped` / `Formed` / `Failed` /
 `Undecided` / `Deferred`、`UndecidedReason`、`MatchOutcome`、`BayBinding`、`SeamBinding`、
 `Census`、`PrescreenIndex`、`AnchorCandidate`、`Fingerprint`、`ReadSet`、`ChangeSet`、
@@ -81,8 +81,8 @@ public sealed interface MatchResult extends AutoCloseable
 
 安放位在请求存在之前就已解析：请求里没有 `Place`，`run()` 内部也没有朝向搜索（`22` §4.4）。
 `ticket` 是合并令牌，`lease` 是一次移交——从未被派发的请求得不到租约，而被派发的请求持有它，直到
-结果或调度器把它收回。`blueprint` 是一个 `BlueprintId`，在计算单元顺序之前，对 `apply` 时冻结的
-目录解析一次。预算是槽位的对象，按引用传入：`run()` 对它花费，且永远无法重置计数器。
+结果或调度器把它收回。`blueprint` 是 `apply` 时冻结的目录解析出的 `Blueprint`，该解析发生在计算
+单元顺序之前。预算是槽位的对象，按引用传入：`run()` 对它花费，且永远无法重置计数器。
 `MatchPolicy.defaults()` 把 `maxSectionsPerUnit` 保持为 8，足以覆盖区域横跨区块角落的单元；该上限
 约束的是 `closureDigest` 所哈希的 `(SectionKey, contentDigest)` 列表（§4.7），而不是正确性。
 
@@ -198,7 +198,8 @@ interface AnchorResolver {
 
 只有当拒绝否定了**蓝图所声明**的东西时才是 `Failed`；当它否定的是*认知*的条件时是 `Undecided`；
 启发式（“比上次的砖少”）两者都不是：普查从不与另一次观测比较。没有任何已冻结的类型携带按类型的
-需求量（`ExpectationMeta.requires` 是特征，不是计数），因此今天的普查检查只做观测。
+需求量（`ExpectationMeta.requires` 是一项 `ContextKey` 覆盖需求，不是计数），因此今天的普查检查
+只做观测。
 
 `Fingerprint` 覆盖模板——id、bounds、带其 `Coverage`、`Footprint` 与 `Sharing` 的舱位长方体、锚点规格、
 朝向策略、需求量，以及每个计划的单元 id——摘要的是规范内容，因此跨宿主稳定。它是缓存键，不是
@@ -264,7 +265,7 @@ Dropped(CAPTURE_INVALID):    // isValid -> SC-ENG-0006
 计数器位于槽位中，以单元 id 为键——`discards`、`attempts` 与 `InstanceBudget`——因此合并的提交
 继承它们，只有成功的结算或 `dropInstance` 才会重置它们。超过 `maxDiscards`（槽位策略，默认 3）
 之后，尝试以 `SC-MC-0404` 结算为 `Undecided(DIRTY_UNSTABLE)`，并重新发出先前的 `Formed`，其
-`generation + 1` 且事实相同，因此消费者能区分重发与新的匹配。
+`generation + 1` 且产物相同，因此消费者能区分重发与新的匹配。
 
 ```java
 final class InstanceBudget {                 // owned by the slot; the request holds the reference

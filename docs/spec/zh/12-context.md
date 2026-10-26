@@ -21,7 +21,7 @@
 | `ContextTier` | `BLUEPRINT`、`PROBE`、`FORM`、`SETTLE`：帧的阶段投影 |
 | `ContextFrame` | `(tier, revision, Map<ContextKey<?>, Object>)`，一次发布 |
 | `StructureContext` | `(instance, revision, frames)`；不可变，读取按层打戳 |
-| `ContextDraft` | 一个阶段的写入：`put`（单写者）与 `contribute`（区段部分值） |
+| `ContextDraft` | 一个阶段的写入：`put`（单写者）、`forSection` + `contribute`（区段部分值）、`refuse`/`declined`（已决定的缺席） |
 | `ContextView` | `get`（可空）/ `require`（`Outcome`）/ `at(tier)` |
 | `ContextStore` | 每实例一个：`context(instance)`、`draft(tier, baseRevision)`、`publish(draft)` |
 | `RuntimeState` | `(context, augments, contextRevision)` 外加折叠诊断项；唯一被持久化的形态 |
@@ -51,7 +51,7 @@ public interface ContextView {
     <T> Outcome<T> require(ContextKey<T> key);     // Missing with a finding, never a bare null
     boolean has(ContextKey<?> key);
     Set<ContextKey<?>> keys();                     // ascending (id, type name)
-    ContextView at(ContextTier tier);              // narrow to `tier`, same frames
+    ContextView at(ContextTier tier);              // narrow to `tier`, same frames; a wider tier clamps
 }
 
 public record StructureContext(InstanceId instance, long revision, List<ContextFrame> frames)
@@ -64,7 +64,13 @@ public record StructureContext(InstanceId instance, long revision, List<ContextF
 public final class ContextDraft {                  // one stage's writes, not yet visible
     public ContextTier tier();  public long baseRevision();
     public <T> ContextDraft put(ContextKey<T> key, T value);          // merge == null only
-    public <T> ContextDraft contribute(ContextKey<T> key, T partial); // merge != null only
+    public ContextDraft forSection(SectionKey section);              // the scope contribute requires
+    public <T> ContextDraft contribute(ContextKey<T> key, T partial); // merge != null only; needs forSection
+    public <T> ContextDraft refuse(ContextKey<T> key);                // a section of the region was refused
+    public <T> ContextDraft declined(ContextKey<T> key);              // every section readable, nothing contributed
+    public <T> @Nullable T read(ContextKey<T> key);                   // the draft's own folded value
+    public boolean publishes(ContextKey<?> key);                      // decides the key, value or absence
+    public Set<ContextKey<?>> keys();                                 // every key this draft decides
 }
 
 public interface ContextStore {
@@ -94,6 +100,7 @@ public final class RuntimeState {
 | 声明归目录所有 | 声明用 `ContextKeys.of(...)` 构建，用 `ContextKeys.register(draft, key)` 绑定；同一 id 的两次注册是 `SC-CTX-0102`；相等性是 `(id, type)` |
 | 不交出裸 `Map` | `ContextDraft` 与 `ContextView` 是唯一句柄；帧的映射从不交出 |
 | 按层打戳 | 在层 `t` 的读者看见的是在 `t` 或以下打戳的值；在 `t+1` 的发布绝不重写 `t` 的帧 |
+| 缺席会被发布 | 帧为其草稿决定的每个键携带一个条目；已决定但无值的键记录为缺席标记，因此该帧遮蔽更旧的值，而不是让读者回退到它 |
 
 ## 4. 语义（Semantics）
 
@@ -127,20 +134,26 @@ Projection -          -      -     RUNTIME
   发布一次。
 - `publish` 返回 `Outcome<Void>`：过期的 `baseRevision` 是 `Missing(SC-CTX-0108)`，且不写入任何
   内容。同一帧内一个键出现两个不同值是 `SC-CTX-0107`，被拒绝而不是后写者胜。
+- 草稿决定了一个键却不给值时，就发布那次缺席：帧记录该标记，因此在该层或以上的读者得到
+  `null`/`Missing`，而不是更旧帧的值。
 - **一个写者。** 匹配器在每个阶段边界发布一个草稿，存储按实例串行化发布；没有其他组件为某个层
   打开草稿。
 - 读者按层打戳：聚合在其阶段的层读取 `context()`，检查通过 `FocusContext` 读取，
-  `StructureContext.at(t)` 把实例上下文收窄到 `t`。
+  `StructureContext.at(t)` 把实例上下文收窄到 `t`；高于视图自身层的层被钳制到它，因此 `at`
+  绝不放宽。
 
 ### 4.3 贡献与折叠（Contributions and the fold）
 
-- 区段计算对其区域内的每个区段调用一次 `draft.contribute(key, partial)`。
+- 区段计算通过一个以区段为界的草稿贡献：`draft.forSection(section)` 把该句柄的每次
+  `contribute(key, partial)` 打上该区段，而在没有区段范围的草稿上调用 `contribute` 会被拒绝。
 - 在屏障处，贡献按 `SectionKey` `(x, z, y)` 排序，并用 `merge.combine` 从左到右合并。折叠从第一个
   存在的贡献开始；没有单位元。
-- 区域内任何一个区段被拒绝，该键就缺席。不完整的和无法表示。
+- 区域内任何一个区段被拒绝，该键就缺席。不完整的和无法表示。无法产出自己那份部分值的区段计算
+  记录 `draft.refuse(key)`；读遍了每个区段却什么也没贡献的区段计算记录 `draft.declined(key)`，
+  这是通往 `whenAbsent` 的唯一路径。
 - 聚合计算或检查通过 `view.require(key)` 读取折叠后的值；不存在 `PartialKey` 式的直接读取。
-- 单写者键（`merge == null`）由聚合计算或 `Deriver` 用 `put` 写入一次；同一次尝试中的第二次写入
-  是 `SC-CTX-0107`。
+- 单写者键（`merge == null`）由聚合计算或 `Deriver` 用 `put` 写入一次；同一次尝试中第二次写入
+  不同的值是 `SC-CTX-0107`，而写入相同的值两次会被接受。
 - 允许并行区段遍历：贡献彼此独立，且折叠顺序固定。
 
 ### 4.4 增益（Augments）
@@ -156,7 +169,8 @@ Projection -          -      -     RUNTIME
 
 `RuntimeState.of` 按 `AugmentKey`（`id`、折叠序数）稳定排序，然后对每个键从左到右折叠：键序规范，
 键内顺序为声明顺序。严格浮点使其可按位复现。未被表示的键是**缺席**，绝不是零或一；非有限的
-`amount` 在构造时被拒绝；由有限输入得到的非有限*总和*会被省略并报 `SC-CTX-0301`。
+`amount` 在构造时被拒绝；由有限输入得到的非有限*总和*会被省略并报 `SC-CTX-0301`，这是一条无
+标签的 `WARNING`，其消息具名该增益键。
 
 ### 4.5 运行时状态（Runtime state）
 
@@ -225,7 +239,7 @@ Check<Integer> enoughFree = new Check<>(
 // host side: `store` is the instance's store (§4.2), one draft per stage boundary
 StructureContext before = store.context(instance);                     // revision 7, FORM frame
 ContextDraft draft = store.draft(ContextTier.FORM, before.revision());
-// the section pass calls draft.contribute(VOLUME, partial) once per section;
+// the section pass calls draft.forSection(section).contribute(VOLUME, partial) once per section;
 // the barrier folds; the aggregate calls draft.put(CAPACITY, 400).
 Outcome<Void> published = store.publish(draft);                        // Missing(SC-CTX-0108) if 7 moved
 if (published instanceof Outcome.Missing<Void> stale) {
@@ -305,7 +319,7 @@ RuntimeState upgraded = state.upgrade(VOLUME, 144);                     // revis
 | 测试 | 否定 | 期望 |
 | --- | --- | --- |
 | 发布一个 `baseRevision` 落后一次的草稿 | P7 | `Missing(SC-CTX-0108)`，较新的帧完好 |
-| 两个单元在一个草稿里 put 同一个键 | §4.2 | `SC-CTX-0107`，不写入帧 |
+| 两个单元在一个草稿里为同一个键 put 不同的值 | §4.2 | `SC-CTX-0107`，不写入帧 |
 | 对一个 `merge` 非空的键调用 `put` | §3 动词规则 | DESIGN 时报 `SC-CTX-0109` |
 | 一个 `FORM` 读者请求首次发布于 `SETTLE` 的键 | P8 | 在 `ContextTier.FORM` 处为 `null`，值只在 `SETTLE` 可见 |
 | 三个被贡献的区段中有一个是 `Refused` | P1 / §4.3 | 该键缺席，`require` 返回 `Missing`，绝不是不完整的和 |

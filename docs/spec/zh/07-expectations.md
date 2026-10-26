@@ -49,8 +49,10 @@ public sealed interface Outcome<T> permits Outcome.Found, Outcome.Missing {
 
 public enum DecisionKind { EVERY_CELL, ONE_SUBJECT, ANY_SUBJECT }
 
-public record ExpectationMeta(NamespacedId id, int specificity, Set<TraitKey<?>> requires) {
-    public static ExpectationMeta anonymous();   // structurecumulus:anonymous, 0, empty
+public record ExpectationMeta(NamespacedId id, int specificity, Set<ContextKey<?>> requires,
+                              FindingCode mismatchCode) {
+    public static ExpectationMeta anonymous();   // structurecumulus:anonymous, 0, empty, SC-EXP-0001
+    public static ExpectationMeta of(NamespacedId id, int specificity, FindingCode mismatchCode);
 }
 
 public enum Verdict { MATCH, MISMATCH, ABSTAIN, UNREADABLE }
@@ -66,35 +68,32 @@ public record Reply(Verdict verdict, Bindings bindings, FindingBundle findings) 
 }
 
 public interface FocusContext extends AggregateContext {          // read, occupants, context
-    Cuboid cells();  Siting siting();  Stage stage();
-    ContextView context();                                        // the key channel: get / require
-}
-
-public interface CheckContext extends FocusContext {              // the argument of Check.run
-    <V> ExpectationContext<V> with(V value, List<OccupantRef> subjects);
+    BayView bay();  WorldView view();  Siting siting();           // bay() carries the id and the cells
+    Cuboid cells();  Stage stage();  Locus locus();               // locus() is this check's label frame
 }
 
 public interface ExpectationContext<T> extends FocusContext {     // what a test may see
     T subject();  List<OccupantRef> subjects();
-    WorldView view();  NamespacedId bay();  Locus locus();  Budget budget();
-    ProbeSession session();  @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    <V> ExpectationContext<V> withSubject(V subject, List<OccupantRef> subjects);   // one cell of a bay test
+    static <T> ExpectationContext<T> of(FocusContext base, T subject, List<OccupantRef> subjects);
+    Budget budget();  ProbeSession session();
+    @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
 }
 ```
 
 | 类型 | 签名 |
 | --- | --- |
 | `Bindings` / `BindingKey<T>` | `EMPTY`、`of`、`<T> @Nullable T get(key)`、`merge(Bindings, Bindings, Locus): Reply`；键为 `(NamespacedId id, Class<T> type)` |
-| `FocusContext` | `extends AggregateContext`，并增加 `cells()`、`siting()`、`stage()`、`context()`；因此一个检查只能通过 `context()` 读取 `ContextKey`，别无其他途径 |
-| `CheckContext` | `extends FocusContext`，并增加 `with(value, subjects): ExpectationContext<V>`；它是 `Check.run` 的实参 |
-| `ExpectationContext<T>` | `extends FocusContext`，并增加 `subject(): T`、`subjects()`、`view()`、`bay()`、`locus()`、`budget()`、`session()`、`occupantAt(p)`——null ⇔ `readStatus(p) != READABLE` |
+| `FocusContext` | `extends AggregateContext`（后者回答 `read(key)`、`occupants(box)` 与 `context()`），并增加 `bay(): BayView`、`view()`、`siting()`、`cells()`、`stage()`、`locus()`；因此一个检查只能通过 `context()` 读取 `ContextKey`，别无其他途径 |
+| `ExpectationContext<T>` | `extends FocusContext`，并增加 `subject(): T`、`subjects()`、`withSubject(value, subjects): ExpectationContext<V>`——为舱位测试中的单个单元格重新指定主体类型的唯一途径——、静态的 `of(base, subject, subjects)`、`budget()`、`session()`、`occupantAt(p)`——null ⇔ 该单元格所在区段不可读 |
 | `ProbeSession` | `occupant(LatticePoint)`、`claimsAt(LatticePoint): List<Claim>`（仅限冻结账本；会话预留保持私有）、`<T> @Nullable T binding(BindingKey<T>)`、`remaining(): Budget`、`stage(): Stage` |
-| `Expectations` | `allOf`、`anyOf`、`not`、`sequence`、`atLeast(k)`、`atMost(k)`、`exactly(k)`、`block`、`air`、`trait`、`anyOccupant`、`nothing`、`custom(meta, body)`——每个都返回其子项主体类型的 `Expectation<T>` |
+| `Expectations` | `allOf`、`anyOf`、`not`、`sequence`、`atLeast(k)`、`atMost(k)`、`exactly(k)`、`block`、`air`、`eachCell(element)`、`trait`、`anyOccupant`、`nothing`、`custom(meta, body)`——每个都返回其子项主体类型的 `Expectation<T>`；`eachCell` 是唯一改变该类型的组合器（`Expectation<OccupantSnapshot>` → `Expectation<BayView>`） |
 | `ExpectationFactory` / `FactoryContext` | `id()`、`create(DataView, FactoryContext): @Nullable Expectation<?>`；`factory(id)`、`source()`、`range()`、`report(Finding)` |
 
 `subject()` 是一次测试接受的唯一类型：`Check<T>` 拒绝 `subject()` 不同的焦点与期望
 （`SC-CHK-0101`），因此 `DoorView` 测试无法与 `BayView` 焦点配对。`meta().specificity` 用于打破
 平局，绝不是预算输入；`requires` 是**覆盖**要求（§4.5）。`reads()` 默认为 `ReadScope.none()`，
-而读取舱位决策单元格之外内容的期望——特征的来源、相邻的单元格、`ContextKey`——必须声明它，
+而读取舱位决策单元格之外内容的期望——相邻的单元格、实体窗口、`ContextKey`——必须声明它，
 因为 `Check.reads(bayCells)` 是 `focus.reads(bayCells).union(expectation.reads())`，而这个读取
 闭包正是引擎按单元格与区段计费的对象（`22` §6.1、§9.5）。不存在 `cost` 字段，也完全不存在
 逐单元的数字：预算是对单元格与区段的粗粒度资源上限。`Reply`**不是**泛型的：判定针对整个检查，
@@ -128,10 +127,11 @@ public interface ExpectationContext<T> extends FocusContext {     // what a test
 焦点回答 `Outcome<T>`，期望回答 `Reply`，而 `Check` 是这两条通道相遇的唯一地方：
 
 ```java
-public CheckResult run(CheckContext ctx) {
+public CheckResult run(FocusContext ctx) {
     Outcome<T> taken = focus.take(ctx);
     if (taken instanceof Outcome.Found<T> found) {
-        return new CheckResult(expectation.test(ctx.with(found.value(), found.subjects())),
+        return new CheckResult(
+                expectation.test(ExpectationContext.of(ctx, found.value(), found.subjects())),
                 found.subjects(), found.notes());
     }
     Outcome.Missing<T> missing = (Outcome.Missing<T>) taken;
@@ -146,11 +146,14 @@ public CheckResult run(CheckContext ctx) {
 | 焦点所需的某个区段被拒绝 | `Outcome.Missing` | `SC-FOC-0301` |
 | 部分贡献在屏障处缺失 | 该键是 `Outcome.Missing`，每个读取方都是 `unreadable` | `SC-FOC-0302` |
 
-- `Missing` 携带标注在 `Locus` 上的诊断项（上下文键缺席为 `KEY`，单元格为 `WORLD`/`LOCAL`），
+- `Missing` 携带标注在 `Locus` 上的诊断项（上下文键缺席为 `LOCAL`，单元格为 `WORLD`/`LOCAL`），
   因此标签指向的是缺席处，而不是舱位的其他单元格。
 - 读取键的焦点是 `ContextKey<T>` 上的 `Focuses.context(key)`：它恰好是
-  `ctx.context().require(key)`，因此键缺席是带 `KEY` 定位域的 `Outcome.Missing`，绝不是持有
-  null 的 `Found`，也绝不是零值。
+  `ctx.context().require(key)`，因此键缺席是携带 `SC-FOC-0302` 的 `Outcome.Missing`——消息指名
+  该键，标签落在一个既没有单元格、也没有自身键的 `LOCAL` 定位域上——绝不是持有 null 的 `Found`，
+  也绝不是零值。该键只在一处声明，即在 `reads()` 中；同一个缺席还会作为 `ContextView.require`
+  自己的诊断项出现在 `CheckResult.notes` 里（§4.2 的参考代码），因此它被报告两次，处于两个框架
+  之中。
 - 主体缺席绝不是 `test(null)`，也绝不是静默：`fold` 的第二个分支根本不会调用期望，应答是携带
   该焦点诊断项的 `UNREADABLE`。`describeMissing()` 提供它们的措辞。
 - 每个不可读诊断项都是 `SC-FOC-*` 的检查会结算为 `Undecided(ONE_SUBJECT_ABSENT)`，绝不是
@@ -203,7 +206,7 @@ MISMATCH，而对取反后的子项取 `atMost(1)` 得 MATCH）；`anyOf` 在*�
 
 特异性对 `allOf`/`sequence` 取 `max`，对 `anyOf` 与 `k < n` 的阈值取 `min`（一个可以在跳过某
 子项时仍被满足的测试，不能声称拥有该子项的窄度），对 `not` 取 `0`。`requires` 取并集，`anyOf`
-也包含在内，因为它是对*覆盖*的要求：未被满足的特征会在读取任何单元格之前就让舱位
+也包含在内，因为它是对*覆盖*的要求：未被满足的 `ContextKey` 会在读取任何单元格之前就让舱位
 `UNREADABLE`，而把它当作未命中则会把“我没有看”变成 `MISMATCH`。`reads()` 是各子项读取范围的
 并集，`subject()` 是它们共同的 `T`；两者都不是价格——读取范围就是引擎在运行时按单元格与区段
 计费的内容（§4.7）。
@@ -214,16 +217,18 @@ MISMATCH，而对取反后的子项取 `atMost(1)` 得 MATCH）；`anyOf` 在*�
 
 | 焦点种类 | 主体类型 | `DecisionKind` |
 | --- | --- | --- |
-| `block` | `BlockView` | `ONE_SUBJECT` 或 `EVERY_CELL`，取决于它的单元格是否覆盖该舱位 |
-| `allCells`、`bay` | `BayView` | `EVERY_CELL` |
-| `occupant` | `OccupantView` | `ONE_SUBJECT` |
-| `entity` | `EntityView` | `ONE_SUBJECT` |
+| `bay` | `BayView` | `EVERY_CELL` |
+| `allCells` | `List<OccupantSnapshot>` | `EVERY_CELL` |
+| `occupant` | `OccupantSnapshot` | `ONE_SUBJECT` |
+| `entity` | `EntitySnapshot` | `ONE_SUBJECT` |
 | `nested` | `NestedView` | `ONE_SUBJECT` |
 | `context` | `T` | `ANY_SUBJECT` |
-| `door` | `DoorView`（两个 `OccupantRef`，一个合并状态） | `ONE_SUBJECT` 或 `EVERY_CELL` |
+| `door` | `DoorView`（两个 `OccupantRef`，一个合并状态） | `ONE_SUBJECT` |
 
 | 规则 | 陈述 |
 | --- | --- |
+| 元素 | 元素测试是 `Expectations.block(type)` 与 `Expectations.air()`，二者都作用于 `OccupantSnapshot`；绑定该主体的焦点是 `occupant`，而 `door` 是一种焦点（`Focuses.door`），绝不是组合器 |
+| 舱位测试 | 针对整个舱位的测试是作用于 `BayView` 的 `Expectations.eachCell(element)`，与 `bay` 配对；元素通过 `withSubject` 一次看到一个单元格 |
 | 几何 | 焦点的决策单元格是 `bay.cells` 内的 `CuboidSet`，在 DESIGN 由 `staticDecisionCells(bayCells)` 计算；动态种类（`occupant`、`entity`、`nested`、`context`）没有决策单元格 |
 | 主体 | `focus: door` 产出 `DoorView`；门期望消费 `DoorView`，绝不消费 `BayView`，因此把它与 `BayView` 焦点配对是 `SC-CHK-0101`，而不是一次强制转换 |
 | 原子性 | 一个 `Check`、一个 `Reply`：焦点取一次主体，期望回答一次，被绑定的主体随 `Found.subjects` 传递 |
@@ -245,14 +250,15 @@ MISMATCH，而对取反后的子项取 `atMost(1)` 得 MATCH）；`anyOf` 在*�
 ## 5. 参考代码（Reference sketch）
 
 ```java
-final class HatchExpectation implements Expectation<OccupantView> {   // three outcomes, one binding
+final class HatchExpectation implements Expectation<OccupantSnapshot> {   // three outcomes, one binding
     static final BindingKey<OccupantRef> HATCH = BindingKey.of(ID("hatch"), OccupantRef.class);
-    public Class<OccupantView> subject() { return OccupantView.class; }
-    public ExpectationMeta meta() { return new ExpectationMeta(ID("hatch"), 80, Set.of(Traits.ITEM_INVENTORY)); }
+    public Class<OccupantSnapshot> subject() { return OccupantSnapshot.class; }
+    public ExpectationMeta meta() { return ExpectationMeta.of(ID("hatch"), 80, SC_EXP_0001); }
 
-    public Reply test(ExpectationContext<OccupantView> ctx) {
-        OccupantView o = ctx.subject();                                  // never null: absence is Missing
+    public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
+        OccupantSnapshot o = ctx.subject();                              // never null: absence is Missing
         if (!o.has(Traits.ITEM_INVENTORY)) return Reply.mismatch(Finding.builder(SC_EXP_0001)
+                .message("expected an inventory-bearing hatch")
                 .label(ctx.locus(), "expected an inventory-bearing hatch")
                 .note("found " + o.descriptor().type()).build());
         return Reply.match(Bindings.of(HATCH, o.ref()));
@@ -263,7 +269,7 @@ final class OakDoorExpectation implements Expectation<DoorView> {     // one bay
     private static final NamespacedId OAK = NamespacedId.of("minecraft", "oak_door");
 
     public Class<DoorView> subject() { return DoorView.class; }
-    public ExpectationMeta meta() { return new ExpectationMeta(ID("oak_door"), 90, Set.of()); }
+    public ExpectationMeta meta() { return ExpectationMeta.of(ID("oak_door"), 90, SC_EXP_0001); }
 
     public Reply test(ExpectationContext<DoorView> ctx) {
         DoorView door = ctx.subject();                                   // both halves, already bound
@@ -285,14 +291,14 @@ final class OakDoorExpectation implements Expectation<DoorView> {     // one bay
 
 // block+trait on one cell, an anyOf fallback, and a pair whose members may ABSTAIN.
 var core  = Expectations.allOf(Expectations.block(NamespacedId.of("minecraft", "barrel")),
-                               Expectations.trait(Traits.ITEM_INVENTORY));
+                               Expectations.trait(NamespacedId.of("minecraft", "item_inventory")));
 var panel = Expectations.anyOf(Expectations.custom(PANEL_META, ctx -> {
     OccupantSnapshot s = ctx.occupantAt(ctx.cells().min());
     return s == null ? Reply.unreadable(/* as above */)
             : s.descriptor().tags().contains(Tags.STONE_FAMILY) ? Reply.match() : Reply.abstain();
 }), new WoodPanel());
-// not `anyOf(HatchExpectation, Expectations.block(...))`: an `OccupantView` child and a `BlockView`
-// child are different subject types, so a hatch-or-bars bay is two bays, or one occupant test.
+// `anyOf(HatchExpectation, Expectations.block(mc("bars")))` is one `Expectation<OccupantSnapshot>`:
+// a hatch-or-bars cell is one occupant focus and two element tests, not two bays.
 ```
 
 一个既不是石头也不是木材的面板会让两个子项都弃权，于是 `anyOf` 弃权，引擎报告
@@ -339,10 +345,10 @@ var panel = Expectations.anyOf(Expectations.custom(PANEL_META, ctx -> {
 ## 8. 依赖与待决问题（Dependencies and open questions）
 
 依赖 U0 `base`（`NamespacedId`、`Budget`、`Stage`）、U1 `space`（`Cuboid`、`CuboidSet`、`Locus`、
-`Siting`）、U2 `occupant`（`WorldView`、`ReadStatus`、`OccupantSnapshot`、`OccupantRef`、
-`TraitKey`）、U4 `claim`（`Claim`）与 U9 `finding`（`Finding`、`FindingBundle`、`FindingCode`、
-`SourceSpan`）。U5 拥有 `Bay`，并把 `staticDecisionCells` 的输入提供给它；U7 对检查的读取闭包
-计费，然后调用焦点与期望。
+`Siting`）、U2 `occupant`（`WorldView`、`ReadStatus`、`OccupantSnapshot`、`OccupantRef`）、U8
+`context`（`ContextKey`、`ContextView`、`AggregateContext`）、U4 `claim`（`Claim`）与 U9
+`finding`（`Finding`、`FindingBundle`、`FindingCode`、`SourceSpan`）。U5 拥有 `Bay`，并把
+`staticDecisionCells` 的输入提供给它；U7 对检查的读取闭包计费，然后调用焦点与期望。
 
 **OQ-1——实体窗口代价（`22` §16 Q2）。** `focus: entity` 与 `focus: occupant` 读取一个膨胀的
 实体窗口；如果宿主采用共享空间索引，`Focus.reads(bayCells)` 必须指名一个索引而不是一个窗口

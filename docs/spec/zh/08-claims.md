@@ -17,8 +17,8 @@
 | `Sharing` | `EXCLUSIVE`、`SHARED`：同一格上是否排斥另一份登记 |
 | `Footprint` | `Box`、`Bound`、`Declared`、`None`：一个舱位拥有哪些单元格 |
 | `ClaimRow` | `(world, cell, sharing, owner, siting, bay)`：一个世界的一个单元格，由一个所有者在一个安放位上的一个舱位持有 |
-| `ClaimSet` | `(rows, revision)`：一次完整结算，行按规范顺序 |
-| `ClaimConflict` | `(rows, findings)`：未通过矩阵的行，加上指名它们的诊断项 |
+| `ClaimSet` | `(rows, revision)`：一次完整结算，行按规范顺序（`ClaimRow.ordered`） |
+| `ClaimConflict` | `(rows, findings)`：阻断本次结算的持有行，当冲突发生在同一个请求内部时再加上该请求自身冲突的行，以及指名这些行的诊断项 |
 | `ClaimMatrix` | 唯一的冲突谓词 `conflicts(a, b)`：同一个世界、同一个单元格、不同的归属，至少一方为 `EXCLUSIVE` |
 | `ClaimLedger` | 宿主存储，一个世界一个句柄：`world()`、`settle(SettleRequest)`、`release(OwnerId, Siting)` 与 `read(Cuboid)` |
 | `ClaimView` | 一次读取：与某个长方体相交的行、读到的修订号，以及存储是否作答 |
@@ -48,12 +48,16 @@ public record ClaimRow(World world, LatticeKey cell, Sharing sharing, OwnerId ow
                        NamespacedId bay) {}
 
 public record ClaimSet(List<ClaimRow> rows, long revision) {
-    public ClaimSet { rows = List.copyOf(rows); }                 // canonical order, §4.1
+    public ClaimSet { rows = ClaimRow.ordered(rows); }           // canonical order, §4.1
 }
 
 public sealed interface ClaimVerdict permits Settled, ClaimConflict, RevisionMoved {
-    record Settled(long revision, List<ClaimRow> rows) implements ClaimVerdict {}
-    record ClaimConflict(List<ClaimRow> rows, List<Finding> findings) implements ClaimVerdict {}
+    record Settled(long revision, List<ClaimRow> rows) implements ClaimVerdict {
+        public Settled { rows = ClaimRow.ordered(rows); }
+    }
+    record ClaimConflict(List<ClaimRow> rows, FindingBundle findings) implements ClaimVerdict {
+        public ClaimConflict { rows = ClaimRow.ordered(rows); }
+    }
     record RevisionMoved(long expected, long actual) implements ClaimVerdict {}
 }
 
@@ -72,10 +76,13 @@ public interface ClaimLedger {                                    // @NullMarked
     ClaimView read(Cuboid box);                                   // never null; an empty answer is available
 }
 
-public interface ClaimView {
-    List<ClaimRow> rows();                                        // rows intersecting the box, canonical order
-    long revision();                                              // the revision this answer was read at
-    boolean available();                                          // false = the store could not answer
+public record ClaimView(List<ClaimRow> rows, long revision, boolean available) {
+    public ClaimView {                                            // an unavailable view holds no rows
+        rows = ClaimRow.ordered(rows);
+        if (!available && !rows.isEmpty()) throw new IllegalArgumentException("an unavailable view holds no rows");
+    }
+    public static ClaimView unavailable() { return new ClaimView(List.of(), 0L, false); }
+    public List<ClaimRow> rowsIn(Cuboid box);                     // rows intersecting the box, canonical order
 }
 
 public sealed interface ClaimPlan permits ClaimPlan.Matched, ClaimPlan.Invalid {
@@ -108,7 +115,7 @@ public final class ClaimPlanner {
 | 对象 | 全序 |
 | --- | --- |
 | 单元格 | U1 的规范顺序（`LatticeKey` 的自然顺序） |
-| `ClaimRow` | `(world, cell, owner, bay)`；共享值从不用于打破平局 |
+| `ClaimRow` | `(world, cell, owner, bay)`，由 `ClaimRow.ordered(List<ClaimRow>)` 唯一实现；共享值从不用于打破平局 |
 | `ClaimSet.rows`、`Settled.rows`、`ClaimConflict.rows` | `ClaimRow` 顺序 |
 
 **替换规则。** `settle` 在一次 CAS 中替换 `(world, owner, siting)` 的*每一*行：没有逐行合并，没有逐舱位
@@ -201,7 +208,8 @@ public final class ClaimPlanner {
 - 出现 `RevisionMoved` 时，结算器在事务内部**一次**重读并重新检查；第二次变动是
   `Undecided(LEDGER_MOVED)`，携带一个重试令牌，绝不是凭空构造的冲突。
 - `Formed` 只在 `Settled` 之后存在，携带 `ClaimSet` 与结算时的修订号。冲突是
-  `Failed(SC-CLM-0002)` 并带有在位行；无法作答的账本是 `Undecided`。
+  `Failed(SC-CLM-0002)`，携带阻断本次结算的持有行；当冲突发生在同一个请求内部时，也携带该请求
+  自身的行；无法作答的账本是 `Undecided`。
 - `release(owner, siting)`——在一个只服务一个世界的句柄上——在一个事务中删除该键的每一行并递增
   修订号；被释放的键读出来是空的，而调用它的三个生命周期点是 `23` §5 的——实例移除、一次移动、
   一次世界卸载。

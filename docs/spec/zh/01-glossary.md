@@ -56,7 +56,8 @@
 | 摆放（Placement） | `Placement` | `(Orientation orientation, LatticePoint offset)`：蓝图如何被转向与平移。 | `Transform` |
 | 安放位（Siting） | `Siting` | `(LatticePoint origin, Placement placement)`：蓝图在世界中站立的位置。`toWorld(local)` / `toLocal(world)`。 | `Pose` |
 | 定位域框架（Locus frame） | `LocusFrame` | `DEFINITION`、`LOCAL`、`WORLD`、`KEY`：诊断可以指向的坐标框架；`KEY` 命名一个值，而不是单元格。 | `DefSpan`/`LocalSpan`/`WorldSpan` |
-| 定位域（Locus） | `Locus` | 一个框架 + 一个可选 `CuboidSet` + 一个可选 `SourceSpan`；`KEY` 定位域携带 `(InstanceId, NamespacedId)`，不含单元格。 | `Span` |
+| 定位域（Locus） | `Locus` | 一个框架 + 一个非空 `CuboidSet`（框架不携带单元格时为空集）+ 一个可选 `KeyLocus` + 一个可选 `SourceSpan`；`KEY` 定位域携带一个 `KeyLocus` 且不含单元格，`DEFINITION` 定位域要求其源区间。 | `Span` |
+| 键定位域（Key locus） | `KeyLocus` | `(InstanceId instance, NamespacedId key)`：一个 `KEY` 定位域所命名的那一个实例键。 | — |
 | 定位域映射（Locus map） | `LocusMap` | 针对一个 `Siting`，在单元格框架之间转换 `Locus`；`toWorld`、`toLocal`、`toDefinition`；`KEY` 定位域不参与转换。 | `SpanMapper` |
 | 区块键（Chunk key） | `ChunkKey` | `ChunkGrid` 中的 `(int cx, cy, cz)` 下标，按 `(cy, cz, cx)` 排序。不是 Minecraft 类。 | — |
 | 区块网格（Chunk grid） | `ChunkGrid` | `(int cellSize, LatticePoint origin)`：世界框架下的立方区块网格；`chunkOf`、`boundsOf`、`chunkCount`、`chunksOf`。`cellSize` 是数据；适配器传 16。 | — |
@@ -71,10 +72,13 @@
 | 特征键（Trait key） | `TraitKey<T>` | 可查询特征的类型化标识：`(NamespacedId id, Class<T> type)`。 | `ElementAspect` |
 | 特征（Trait） | `Trait<T>` | 由占用体快照携带的 `(TraitKey<T>, @Nullable T value)` 对；存在的特征带 null 值是一个事实，缺失的特征则是不可读。 | `ElementAspect` 值 |
 | 占用体快照（Occupant snapshot） | `OccupantSnapshot` | 不可变读模型：ref、descriptor、占地轮廓（`Cuboid`）、特征、可选 `NestedView`。空气是普通占用体；`null` 表示“不可读”。 | `ElementSnapshot` |
-| 嵌套视图（Nested view） | `NestedView` | 由嵌套占用体暴露的子 `WorldView`；`bounds()`、`occupant(LatticePoint)`。 | `NestedElementView` |
-| 世界视图（World view） | `WorldView` | 内核唯一的世界窗口：`@Nullable OccupantSnapshot occupant(LatticePoint)`、`List<OccupantSnapshot> occupants(Cuboid)`、`ReadStatus readStatus(LatticePoint)`、`SnapshotId snapshotId()`、`Cuboid bounds()`；可选 `chunkGrid()`、`chunk(ChunkKey)`、`summary(Cuboid)`。 | `WorldView` |
-| 占用汇总（Occupancy summary） | `OccupancySummary` | `(Map<NamespacedId,Integer> byType, int total)`：由调色板得出的、覆盖一个盒的计数；`WorldView.summary` 返回 `null` 表示宿主无法廉价回答。 | — |
-| 区块内容（Chunk content） | `ChunkContent` | 只读的逐区块门面：`bounds`、`status`、`allAir`、`maybeHasBlock`、`countBlock`（`-1` 表示未知）、`occupant`、`readStatus`。 | — |
+| 区段槽（Section slot） | `SectionSlot` | 一个区段的回答：`Air(revision)`、`Present(section)`、`Refused(status, code)`；`readable()` 为 `Air` 或 `Present`，而 `Refused` 槽不能携带可读状态。 | — |
+| 区段快照（Section snapshot） | `SectionSnapshot` | 一个冻结的区段：`(SectionKey key, Map<LatticePoint, OccupantSnapshot> cells)`；`contentDigest()`、`occupantAt(cell)`、`occupants(box, filter)`。 | — |
+| 占用体过滤器（Occupant filter） | `OccupantFilter` | 盒查询用的 `(type, kind, trait)` 谓词；为 `null` 的组件不施加约束。 | — |
+| 实体窗口（Entity window） | `EntityWindow` | `(Cuboid cells, NamespacedId type)`：一种实体类型可以在其中移动的盒；`MAX_ENTITY_SPAN = 3`；由 `ReadScope.entities` 携带。 | — |
+| 实体键（Entity key） | `EntityKey` | `(UUID id, NamespacedId type, long dataDigest)`：一个实体在窗口差异中的身份。 | — |
+| 嵌套视图（Nested view） | `NestedView` | 由嵌套占用体暴露的子 `WorldView`；`parent()`、`depth()`、`ancestry()`、`occupant(LatticePoint)`。 | `NestedElementView` |
+| 世界视图（World view） | `WorldView` | 内核唯一的世界窗口：`SnapshotId snapshotId()`、`SectionSlot slot(SectionKey)`、`@Nullable OccupantSnapshot occupant(LatticePoint)`、`@Nullable OccupantSnapshot occupant(OccupantRef)`、`List<OccupantSnapshot> occupants(Cuboid, OccupantFilter)`、`@Nullable NestedView nested(LatticePoint)`、`long contentDigest(SectionKey)`。 | `WorldView` |
 | 读取状态（Read status） | `ReadStatus` | `READABLE`、`OUT_OF_BOUNDS`、`NOT_CAPTURED`、`DENIED`、`STALE`。`READABLE` 且占用体为空气是一个事实；其他每个值都是 `UNREADABLE`，绝不是“空气”。 | — |
 | 世界（World） | `World` | 内核视角下的一个 Minecraft 层级：`record World(NamespacedId id)`，`id` 是该层级的键（`minecraft:overworld`）。Minecraft 侧把它叫作 level（`ServerLevel`、`LevelEvent.Unload`），这些名称按原样引用，绝不用作内核术语。`World` 不是一个地点：坐标存在于 `LatticeKey`，因此两个世界中的相同坐标是两个不同的单元格。 | `dimension` |
 | 属主（Owner） | `OwnerId` | `(NamespacedId owner)`：谁持有声明——一名玩家或一个队伍。世界不是它的一部分；声明另行命名自己的世界。 | — |
@@ -91,17 +95,17 @@
 | 术语 | 类型（Type） | 定义 | 先前术语（Prior） |
 | --- | --- | --- | --- |
 | 期望（Expectation） | `Expectation<T>` | 对一个 `Bay` 所绑定主体的测试：`Reply test(ExpectationContext<T>)`、`Class<T> subject()`、`default ReadScope reads()`、`default ExpectationMeta meta()`。这是内核用来指称“谓词”的词；`Predicate` 因 `java.util.function.Predicate` 而被禁用。 | `CellPredicate` |
-| 期望上下文（Expectation context） | `ExpectationContext<T>` | 测试可见的内容：`subject()`（`T`）与 `subjects()`（绑定的 `OccupantRef`，取自 `Found`），以及 `view()`、`siting()`、`bay()`（一个 `NamespacedId`）、`cells()`（`Cuboid`）、`occupantAt(LatticePoint)`、`context()`（一个 `ContextView`：`get`/`require`）、`session()`（`ProbeSession`）、`budget()`、`locus()`、`stage()`；由 `with(value, subjects)` 构建。 | `PredicateContext` |
+| 期望上下文（Expectation context） | `ExpectationContext<T>` | 测试可见的内容：`subject()`（`T`）与 `subjects()`（绑定的 `OccupantRef`，取自 `Found`），以及 `withSubject(value, subjects)`——它重新定型主体，使舱位级测试可以把一个单元格交给单元格级测试；`of(base, subject, subjects)` 从 `FocusContext` 构建它。它扩展 `FocusContext`，因此 `bay()`（`BayView`）、`view()`、`siting()`、`cells()`、`stage()`、`locus()` 与 `AggregateContext` 的 `read`/`occupants`/`context()` 一并继承。 | `PredicateContext` |
 | 探测会话（Probe session） | `ProbeSession` | 运行中尝试的只读面：`occupant(LatticePoint)`、`claimsAt(LatticePoint)`（仅限冻结账本；会话预留保持私有）、`binding(BindingKey<T>)`、`remaining()`、`stage()`。 | `MatchSessionView` |
 | 判定（Verdict） | `Verdict` | `MATCH`、`MISMATCH`、`ABSTAIN`、`UNREADABLE`。`ABSTAIN` 表示“该期望拒绝作答”；`UNREADABLE` 表示“快照无法回答”。 | `Verdict` |
 | 应答（Reply） | `Reply` | `(Verdict verdict, Bindings bindings, FindingBundle findings)`，从不泛型化：每次检查一个应答，无论主体类型为何。只有 `MATCH` 可以携带绑定；`MISMATCH` 与 `UNREADABLE` 必须携带至少一条诊断项。 | `Outcome` |
 | 绑定（Bindings） | `Bindings` | 以 `BindingKey<T>` 为键的不可变异构映射；由一次成功的期望产出，并由组合器合并。 | — |
 | 绑定键（Binding key） | `BindingKey<T>` | 单个绑定值的类型化键 `(NamespacedId id, Class<T> type)`。 | — |
-| 期望元数据（Expectation meta） | `ExpectationMeta` | `(NamespacedId id, int specificity, Set<TraitKey<?>> requires)`；目录身份与报告顺序提示。不存在 `cost` 或 `admission`：预算只数单元格与区段（`22` §9.5）。 | `PredicateMeta` |
+| 期望元数据（Expectation meta） | `ExpectationMeta` | `(NamespacedId id, int specificity, Set<ContextKey<?>> requires, FindingCode mismatchCode)`；目录身份、报告顺序提示、测试所需的 `ContextKey`，以及一次普通不匹配所携带的诊断码。工厂方法是 `anonymous()` 与 `of(id, specificity, mismatchCode)`。不存在 `cost` 或 `admission`：预算只数单元格与区段（`22` §9.5）。 | `PredicateMeta` |
 | 期望工厂（Expectation factory） | `ExpectationFactory` | `NamespacedId id()`、`Expectation<?> create(DataView args, FactoryContext ctx)`；数据驱动的解析步骤。 | `PredicateFactory` |
 | 工厂上下文（Factory context） | `FactoryContext` | 工厂在构建期望时可见的内容：目录快照与文档来源。 | — |
 | 组合器（Combinators） | `Expectations` | 静态方法 `allOf`、`anyOf`、`not`、`sequence`、`atLeast`、`atMost`、`exactly`、`block`、`air`、`trait`、`anyOccupant`、`nothing`、`custom`。每个组合器都返回其子项主体类型的 `Expectation<T>`，因此一个 `DoorView` 子项与一个 `BayView` 子项不能组合。 | `Predicates` |
-| 焦点（Focus） | `Focus<T>` | 检查的读取那一半：`Outcome<T> take(FocusContext)`、`Class<T> subject()`、`DecisionKind decisionKind()`、`CuboidSet staticDecisionCells(Cuboid)`、`ReadScope reads(Cuboid bayCells)`、`FindingBundle describeMissing()`。种类是数据：`block`、`allCells`、`bay`、`occupant`、`entity`、`nested`、`context`、`door`。 | — |
+| 焦点（Focus） | `Focus<T>` | 检查的读取那一半：`Outcome<T> take(FocusContext)`、`Class<T> subject()`、`DecisionKind decisionKind()`、`CuboidSet staticDecisionCells(Cuboid)`、`ReadScope reads(Cuboid bayCells)`、`FindingBundle describeMissing()`。种类是数据，且各自绑定自己的主体：`bay` → `BayView`，`allCells` → `List<OccupantSnapshot>`，`occupant` → `OccupantSnapshot`，`entity` → `EntitySnapshot`，`nested` → `NestedView`，`context` → `T`，`door` → `DoorView`。 | — |
 | 焦点结果（Focus outcome） | `Outcome<T>` | `Found(value, subjects, notes)` 或 `Missing(findings)`，带 `fold(onFound, onMissing)`；`Found.subjects` 是构建舱位绑定的唯一途径，缺失的主体永不进入 `test`。 | — |
 | 决策种类（Decision kind） | `DecisionKind` | `EVERY_CELL`、`ONE_SUBJECT`、`ANY_SUBJECT`：焦点在 DESIGN 可以断言的内容，按该舱位的 `Coverage` 校验。 | — |
 | 读取范围（Read scope） | `ReadScope` | 一个单元声明的读取闭包：单元格、键与实体窗口。`Check.reads(bayCells)` 是其焦点与期望的并集；舱位焦点读取整个舱位。 | — |
@@ -119,8 +123,8 @@
 | 声明账本（Claim ledger） | `ClaimLedger` | 一个句柄绑定到一个世界：`World world()`、`long revision()`、`ClaimVerdict settle(SettleRequest)`、`ClaimVerdict release(OwnerId, Siting)` 与 `ClaimView read(Cuboid)`；视图回答 `rows()`、`revision()` 与 `available()`，其中 `available() == false` 表示“无法回答”，绝不是空声明集。`settle` 与 `release` 是唯一的写入者；调用 `release` 的三个生命周期点——实例被移除、一次移动、一次世界卸载——见 `23` §5。把一个其他世界的句柄交给内核是 `SC-CLM-0007`。 | `ClaimLedger` |
 | 声明矩阵（Claim matrix） | `ClaimMatrix` | 唯一的冲突谓词：`static boolean conflicts(ClaimRow a, ClaimRow b)`——当且仅当两行属于同一个世界、命名同一个单元格、不是同一个 `(owner, siting)`，且至少一个为 `EXCLUSIVE` 时为真。 | — |
 | 结算请求（Settle request） | `SettleRequest` | `(World world, OwnerId owner, Siting siting, List<ClaimRow> rows, long expectedRevision)`：账本那一次 CAS 的单位；每一行的世界都必须等于请求的世界（`SC-CLM-0007`）。 | — |
-| 声明视图（Claim view） | `ClaimView` | 一次账本读取：与某个盒相交的行、读到它们时的修订号，以及 `available()`，其中 `false` 表示“无法回答”，绝不是空声明集。 | — |
-| 声明冲突（Claim conflict） | `ClaimConflict` | `(List<ClaimRow> rows, List<Finding> findings)`：两条无法共存的声明；不写入任何内容。 | `ClaimConflict` |
+| 声明视图（Claim view） | `ClaimView` | `record (List<ClaimRow> rows, long revision, boolean available)`：与某个盒相交的行，按规范顺序排列，读到它们时的修订号，以及 `available`，其中 `false` 表示“无法回答”，绝不是空声明集——不可用的视图不持有任何行（`unavailable()` 是它的工厂），`rowsIn(Cuboid)` 收窄它。 | — |
+| 声明冲突（Claim conflict） | `ClaimConflict` | `(List<ClaimRow> rows, FindingBundle findings)`：阻塞的已持有行，加上冲突位于单个请求内部时该请求自身的冲突行；不写入任何内容。 | `ClaimConflict` |
 | 声明计划（Claim plan） | `ClaimPlan` | 密封的 `Matched(long ledgerRevision, List<BayBinding> bindings)` \| `Invalid(FindingBundle findings)`：`check` 发现了什么，以及它读取的修订号。它**不携带任何行**——每一行都由 `ClaimPlanner` 派生，因此调用方无法把自己构造的行交给 `settle`。 | — |
 | 声明规划器（Claim planner） | `ClaimPlanner` | 唯一的行工厂：`Derived derive(World, Blueprint, Siting, OwnerId, Collection<BayBinding>)`，纯净且确定性（无视图、无账本、无 I/O），返回 `(rows, overlaps, staticFootprint)`。 | — |
 
@@ -203,7 +207,7 @@
 | 锚点候选（Anchor candidate） | `AnchorCandidate` | `(NamespacedId role, LatticePoint cell, Orientation implied, int score)`。 | `AnchorCandidate` |
 | 指纹（Fingerprint） | `Fingerprint` | 预筛内容的摘要 `(long high, long low)`；跨运行稳定。 | `Fingerprint` |
 | 读取集（Read set） | `ReadSet` | 实际读取的 `(CuboidSet cells, Set<ChunkKey> chunks, Set<OccupantRef> occupants)`。 | `ReadSet` |
-| 变更集（Change set） | `ChangeSet` | `(Set<LatticeKey> changed, Set<ChunkKey> chunks, Set<NamespacedId> changedTypes, long revision)`。 | `ChangeSet` |
+| 变更集（Change set） | `ChangeSet` | `(Set<LatticeKey> cells, Set<SectionKey> sections, Set<LatticeKey> payloads, Set<EntityKey> entities, Set<NamespacedId> keys, long revision)`。 | `ChangeSet` |
 | 失效索引（Invalidation index） | `InvalidationIndex` | `List<InstanceRef> affectedBy(ChangeSet)`。 | `InvalidationIndex` |
 | 实例引用（Instance ref） | `InstanceRef` | `(NamespacedId blueprint, Siting siting, long generation)`。 | — |
 | 实例 id（Instance id） | `InstanceId` | `(World world, long serial)`：一个已摆放结构的身份。它以自身为键拥有 `StructureContext` 存储，因此两个实例发布同一个键永不冲突；它也是 `KEY` 定位域所命名的对象。 | — |
@@ -271,7 +275,7 @@
 | 计划差异（Plan diff） | `PlanDiff` | `(List<EditStep> added, removed, changed)`。 | `PlanDiff` |
 | 应用报告（Apply report） | `ApplyReport` | `(boolean success, List<Finding> findings, Spend spend)`。 | `ApplyReport` |
 | 编辑事务（Edit transaction） | `EditTransaction` | 可回退的应用范围：`apply(EditStep)`、`commit()`、`rollback()`。 | `Transaction` |
-| 编辑执行器（Edit executor） | `EditExecutor` | 宿主 SPI：`EditTransaction begin(WorldView, Siting)`。 | — |
+| 编辑执行器（Edit executor） | `EditExecutor` | 宿主 SPI：`EditTransaction begin(WorldView, Siting, ClaimView, long ledgerRevision, PlanDigest)`。 | — |
 | 叠加层模型（Overlay model） | `OverlayModel` | `(Cuboid bounds, Map<LatticeKey,CellMark> cells, List<Marker> markers)`。 | `OverlayModel` |
 | 格标记（Cell mark） | `CellMark` | `EXPECTED`、`PRESENT`、`MISSING`、`EXTRA`、`WRONG`、`BLOCKED`、`UNKNOWN`。 | `CellStatus` |
 | 标记（Marker） | `Marker` | `(Locus locus, String label, MarkerKind kind)`。 | `Annotation` |
@@ -317,7 +321,6 @@
 | 监视状态（Watch state） | `WatchState` | `CLEAN`、`DIRTY`、`CHECKING`、`BROKEN`、`UNKNOWN`。 | — |
 | 区段存储（Section store） | `SectionStore` | 可选的每世界共享缓存，保存不可变 `SectionSnapshot`；默认是逐快照副本。 | — |
 | 区段快照（Section snapshot） | `SectionSnapshot` | 冻结的 `PalettedContainer<BlockState>` 副本 + 捕获修订号 + 载荷单元格。 | — |
-| 区段槽（Section slot） | `SectionSlot` | `Air` \| `Present(SectionSnapshot)` \| `Refused(status, code)`。 | — |
 | 单元格载荷（Cell payload） | `CellPayload` | 受监视的 BE/实体单元格的 `(LatticeKey, OccupantDescriptor, List<Trait<?>>)`；`OccupantRef` 在读取时用最终 `SnapshotId` 惰性盖上。 | — |
 | 捕获请求 / 上限（Capture request / limits） | `CaptureRequest`, `CaptureLimits` | 边界、策略、网格、受跟踪的类型/单元格，以及上限（单元格、区段、字节、实体、载荷）。 | — |
 | 捕获结果（Capture result） | `CaptureResult` | 密封的 `Captured(WorldView)`、`TooLarge`、`Unavailable(status, code)`；绝不把部分快照当作完整。 | — |

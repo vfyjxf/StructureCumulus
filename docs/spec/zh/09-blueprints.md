@@ -24,6 +24,7 @@
 | 名称 | 契约 |
 | --- | --- |
 | `Bay` record | 具名 `Cuboid` + `Coverage` + `Sharing` + `Footprint` + `Requirement` + 可选描述 |
+| `BayBuilder` final class | `start(id, cells, coverage, footprint, sharing[, description])`、`bayId()`——该舱位的每个检查都把它命名为自己的 `bay`——、`attach(Requirement)`：这两步闭合检查与舱位之间的结，并封存不可变的 `Bay` |
 | `Requirement` record | 一个舱位的 `Check` 与 `Computation`；阶段计划所展开的单元列表 |
 | `Check` record | 计划单元：id、舱位、`Focus<T>`、`Expectation<T>`、描述 |
 | `Coverage` enum | `EVERY_CELL`、`ONE_SUBJECT`、`ANY_SUBJECT`——一次 MATCH 就舱位断言了什么 |
@@ -38,7 +39,7 @@
 | `AnchorResolver` interface | `resolve(blueprint, origin, view) → Outcome<Siting>`；一次属性读取，一次映射 |
 | `OrientationPolicy` record | 允许的朝向变换、提供朝向的角色、直立承诺 |
 | `Blueprint` final class | 编译后的模板；唯一构造路径（§4.6） |
-| `BlueprintBuilder` final class | 流式、可变、非线程安全；在 `build()` 处一次性校验 |
+| `BlueprintBuilder` final class | 流式、可变、非线程安全；在 `build()` 处一次性校验；它只接受已完成的值——`bay(Bay)`，绝不是舱位的各个组成部分 |
 | `DerivationSpec` record | `(deriver, Arguments, output, order)`；是一个引用，不是对象 |
 | `CheckPlan` record | 一个阶段的展开结果：区段计算、聚合计算、派生、检查（§4.8） |
 
@@ -48,11 +49,21 @@
 public record Bay(NamespacedId id, Cuboid cells, Coverage coverage, Footprint footprint,
                   Sharing sharing, Requirement requirement,
                   @Nullable String description) {           // empty cells refused
-    public static Bay of(NamespacedId id, Cuboid cells, Coverage coverage, Footprint footprint,
-                         Sharing sharing, @Nullable String description,
-                         Function<Bay, Requirement> units);  // the check/bay knot, one pass
 }
-public record Requirement(List<Check<?>> checks, List<Computation<?>> computations) {}
+public final class BayBuilder {                             // the check/bay knot, two steps
+    public static BayBuilder start(NamespacedId id, Cuboid cells, Coverage coverage,
+                                   Footprint footprint, Sharing sharing);
+    public static BayBuilder start(NamespacedId id, Cuboid cells, Coverage coverage,
+                                   Footprint footprint, Sharing sharing, @Nullable String description);
+    public NamespacedId bayId();                            // the bay every check of it names
+    public Bay attach(Requirement requirement);             // seals the immutable Bay
+}
+public record Requirement(List<Check<?>> checks, List<Computation<?>> computations) {
+    public Requirement {                                    // a bay that asserts nothing is a seam
+        if (checks.isEmpty() && computations.isEmpty())
+            throw new IllegalArgumentException("SC-CHK-0107: a bay that asserts nothing is a seam, not a bay");
+    }
+}
 
 public enum Coverage { EVERY_CELL, ONE_SUBJECT, ANY_SUBJECT }
 public sealed interface Footprint permits Box, Bound, Declared, None {
@@ -72,10 +83,11 @@ public record Check<T>(NamespacedId id, NamespacedId bay, Focus<T> focus,
 
     public ReadScope reads(Cuboid bayCells) { return focus.reads(bayCells).withKeys(expectation.meta().requires()); }
 
-    public CheckResult run(CheckContext ctx) {
+    public CheckResult run(FocusContext ctx) {
         Outcome<T> taken = focus.take(ctx);
         if (taken instanceof Outcome.Found<T> found) {
-            return new CheckResult(expectation.test(ctx.with(found.value(), found.subjects())),
+            return new CheckResult(
+                    expectation.test(ExpectationContext.of(ctx, found.value(), found.subjects())),
                     found.subjects(), found.notes());
         }
         Outcome.Missing<T> missing = (Outcome.Missing<T>) taken;
@@ -122,14 +134,7 @@ public final class Blueprint {                  // private ctor; builder() is th
 }
 public final class BlueprintBuilder {   // every member returns the builder
     public BlueprintBuilder bounds(Cuboid b);
-    public BlueprintBuilder bay(NamespacedId id, Cuboid c, Coverage cov, Footprint footprint, Sharing sharing);
-    public BlueprintBuilder bay(NamespacedId id, Cuboid c, Coverage cov, Footprint footprint,
-                                Sharing sharing, @Nullable String d);
-    public BlueprintBuilder bay(String path, Cuboid c, Coverage cov, Footprint footprint, Sharing sharing);
-    public <T> BlueprintBuilder check(NamespacedId bay, NamespacedId id, Focus<T> focus,
-                                      Expectation<T> expectation,
-                                      @Nullable String description);   // appends to that bay's Requirement
-    public BlueprintBuilder compute(NamespacedId bay, Computation<?> computation);
+    public BlueprintBuilder bay(Bay bay);                     // a finished Bay: checks travel in its Requirement
     public BlueprintBuilder seam(SeamId id, Cuboid c, SeamKind k);          // + properties overload
     public BlueprintBuilder anchor(AnchorSpec s);
     public BlueprintBuilder orientation(OrientationPolicy p);  public BlueprintBuilder derive(DerivationSpec d);
@@ -150,10 +155,11 @@ public record CheckPlan(Stage stage, List<Computation<?>> computations,
 接受的朝向变换”，绝不是恒等变换，也绝不是 `allowed.get(0)`。每个锚点角色只有一个规格：一个角色
 命名定义原点必须呈现的那一个属性（§4.5），因此没有备选位点可排序，也没有优先级可打平。阶段计划
 是蓝图的纯函数：`expand(S)` 每次重算、从不存储，因此相等的蓝图不可能对计划有分歧。
-一个舱位的 `cells` 非空，它的声明遵守 §4.1 的 R1 与 R4，它的 `requirement` 非空
-——一个不断言任何东西的舱位就是接缝（§4.3）。`Bay` 与 `Check` 互相引用；`Bay.of` 一趟就闭合
-这个结——它把舱位值交给作者，供其挂上检查，而检查记住那个声明值。`bay` 按 `id` 比较与哈希，
-`Requirement` 按各检查的 id 比较与哈希，因此没有相等链会递归（§7.1）。
+一个舱位的 `cells` 非空，它的声明遵守 §4.1 的 R1 与 R4，它的 `requirement` 非空——`Requirement`
+的构造器用 `SC-CHK-0107` 拒绝空的那个，因为一个不断言任何东西的舱位就是接缝（§4.3）。`Bay` 与
+`Check` 互相引用；`BayBuilder` 用两步闭合这个结——`start(...)` 携带声明，`bayId()` 是该舱位每个
+检查都命名的 id，而 `attach(requirement)` 封存不可变的 `Bay`；检查记住那个声明值。`bay` 按 `id`
+比较与哈希，`Requirement` 按各检查的 id 比较与哈希，因此没有相等链会递归（§7.1）。
 
 ## 4. 语义（Semantics）
 
@@ -305,8 +311,8 @@ mymod:mouth_bars is declared twice"`）。
 
 **允许规范化，不允许修复。** 复制集合、排序 `allowed`、规范化 `Overlap` 的顺序、致密化一个阶段
 内的派生顺序都是规范化；钳制一个 `Cuboid`、丢弃空舱位、补上缺失的主锚点、或重排一个阶段计划，
-都会被拒绝。**`String` id 只是语法糖**：`bay("mouth", …)` 即
-`bay(NamespacedId.of(id.namespace(), "mouth"), …)`——位于蓝图命名空间内的一个路径，也是
+都会被拒绝。**`String` id 只是语法糖**：`BayBuilder.start("mouth", …)` 即
+`BayBuilder.start(NamespacedId.of(id.namespace(), "mouth"), …)`——位于蓝图命名空间内的一个路径，也是
 `04-api-doctrine.md` §3.3 允许的唯一 `String` 通道。
 
 ### 4.8 计划与展开（Plans and expansion）
@@ -355,26 +361,31 @@ static NamespacedId id(String path) { return NamespacedId.of("mymod", path); }
 static NamespacedId mc(String path) { return NamespacedId.of("minecraft", path); }
 
 // Huge furnace: shell, door bay, owned cavity; a seam; an anchor; a section computation; a derivation.
+var wall = BayBuilder.start(id("wall"), Cuboid.of(0, 0, 6, 7, 6, 7), Coverage.EVERY_CELL,
+        Sharing.EXCLUSIVE, new Footprint.Bound());
+var mouth = BayBuilder.start(id("mouth"), Cuboid.of(3, 1, 0, 4, 3, 1), Coverage.ONE_SUBJECT,
+        Sharing.EXCLUSIVE, new Footprint.Bound(), "the opening the player sees");
+var interior = BayBuilder.start(id("interior"), Cuboid.of(1, 1, 1, 6, 5, 6), Coverage.EVERY_CELL,
+        Sharing.EXCLUSIVE, new Footprint.Box());          // the empty volume is protected
+
 Blueprint furnace = Blueprint.builder(id("huge_furnace"))
         .bounds(Cuboid.of(0, 0, 0, 7, 6, 7))
-        .bay(id("wall"), Cuboid.of(0, 0, 6, 7, 6, 7), Coverage.EVERY_CELL,
-                Sharing.EXCLUSIVE, new Footprint.Bound())
-        .bay(id("mouth"), Cuboid.of(3, 1, 0, 4, 3, 1), Coverage.ONE_SUBJECT,
-                Sharing.EXCLUSIVE, new Footprint.Bound(), "the opening the player sees")
-        .bay(id("interior"), Cuboid.of(1, 1, 1, 6, 5, 6), Coverage.EVERY_CELL,
-                Sharing.EXCLUSIVE, new Footprint.Box())          // the empty volume is protected
-        .check(id("wall"), id("wall_bricks"), Foci.block(Cuboid.of(0, 0, 6, 7, 6, 7)),
-                Expectations.block(mc("bricks")), null)
-        .check(id("mouth"), id("mouth_door"), Foci.door(LatticePoint.of(3, 1, 0)),
-                Expectations.door(mc("iron_door")), null)             // ONE_SUBJECT: two cells, one claim
-        .check(id("interior"), id("interior_air"), Foci.allCells(), Expectations.air(),
-                null)
+        .bay(wall.attach(new Requirement(List.of(
+                new Check<>(id("wall_bricks"), wall.bayId(), Focuses.bay(),
+                        Expectations.eachCell(Expectations.block(mc("bricks"))), null)), List.of())))
+        .bay(mouth.attach(new Requirement(List.of(
+                new Check<>(id("mouth_door"), mouth.bayId(), Focuses.door(LatticePoint.of(3, 1, 0)),
+                        new OakDoorExpectation(), null)),               // ONE_SUBJECT: two cells, one claim
+                List.of())))
+        .bay(interior.attach(new Requirement(List.of(
+                new Check<>(id("interior_air"), interior.bayId(), Focuses.bay(),
+                        Expectations.eachCell(Expectations.air()), null)),
+                List.of(Computations.volume(id("interior_volume"))))))
         .seam(new SeamId(id("mouth_item")), Cuboid.of(3, 1, 0, 4, 2, 1), SeamKind.ITEM)
         .anchor(new AnchorSpec(AnchorRoles.FRONT, mc("facing"), "east"))  // read at the definition origin
         .orientation(OrientationPolicy.builder(AnchorRoles.FRONT)
                 .allowTurns(Turn.NONE, Turn.CLOCKWISE, Turn.HALF, Turn.COUNTERCLOCKWISE)
                 .uprightOnly().build())
-        .compute(id("interior"), Computations.volume(id("interior_volume")))
         .derive(new DerivationSpec(id("capacity"), Arguments.empty(), id("capacity"), 0))
         .build();   // bayCells() 42 + 2 + 100 = 144; expand(FORM) = interior_volume, barrier,
                     // then wall (42), mouth (2), interior (100) — declaration order
@@ -383,20 +394,20 @@ Blueprint furnace = Blueprint.builder(id("huge_furnace"))
 管道拐角是一个舱位，而不是用 `allOf` 绕开：八个格子被断言，四个被拥有。
 
 ```java
-var corner = Blueprint.builder(id("pipe_corner")).bounds(Cuboid.of(0, 0, 0, 2, 2, 2))
-        .bay(id("corner"), Cuboid.of(0, 0, 0, 2, 2, 2), Coverage.EVERY_CELL,
-                Sharing.EXCLUSIVE, new Footprint.Bound());
+var corner = BayBuilder.start(id("corner"), Cuboid.of(0, 0, 0, 2, 2, 2), Coverage.EVERY_CELL,
+        Sharing.EXCLUSIVE, new Footprint.Bound());
+List<Check<?>> cornerChecks = new ArrayList<>();
 for (LatticePoint p : List.of(LatticePoint.of(0, 0, 0), LatticePoint.of(1, 0, 0),
                               LatticePoint.of(0, 0, 1), LatticePoint.of(1, 0, 1)))
-    corner.check(id("corner"), id("pipe_" + p.x() + p.y() + p.z()),
-            Foci.block(Cuboid.of(p.x(), p.y(), p.z(), p.x() + 1, p.y() + 1, p.z() + 1)),
-            Expectations.block(mc("pipe")), 1, null);
+    cornerChecks.add(new Check<>(id("pipe_" + p.x() + p.y() + p.z()), corner.bayId(),
+            Focuses.occupant(LatticeKey.of(p)), Expectations.block(mc("pipe")), null));
 for (LatticePoint p : List.of(LatticePoint.of(0, 1, 0), LatticePoint.of(1, 1, 0),
                               LatticePoint.of(0, 1, 1), LatticePoint.of(1, 1, 1)))
-    corner.check(id("corner"), id("clear_" + p.x() + p.y() + p.z()),
-            Foci.block(Cuboid.of(p.x(), p.y(), p.z(), p.x() + 1, p.y() + 1, p.z() + 1)),
-            Expectations.air(), 1, null);
-Blueprint pipeCorner = corner.build();
+    cornerChecks.add(new Check<>(id("clear_" + p.x() + p.y() + p.z()), corner.bayId(),
+            Focuses.occupant(LatticeKey.of(p)), Expectations.air(), null));
+Blueprint pipeCorner = Blueprint.builder(id("pipe_corner")).bounds(Cuboid.of(0, 0, 0, 2, 2, 2))
+        .bay(corner.attach(new Requirement(cornerChecks, List.of())))
+        .build();
 // The corner claims its four pipe cells; a neighbour's corner claims its own four, and the four
 // must-be-air cells are asserted by both and owned by neither.
 ```
@@ -404,18 +415,20 @@ Blueprint pipeCorner = corner.build();
 一个参数化外壳片段（`HEIGHT` 是一个 `ParameterKey<Integer>`），放置两次：
 
 ```java
+var floor = BayBuilder.start(id("floor"), Cuboid.of(0, 0, 0, 5, 1, 5), Coverage.EVERY_CELL,
+        Sharing.SHARED, new Footprint.Bound());
+var hollow = BayBuilder.start(id("hollow"), Cuboid.of(1, 1, 1, 4, 3, 4), Coverage.EVERY_CELL,
+        Sharing.SHARED, new Footprint.Bound());
 Segment shell = new Segment(
         new SegmentKey(id("shell"), Arguments.of(Keys.HEIGHT, 3)),
         Cuboid.of(0, 0, 0, 5, 3, 5),
-        List.of(Bay.of(id("floor"), Cuboid.of(0, 0, 0, 5, 1, 5), Coverage.EVERY_CELL,
-                        Sharing.SHARED, new Footprint.Bound(), null,
-                        b -> new Requirement(List.of(new Check<>(id("floor_bricks"), b,
-                                Foci.block(Cuboid.of(0, 0, 0, 5, 1, 5)),
-                                Expectations.block(mc("bricks")), 25, null)), List.of())),
-                Bay.of(id("hollow"), Cuboid.of(1, 1, 1, 4, 3, 4), Coverage.EVERY_CELL,
-                        Sharing.SHARED, new Footprint.Bound(), null,
-                        b -> new Requirement(List.of(new Check<>(id("hollow_air"), b,
-                                Foci.allCells(), Expectations.air(), 36, null)), List.of()))),
+        List.of(floor.attach(new Requirement(List.of(
+                        new Check<>(id("floor_bricks"), floor.bayId(), Focuses.bay(),
+                                Expectations.eachCell(Expectations.block(mc("bricks"))), null)),
+                        List.of())),
+                hollow.attach(new Requirement(List.of(
+                        new Check<>(id("hollow_air"), hollow.bayId(), Focuses.bay(),
+                                Expectations.eachCell(Expectations.air()), null)), List.of()))),
         List.of(new Seam(new SeamId(id("hatch")), Cuboid.of(2, 1, 1, 3, 2, 2), SeamKind.ITEM,
                 Map.of())),
         List.of(new AnchorSpec(AnchorRoles.CENTER, mc("facing"), "north")));
@@ -431,16 +444,18 @@ Blueprint kiln = Blueprint.builder(id("kiln"))
 两个 `EXCLUSIVE` 舱位覆盖同一个格子会被 `build()` 拒绝：
 
 ```java
+var gateDoor = BayBuilder.start(id("door"), Cuboid.of(0, 0, 0, 4, 2, 1), Coverage.EVERY_CELL,
+        Sharing.EXCLUSIVE, new Footprint.Box());
+var gateLintel = BayBuilder.start(id("lintel"), Cuboid.of(0, 1, 0, 4, 3, 1), Coverage.EVERY_CELL,
+        Sharing.EXCLUSIVE, new Footprint.Box());
+Bay doorBay = gateDoor.attach(new Requirement(List.of(new Check<>(id("door_planks"), gateDoor.bayId(),
+        Focuses.bay(), Expectations.eachCell(Expectations.block(mc("oak_planks"))), null)), List.of()));
+Bay lintelBay = gateLintel.attach(new Requirement(List.of(new Check<>(id("lintel_planks"), gateLintel.bayId(),
+        Focuses.bay(), Expectations.eachCell(Expectations.block(mc("oak_planks"))), null)), List.of()));
 assertThrows(IllegalArgumentException.class, () -> Blueprint.builder(id("gate"))
         .bounds(Cuboid.of(0, 0, 0, 4, 4, 4))
-        .bay(id("door"),   Cuboid.of(0, 0, 0, 4, 2, 1), Coverage.EVERY_CELL,
-                Sharing.EXCLUSIVE, new Footprint.Box())
-        .bay(id("lintel"), Cuboid.of(0, 1, 0, 4, 3, 1), Coverage.EVERY_CELL,
-                Sharing.EXCLUSIVE, new Footprint.Box())
-        .check(id("door"), id("door_planks"), Foci.block(Cuboid.of(0, 0, 0, 4, 2, 1)),
-                Expectations.block(mc("oak_planks")), 8, null)
-        .check(id("lintel"), id("lintel_planks"),
-                Foci.block(Cuboid.of(0, 1, 0, 4, 3, 1)), Expectations.block(mc("oak_planks")), 8, null)
+        .bay(doorBay)
+        .bay(lintelBay)
         .build());    // B-7: bays lintel and door overlap at x[0,4) y[1,2) z[0,1)
 ```
 
@@ -498,14 +513,15 @@ Kahn 序，按 `SC-CHK-0102` 是一个 DAG；第 4 步排在它所读取的每�
 使用 `base`（`NamespacedId`、`Arguments`、`ParameterKey`、`Stage`、`Budget`）、`space`（`Cuboid`、
 `CuboidSet`、`LatticePoint`、`Orientation`、`Heading`、`Siting`、`WorldView`；`Turn`/`Tilt`/`Flip`
 仅用于 `allowTurns`）、`base`（`ReadScope`）、`context`（`Computation`、`StatePhase`）、`occupant`（`EntityWindow`）、
-`expectation`（`Focus`、`Expectation`、`Outcome`、`Reply`、`CheckContext`）、`claim`（`Sharing`）。
+`expectation`（`Focus`、`Expectation`、`FocusContext`、`ExpectationContext`、`BayView`、`Outcome`、
+`Reply`）、`claim`（`Sharing`）。
 `LatticePoint` 与各偏转类型超出任务书的参考清单，因为一个偏移量与偏转语法糖没有别的类型可用。
 `AnchorResolver` 是唯一读取 `WorldView` 的成员；视图是实参，因此该值保持无宿主（I-5）。
 
 **假定，待确认：** U0——`Arguments` 具有与顺序无关的值相等（否则 `SegmentKey` 与 `DerivationSpec`
 的身份就是错的）、`Arguments.of(ParameterKey<T>, T)`、`Budget.min`。U1——`Cuboid.isEmpty`、
 `Cuboid.intersects`、`Cuboid.translate(int,int,int)`、`LatticePoint.x()/y()/z()`、
-`Orientation.of(Turn,Tilt,Flip)`、`Orientation.all()` 的顺序。U3——`Foci` 与 `Expectations` 持有者、
+`Orientation.of(Turn,Tilt,Flip)`、`Orientation.all()` 的顺序。U3——`Focuses` 与 `Expectations` 持有者、
 `Focus.reads()`/`reads().union`、`ExpectationMeta.specificity()`。U8——`Computations` 持有者、
 带 `StatePhase` 的一个 `Computation` 及其 `compute(...)` 上下文、`ContextKey`。U9 拥有每个诊断码；
 本文件只命名诊断*位点*（`SC-BPT-…`）。

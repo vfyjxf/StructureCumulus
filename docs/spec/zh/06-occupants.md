@@ -5,8 +5,10 @@
 ## 1. 范围（Scope）
 
 **纳入：** `OccupantKind`、`OccupantRef`、`OccupantDescriptor`、`TraitKey`、`Trait`、
-`OccupantSnapshot`、`NestedView`、`WorldView`、`ReadStatus`、`SnapshotId`、`SnapshotPolicy`、
-`WorldWindow`、`WorldCapture`、`OccupantResolver<R>`、`ResolveContext`。
+`OccupantSnapshot`、`SectionSlot`、`SectionSnapshot`、`NestedView`、`NestedLevelSnapshot`、
+`WorldView`、`OccupantFilter`、`ReadStatus`、`EntityWindow`、`EntityKey`、`ChangeSet`、
+`SnapshotId`、`SnapshotPolicy`、`WorldWindow`、`WorldCapture`、`OccupantResolver<R>`、
+`ResolveContext`。
 
 **排除：** 空间原语（U1）；`Verdict`/`Reply`（U3 —— `expectation` 依赖 `occupant`）；
 `Census`/`ReadSet`（U7）；`Finding`（U9 —— U2 只保留诊断码）；捕获实现（A1）；声明（U4）。
@@ -24,7 +26,14 @@
 | `TraitKey<T>`、`Trait<T>` | 类型化键 `(id, Class<T>)`；一个 `(key, @Nullable value)` 对。 |
 | `OccupantSnapshot` | 不可变读取模型：ref、描述符、占地轮廓、特征、可选的嵌套视图。 |
 | `NestedView` | 子结构的窗口：一个完整的 `WorldView`，同一快照，自有框架，深度有界。 |
-| `WorldView` | 唯一的世界窗口；在其边界内是全函数；从不接触世界。 |
+| `NestedLevelSnapshot` | 一个嵌套占用体冻结的内部，在它自己的框架中读取：`parent()`、`depth()`、`contentDigest()`、`occupantAt(LatticePoint)`、`occupants(Cuboid, OccupantFilter)`。 |
+| `WorldView` | 唯一的世界窗口：每个区段一个 `SectionSlot`，单元格经 `occupant` 应答；从不接触世界。 |
+| `SectionSlot` | 一个区段的回答：`Air`（已读取且为空）、`Present(section)`、`Refused(status, code)`；`readable()` 为 `Air` 或 `Present`。 |
+| `SectionSnapshot` | 一个冻结的区段：`key`、`contentDigest`、`occupantAt(cell)`、`occupants(box, filter)`；每个被枚举的单元格都有应答。 |
+| `OccupantFilter` | 盒查询用的 `(type, kind, trait)` 谓词；为 `null` 的组件不施加约束。 |
+| `EntityWindow` | `(Cuboid cells, NamespacedId type)`：一种实体类型可以在其中移动的盒；`MAX_ENTITY_SPAN = 3`。 |
+| `EntityKey` | `(UUID id, NamespacedId type, long dataDigest)`：一个实体在窗口差异中的身份。 |
+| `ChangeSet` | `(cells, sections, payloads, entities, keys, revision)`：两个修订之间变化了什么；`empty()`，`plus(other)` 保留较晚的修订。 |
 | `ReadStatus` | `READABLE`、`OUT_OF_BOUNDS`、`NOT_CAPTURED`、`DENIED`、`STALE`。 |
 | `SnapshotId`、`SnapshotPolicy`、`WorldWindow` | 捕获标识、其保证、请求的盒。 |
 | `WorldCapture`、`OccupantResolver<R>`、`ResolveContext` | 捕获 SPI、解析器 SPI、解析器上下文。 |
@@ -75,7 +84,7 @@ enum ReadStatus { READABLE, OUT_OF_BOUNDS, NOT_CAPTURED, DENIED, STALE; boolean 
   构造时拒绝 ref 与描述符不一致、空占地轮廓、没有子结构的 `NESTED`。
 - `air(...)`：kind 为 `BLOCK`（该 id 是哨兵），一格，无特征；适配器把每个空世界值映射
   到它。
-- `view.occupant(cell) != null ⇔ view.readStatus(cell) == READABLE`（§7.2）。
+- `view.occupant(cell) != null ⇔ view.slot(SectionKey.of(dimension, cell, cellSize)).readable()`（§7.2）。
 
 ### 3.3 嵌套视图、世界视图与策略
 
@@ -87,21 +96,33 @@ interface NestedView extends WorldView
 
 interface WorldView
     SnapshotId snapshotId()
-    Cuboid bounds()
+    SectionSlot slot(SectionKey key)
     @Nullable OccupantSnapshot occupant(LatticePoint cell)
-    List<OccupantSnapshot> occupants(Cuboid box)
-    ReadStatus readStatus(LatticePoint cell)
-    default @Nullable OccupancySummary summary(Cuboid box) { return null; }   // palette-derived
-    default @Nullable ChunkGrid chunkGrid() { return null; }                  // no chunking
-    default @Nullable ChunkContent chunk(ChunkKey key) { return null; }       // palette facade
-record OccupancySummary(Map<NamespacedId, Integer> byType, int total) {}
-interface ChunkContent {
-    Cuboid bounds(); ReadStatus status(); boolean allAir();
-    boolean maybeHasBlock(NamespacedId type);
-    int countBlock(NamespacedId type);          // -1 = cannot answer
-    @Nullable OccupantSnapshot occupant(LatticePoint cell);
-    ReadStatus readStatus(LatticePoint cell);
-}
+    @Nullable OccupantSnapshot occupant(OccupantRef ref)
+    List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter)
+    @Nullable NestedView nested(LatticePoint cell)
+    long contentDigest(SectionKey key)
+
+sealed interface SectionSlot
+    record Air(long revision) implements SectionSlot
+    record Present(SectionSnapshot section) implements SectionSlot
+    record Refused(ReadStatus status, FindingCode code) implements SectionSlot
+    default boolean readable()      // Air or Present
+
+final class SectionSnapshot
+    SectionKey key()
+    long contentDigest()
+    @Nullable OccupantSnapshot occupantAt(LatticePoint cell)   // null only outside the enumerated cells
+    List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter)
+    static SectionSnapshot of(SectionKey key, Map<LatticePoint, OccupantSnapshot> occupants)
+    static Builder builder(SectionKey key)                     // put, putAll, build
+
+record OccupantFilter(@Nullable Predicate<NamespacedId> type, @Nullable Predicate<OccupantKind> kind,
+                      @Nullable Predicate<NamespacedId> trait)
+    static OccupantFilter any()                                // no component constrains
+    static ofType(NamespacedId), ofKind(OccupantKind), ofTrait(NamespacedId)
+    boolean matches(OccupantSnapshot occupant)
+
 record SnapshotId(World world, long revision) implements Comparable<SnapshotId>
 record WorldWindow(Cuboid bounds, int maxElements)
 record SnapshotPolicy(CaptureMode capture, Set<OccupantKind> requiredKinds,
@@ -112,8 +133,9 @@ record SnapshotPolicy(CaptureMode capture, Set<OccupantKind> requiredKinds,
 ```
 
 嵌套视图**就是**一个完整的 `WorldView`：顶层能问的每个问题都能在下一层以相同的代价类别
-与缺席规则询问（R-01）；改变的只有框架。`bounds()` 是本视图的可寻址盒，其外是
-`OUT_OF_BOUNDS`，绝不是“空”。`revision >= 1`，按世界单调递增。上限是
+与缺席规则询问（R-01）；改变的只有框架。本视图任何区段都不覆盖的单元格，`occupant` 回答
+`null`，其所在区段的槽是 `Refused(OUT_OF_BOUNDS, …)` 或 `Refused(NOT_CAPTURED, …)`，绝不是
+“空”。`revision >= 1`，按世界单调递增。上限是
 `min(window.maxElements(), policy.maxElements)` —— 请求可以降低宿主的承诺，绝不能抬高。
 `requiredTraits` 必须得到回答；无法计算某一项的宿主把它记为缺席（⇒ 不可读），绝不是
 默认值。
@@ -146,14 +168,19 @@ interface ResolveContext
 
 ### 4.1 五种状态；空不等于不可读
 
-| 状态 | `occupant(cell)` | 原因 |
-| --- | --- | --- |
-| `READABLE` | 非空：覆盖该格的占用体，否则为空气 | 在 `snapshotId()` 处已捕获 |
-| `OUT_OF_BOUNDS` | `null` | 在 `bounds()` 之外，或位于另一框架的点 |
-| `NOT_CAPTURED` | `null` | 在界内但无数据：元素上限、深度截断、不支持的区域 |
-| `DENIED` | `null` | 可读但被拒绝：保护、权限、不加载策略 |
-| `STALE` | `null` | 只存在另一修订的值 |
+一个状态是**区段**的回答：`slot(SectionKey)` 返回 `Air`（已读取，且其中没有东西）、
+`Present`（一个冻结的 `SectionSnapshot`）或 `Refused(status, code)`，而单元格经
+`occupant(cell)` 应答，它读取该单元格自己所属的区段。
 
+| 状态 | 携带它的槽 | 原因 |
+| --- | --- | --- |
+| `READABLE` | `Air` 或 `Present`；`occupant(cell)` 为被索引的占用体，否则为空气 | 在 `snapshotId()` 处已捕获 |
+| `OUT_OF_BOUNDS` | `Refused`；`occupant(cell)` 为 `null` | 在已捕获的区段之外，或位于另一框架的点 |
+| `NOT_CAPTURED` | `Refused`；`occupant(cell)` 为 `null` | 在界内但无数据：元素上限、深度截断、不支持的区域 |
+| `DENIED` | `Refused`；`occupant(cell)` 为 `null` | 可读但被拒绝：保护、权限、不加载策略 |
+| `STALE` | `Refused`；`occupant(cell)` 为 `null` | 只存在另一修订的值 |
+
+`Refused` 槽不能携带可读状态：该记录在构造时拒绝它。
 优先级 `OUT_OF_BOUNDS > DENIED > STALE > NOT_CAPTURED > READABLE`。保留诊断码（U3/U7 构建
 诊断项）：`SC-OCC-0101` 越界、`0102` 未捕获、`0103` 被拒绝、`0104` 陈旧、`0201` 占地轮廓
 跨越窗口、`0202` 深度截断、`0203` 环。
@@ -163,7 +190,7 @@ interface ResolveContext
 - **不可读不是否定回答：** `null` 加上不可读状态就是 `UNREADABLE`（U3），进而 `Undecided`
   （U7），而不是 `Failed`。在陈旧区块上返回不匹配的谓词，是在从未查看的情况下断言一堵墙
   不存在；把 `DENIED` 洗成空气，正是让正确内核说谎的宿主 bug。
-- 消费者使用两次调用（先 `occupant`，再 `readStatus`），因为 `WorldView` 是冻结的；U3 的
+- 消费者读取槽以获得状态、读取单元格以获得占用体，因为 `WorldView` 是冻结的；U3 的
   `ExpectationContext.occupantAt` 是安全路径必须成为短路径的地方。
 
 ### 4.2 一种形状，四类来源
@@ -184,7 +211,7 @@ interface ResolveContext
 | --- | --- |
 | 占地轮廓内的单元格 | `occupant(cell)` 整体返回该占用体：一个 2×1 实体的两格给出同一个 ref、同一个描述符。**被覆盖的单元格是 `READABLE`，即使它自己的读取被拒绝或从未尝试**，因为已准入占用体的占地轮廓就是证据；`DENIED` 只适用于没有已准入占用体覆盖的单元格。 |
 | `occupants(box)` | 每个占用体一条，无论它有多少格落在盒内，按 `OccupantRef` 排序；按 `ref` 去重，每个占用体只铸造一次。空气被排除，所以盒查询以元素为界，而不是以体积为界。 |
-| 占地轮廓越过 `bounds()` | 允许，**不裁剪**（I-3）；准入以锚点为准。锚点在外而身体在内的占用体是缺席的，其在内的单元格是 `NOT_CAPTURED`，绝不是空气。 |
+| 占地轮廓越过已捕获的区段 | 允许，**不裁剪**（I-3）；准入以锚点为准。锚点在外而身体在内的占用体是缺席的，其在内的单元格是 `NOT_CAPTURED`，绝不是空气。 |
 | 跨越舱位 | 对 U2 不可见：`occupants(bayCuboid)` 整体返回跨界者，所以 `footprint().volume() > bay.volume()` 可见，由期望决定。 |
 | 一格两个占用体 | 两者都存在；`occupant(cell)` 依次按非空气、再按更小体积、再按 ref 顺序收窄。 |
 
@@ -244,6 +271,22 @@ host thread: capture(window, policy)
 一次尝试，它看到不同的 `SnapshotId` —— 不同的输入，而不是不同的回答。`STALE` 复查会捕获
 新视图；它从不刷新正在运行的视图。id 从不持久化，所以持久状态保存值（U8），绝不保存 ref。
 
+### 4.8 实体窗口与变更集
+
+以区段为粒度的读取，对一个移出自身单元格但仍留在同一区段内的实体是盲的，所以依赖实体的
+读者声明一个 `EntityWindow(Cuboid cells, NamespacedId type)`：一种实体类型可以在其中移动的
+盒。窗口随读取闭包传递（`ReadScope.entities`），与单元格和上下文键并列。
+
+- `MAX_ENTITY_SPAN = 3`；身体在任一轴上宽于三格的类型在 DESIGN 即被拒绝（`SC-BAY-0110`），
+  所以窗口绝不会对它占用体的一部分失明。窗口是所声明的盒按该跨度外扩后的结果。
+- 每个 tick、每个窗口，宿主把实时的 `cell → EntityKey` 集合与已捕获的集合比较；差异把读取
+  闭包命名该窗口的每个单元标脏。加入与离开都标记占地轮廓。这就是 `22` §5.4 所称的向外移动
+  见证。
+- `ChangeSet(Set<LatticeKey> cells, Set<SectionKey> sections, Set<LatticeKey> payloads,
+  Set<EntityKey> entities, Set<NamespacedId> keys, long revision)` 是两个修订之间变化了什么：
+  `empty()` 是无变化值，`plus(other)` 把五个集合并起来并保留较晚的修订，且只有五个集合都为空
+  时 `isEmpty()` 才为真。`keys` 按 id 排序保存，使迭代是确定性的。
+
 ## 5. 参考代码（Reference sketch）
 
 ```java
@@ -253,35 +296,60 @@ record ItemInventory(List<StackCount> stacks) { ItemInventory { stacks = List.co
 static final TraitKey<ItemInventory> ITEM_INVENTORY =
         new TraitKey<>(id("item_inventory"), ItemInventory.class);
 
-final class CapturedView implements WorldView {      // built by capture; indexes and order precomputed
+final class CapturedView implements WorldView {      // built by capture; sections and order precomputed
+    private final NamespacedId dimension;
     private final SnapshotId id;
-    private final Cuboid bounds;
-    private final CuboidSet readable;
-    private final Map<LatticePoint, ReadStatus> refused;       // DENIED / STALE / NOT_CAPTURED, in bounds
-    private final Map<LatticePoint, OccupantSnapshot> covered;  // non-air, by covered cell
-    private final List<OccupantSnapshot> elements;              // canonical order
+    private final int cellSize;                                 // 16 from the adapter
+    private final Map<SectionKey, SectionSlot> slots;           // Air, Present or Refused
+    private final List<OccupantSnapshot> elements;              // canonical order, air excluded
 
     @Override public SnapshotId snapshotId() { return id; }
-    @Override public Cuboid bounds() { return bounds; }
 
-    @Override public ReadStatus readStatus(LatticePoint cell) {
-        if (!bounds.contains(cell)) return ReadStatus.OUT_OF_BOUNDS;
-        ReadStatus here = refused.get(cell);
-        if (here != null) return here;
-        return readable.contains(cell) ? ReadStatus.READABLE : ReadStatus.NOT_CAPTURED;
+    @Override public SectionSlot slot(SectionKey key) {
+        SectionSlot slot = slots.get(key);
+        return slot != null ? slot
+                : new SectionSlot.Refused(ReadStatus.OUT_OF_BOUNDS, FindingCode.of(Family.OCC, 101));
     }
 
     @Override public @Nullable OccupantSnapshot occupant(LatticePoint cell) {
-        if (readStatus(cell) != ReadStatus.READABLE) return null;           // the biconditional
-        OccupantSnapshot o = covered.get(cell);
-        return o != null ? o : OccupantSnapshot.air(id, cell);
+        SectionSlot slot = slots.get(SectionKey.of(dimension, cell, cellSize));
+        if (slot == null || slot instanceof SectionSlot.Refused) return null;     // the biconditional
+        if (slot instanceof SectionSlot.Present present) {
+            OccupantSnapshot found = present.section().occupantAt(cell);
+            if (found != null) return found;
+        }
+        return OccupantSnapshot.air(id, cell);
     }
 
-    @Override public List<OccupantSnapshot> occupants(Cuboid box) {
+    @Override public @Nullable OccupantSnapshot occupant(OccupantRef ref) {
+        for (OccupantSnapshot e : elements) {
+            if (e.ref().equals(ref)) return e;
+        }
+        return null;
+    }
+
+    @Override public List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter) {
         List<OccupantSnapshot> out = new ArrayList<>();
-        for (OccupantSnapshot e : elements)      // sorted by ref once, in the capture constructor
-            if (e.footprint().intersects(box) && readStatus(e.ref().anchor()) == ReadStatus.READABLE) out.add(e);
+        for (OccupantSnapshot e : elements) {    // sorted by ref once, in the capture constructor
+            if (e.footprint().intersects(box) && readable(e.ref().anchor()) && filter.matches(e)) {
+                out.add(e);
+            }
+        }
         return List.copyOf(out);
+    }
+
+    @Override public @Nullable NestedView nested(LatticePoint cell) {
+        OccupantSnapshot occupant = occupant(cell);
+        return occupant == null ? null : occupant.nested();
+    }
+
+    @Override public long contentDigest(SectionKey key) {
+        return slots.get(key) instanceof SectionSlot.Present present
+                ? present.section().contentDigest() : 0L;
+    }
+
+    private boolean readable(LatticePoint cell) {
+        return slot(SectionKey.of(dimension, cell, cellSize)).readable();
     }
 }
 
@@ -303,14 +371,16 @@ static OccupantSnapshot golem(SnapshotId id, LatticePoint min) {   // 2x1 entity
 }
 
 static void inspect(WorldView view, Cuboid hallBox) {
+    NamespacedId overworld = NamespacedId.of("minecraft", "overworld");
+
     view.occupant(LatticePoint.of(3, 64, 4));                                    // one ref for both cells
-    view.occupants(Cuboid.of(3, 64, 4, 5, 65, 5));                               // the golem, listed once
+    view.occupants(Cuboid.of(3, 64, 4, 5, 65, 5), OccupantFilter.any());          // the golem, listed once
 
-    ReadStatus denied = view.readStatus(LatticePoint.of(4, 64, 9));              // DENIED
+    SectionSlot denied = view.slot(SectionKey.of(overworld, LatticePoint.of(4, 64, 9), 16));      // Refused(DENIED, …)
     OccupantSnapshot none = view.occupant(LatticePoint.of(4, 64, 9));            // null, never air
-    ReadStatus outside = view.readStatus(LatticePoint.of(-1, 64, 0));            // OUT_OF_BOUNDS
+    SectionSlot outside = view.slot(SectionKey.of(overworld, LatticePoint.of(-1, 64, 0), 16));    // Refused(OUT_OF_BOUNDS, …)
 
-    for (OccupantSnapshot o : view.occupants(hallBox)) {
+    for (OccupantSnapshot o : view.occupants(hallBox, OccupantFilter.ofKind(OccupantKind.NESTED))) {
         NestedView inner = o.nested();
         if (inner == null || inner.depth() > 2) continue;
         boolean sameCapture = inner.snapshotId().equals(view.snapshotId());      // true
@@ -326,6 +396,7 @@ static void inspect(WorldView view, Cuboid hallBox) {
 | 附加包 | 需要物品栏的舱口；想要子结构内部的熔炉舱位 | `has(...)` 作免费测试，`trait(...)` 作计费测试，`nested()` 取内部 |
 | 附加包 | 一扇门：两格、两个占用体、一个覆盖舱位的期望 | `occupants(bayCuboid)` 整体返回两者；没有体素形状（R-06） |
 | 宿主 | 用于 `/cumulus validate` 的 `LevelCapture`；kernelTest 假视图 | 两个 SPI 加一个基于 map 的 `CapturedView`：服务端与测试共用一条代码路径 |
+| 宿主 | 一个实体走出其单元格之后的监视 | 窗口差异标记读取闭包命名该窗口的单元；下一次 `check` 只重跑这些单元 |
 | 宿主 | 建造魔杖预览 | 确定性的 `occupants` 顺序：同一快照的两次预览完全一致 |
 
 ## 7. 证明（Proofs）
@@ -334,7 +405,8 @@ static void inspect(WorldView view, Cuboid hallBox) {
    `resolve`，且 `kernel.occupant` 只导入 `base` 与 `space`。*反例：* 委托给活关卡的宿主
    满足接口却破坏 I-4 —— 这是宿主承诺，由适配器“关卡关闭后视图仍能应答”的测试抓住。
 2. **不可变性与状态不变量。** 构造函数做规范化，没有 setter；`occupant` 是
-   `readStatus != READABLE ? null : getOrDefault(cell, air)`。*反例：* 把调用方的 map 直接
+   `slot(SectionKey.of(dimension, cell, cellSize)) instanceof SectionSlot.Refused ? null :
+   section.occupantAt(cell)`，可读区段中未应答的单元格取空气。*反例：* 把调用方的 map 直接
    交出去的描述符会改变正在运行的匹配。
 3. **多单元格一致性。** 每个占用体一个 ref，映射到它覆盖的每一格；`occupants` 过滤元素
    列表，所以去重靠同一性。*反例：* 每格一个 ref ⇒ 两个元素、翻倍的普查、被重复记账的
@@ -350,7 +422,8 @@ static void inspect(WorldView view, Cuboid hallBox) {
 ## 8. 依赖与待决问题（Dependencies and open questions）
 
 **依赖。** U0：`NamespacedId`、`Checks`。U1：`LatticePoint`、`LatticeKey.of/toPoint`、
-`Cuboid.of/contains/intersects/volume`、`CuboidSet.contains`。**使用方。** U3、U4、U7、U8、
+`Cuboid.of/contains/intersects/volume`、`CuboidSet.contains`、`SectionKey.of`/`sectionOf`、
+`ChunkGrid`。**使用方。** U3、U4、U7、U8、
 U10、U11、A1。
 
 | # | 问题 | 立场 |

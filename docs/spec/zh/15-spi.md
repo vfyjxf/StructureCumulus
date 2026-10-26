@@ -7,7 +7,7 @@
 
 | 拥有 | 不拥有 |
 | --- | --- |
-| `NamespacedId`——唯一的命名类型、它的语法与全序 | 格、长方体、安放位（`05`） |
+| `NamespacedId` 的语法与全序——唯一的命名类型；记录本身属于 U0（`kernel.base`、`01` §B） | 格、长方体、安放位（`05`） |
 | `Catalog<T>`、`Catalogs`、`ContextKeys`——冻结的扩展快照与唯一的键工厂 | 被存储的类型：`ExpectationFactory`（`07`）、`FocusFactory`/`ComputationFactory`（`11`）、`RemedyProvider`（`14`）、`FindingCode`/`ExplainBook`（`13`） |
 | `StructureKernel`——九个操作、它们的不变量、线程约定 | 匹配、计算或补救*意味着*什么（`11`、`12`、`14`） |
 | `Stability`、随附的 `Codes`、I-8 这条线 | 语法（`10`）、诊断码格式（`13`）、每个宿主端口 |
@@ -22,9 +22,9 @@
 | 名称 | 形态 | 定义 |
 | --- | --- | --- |
 | `NamespacedId` | 记录 `(namespace, path)`，`Comparable` | `ns:path`；唯一的命名类型；先按命名空间、再按路径排序 |
-| `Catalog<T>` / `.Builder<T>` | 接口 / 嵌套构建器 | 一个冻结的、带命名空间的、按插入顺序排列的家族；`get` 是 `@Nullable`；构建器是唯一可变形态 |
+| `Catalog<T>` / `.Builder<T>` | final 类 / 嵌套构建器 | 一个冻结的、带命名空间的、按插入顺序排列的家族，其自身的 id 由 `family()` 给出；`get` 是 `@Nullable`；构建器是唯一可变形态，并拒绝为同一个 id 提供第二个不同的值 |
 | `Catalogs` | 接口 | 七个冻结家族加解释手册，对应一个内核 |
-| `ContextKeys` | final 类 | `ContextKey` 的唯一构造者；在 `build()` 之前注册进 `Catalogs` 草稿（重复注册为 `SC-CTX-0102`） |
+| `ContextKeys` | final 类 | `ContextKey` 的唯一构造者，也是它唯一的注册漏斗：`of(...)` 构建，`register(draft, key)` 绑定进 `Catalogs.Builder` 所实现的草稿，重复注册就在此时被拒绝（`SC-CTX-0102`） |
 | `StructureKernel` | 接口，静态工厂 | 九个操作：`document`、`compile`、`siting`、`check`、`settle`、`derive`、`solve`、`explain`、`ledger`；`create` 是静态工厂 |
 | `MatchResult` | 密封接口，`AutoCloseable` | `Admitted`、`Dropped`、`Formed`、`Failed`、`Undecided`、`Deferred`；只有 `Formed` 携带声明与修订，且只有 `settle` 产出它 |
 | `Host` | 嵌套记录 | 创建时固定的只读端口：`DocumentSource`、`SegmentLibrary`、`@Nullable ClaimLedger` |
@@ -34,7 +34,7 @@
 ## 3. API 设计（API design）
 
 ```java
-package dev.vfyjxf.cumulus.kernel.spi;                              // @NullMarked
+package dev.vfyjxf.cumulus.kernel.base;                             // @NullMarked
 
 public record NamespacedId(String namespace, String path) implements Comparable<NamespacedId> {
     public static final String DEFAULT_NAMESPACE = "structurecumulus";
@@ -44,18 +44,29 @@ public record NamespacedId(String namespace, String path) implements Comparable<
     public String text();                                           // "ns:path"
     @Override public int compareTo(NamespacedId other);             // namespace, then path, code point
 }
+```
 
-public interface Catalog<T> {
-    NamespacedId id();                                              // the family
-    @Nullable T get(NamespacedId id);                               // null = not registered
-    List<NamespacedId> ids();                                       // frozen, registration order
-    SequencedMap<NamespacedId, T> asMap();                          // unmodifiable, same order
-    int size();  boolean isEmpty();
-    static <T> Builder<T> builder(NamespacedId family);
-    static <T> Catalog<T> empty(NamespacedId family);
-    interface Builder<T> {
-        Builder<T> put(NamespacedId id, T value);                   // records a duplicate for build() to refuse
-        Catalog<T> build();                                         // IAE on a repeated id; idempotent
+`NamespacedId` 是 `kernel.base` 的，与其他 id 并列；本单元只是使用它。
+
+```java
+package dev.vfyjxf.cumulus.kernel.spi;                              // @NullMarked
+
+public final class Catalog<T> {
+    public NamespacedId family();                                   // the family's own id
+    public @Nullable T get(NamespacedId id);                        // null = not registered
+    public T require(NamespacedId id);                              // IAE naming the family and the id
+    public boolean has(NamespacedId id);
+    public List<NamespacedId> ids();                                // frozen, registration order
+    public Map<NamespacedId, T> asMap();                            // unmodifiable, same order
+    public int size();  public boolean isEmpty();
+    public static <T> Catalog<T> empty(NamespacedId family);
+    public static <T> Builder<T> builder(NamespacedId family);
+
+    public static final class Builder<T> {
+        public Builder<T> put(NamespacedId id, T value);            // a different value for one id is an IAE here
+        public Builder<T> putAll(Catalog<T> catalog);
+        public Builder<T> fill(Map<NamespacedId, T> values);
+        public Catalog<T> build();                                  // frozen copy, ids in registration order
     }
 }
 
@@ -85,12 +96,11 @@ public interface Catalogs {
     }
 }
 
-public final class ContextKeys {
-    public static <T> ContextKey<T> register(Catalogs.Builder draft, NamespacedId id, Class<T> type,
-                                             Retention retention, @Nullable Merge<T> merge,
-                                             @Nullable T whenAbsent);
-    public static <T> ContextKey<T> register(Catalogs.Builder draft, ContextKey<T> declared);
-    // A repeated id is refused by draft.build() as an IAE whose message names SC-CTX-0102 (§4.8).
+public final class ContextKeys {                                    // kernel.context
+    public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention,
+                                       @Nullable Merge<T> merge, @Nullable T whenAbsent);
+    public static <T> ContextKey<T> register(CatalogsDraft draft, ContextKey<T> declared);
+    // A repeated id is refused when it registers, not at build(); the message names SC-CTX-0102 (§4.8).
 }
 
 public interface StructureKernel {
@@ -140,8 +150,9 @@ public sealed interface MatchResult extends AutoCloseable {
 
 `create` 固定 `(Catalogs, Host)`；没有任何成员修改这两者，也不存储别的东西。`asMap()` 之所以存
 在，是因为 `Catalog` 也被 `context` 的计划编译器消费，后者接受 `Map<NamespacedId, …>`，且不得
-导入 `spi`（`02` §2）。`ContextKeys` 放在这里而不是与键类型放在一起，原因相同：它是*注册*——
-接受草稿并返回键——而草稿类型属于本单元。
+导入 `spi`（`02` §2）。`ContextKeys` 与键类型一起位于 `kernel.context`，原因相同：它是*注册*
+——接受草稿并返回键——而草稿是 `kernel.context` 的 `CatalogsDraft`，一个由本单元的
+`Catalogs.Builder` 实现的接口，因此没有任何 `context` 类型导入 `spi`。
 
 `Formed` 是唯一携带 `ClaimSet` 的分支，而且只有 `settle` 产出它：`Admitted` 既没有 id 也没有
 声明（`derive` 会拒绝它），它改为携带计划中的声明与 `check` 读到的账本修订，因此调用方可以
@@ -170,9 +181,10 @@ public sealed interface MatchResult extends AutoCloseable {
 
 ### 4.2 `Catalog<T>`：冻结，以及为何不用静态注册表
 
-`put` 按引用存储实例，从不克隆；`build()` 一趟把 id 复制进冻结列表加一个索引，并以
-`IllegalArgumentException` 拒绝重复 id，同时指名两个值。冻结后的类型没有修改器，因此
-`get`/`ids`/`asMap` 是 `O(1)` 且不会失败：冻结是类型事实，不是运行时标志。
+`put` 按引用存储实例，从不克隆，并在同一个 id 出现第二个*不同的*值时立即以
+`IllegalArgumentException` 拒绝，同时指名该家族与该 id；重新放入同一个实例是空操作。`build()`
+一趟把 id 复制进冻结列表加一个索引。冻结后的类型没有修改器，因此 `get`/`ids`/`asMap` 是
+`O(1)` 且不会失败：冻结是类型事实，不是运行时标志。
 
 静态注册表会成为全局可变状态（I-15），依赖类加载顺序，每个 JVM 只允许一个快照（无法做黄金对
 比，无法并行测试），而且没有冻结，等于给 I-4 的元组增加一个隐藏参数。目录是一个值。
@@ -203,7 +215,7 @@ public sealed interface MatchResult extends AutoCloseable {
 被采纳）。插件通过调用自己的 `Catalog.builder(...).put(...).build()` 方法，并在唯一一次
 `create` 之前把它们交给 `Catalogs.builder()` 来加入；插件永远看不到内核。
 `ContextKeys.register(draft, …)` 是键进入 `:contextKeys` 的途径：草稿是唯一能对照将要与之一
-冻结的目录来校验声明的地方，而同一个 id 的第二次注册会在 `build()` 处被拒绝
+冻结的目录来校验声明的地方，而同一个 id 的第二次注册会在注册时被拒绝
 （`SC-CTX-0102`），无论两条记录的其他组件如何。
 
 ### 4.4 九个操作（The nine operations）
@@ -457,7 +469,7 @@ try (MatchResult result = kernel.settle(request, admitted)) {
 
 | # | 主张 | 能破坏它的测试 |
 | --- | --- | --- |
-| F1 | 冲突被拒绝，永不被消解 | 两个目录都注册 `mymod:hatch`，两次 `ContextKeys.register` 调用取同一个 id，或两个命名空间都注册 `SC-EXP-1234`：`build()` 抛异常并指名两个键，且没有任何内核持有其中任何一对。静默保留第一个才是 bug。 |
+| F1 | 冲突被拒绝，永不被消解 | 两个目录都注册 `mymod:hatch`，两次 `ContextKeys.register` 调用取同一个 id，或两个命名空间都注册 `SC-EXP-1234`：第二次 `put`／注册抛异常并指名该家族与该 id，且没有任何内核持有其中任何一对，而重新放入同一个实例是空操作。静默保留第一个才是 bug。 |
 | F2 | 目录变更之后内核永不改变 | 留存两个构建器，构建内核，再 `put` 更多条目并再次构建：`check`、`settle`、`derive`、`solve`、`explain` 与全新内核完全一致。 |
 | F3 | 没有门面操作读取世界 | 统计 `WorldView` 上的读取次数；调用 `document`、`compile`、`explain`、`explainOrFallback`、`ledger`：计数保持为零。然后用一个*不同的*桩作为请求的视图调用 `check`：只有那一个被读取，而 `siting` 恰好读取它自己实参的一个格。 |
 | F4 | 没有插件需要内核子类 | 写一个改变引擎步骤顺序、增加第十个操作或遮蔽随附诊断码的插件。若其中任何一项不编辑 `kernel.spi` 就能表达，“一个内核，多种扩展”即为假；今天这三项都被冻结的类型拒绝。 |

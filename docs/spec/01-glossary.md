@@ -208,7 +208,7 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Anchor candidate | `AnchorCandidate` | `(NamespacedId role, LatticePoint cell, Orientation implied, int score)`. | `AnchorCandidate` |
 | Fingerprint | `Fingerprint` | `(long high, long low)` digest of prescreen content; stable across runs. | `Fingerprint` |
 | Read set | `ReadSet` | `(CuboidSet cells, Set<ChunkKey> chunks, Set<OccupantRef> occupants)` actually read. | `ReadSet` |
-| Change set | `ChangeSet` | `(Set<LatticeKey> changed, Set<ChunkKey> chunks, Set<NamespacedId> changedTypes, long revision)`. | `ChangeSet` |
+| Change set | `ChangeSet` | `(Set<LatticeKey> cells, Set<SectionKey> sections, Set<LatticeKey> payloads, Set<EntityKey> entities, Set<NamespacedId> keys, long revision)`. | `ChangeSet` |
 | Invalidation index | `InvalidationIndex` | `List<InstanceRef> affectedBy(ChangeSet)`. | `InvalidationIndex` |
 | Instance ref | `InstanceRef` | `(NamespacedId blueprint, Siting siting, long generation)`. | — |
 | Instance id | `InstanceId` | `(World world, long serial)`: the identity of one placed structure. It keys its own `StructureContext` store, so two instances publishing one key never collide, and it is what a `KEY` locus names. | — |
@@ -322,7 +322,6 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Watch state | `WatchState` | `CLEAN`, `DIRTY`, `CHECKING`, `BROKEN`, `UNKNOWN`. | — |
 | Section store | `SectionStore` | Optional per-world shared cache of immutable `SectionSnapshot`s; default is per-snapshot copies. | — |
 | Section snapshot | `SectionSnapshot` | Frozen `PalettedContainer<BlockState>` copy + capture revision + payload cells. | — |
-| Section slot | `SectionSlot` | `Air` \| `Present(SectionSnapshot)` \| `Refused(status, code)`. | — |
 | Cell payload | `CellPayload` | `(LatticeKey, OccupantDescriptor, List<Trait<?>>)` for a watched BE/entity cell; the `OccupantRef` is stamped with the final `SnapshotId` lazily. | — |
 | Capture request / limits | `CaptureRequest`, `CaptureLimits` | Bounds, policy, grid, tracked types/cells, caps (cells, sections, bytes, entities, payloads). | — |
 | Capture result | `CaptureResult` | Sealed `Captured(WorldView)`, `TooLarge`, `Unavailable(status, code)`; never a partial snapshot treated as complete. | — |

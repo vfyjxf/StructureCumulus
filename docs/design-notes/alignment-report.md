@@ -536,8 +536,8 @@ L 另外指出四句引用需要改口径（方向不变）：`Bay.java` 里的 
 | --- | --- |
 | `Codes` 在 `12:246`、`13:658-726`、`14:341-345`、`15:32` 的其余引用 | `Codes` 这个类型存不存在是 `Q19`，待定 |
 | `01` §I 的 `ReadSet` 行（与 `ReadScope` 重复） | 一个类型还是两个是 `Q4`，待定 |
-| `ChangeSet` 的两套分量（`01:213` vs `06` §4.8） | `MQ-11`，待定 |
-| `NestedView` 还是 `NestedLevelSnapshot` | `C-14` 是 `RULE` 行，待定 |
+| `ChangeSet` 的两套分量 | `01` §I 已改成代码的六分量（与 `06` §4.8 一致）；`MQ-11` 仍待定的是"要不要两种形态（变更提示 vs 逐格标记）"，不是分量 |
+| `NestedView` 还是 `NestedLevelSnapshot` | `C-14` 是 `RULE` 行，待定。补一条事实：`16`/`22` 写的是实现类、`06` 写的是接口，而 `NestedLevelSnapshot implements NestedView`，所以两者**可以并存**（协变返回），真正待定的只是"子视图是不是完整 `WorldView`"，不是名字 |
 | `06` §3.4 的捕获 SPI（`CaptureResult`/`SnapshotPolicy`/`OccupantResolver`） | `C-15` 是 `RULE` 行，待定；且代码里这些都还不存在 |
 | `18` §2 的测试层名（`.../expectation`、`.../finding`、`.../remedy`） | 打包归属是 `DOC` 判定，属代码迁移 |
 | `kernel.expectation` 还是 `kernel.predicate`（`07` 标题、`00` §5、`03` §3、`01` §E 头、`06` §1） | `d-D1` 是 `DOC` 判定：文档的 `expectation` 为准，代码的 `predicate` 在迁移批里改 |

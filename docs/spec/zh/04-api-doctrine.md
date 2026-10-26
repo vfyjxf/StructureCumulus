@@ -112,8 +112,8 @@ switch (result) {
 
 ## 6. 构建器与不可变性（Builders and immutability）
 
-- 组件多于四个的值**仅当**多数组件可选时才配一个构建器。`Blueprint` 与
-  `MatchRequest` 符合；`LatticePoint`、`Cuboid`、`Claim` 和 `Finding` 不符合。
+- 组件多于四个的值**仅当**多数组件可选时才配一个构建器。`Blueprint`、`MatchRequest` 与
+  `Finding` 符合；`LatticePoint`、`Cuboid` 与 `Claim` 不符合。
 - 构建器是可变的、非线程安全的，`build()` 只校验一次。构建出的值不可变。
 - 除非必须缓存派生字段，每个值类型都是 `record`；被缓存的字段是 `private final`，且不
   参与相等判定。
@@ -210,24 +210,24 @@ if (compiled.blueprint() != null) {
 
 ```java
 public final class HatchExpectation implements Expectation {
-    public static final BindingKey<OccupantRef> HATCH = BindingKeys.of("hatch", OccupantRef.class);
+    public static final BindingKey<OccupantRef> HATCH = BindingKey.of("hatch", OccupantRef.class);
 
     @Override
     public ExpectationMeta meta() {
-        return new ExpectationMeta(NamespacedId.of("mymod", "hatch"), 4, Set.of(Traits.ITEM_INVENTORY));
+        return ExpectationMeta.of(NamespacedId.of("mymod", "hatch"), 4, FindingCode.of(Family.EXP, 1));
     }
 
     @Override
     public Reply test(ExpectationContext ctx) {
         OccupantSnapshot occupant = ctx.occupantAt(ctx.cells().min());
         if (occupant == null) {
-            return Reply.unreadable(Finding.builder(Codes.UNREADABLE_CELL)
+            return Reply.unreadable(Finding.builder(FindingCode.of(Family.FOC, 301))
                     .stage(ctx.stage())
                     .label(ctx.locus(), "this cell was not readable")
                     .build());
         }
         if (!occupant.has(Traits.ITEM_INVENTORY)) {
-            return Reply.mismatch(Finding.builder(Codes.EXPECTED_INVENTORY)
+            return Reply.mismatch(Finding.builder(FindingCode.of(Family.EXP, 1))
                     .stage(ctx.stage())
                     .label(ctx.locus(), "expected an inventory-bearing hatch")
                     .note("found " + occupant.descriptor().type())

@@ -15,8 +15,7 @@
 任何内核类型都不得与 `net.minecraft.**` 类型或常被导入的 JDK 类型同名。可操作的规则：
 
 - 若同一适配器文件中很可能 import 一个同名的 Minecraft 类，该名字即被禁用。
-- 若该名字是 `java.util.function` 接口、`java.util` 集合、`java.time` 值类型，或
-  `javax.tools`/`javax.swing`/`java.awt` UI 类型，该名字即被禁用。
+- 若该名字是 `java.util.function` 接口、`java.util` 集合或 `java.time` 值类型，该名字即被禁用。
 - 被禁用的概念取一个领域词，而不是加前缀。`Turn` 优于 `CumulusRotation`。
 - 适配器包本身就是命名空间。适配器类按 Minecraft 侧的角色命名（`LevelSnapshot`、
   `LevelCapture`、`WorldEdits`），绝不加机械的 `Mc`/`Vanilla` 前缀。与内核类型冲突时，
@@ -48,7 +47,7 @@
 
 | 后缀 / 形状 | 含义 | 示例 |
 | --- | --- | --- |
-| `record` | 具备结构化相等的不可变值 | `LatticePoint`、`Finding`、`Claim` |
+| `record` | 具备结构化相等的不可变值 | `LatticePoint`、`Finding`、`Claim`、`KeyLocus` |
 | `sealed interface` + record | 调用方以 switch 覆盖的封闭家族 | `MatchResult`、`Edit`、`Remedy` |
 | 普通 `interface` | 扩展点或只读视图 | `Expectation`、`WorldView`、`ClaimLedger` |
 | `*Key<T>` | 携带 `Class<T>` 令牌的类型化标识 | `ContextKey<T>`、`TraitKey<T>` |
@@ -61,7 +60,7 @@
 | `*Policy` | 一小组成员可选项，改变行为 | `OrientationPolicy`、`MatchPolicy` |
 | `*Mode` | 从几种语义中择一的枚举 | `CacheMode` |
 | `*Options` | 面向宿主调用的旋钮，带默认值 | `FindingOptions`、`SolveOptions` |
-| `*Context` | 一次调用中扩展可见的内容 | `ExpectationContext`、`DerivationContext`、`RemedyContext` |
+| `*Context` | 一次调用中扩展可见的内容 | `ExpectationContext`、`DeriveContext`、`RemedyContext` |
 | `*Factory` | 在目录中注册的数据驱动构造器 | `ExpectationFactory` |
 | `*Provider` | 返回多个候选答案的扩展 | `RemedyProvider` |
 | `*Sink` | 推送型消费者 | `FindingSink` |
