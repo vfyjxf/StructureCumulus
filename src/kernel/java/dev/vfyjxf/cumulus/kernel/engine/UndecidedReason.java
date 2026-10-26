@@ -1,12 +1,13 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
-/** Why an attempt reached no verdict; the reason names the stop, never the verdict. */
+/** Why an attempt has no verdict. */
 public enum UndecidedReason {
     BUDGET_EXHAUSTED,
-    DIRTY_UNSTABLE,
+    CANCELLED,
+    UNREADABLE,
+    ABSTAINED,
+    NO_CHECKS,
+    LEDGER_UNAVAILABLE,
     LEDGER_MOVED,
-    SUBJECT_ABSENT,
-    LEASE_CLOSED,
-    WORKER_FAILED,
     DESIGN_DEFECT
 }

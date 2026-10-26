@@ -1,76 +1,66 @@
 package dev.vfyjxf.cumulus.kernel.context;
 
-import dev.vfyjxf.cumulus.kernel.base.FindingBundle;
-import dev.vfyjxf.cumulus.kernel.base.InstanceId;
-import dev.vfyjxf.cumulus.kernel.base.Outcome;
+import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
+import dev.vfyjxf.cumulus.kernel.core.Retention;
+import dev.vfyjxf.cumulus.kernel.core.Spend;
+import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+/** The per-instance value store. One writer per instance. */
+public interface ContextStore {
 
-/** The single publication point of one instance; every write is a draft published against a base revision. */
-public final class ContextStore {
+    StructureContext context(InstanceId instance);
 
-    private final InstanceId instance;
-    private volatile StructureContext context;
+    StructureContext publish(InstanceId instance, Map<ContextKey<?>, Object> values,
+                             FindingBundle findings, Spend spend);
 
-    public ContextStore(InstanceId instance) {
-        this.instance = Objects.requireNonNull(instance, "instance");
-        this.context = StructureContext.empty(instance);
-    }
+    static ContextStore inMemory() {
+        return new ContextStore() {
+            private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator
+                    .comparing((ContextKey<?> key) -> key.id())
+                    .thenComparing(key -> key.type().getName());
+            private final ConcurrentHashMap<InstanceId, StructureContext> contexts =
+                    new ConcurrentHashMap<>();
 
-    public InstanceId instance() {
-        return instance;
-    }
+            @Override
+            public StructureContext context(InstanceId instance) {
+                Objects.requireNonNull(instance, "instance");
+                return contexts.computeIfAbsent(instance, StructureContext::empty);
+            }
 
-    public long revision() {
-        return context.revision();
-    }
-
-    public StructureContext context(InstanceId instance) {
-        Objects.requireNonNull(instance, "instance");
-        if (!this.instance.equals(instance)) {
-            throw new IllegalArgumentException("instance");
-        }
-        return context;
-    }
-
-    public ContextDraft draft(ContextTier tier, long baseRevision) {
-        Objects.requireNonNull(tier, "tier");
-        return new ContextDraft(this, tier, baseRevision);
-    }
-
-    public synchronized Outcome<Void> publish(ContextDraft draft) {
-        Objects.requireNonNull(draft, "draft");
-        if (!draft.ownedBy(this)) {
-            throw new IllegalArgumentException("draft");
-        }
-        if (draft.consumed()) {
-            throw new IllegalStateException("draft already published");
-        }
-        StructureContext current = context;
-        if (draft.baseRevision() != current.revision()) {
-            draft.consume();
-            return new Outcome.Missing<>(ContextFindings.bundle(
-                    ContextFindings.staleBase(instance, draft.baseRevision(), current.revision())));
-        }
-        FindingBundle conflicts = draft.conflictFindings();
-        if (!conflicts.isEmpty()) {
-            draft.consume();
-            return new Outcome.Missing<>(conflicts);
-        }
-        long nextRevision = current.revision() + 1;
-        ContextFrame frame = draft.buildFrame(nextRevision);
-        List<ContextFrame> frames = new ArrayList<>(current.frames());
-        frames.add(frame);
-        context = new StructureContext(instance, nextRevision, frames);
-        draft.consume();
-        return success();
-    }
-
-    private static Outcome<Void> success() {
-        @SuppressWarnings("NullAway")
-        Outcome<Void> published = new Outcome.Found<>(null, List.of(), FindingBundle.empty());
-        return published;
+            @Override
+            public StructureContext publish(InstanceId instance,
+                                            Map<ContextKey<?>, Object> values,
+                                            FindingBundle findings, Spend spend) {
+                Objects.requireNonNull(instance, "instance");
+                Objects.requireNonNull(values, "values");
+                Objects.requireNonNull(findings, "findings");
+                Objects.requireNonNull(spend, "spend");
+                for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
+                    Objects.requireNonNull(entry.getKey(), "key");
+                    Objects.requireNonNull(entry.getValue(), "value");
+                    if (entry.getKey().retention() != Retention.INSTANCE) {
+                        throw new IllegalArgumentException(
+                                "only INSTANCE values are published: " + entry.getKey().id());
+                    }
+                }
+                return contexts.compute(instance, (ignored, current) -> {
+                    StructureContext base = current == null
+                            ? StructureContext.empty(instance) : current;
+                    TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(KEY_ORDER);
+                    merged.putAll(base.values());
+                    merged.putAll(values);
+                    return new StructureContext(instance, base.revision() + 1,
+                            Collections.unmodifiableMap(merged), findings,
+                            base.spend().plus(spend));
+                });
+            }
+        };
     }
 }

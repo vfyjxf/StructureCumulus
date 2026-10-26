@@ -1,12 +1,15 @@
 package dev.vfyjxf.cumulus.kernel.space;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.TreeSet;
-import org.jspecify.annotations.Nullable;
-
+/** A canonical, disjoint, sorted set of boxes. */
 public final class CuboidSet {
 
     private static final CuboidSet EMPTY = new CuboidSet(List.of());
@@ -22,86 +25,67 @@ public final class CuboidSet {
     }
 
     public static CuboidSet of(Cuboid... boxes) {
-        return of(List.of(boxes));
+        return of(Arrays.asList(boxes));
     }
 
     public static CuboidSet of(Collection<Cuboid> boxes) {
-        List<Cuboid> solid = new ArrayList<>(boxes.size());
+        Objects.requireNonNull(boxes, "boxes");
+        List<Cuboid> nonEmpty = new ArrayList<>();
         for (Cuboid box : boxes) {
+            Objects.requireNonNull(box, "box");
             if (!box.isEmpty()) {
-                solid.add(box);
+                nonEmpty.add(box);
             }
         }
-        if (solid.isEmpty()) {
+        if (nonEmpty.isEmpty()) {
             return EMPTY;
         }
-        List<Integer> xs = boundaries(solid, Axis.X);
-        List<Integer> zs = boundaries(solid, Axis.Z);
-        List<Cuboid> pieces = new ArrayList<>();
-        for (int i = 0; i + 1 < xs.size(); i++) {
-            int x0 = xs.get(i);
-            int x1 = xs.get(i + 1);
-            List<Cuboid> slab = new ArrayList<>();
-            for (Cuboid box : solid) {
-                if (box.min().x() <= x0 && box.max().x() >= x1) {
-                    slab.add(box);
+        TreeSet<Integer> xBoundaries = new TreeSet<>();
+        TreeSet<Integer> zBoundaries = new TreeSet<>();
+        for (Cuboid box : nonEmpty) {
+            xBoundaries.add(box.min().x());
+            xBoundaries.add(box.max().x());
+            zBoundaries.add(box.min().z());
+            zBoundaries.add(box.max().z());
+        }
+        List<Integer> xs = List.copyOf(xBoundaries);
+        List<Integer> zs = List.copyOf(zBoundaries);
+        List<Cuboid> result = new ArrayList<>();
+        for (int xi = 0; xi < xs.size() - 1; xi++) {
+            int x0 = xs.get(xi);
+            int x1 = xs.get(xi + 1);
+            for (int zi = 0; zi < zs.size() - 1; zi++) {
+                int z0 = zs.get(zi);
+                int z1 = zs.get(zi + 1);
+                record Interval(int lo, int hi) { }
+                List<Interval> intervals = new ArrayList<>();
+                for (Cuboid box : nonEmpty) {
+                    if (box.min().x() <= x0 && x1 <= box.max().x()
+                            && box.min().z() <= z0 && z1 <= box.max().z()) {
+                        intervals.add(new Interval(box.min().y(), box.max().y()));
+                    }
                 }
-            }
-            if (slab.isEmpty()) {
-                continue;
-            }
-            List<Integer> slabZ = boundaries(slab, Axis.Z);
-            for (int j = 0; j + 1 < slabZ.size(); j++) {
-                int z0 = slabZ.get(j);
-                int z1 = slabZ.get(j + 1);
-                mergeColumn(slab, x0, x1, z0, z1, pieces);
-            }
-        }
-        pieces.sort(null);
-        return new CuboidSet(List.copyOf(pieces));
-    }
-
-    private static void mergeColumn(List<Cuboid> slab, int x0, int x1, int z0, int z1, List<Cuboid> pieces) {
-        List<Cuboid> column = new ArrayList<>();
-        for (Cuboid box : slab) {
-            if (box.min().z() <= z0 && box.max().z() >= z1) {
-                column.add(box);
+                if (intervals.isEmpty()) {
+                    continue;
+                }
+                intervals.sort(Comparator.comparingInt(Interval::lo).thenComparingInt(Interval::hi));
+                int lo = intervals.get(0).lo();
+                int hi = intervals.get(0).hi();
+                for (int i = 1; i < intervals.size(); i++) {
+                    Interval next = intervals.get(i);
+                    if (next.lo() < hi) {
+                        hi = Math.max(hi, next.hi());
+                    } else {
+                        result.add(Cuboid.of(x0, lo, z0, x1, hi, z1));
+                        lo = next.lo();
+                        hi = next.hi();
+                    }
+                }
+                result.add(Cuboid.of(x0, lo, z0, x1, hi, z1));
             }
         }
-        if (column.isEmpty()) {
-            return;
-        }
-        column.sort(Comparator.comparingInt(box -> box.min().y()));
-        int start = column.get(0).min().y();
-        int end = column.get(0).max().y();
-        for (int i = 1; i < column.size(); i++) {
-            Cuboid next = column.get(i);
-            if (next.min().y() < end) {
-                end = Math.max(end, next.max().y());
-            } else {
-                pieces.add(Cuboid.of(x0, start, z0, x1, end, z1));
-                start = next.min().y();
-                end = next.max().y();
-            }
-        }
-        pieces.add(Cuboid.of(x0, start, z0, x1, end, z1));
-    }
-
-    private static List<Integer> boundaries(List<Cuboid> boxes, Axis axis) {
-        TreeSet<Integer> values = new TreeSet<>();
-        for (Cuboid box : boxes) {
-            values.add(coordinate(box.min(), axis));
-            values.add(coordinate(box.max(), axis));
-        }
-        return new ArrayList<>(values);
-    }
-
-    private static int coordinate(LatticePoint point, Axis axis) {
-        return switch (axis) {
-            case X -> point.x();
-            case Y -> point.y();
-            case Z -> point.z();
-        };
+        result.sort(Comparator.naturalOrder());
+        return new CuboidSet(List.copyOf(result));
     }
 
     public List<Cuboid> boxes() {
@@ -117,10 +101,13 @@ public final class CuboidSet {
     }
 
     public long volume() {
-        long total = 0L;
+        long total = 0;
         for (Cuboid box : boxes) {
             long volume = box.volume();
-            total = Long.MAX_VALUE - total < volume ? Long.MAX_VALUE : total + volume;
+            if (total > Long.MAX_VALUE - volume) {
+                return Long.MAX_VALUE;
+            }
+            total += volume;
         }
         return total;
     }
@@ -129,16 +116,26 @@ public final class CuboidSet {
         if (boxes.isEmpty()) {
             return null;
         }
-        Cuboid bounds = boxes.get(0);
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+        int minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE;
+        int maxY = Integer.MIN_VALUE;
+        int maxZ = Integer.MIN_VALUE;
         for (Cuboid box : boxes) {
-            bounds = bounds.bounding(box);
+            minX = Math.min(minX, box.min().x());
+            minY = Math.min(minY, box.min().y());
+            minZ = Math.min(minZ, box.min().z());
+            maxX = Math.max(maxX, box.max().x());
+            maxY = Math.max(maxY, box.max().y());
+            maxZ = Math.max(maxZ, box.max().z());
         }
-        return bounds;
+        return Cuboid.of(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
-    public boolean contains(LatticePoint point) {
+    public boolean contains(LatticePoint cell) {
         for (Cuboid box : boxes) {
-            if (box.contains(point)) {
+            if (box.contains(cell)) {
                 return true;
             }
         }
@@ -146,10 +143,12 @@ public final class CuboidSet {
     }
 
     public boolean containsAll(CuboidSet other) {
+        Objects.requireNonNull(other, "other");
         return other.subtract(this).isEmpty();
     }
 
     public boolean intersects(CuboidSet other) {
+        Objects.requireNonNull(other, "other");
         for (Cuboid a : boxes) {
             for (Cuboid b : other.boxes) {
                 if (a.intersects(b)) {
@@ -161,16 +160,11 @@ public final class CuboidSet {
     }
 
     public CuboidSet union(CuboidSet other) {
-        if (other.isEmpty()) {
-            return this;
-        }
-        if (isEmpty()) {
-            return other;
-        }
-        List<Cuboid> merged = new ArrayList<>(boxes.size() + other.boxes.size());
-        merged.addAll(boxes);
-        merged.addAll(other.boxes);
-        return of(merged);
+        Objects.requireNonNull(other, "other");
+        List<Cuboid> all = new ArrayList<>(boxes.size() + other.boxes.size());
+        all.addAll(boxes);
+        all.addAll(other.boxes);
+        return of(all);
     }
 
     public CuboidSet union(Cuboid box) {
@@ -178,19 +172,17 @@ public final class CuboidSet {
     }
 
     public CuboidSet intersect(CuboidSet other) {
-        if (isEmpty() || other.isEmpty()) {
-            return EMPTY;
-        }
-        List<Cuboid> pieces = new ArrayList<>();
+        Objects.requireNonNull(other, "other");
+        List<Cuboid> result = new ArrayList<>();
         for (Cuboid a : boxes) {
             for (Cuboid b : other.boxes) {
-                Cuboid piece = a.intersect(b);
-                if (piece != null) {
-                    pieces.add(piece);
+                Cuboid intersection = a.intersect(b);
+                if (intersection != null) {
+                    result.add(intersection);
                 }
             }
         }
-        return of(pieces);
+        return of(result);
     }
 
     public CuboidSet intersect(Cuboid box) {
@@ -198,73 +190,68 @@ public final class CuboidSet {
     }
 
     public CuboidSet subtract(CuboidSet other) {
-        if (isEmpty() || other.isEmpty()) {
-            return this;
-        }
-        CuboidSet result = this;
-        for (Cuboid box : other.boxes) {
-            result = result.subtract(box);
-            if (result.isEmpty()) {
-                return EMPTY;
+        Objects.requireNonNull(other, "other");
+        List<Cuboid> current = new ArrayList<>(boxes);
+        for (Cuboid cut : other.boxes) {
+            List<Cuboid> next = new ArrayList<>();
+            for (Cuboid box : current) {
+                next.addAll(subtractOne(box, cut));
             }
+            current = next;
         }
-        return result;
+        return of(current);
     }
 
-    public CuboidSet subtract(Cuboid removed) {
-        if (isEmpty() || removed.isEmpty()) {
-            return this;
+    public CuboidSet subtract(Cuboid box) {
+        return subtract(of(box));
+    }
+
+    private static List<Cuboid> subtractOne(Cuboid a, Cuboid b) {
+        if (!a.intersects(b)) {
+            return List.of(a);
         }
-        List<Cuboid> pieces = new ArrayList<>();
-        for (Cuboid box : boxes) {
-            if (!box.intersects(removed)) {
-                pieces.add(box);
-                continue;
-            }
-            int lowX = Math.max(box.min().x(), removed.min().x());
-            int highX = Math.min(box.max().x(), removed.max().x());
-            int lowY = Math.max(box.min().y(), removed.min().y());
-            int highY = Math.min(box.max().y(), removed.max().y());
-            int lowZ = Math.max(box.min().z(), removed.min().z());
-            int highZ = Math.min(box.max().z(), removed.max().z());
-            if (box.min().x() < lowX) {
-                pieces.add(Cuboid.of(box.min().x(), box.min().y(), box.min().z(),
-                        lowX, box.max().y(), box.max().z()));
-            }
-            if (highX < box.max().x()) {
-                pieces.add(Cuboid.of(highX, box.min().y(), box.min().z(),
-                        box.max().x(), box.max().y(), box.max().z()));
-            }
-            if (box.min().y() < lowY) {
-                pieces.add(Cuboid.of(lowX, box.min().y(), box.min().z(),
-                        highX, lowY, box.max().z()));
-            }
-            if (highY < box.max().y()) {
-                pieces.add(Cuboid.of(lowX, highY, box.min().z(),
-                        highX, box.max().y(), box.max().z()));
-            }
-            if (box.min().z() < lowZ) {
-                pieces.add(Cuboid.of(lowX, lowY, box.min().z(),
-                        highX, highY, lowZ));
-            }
-            if (highZ < box.max().z()) {
-                pieces.add(Cuboid.of(lowX, lowY, highZ,
-                        highX, highY, box.max().z()));
-            }
+        List<Cuboid> pieces = new ArrayList<>(6);
+        if (a.min().x() < b.min().x()) {
+            pieces.add(Cuboid.of(a.min().x(), a.min().y(), a.min().z(),
+                    b.min().x(), a.max().y(), a.max().z()));
         }
-        return of(pieces);
+        if (b.max().x() < a.max().x()) {
+            pieces.add(Cuboid.of(b.max().x(), a.min().y(), a.min().z(),
+                    a.max().x(), a.max().y(), a.max().z()));
+        }
+        int x0 = Math.max(a.min().x(), b.min().x());
+        int x1 = Math.min(a.max().x(), b.max().x());
+        if (a.min().z() < b.min().z()) {
+            pieces.add(Cuboid.of(x0, a.min().y(), a.min().z(), x1, a.max().y(), b.min().z()));
+        }
+        if (b.max().z() < a.max().z()) {
+            pieces.add(Cuboid.of(x0, a.min().y(), b.max().z(), x1, a.max().y(), a.max().z()));
+        }
+        int z0 = Math.max(a.min().z(), b.min().z());
+        int z1 = Math.min(a.max().z(), b.max().z());
+        if (a.min().y() < b.min().y()) {
+            pieces.add(Cuboid.of(x0, a.min().y(), z0, x1, b.min().y(), z1));
+        }
+        if (b.max().y() < a.max().y()) {
+            pieces.add(Cuboid.of(x0, b.max().y(), z0, x1, a.max().y(), z1));
+        }
+        return pieces;
     }
 
     public @Nullable CuboidSet translate(int dx, int dy, int dz) {
-        List<Cuboid> moved = new ArrayList<>(boxes.size());
+        List<Cuboid> translated = new ArrayList<>(boxes.size());
         for (Cuboid box : boxes) {
-            Cuboid image = box.translate(dx, dy, dz);
-            if (image == null) {
+            Cuboid moved = box.translate(dx, dy, dz);
+            if (moved == null) {
                 return null;
             }
-            moved.add(image);
+            translated.add(moved);
         }
-        return of(moved);
+        return new CuboidSet(List.copyOf(translated));
+    }
+
+    public boolean contentEquals(CuboidSet other) {
+        return containsAll(other) && other.containsAll(this);
     }
 
     @Override

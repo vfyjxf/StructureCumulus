@@ -2,42 +2,66 @@ package dev.vfyjxf.cumulus.kernel.space;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
+/** An orientation plus an integer offset. */
 public record Placement(Orientation orientation, LatticePoint offset) {
 
     public static final Placement IDENTITY = new Placement(Orientation.IDENTITY, LatticePoint.ORIGIN);
 
-    public @Nullable LatticePoint apply(LatticePoint local) {
-        LatticePoint rotated = orientation.apply(local);
-        return rotated == null ? null : rotated.offset(offset.x(), offset.y(), offset.z());
+    public Placement {
+        Objects.requireNonNull(orientation, "orientation");
+        Objects.requireNonNull(offset, "offset");
     }
 
-    /** {@code other} first, then this placement. */
     public @Nullable Placement compose(Placement other) {
-        LatticePoint shifted = orientation.apply(other.offset);
-        if (shifted == null) {
+        Objects.requireNonNull(other, "other");
+        Orientation orientation = this.orientation.compose(other.orientation);
+        LatticePoint rotated = this.orientation.apply(other.offset);
+        if (rotated == null) {
             return null;
         }
-        LatticePoint summed = shifted.offset(offset.x(), offset.y(), offset.z());
-        if (summed == null) {
-            return null;
-        }
-        return new Placement(orientation.compose(other.orientation), summed);
+        LatticePoint translated = rotated.offset(offset.x(), offset.y(), offset.z());
+        return translated == null ? null : new Placement(orientation, translated);
     }
 
     public @Nullable Placement inverse() {
-        Orientation inverse = orientation.inverse();
-        LatticePoint rotated = inverse.apply(offset);
+        LatticePoint rotated = orientation.inverse().apply(offset);
         if (rotated == null) {
             return null;
         }
         LatticePoint negated = negate(rotated);
-        return negated == null ? null : new Placement(inverse, negated);
+        return negated == null ? null : new Placement(orientation.inverse(), negated);
+    }
+
+    public @Nullable LatticePoint apply(LatticePoint point) {
+        LatticePoint rotated = orientation.apply(point);
+        if (rotated == null) {
+            return null;
+        }
+        return rotated.offset(offset.x(), offset.y(), offset.z());
+    }
+
+    public @Nullable Cuboid apply(Cuboid cuboid) {
+        Cuboid rotated = orientation.apply(cuboid);
+        if (rotated == null) {
+            return null;
+        }
+        return rotated.translate(offset.x(), offset.y(), offset.z());
+    }
+
+    public @Nullable CuboidSet apply(CuboidSet cells) {
+        CuboidSet rotated = orientation.apply(cells);
+        if (rotated == null) {
+            return null;
+        }
+        return rotated.translate(offset.x(), offset.y(), offset.z());
     }
 
     private static @Nullable LatticePoint negate(LatticePoint point) {
-        int x = -point.x();
-        int y = -point.y();
-        int z = -point.z();
-        return LatticePoint.inLattice(x, y, z) ? LatticePoint.of(x, y, z) : null;
+        if (point.x() == LatticePoint.MIN_XZ || point.y() == LatticePoint.MIN_Y
+                || point.z() == LatticePoint.MIN_XZ) {
+            return null;
+        }
+        return LatticePoint.of(-point.x(), -point.y(), -point.z());
     }
 }

@@ -13,7 +13,7 @@ export const PAGES: PageMeta[] = [
     zone: 'B-4',
     stage: 'DESIGN',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §1.4, §2, §3', 'docs/spec/22-consolidated-design.md §1–§3'],
+    sources: ['docs/design/04-api.md §1.4, §2, §3', 'docs/design/02-model.md §1–§3'],
   },
   {
     id: 'mission',
@@ -27,7 +27,7 @@ export const PAGES: PageMeta[] = [
     zone: 'A-2',
     stage: 'SETTLE',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §2', 'docs/spec/22-consolidated-design.md §7–§10', 'docs/spec/17-worked-example.md'],
+    sources: ['docs/design/04-api.md §2', 'docs/design/02-model.md §7–§10', 'docs/design/04-api.md'],
   },
   {
     id: 'space',
@@ -41,7 +41,7 @@ export const PAGES: PageMeta[] = [
     zone: 'C-3',
     stage: 'DESIGN',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §3.1', 'docs/spec/22-consolidated-design.md §4', 'docs/spec/05-space.md §4.4–§4.6'],
+    sources: ['docs/design/04-api.md §3.1', 'docs/design/02-model.md §4', 'docs/modules/space.md §4.4–§4.6'],
   },
   {
     id: 'authoring',
@@ -55,7 +55,7 @@ export const PAGES: PageMeta[] = [
     zone: 'D-5',
     stage: 'DESIGN',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §1.2–§1.4', 'docs/spec/22-consolidated-design.md §6.4'],
+    sources: ['docs/design/04-api.md §1.2–§1.4', 'docs/design/02-model.md §6.4'],
   },
   {
     id: 'anatomy',
@@ -69,7 +69,7 @@ export const PAGES: PageMeta[] = [
     zone: 'B-6',
     stage: 'FORM',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §1.4', 'docs/spec/17-worked-example.md §1–§3', 'docs/spec/22-consolidated-design.md §6.5'],
+    sources: ['docs/design/04-api.md §1.4', 'docs/design/04-api.md §1–§3', 'docs/design/02-model.md §6.5'],
   },
   {
     id: 'voxel',
@@ -83,7 +83,7 @@ export const PAGES: PageMeta[] = [
     zone: 'B-7',
     stage: 'FORM',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §1.4, §3.1–§3.2', 'docs/spec/22-consolidated-design.md §5, §6.5'],
+    sources: ['docs/design/04-api.md §1.4, §3.1–§3.2', 'docs/design/02-model.md §5, §6.5'],
   },
   {
     id: 'slice',
@@ -97,7 +97,7 @@ export const PAGES: PageMeta[] = [
     zone: 'B-8',
     stage: 'FORM',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §1.4, §3.5', 'docs/spec/22-consolidated-design.md §5, §10.2'],
+    sources: ['docs/design/04-api.md §1.4, §3.5', 'docs/design/02-model.md §5, §10.2'],
   },
   {
     id: 'predicates',
@@ -111,7 +111,7 @@ export const PAGES: PageMeta[] = [
     zone: 'D-2',
     stage: 'FORM',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §3.3, §4', 'docs/spec/22-consolidated-design.md §6.1–§6.3, §7.4'],
+    sources: ['docs/design/04-api.md §3.3, §4', 'docs/design/02-model.md §6.1–§6.3, §7.4'],
   },
   {
     id: 'context',
@@ -125,7 +125,7 @@ export const PAGES: PageMeta[] = [
     zone: 'E-4',
     stage: 'FORM',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §3.4, §2', 'docs/spec/22-consolidated-design.md §7–§8', 'docs/spec/12-context.md §4'],
+    sources: ['docs/design/04-api.md §3.4, §2', 'docs/design/02-model.md §7–§8', 'docs/modules/context.md §4'],
   },
   {
     id: 'pipeline',
@@ -139,7 +139,7 @@ export const PAGES: PageMeta[] = [
     zone: 'C-5',
     stage: 'SETTLE',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §2', 'docs/spec/22-consolidated-design.md §9–§10.5', 'docs/spec/11-engine.md §4.4'],
+    sources: ['docs/design/04-api.md §2', 'docs/design/02-model.md §9–§10.5', 'docs/modules/engine.md §4.4'],
   },
   {
     id: 'claims',
@@ -153,7 +153,7 @@ export const PAGES: PageMeta[] = [
     zone: 'F-5',
     stage: 'SETTLE',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §3.6', 'docs/spec/22-consolidated-design.md §10.1–§10.3', 'docs/spec/08-claims.md'],
+    sources: ['docs/design/04-api.md §3.6', 'docs/design/02-model.md §10.1–§10.3', 'docs/modules/claim.md'],
   },
   {
     id: 'results',
@@ -167,7 +167,7 @@ export const PAGES: PageMeta[] = [
     zone: 'D-7',
     stage: 'STALE',
     stamp: 'INTERNAL',
-    sources: ['docs/guide.zh.md §3.7', 'docs/spec/22-consolidated-design.md §10.4, §11.1', 'docs/spec/13-findings.md §4'],
+    sources: ['docs/design/04-api.md §3.7', 'docs/design/02-model.md §10.4, §11.1', 'docs/modules/finding.md §4'],
   },
   {
     id: 'glossary',
@@ -181,7 +181,7 @@ export const PAGES: PageMeta[] = [
     zone: 'A-1',
     stage: 'DESIGN',
     stamp: 'UNCLASSIFIED',
-    sources: ['docs/guide.zh.md §1.4, §3, §8', 'docs/spec/22-consolidated-design.md §6–§10'],
+    sources: ['docs/design/04-api.md §1.4, §3, §8', 'docs/design/02-model.md §6–§10'],
   },
 ];
 

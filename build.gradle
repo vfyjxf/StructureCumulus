@@ -213,7 +213,7 @@ tasks.withType(JavaCompile).configureEach {
     options.errorprone {
         disableAllChecks = true
         option("NullAway:OnlyNullMarked", "true")
-        option("NullAway:CastToNonNullMethod", "dev.vfyjxf.cumulus.util.Checks.checkNotNull")
+        option("NullAway:CastToNonNullMethod", "dev.vfyjxf.cumulus.kernel.core.Checks.checkNotNull")
         check("NullAway", CheckSeverity.ERROR)
     }
 }

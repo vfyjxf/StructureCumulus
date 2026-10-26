@@ -1,10 +1,17 @@
 package dev.vfyjxf.cumulus.kernel.context;
 
-import dev.vfyjxf.cumulus.kernel.base.Outcome;
+import dev.vfyjxf.cumulus.kernel.core.Budget;
+import dev.vfyjxf.cumulus.kernel.core.CancelToken;
+import dev.vfyjxf.cumulus.kernel.core.ContextView;
+import dev.vfyjxf.cumulus.kernel.finding.Finding;
+/** What a derivation sees. */
+public interface DeriveContext extends ContextView {
 
-public interface DeriveContext {
+    StructureContext base();
 
-    <T> Outcome<T> read(ContextKey<T> key);
+    Budget remaining();
 
-    ContextView context();
+    CancelToken cancel();
+
+    void report(Finding finding);
 }

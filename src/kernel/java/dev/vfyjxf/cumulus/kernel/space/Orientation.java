@@ -1,51 +1,60 @@
 package dev.vfyjxf.cumulus.kernel.space;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+/** One of the 48 signed axis permutations. */
 public record Orientation(int ordinal) implements Comparable<Orientation> {
-
-    private static final int COUNT = 48;
-    private static final int IDENTITY_CODE = encode(new int[] {0, 1, 2}, new int[] {1, 1, 1});
-    private static final int MIRROR_CODE = encode(new int[] {0, 1, 2}, new int[] {-1, 1, 1});
-
-    private static final Turn[] TURNS = Turn.values();
-    private static final Tilt[] TILTS = Tilt.values();
-    private static final int[] MATRIX = new int[COUNT];
-    private static final int[] ORDINAL = new int[512];
-    private static final List<Orientation> ALL;
 
     public static final Orientation IDENTITY = new Orientation(0);
 
+    private static final int[][][] MATRICES = new int[48][][];
+    private static final Turn[] TURNS = new Turn[48];
+    private static final Tilt[] TILTS = new Tilt[48];
+    private static final boolean[] MIRRORS = new boolean[48];
+    private static final Map<String, Integer> ORDINALS = new HashMap<>();
+    private static final List<Orientation> ALL;
+
     static {
-        Arrays.fill(ORDINAL, -1);
-        for (int index = 0; index < COUNT; index++) {
-            int turn = index / 12;
-            int tilt = (index % 12) / 2;
-            boolean mirror = (index & 1) == 1;
-            int code = multiply(turnCode(TURNS[turn]),
-                    multiply(tiltCode(TILTS[tilt]), mirror ? MIRROR_CODE : IDENTITY_CODE));
-            MATRIX[index] = code;
-            ORDINAL[code] = index;
+        List<Orientation> all = new ArrayList<>(48);
+        int[][] identity = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+        int[][] frontBack = Flip.FRONT_BACK.matrix();
+        for (int turn = 0; turn < 4; turn++) {
+            for (int tilt = 0; tilt < 6; tilt++) {
+                for (int parity = 0; parity < 2; parity++) {
+                    int ordinal = (turn * 6 + tilt) * 2 + parity;
+                    int[][] matrix = multiply(
+                            Turn.values()[turn].matrix(),
+                            multiply(Tilt.values()[tilt].matrix(),
+                                    parity == 0 ? identity : frontBack));
+                    MATRICES[ordinal] = matrix;
+                    TURNS[ordinal] = Turn.values()[turn];
+                    TILTS[ordinal] = Tilt.values()[tilt];
+                    MIRRORS[ordinal] = determinant(matrix) < 0;
+                    ORDINALS.put(key(matrix), ordinal);
+                    all.add(new Orientation(ordinal));
+                }
+            }
         }
-        Orientation[] all = new Orientation[COUNT];
-        for (int index = 0; index < COUNT; index++) {
-            all[index] = new Orientation(index);
-        }
-        ALL = List.of(all);
+        ALL = List.copyOf(all);
     }
 
     public Orientation {
-        if (ordinal < 0 || ordinal >= COUNT) {
-            throw new IllegalArgumentException("ordinal must be within 0..47: " + ordinal);
+        if (ordinal < 0 || ordinal >= 48) {
+            throw new IllegalArgumentException("ordinal must be 0..47");
         }
     }
 
     public static Orientation of(Turn turn, Tilt tilt, Flip flip) {
-        int code = multiply(turnCode(turn), multiply(tiltCode(tilt), flipCode(flip)));
-        return ofMatrix(code);
+        int[][] matrix = multiply(turn.matrix(), multiply(tilt.matrix(), flip.matrix()));
+        Integer ordinal = ORDINALS.get(key(matrix));
+        if (ordinal == null) {
+            throw new IllegalStateException("generator triple is not an orientation");
+        }
+        return new Orientation(ordinal);
     }
 
     public static List<Orientation> all() {
@@ -53,83 +62,100 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
     }
 
     public Orientation compose(Orientation other) {
-        return ofMatrix(multiply(matrix(), other.matrix()));
-    }
-
-    /** This orientation, then {@code other}. */
-    public Orientation then(Orientation other) {
-        return ofMatrix(multiply(other.matrix(), matrix()));
+        int[][] matrix = multiply(MATRICES[ordinal], MATRICES[other.ordinal]);
+        Integer result = ORDINALS.get(key(matrix));
+        if (result == null) {
+            throw new IllegalStateException("composition left the group");
+        }
+        return new Orientation(result);
     }
 
     public Orientation inverse() {
-        return ofMatrix(invert(matrix()));
+        int[][] inverse = transpose(MATRICES[ordinal]);
+        Integer result = ORDINALS.get(key(inverse));
+        if (result == null) {
+            throw new IllegalStateException("inverse left the group");
+        }
+        return new Orientation(result);
     }
 
     public Heading apply(Heading heading) {
-        int[] vector = vector(heading);
-        int code = matrix();
-        int[] image = new int[3];
-        for (int axis = 0; axis < 3; axis++) {
-            image[axis] = sign(code, axis) * vector[perm(code, axis)];
-        }
-        return headingOf(image);
+        int[] vector = applyVector(heading.stepX(), heading.stepY(), heading.stepZ());
+        return Heading.ofStep(vector[0], vector[1], vector[2]);
     }
 
     public @Nullable LatticePoint apply(LatticePoint point) {
-        int code = matrix();
-        int x = sign(code, 0) * coordinate(point, perm(code, 0));
-        int y = sign(code, 1) * coordinate(point, perm(code, 1));
-        int z = sign(code, 2) * coordinate(point, perm(code, 2));
-        return LatticePoint.inLattice(x, y, z) ? new LatticePoint(x, y, z) : null;
-    }
-
-    public @Nullable Cuboid apply(Cuboid box) {
-        int code = matrix();
-        int[] low = new int[3];
-        int[] high = new int[3];
-        for (int axis = 0; axis < 3; axis++) {
-            int source = perm(code, axis);
-            if (sign(code, axis) > 0) {
-                low[axis] = coordinate(box.min(), source);
-                high[axis] = coordinate(box.max(), source);
-            } else {
-                low[axis] = 1 - coordinate(box.max(), source);
-                high[axis] = 1 - coordinate(box.min(), source);
-            }
-        }
-        if (!LatticePoint.inLattice(low[0], low[1], low[2])
-                || !LatticePoint.inLattice(high[0], high[1], high[2])) {
+        int[] vector = applyVector(point.x(), point.y(), point.z());
+        if (!LatticePoint.inLattice(vector[0], vector[1], vector[2])) {
             return null;
         }
-        return Cuboid.of(low[0], low[1], low[2], high[0], high[1], high[2]);
+        return LatticePoint.of(vector[0], vector[1], vector[2]);
+    }
+
+    public @Nullable Cuboid apply(Cuboid cuboid) {
+        int[] lo = new int[3];
+        int[] hi = new int[3];
+        int[][] matrix = MATRICES[ordinal];
+        for (int axis = 0; axis < 3; axis++) {
+            int source = -1;
+            int sign = 0;
+            for (int column = 0; column < 3; column++) {
+                if (matrix[axis][column] != 0) {
+                    source = column;
+                    sign = matrix[axis][column];
+                }
+            }
+            if (source < 0) {
+                throw new IllegalStateException("not a signed permutation");
+            }
+            int[] min = {cuboid.min().x(), cuboid.min().y(), cuboid.min().z()};
+            int[] max = {cuboid.max().x(), cuboid.max().y(), cuboid.max().z()};
+            if (sign > 0) {
+                lo[axis] = min[source];
+                hi[axis] = max[source];
+            } else {
+                lo[axis] = 1 - max[source];
+                hi[axis] = 1 - min[source];
+            }
+        }
+        if (!LatticePoint.inLattice(lo[0], lo[1], lo[2])
+                || !LatticePoint.inLattice(hi[0], hi[1], hi[2])) {
+            return null;
+        }
+        return Cuboid.of(lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
     }
 
     public @Nullable CuboidSet apply(CuboidSet cells) {
-        List<Cuboid> images = new ArrayList<>(cells.boxCount());
+        List<Cuboid> boxes = new ArrayList<>(cells.boxCount());
         for (Cuboid box : cells.boxes()) {
             Cuboid image = apply(box);
             if (image == null) {
                 return null;
             }
-            images.add(image);
+            boxes.add(image);
         }
-        return CuboidSet.of(images);
+        return CuboidSet.of(boxes);
     }
 
     public Turn turn() {
-        return TURNS[ordinal / 12];
+        return TURNS[ordinal];
     }
 
     public Tilt tilt() {
-        return TILTS[(ordinal % 12) / 2];
+        return TILTS[ordinal];
     }
 
     public boolean isMirror() {
-        return (ordinal & 1) == 1;
+        return MIRRORS[ordinal];
     }
 
-    public int id() {
-        return ordinal;
+    private int[] applyVector(int x, int y, int z) {
+        int[][] matrix = MATRICES[ordinal];
+        int[] result = new int[3];
+        for (int axis = 0; axis < 3; axis++) {
+            result[axis] = matrix[axis][0] * x + matrix[axis][1] * y + matrix[axis][2] * z;
+        }
+        return result;
     }
 
     @Override
@@ -137,111 +163,49 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
         return Integer.compare(ordinal, other.ordinal);
     }
 
-    private int matrix() {
-        return MATRIX[ordinal];
-    }
-
-    private static Orientation ofMatrix(int code) {
-        int index = ORDINAL[code];
-        if (index < 0) {
-            throw new IllegalStateException("not a lattice isometry: " + code);
+    private static int[][] multiply(int[][] left, int[][] right) {
+        int[][] result = new int[3][3];
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                int value = 0;
+                for (int k = 0; k < 3; k++) {
+                    value += left[row][k] * right[k][column];
+                }
+                result[row][column] = value;
+            }
         }
-        return new Orientation(index);
+        return result;
     }
 
-    private static int encode(int[] perm, int[] signs) {
-        return perm[0]
-                | perm[1] << 2
-                | perm[2] << 4
-                | (signs[0] < 0 ? 1 : 0) << 6
-                | (signs[1] < 0 ? 1 : 0) << 7
-                | (signs[2] < 0 ? 1 : 0) << 8;
-    }
-
-    private static int perm(int code, int axis) {
-        return (code >>> (2 * axis)) & 0b11;
-    }
-
-    private static int sign(int code, int axis) {
-        return ((code >>> (6 + axis)) & 1) == 0 ? 1 : -1;
-    }
-
-    private static int multiply(int first, int second) {
-        int[] perm = new int[3];
-        int[] signs = new int[3];
-        for (int axis = 0; axis < 3; axis++) {
-            int outer = perm(first, axis);
-            perm[axis] = perm(second, outer);
-            signs[axis] = sign(first, axis) * sign(second, outer);
+    private static int[][] transpose(int[][] matrix) {
+        int[][] result = new int[3][3];
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                result[row][column] = matrix[column][row];
+            }
         }
-        return encode(perm, signs);
+        return result;
     }
 
-    private static int invert(int code) {
-        int[] perm = new int[3];
-        int[] signs = new int[3];
-        for (int axis = 0; axis < 3; axis++) {
-            int local = perm(code, axis);
-            perm[local] = axis;
-            signs[local] = sign(code, axis);
+    private static int determinant(int[][] matrix) {
+        return matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
+                - matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
+                + matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]);
+    }
+
+    private static String key(int[][] matrix) {
+        StringBuilder builder = new StringBuilder(18);
+        for (int[] row : matrix) {
+            for (int value : row) {
+                builder.append(value).append(',');
+            }
         }
-        return encode(perm, signs);
+        return builder.toString();
     }
 
-    private static int turnCode(Turn turn) {
-        return switch (turn) {
-            case NONE -> IDENTITY_CODE;
-            case CLOCKWISE -> encode(new int[] {2, 1, 0}, new int[] {-1, 1, 1});
-            case HALF -> encode(new int[] {0, 1, 2}, new int[] {-1, 1, -1});
-            case COUNTERCLOCKWISE -> encode(new int[] {2, 1, 0}, new int[] {1, 1, -1});
-        };
-    }
-
-    private static int tiltCode(Tilt tilt) {
-        return switch (tilt) {
-            case LEVEL -> IDENTITY_CODE;
-            case PITCH_UP -> encode(new int[] {0, 2, 1}, new int[] {1, -1, 1});
-            case PITCH_DOWN -> encode(new int[] {0, 2, 1}, new int[] {1, 1, -1});
-            case ROLL_LEFT -> encode(new int[] {1, 0, 2}, new int[] {-1, 1, 1});
-            case ROLL_RIGHT -> encode(new int[] {1, 0, 2}, new int[] {1, -1, 1});
-            case INVERTED -> encode(new int[] {0, 1, 2}, new int[] {1, -1, -1});
-        };
-    }
-
-    private static int flipCode(Flip flip) {
-        return switch (flip) {
-            case NONE -> IDENTITY_CODE;
-            case LEFT_RIGHT -> encode(new int[] {0, 1, 2}, new int[] {1, 1, -1});
-            case FRONT_BACK -> MIRROR_CODE;
-        };
-    }
-
-    private static int coordinate(LatticePoint point, int axis) {
-        return switch (axis) {
-            case 0 -> point.x();
-            case 1 -> point.y();
-            default -> point.z();
-        };
-    }
-
-    private static int[] vector(Heading heading) {
-        return switch (heading) {
-            case NORTH -> new int[] {0, 0, -1};
-            case SOUTH -> new int[] {0, 0, 1};
-            case WEST -> new int[] {-1, 0, 0};
-            case EAST -> new int[] {1, 0, 0};
-            case UP -> new int[] {0, 1, 0};
-            case DOWN -> new int[] {0, -1, 0};
-        };
-    }
-
-    private static Heading headingOf(int[] vector) {
-        if (vector[0] != 0) {
-            return vector[0] > 0 ? Heading.EAST : Heading.WEST;
-        }
-        if (vector[1] != 0) {
-            return vector[1] > 0 ? Heading.UP : Heading.DOWN;
-        }
-        return vector[2] > 0 ? Heading.SOUTH : Heading.NORTH;
+    @Override
+    public String toString() {
+        return "Orientation[" + ordinal + ":" + turn() + "/" + tilt()
+                + (isMirror() ? "/mirror" : "") + "]";
     }
 }

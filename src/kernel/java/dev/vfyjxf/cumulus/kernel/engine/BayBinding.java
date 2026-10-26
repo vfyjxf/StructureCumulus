@@ -1,17 +1,16 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
-import dev.vfyjxf.cumulus.kernel.base.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.occupant.OccupantRef;
-import dev.vfyjxf.cumulus.kernel.predicate.Bindings;
+import dev.vfyjxf.cumulus.kernel.structure.Bay;
+import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+
 import java.util.List;
 import java.util.Objects;
+/** A bay and the subjects its checks bound. */
+public record BayBinding(Bay bay, List<OccupantSnapshot> subjects) {
 
-/** One bay's matched subjects and bindings: the only input claim planning needs beyond the bay. */
-public record BayBinding(NamespacedId bay, List<OccupantRef> subjects, Bindings bindings) {
-
-    public BayBinding(NamespacedId bay, List<OccupantRef> subjects, Bindings bindings) {
-        this.bay = Objects.requireNonNull(bay, "bay");
-        this.subjects = List.copyOf(Objects.requireNonNull(subjects, "subjects"));
-        this.bindings = Objects.requireNonNull(bindings, "bindings");
+    public BayBinding {
+        Objects.requireNonNull(bay, "bay");
+        Objects.requireNonNull(subjects, "subjects");
+        subjects = List.copyOf(subjects);
     }
 }

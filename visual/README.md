@@ -1,4 +1,8 @@
-# StructureCumulus — Visual Specification Suite
+# StructureCumulus — Visual Specification Suite (historical)
+
+> This atlas documents design v0.2. The design of record is now [`docs/README.md`](../docs/README.md);
+> the source labels below point at the current files, but the sheet copy is kept as a visual record
+> and is not part of the v1 kernel acceptance.
 
 An interactive, NASA-punk technical drawing set for the StructureCumulus design. Thirteen sheets
 explain the document → object graph → execution → result chain, the 48-element orientation group,
