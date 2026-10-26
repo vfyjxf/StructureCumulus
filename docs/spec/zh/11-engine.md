@@ -36,8 +36,8 @@
 `build()` 仅在程序员错误时抛 `IllegalArgumentException`（`DESIGN` 阶段没有已声明的计划、更新器
 为 null）；其他任何错误调用都产出一条诊断项。会话的修改器是包私有（package-private），因此扩展
 无法绑定、预留、报告或放宽上限（doctrine §10）。请求是尝试的确定性元组，因此被冻结；会话累积花费
-与绑定，因此不被冻结。只有 `Formed` 携带产物与声明，且 `MatchOutcome` 有序：舱位按 id，接缝按 id，
-声明先按格点再按舱位。
+与绑定，因此不被冻结。只有 `Formed` 同时携带产物与 `settle` 写入的声明；`MatchOutcome` 不持有任何
+声明：它是读到的视图、按键序发布的值、建立的绑定，以及它触碰过的读取。
 
 ```java
 public record MatchRequest(Blueprint blueprint, Siting siting,
@@ -64,17 +64,17 @@ public sealed interface MatchResult extends AutoCloseable
                     SnapshotLease lease, FindingBundle findings) implements MatchResult {
         @Override public void close() { lease.close(); }     // this child handle only
     }
-    record Dropped(Stage stage, DropCause cause, List<Finding> findings) implements MatchResult {}
+    record Dropped(Stage stage, DropCause cause, FindingBundle findings) implements MatchResult {}
     record Formed(Stage stage, InstanceId id, Siting siting, MatchOutcome outcome,
                   ClaimSet claims, long generation, long contextRevision, long ledgerRevision,
                   SnapshotLease lease, FindingBundle findings) implements MatchResult {
         @Override public void close() { lease.close(); }
         public ReadSet readSet();                  // union of outcome.stepReads()
     }
-    record Failed(Stage stage, List<Finding> findings) implements MatchResult {}
-    record Undecided(Stage stage, UndecidedReason reason, List<Finding> findings,
+    record Failed(Stage stage, FindingBundle findings) implements MatchResult {}
+    record Undecided(Stage stage, UndecidedReason reason, FindingBundle findings,
                      @Nullable MatchOutcome partial, @Nullable RetryToken retry) implements MatchResult {}
-    record Deferred(Stage stage, RetryToken token, List<Finding> findings) implements MatchResult {}
+    record Deferred(Stage stage, RetryToken token, FindingBundle findings) implements MatchResult {}
 }
 // MatchSession: idempotent run(), spend(), remaining(), readSet(), probe(); writes are internal.
 

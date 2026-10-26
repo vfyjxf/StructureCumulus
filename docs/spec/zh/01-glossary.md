@@ -196,11 +196,11 @@
 | 匹配结果（Match result） | `MatchResult` | 密封：`Admitted`、`Dropped`、`Formed`、`Failed`、`Undecided`、`Deferred`；每个分支都携带它运行时所处的 `Stage`，且只有 `settle` 产出 `Formed`。该接口是 `AutoCloseable`，在不持有句柄的分支上 `close()` 是空操作，因此 `try (var r = kernel.check(request))` 对每个分支都能编译。 | `AttemptResult` |
 | 准入（Admitted） | `MatchResult.Admitted` | `(Stage, Siting, MatchOutcome, @Nullable ClaimPlan planned, long ledgerRevision, SnapshotLease, FindingBundle)`：结构成立时只读的 `check` 返回的内容；`planned` 就是 `settle` 将会登记的内容。携带子租约句柄，绝不是实例。 | — |
 | 已成型（Formed） | `MatchResult.Formed` | `(Stage, InstanceId, Siting, MatchOutcome, ClaimSet, long generation, long contextRevision, long ledgerRevision, SnapshotLease, FindingBundle)`：只由 `settle` 产出；派生是另一次调用。 | `FormedResult` |
-| 失败（Failed） | `MatchResult.Failed` | `(Stage, List<Finding> findings)`；至少一条 `ERROR` 诊断项（一次不匹配或一次声明冲突）。 | `FailedResult` |
-| 未决（Undecided） | `MatchResult.Undecided` | `(Stage, UndecidedReason reason, List<Finding> findings, @Nullable MatchOutcome partial, @Nullable RetryToken retry)`。 | `UndecidedResult` |
-| 延后（Deferred） | `MatchResult.Deferred` | `(Stage, RetryToken token, List<Finding> findings)`。 | — |
+| 失败（Failed） | `MatchResult.Failed` | `(Stage, FindingBundle findings)`；至少一条 `ERROR` 诊断项（一次不匹配或一次声明冲突）。 | `FailedResult` |
+| 未决（Undecided） | `MatchResult.Undecided` | `(Stage, UndecidedReason reason, FindingBundle findings, @Nullable MatchOutcome partial, @Nullable RetryToken retry)`。 | `UndecidedResult` |
+| 延后（Deferred） | `MatchResult.Deferred` | `(Stage, RetryToken token, FindingBundle findings)`。 | — |
 | 未决原因（Undecided reason） | `UndecidedReason` | `BUDGET_EXHAUSTED`、`DIRTY_UNSTABLE`、`LEDGER_MOVED`、`LEDGER_UNAVAILABLE`、`SUBJECT_ABSENT`、`LEASE_CLOSED`、`WORKER_FAILED`、`DESIGN_DEFECT`。 | — |
-| 作废（Dropped） | `MatchResult.Dropped` | `(Stage, DropCause cause, List<Finding> findings)`：因为捕获在取出之后移动了或失效了，本次没有任何判定；`cause` 是 `SNAPSHOT_CHANGED`（关注区域被标记）或 `CAPTURE_INVALID`（其世界被替换，或租约被关闭）。什么也不发布，下次尝试重新捕获。 | — |
+| 作废（Dropped） | `MatchResult.Dropped` | `(Stage, DropCause cause, FindingBundle findings)`：因为捕获在取出之后移动了或失效了，本次没有任何判定；`cause` 是 `SNAPSHOT_CHANGED`（关注区域被标记）或 `CAPTURE_INVALID`（其世界被替换，或租约被关闭）。什么也不发布，下次尝试重新捕获。 | — |
 | 作废原因（Drop cause） | `DropCause` | `SNAPSHOT_CHANGED`（`SC-ENG-0003`）、`CAPTURE_INVALID`（`SC-ENG-0006`）。 | — |
 | 匹配产物（Match outcome） | `MatchOutcome` | `(Stage stage, Siting siting, WorldView view, Map<ContextKey<?>,Object> context, Bindings bindings, ReadScope reads)`：一次尝试产出了什么——它读了哪个视图、发布了哪些值、绑定了哪些主体，以及它触及的一切。 | — |
 | 舱位绑定（Bay binding） | `BayBinding` | `(NamespacedId bay, List<OccupantRef> subjects, Bindings bindings)`：检查所绑定的主体，门的情形可能是两个，绝不从某个值中解包。 | `SlotBinding` |

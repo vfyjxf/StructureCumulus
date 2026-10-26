@@ -113,4 +113,6 @@ CatalogsDraft  DeriveContext  Computations
 
 `P1`（`01`/`05`/`06` → `base`/`space`/`occupant`）：50 个类型、51 个编译单元，`javac -Xlint:all` **exit 0、零诊断、一次通过**。报告在 `_work/regen/p1-round2.md`，骨架在 `p1-round2-skeleton.md`。结论：文档能生成骨架，剩下的卡点全是已知待定项（`Q9`/`Q10`/`Q11`/`Q20`/`Q21`/`Q22`、`R8`/`R35` 的滞后、`C-15`），另有两个它逼出来的新问题：`Q25`（嵌套视图是不是完整 `WorldView`）与 `Q26`（要不要逐格读状态入口）。它同时点出四处文档内部矛盾，已就地修正：`SectionKey` 的排序与 `sectionOf` 的静态性、`Placement.compose/inverse` 的可空性、`FindingCode` 的归属（`01` §K→§B）、`06` §4.5/§6/Q7 的 `bounds()`/`readStatus` 残留。
 
-`P2` 仍在跑。
+`P2`（`08`/`11`/`20`/`23` → `claim`/`engine`）：61 个声明（42 顶层 + 19 嵌套）、31 个桩类型，`javac --release 21 -Xlint:all` **exit 0、零警告**。报告在 `_work/regen/p2-round2.md`。它抓到一条真正的文档缺陷：`MatchResult` 的接口声明 `FindingBundle findings()`，而 `Dropped`/`Failed`/`Undecided`/`Deferred` 四个臂写成 `List<Finding> findings`——**照文档写编不过**。已把四臂在 `01`/`11`/`15`/`22` 全部改成 `FindingBundle`（这也是代码把接口方法改名成 `bundle()` 的起因，改完就不需要改名了）。另外 `11` §3 还留着一句"`MatchOutcome` 有序：舱位按 id、接缝按 id、声明先按格点再按舱位"，而那些东西早已搬去 `BayBinding`/`ClaimPlan`，已改。
+
+`P2` 的首条发现——`Sharing`/`Footprint`/`Coverage` 在代码里不存在，只有 `ClaimMode`/`ClaimScope`——是 `R32` 的滞后，我在简报里漏了它，所以探针把它当成了缺陷；不是新问题。

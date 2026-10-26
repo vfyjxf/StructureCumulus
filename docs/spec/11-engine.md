@@ -41,8 +41,9 @@ contribution surface a unit drives is `ContextKey` with its `Merge`, a `Computat
 plan, a null updater); every other wrong call is a finding. The session's mutators are
 package-private, so no extension binds, reserves, reports or widens a ceiling (doctrine §10). The
 request is the attempt's determinism tuple, so it is frozen; the session accumulates spend and
-bindings, so it is not. `Formed` alone carries an outcome and claims, and `MatchOutcome` is ordered: bays
-by id, seams by id, claims by cell then bay.
+bindings, so it is not. `Formed` alone carries an outcome and the claims `settle` wrote, and
+`MatchOutcome` holds no claims: it is the view it read, the values it published in key order, the
+bindings it made and the reads it touched.
 
 ```java
 public record MatchRequest(Blueprint blueprint, Siting siting,
@@ -69,17 +70,17 @@ public sealed interface MatchResult extends AutoCloseable
                     SnapshotLease lease, FindingBundle findings) implements MatchResult {
         @Override public void close() { lease.close(); }     // this child handle only
     }
-    record Dropped(Stage stage, DropCause cause, List<Finding> findings) implements MatchResult {}
+    record Dropped(Stage stage, DropCause cause, FindingBundle findings) implements MatchResult {}
     record Formed(Stage stage, InstanceId id, Siting siting, MatchOutcome outcome,
                   ClaimSet claims, long generation, long contextRevision, long ledgerRevision,
                   SnapshotLease lease, FindingBundle findings) implements MatchResult {
         @Override public void close() { lease.close(); }
         public ReadSet readSet();                  // union of outcome.stepReads()
     }
-    record Failed(Stage stage, List<Finding> findings) implements MatchResult {}
-    record Undecided(Stage stage, UndecidedReason reason, List<Finding> findings,
+    record Failed(Stage stage, FindingBundle findings) implements MatchResult {}
+    record Undecided(Stage stage, UndecidedReason reason, FindingBundle findings,
                      @Nullable MatchOutcome partial, @Nullable RetryToken retry) implements MatchResult {}
-    record Deferred(Stage stage, RetryToken token, List<Finding> findings) implements MatchResult {}
+    record Deferred(Stage stage, RetryToken token, FindingBundle findings) implements MatchResult {}
 }
 // MatchSession: idempotent run(), spend(), remaining(), readSet(), probe(); writes are internal.
 

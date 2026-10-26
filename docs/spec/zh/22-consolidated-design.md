@@ -560,16 +560,16 @@ sealed interface MatchResult extends AutoCloseable
                     SnapshotLease lease, FindingBundle findings) implements MatchResult {
         @Override public void close() { lease.close(); }
     }
-    record Dropped(Stage stage, DropCause cause, List<Finding> findings) implements MatchResult {}
+    record Dropped(Stage stage, DropCause cause, FindingBundle findings) implements MatchResult {}
     record Formed(Stage stage, InstanceId id, Siting siting, MatchOutcome outcome,
                   ClaimSet claims, long generation, long contextRevision, long ledgerRevision,
                   SnapshotLease lease, FindingBundle findings) implements MatchResult {
         @Override public void close() { lease.close(); }
     }
-    record Failed(Stage stage, List<Finding> findings) implements MatchResult {}
-    record Undecided(Stage stage, UndecidedReason reason, List<Finding> findings,
+    record Failed(Stage stage, FindingBundle findings) implements MatchResult {}
+    record Undecided(Stage stage, UndecidedReason reason, FindingBundle findings,
                      @Nullable MatchOutcome partial, @Nullable RetryToken retry) implements MatchResult {}
-    record Deferred(Stage stage, RetryToken token, List<Finding> findings) implements MatchResult {}
+    record Deferred(Stage stage, RetryToken token, FindingBundle findings) implements MatchResult {}
 }
 ```
 
