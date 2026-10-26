@@ -5,8 +5,10 @@
 ## 1. Scope
 
 **In:** `OccupantKind`, `OccupantRef`, `OccupantDescriptor`, `TraitKey`, `Trait`,
-`OccupantSnapshot`, `NestedView`, `WorldView`, `ReadStatus`, `SnapshotId`, `SnapshotPolicy`,
-`WorldWindow`, `WorldCapture`, `OccupantResolver<R>`, `ResolveContext`.
+`OccupantSnapshot`, `SectionSlot`, `SectionSnapshot`, `NestedView`, `NestedLevelSnapshot`,
+`WorldView`, `OccupantFilter`, `ReadStatus`, `EntityWindow`, `EntityKey`, `ChangeSet`,
+`SnapshotId`, `SnapshotPolicy`, `WorldWindow`, `WorldCapture`, `OccupantResolver<R>`,
+`ResolveContext`.
 
 **Out:** space primitives (U1); `Verdict`/`Reply` (U3 — `expectation` depends on `occupant`);
 `Census`/`ReadSet` (U7); `Finding` (U9 — U2 reserves codes only); the capture implementation
@@ -25,7 +27,14 @@ explicitly unanswerable; four occupant sources answer through one shape.
 | `TraitKey<T>`, `Trait<T>` | Typed key `(id, Class<T>)`; a `(key, @Nullable value)` pair. |
 | `OccupantSnapshot` | Immutable read model: ref, descriptor, footprint, traits, optional nested view. |
 | `NestedView` | A substructure's window: a full `WorldView`, same snapshot, own frame, bounded depth. |
-| `WorldView` | The only world window; total over its bounds; never touches the world. |
+| `NestedLevelSnapshot` | The frozen interior of one nested occupant, read in its own frame: `parent()`, `depth()`, `contentDigest()`, `occupantAt(LatticePoint)`, `occupants(Cuboid, OccupantFilter)`. |
+| `WorldView` | The only world window: one `SectionSlot` per section, cells answered through `occupant`; never touches the world. |
+| `SectionSlot` | A section's answer: `Air` (read and empty), `Present(section)`, `Refused(status, code)`; `readable()` is `Air` or `Present`. |
+| `SectionSnapshot` | One frozen section: `key`, `contentDigest`, `occupantAt(cell)`, `occupants(box, filter)`; every enumerated cell answers. |
+| `OccupantFilter` | `(type, kind, trait)` predicates for a box query; a `null` component does not constrain. |
+| `EntityWindow` | `(Cuboid cells, NamespacedId type)`: the box one entity type may move in; `MAX_ENTITY_SPAN = 3`. |
+| `EntityKey` | `(UUID id, NamespacedId type, long dataDigest)`: one entity's identity in a window diff. |
+| `ChangeSet` | `(cells, sections, payloads, entities, keys, revision)`: what changed between two revisions; `empty()`, `plus(other)` keeps the later revision. |
 | `ReadStatus` | `READABLE`, `OUT_OF_BOUNDS`, `NOT_CAPTURED`, `DENIED`, `STALE`. |
 | `SnapshotId`, `SnapshotPolicy`, `WorldWindow` | Capture identity, its guarantees, the requested box. |
 | `WorldCapture`, `OccupantResolver<R>`, `ResolveContext` | Capture SPI, resolver SPI, resolver context. |
@@ -77,7 +86,7 @@ enum ReadStatus { READABLE, OUT_OF_BOUNDS, NOT_CAPTURED, DENIED, STALE; boolean 
   without a child.
 - `air(...)`: kind `BLOCK` (the id is the sentinel), one cell, no traits; the adapter maps every
   empty world value to it.
-- `view.occupant(cell) != null ⇔ view.readStatus(cell) == READABLE` (§7.2).
+- `view.occupant(cell) != null ⇔ view.slot(SectionKey.of(dimension, cell, cellSize)).readable()` (§7.2).
 
 ### 3.3 Nested view, world view, policy
 
@@ -89,21 +98,33 @@ interface NestedView extends WorldView
 
 interface WorldView
     SnapshotId snapshotId()
-    Cuboid bounds()
+    SectionSlot slot(SectionKey key)
     @Nullable OccupantSnapshot occupant(LatticePoint cell)
-    List<OccupantSnapshot> occupants(Cuboid box)
-    ReadStatus readStatus(LatticePoint cell)
-    default @Nullable OccupancySummary summary(Cuboid box) { return null; }   // palette-derived
-    default @Nullable ChunkGrid chunkGrid() { return null; }                  // no chunking
-    default @Nullable ChunkContent chunk(ChunkKey key) { return null; }       // palette facade
-record OccupancySummary(Map<NamespacedId, Integer> byType, int total) {}
-interface ChunkContent {
-    Cuboid bounds(); ReadStatus status(); boolean allAir();
-    boolean maybeHasBlock(NamespacedId type);
-    int countBlock(NamespacedId type);          // -1 = cannot answer
-    @Nullable OccupantSnapshot occupant(LatticePoint cell);
-    ReadStatus readStatus(LatticePoint cell);
-}
+    @Nullable OccupantSnapshot occupant(OccupantRef ref)
+    List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter)
+    @Nullable NestedView nested(LatticePoint cell)
+    long contentDigest(SectionKey key)
+
+sealed interface SectionSlot
+    record Air(long revision) implements SectionSlot
+    record Present(SectionSnapshot section) implements SectionSlot
+    record Refused(ReadStatus status, FindingCode code) implements SectionSlot
+    default boolean readable()      // Air or Present
+
+final class SectionSnapshot
+    SectionKey key()
+    long contentDigest()
+    @Nullable OccupantSnapshot occupantAt(LatticePoint cell)   // null only outside the enumerated cells
+    List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter)
+    static SectionSnapshot of(SectionKey key, Map<LatticePoint, OccupantSnapshot> occupants)
+    static Builder builder(SectionKey key)                     // put, putAll, build
+
+record OccupantFilter(@Nullable Predicate<NamespacedId> type, @Nullable Predicate<OccupantKind> kind,
+                      @Nullable Predicate<NamespacedId> trait)
+    static OccupantFilter any()                                // no component constrains
+    static ofType(NamespacedId), ofKind(OccupantKind), ofTrait(NamespacedId)
+    boolean matches(OccupantSnapshot occupant)
+
 record SnapshotId(World world, long revision) implements Comparable<SnapshotId>
 record WorldWindow(Cuboid bounds, int maxElements)
 record SnapshotPolicy(CaptureMode capture, Set<OccupantKind> requiredKinds,
@@ -114,8 +135,9 @@ record SnapshotPolicy(CaptureMode capture, Set<OccupantKind> requiredKinds,
 ```
 
 A nested view **is** a full `WorldView`: every question askable at the top is askable one level
-down with the same cost class and absence rules (R-01); only the frame changes. `bounds()` is
-this view's addressable box, and outside it is `OUT_OF_BOUNDS`, never "empty". `revision >= 1`,
+down with the same cost class and absence rules (R-01); only the frame changes. A cell no
+section of this view covers answers `null` from `occupant`, and its section's slot is
+`Refused(OUT_OF_BOUNDS, …)` or `Refused(NOT_CAPTURED, …)`, never "empty". `revision >= 1`,
 monotonic per world. Ceiling is `min(window.maxElements(), policy.maxElements)` — a request may
 lower a host's promise, never raise it. `requiredTraits` must be answered; a host that cannot
 compute one records it absent (⇒ unreadable), never a default.
@@ -148,14 +170,19 @@ interface ResolveContext
 
 ### 4.1 The five statuses; empty is not unreadable
 
-| Status | `occupant(cell)` | Cause |
-| --- | --- | --- |
-| `READABLE` | non-null: covering occupant, else air | captured at `snapshotId()` |
-| `OUT_OF_BOUNDS` | `null` | outside `bounds()`, or a point in another frame |
-| `NOT_CAPTURED` | `null` | in bounds, no data: element cap, depth cut, unsupported region |
-| `DENIED` | `null` | readable but declined: protection, permission, no-load policy |
-| `STALE` | `null` | a value exists only from another revision |
+A status is a **section** answer: `slot(SectionKey)` returns `Air` (read, and nothing in it),
+`Present` (one frozen `SectionSnapshot`) or `Refused(status, code)`, and a cell is answered
+through `occupant(cell)`, which reads the cell's own section.
 
+| Status | Slot that carries it | Cause |
+| --- | --- | --- |
+| `READABLE` | `Air` or `Present`; `occupant(cell)` is the indexed occupant, else air | captured at `snapshotId()` |
+| `OUT_OF_BOUNDS` | `Refused`; `occupant(cell)` is `null` | outside the captured sections, or a point in another frame |
+| `NOT_CAPTURED` | `Refused`; `occupant(cell)` is `null` | in bounds, no data: element cap, depth cut, unsupported region |
+| `DENIED` | `Refused`; `occupant(cell)` is `null` | readable but declined: protection, permission, no-load policy |
+| `STALE` | `Refused`; `occupant(cell)` is `null` | a value exists only from another revision |
+
+A `Refused` slot cannot carry a readable status: the record rejects it at construction.
 Precedence `OUT_OF_BOUNDS > DENIED > STALE > NOT_CAPTURED > READABLE`. Reserved codes (U3/U7
 build the finding): `SC-OCC-0101` out of bounds, `0102` not captured, `0103` denied, `0104`
 stale, `0201` footprint crosses the window, `0202` depth cut, `0203` cycle.
@@ -166,8 +193,8 @@ stale, `0201` footprint crosses the window, `0202` depth cut, `0203` cycle.
   (U3), hence `Undecided` (U7), not `Failed`. A predicate returning mismatch on a stale chunk
   asserts a wall is missing when it never looked; `DENIED` laundered as air is the host bug that
   makes a correct kernel lie.
-- Consumers use two calls (`occupant`, then `readStatus`) because `WorldView` is frozen; U3's
-  `ExpectationContext.occupantAt` is where the safe path must become the short path.
+- Consumers read the slot for the status and the cell for the occupant, because `WorldView` is
+  frozen; U3's `ExpectationContext.occupantAt` is where the safe path must become the short path.
 
 ### 4.2 One shape, four sources
 
@@ -187,7 +214,7 @@ A kernel algorithm may ask only `type()`, `kind()`, `property(..)`, `has(TraitKe
 | --- | --- |
 | Cell inside a footprint | `occupant(cell)` returns that occupant whole: both cells of a 2×1 entity answer one ref, one descriptor. **A covered cell is `READABLE` even if its own read was denied or never attempted**, because the admitted occupant's footprint is the evidence; `DENIED` applies only where no admitted occupant covers the cell. |
 | `occupants(box)` | One entry per occupant however many cells fall in the box, in `OccupantRef` order; dedup by `ref`, minted once per occupant. Air is excluded, so a box query is element-bounded, not volume-bounded. |
-| Footprint past `bounds()` | Allowed, **not clipped** (I-3); admission is by anchor. An anchor outside with a body inside is absent, and its inside cells are `NOT_CAPTURED`, never air. |
+| Footprint past the captured sections | Allowed, **not clipped** (I-3); admission is by anchor. An anchor outside with a body inside is absent, and its inside cells are `NOT_CAPTURED`, never air. |
 | Crossing a bay | U2-invisible: `occupants(bayCuboid)` returns the straddler whole, so `footprint().volume() > bay.volume()` is visible and the expectation decides. |
 | Two occupants in one cell | Both exist; `occupant(cell)` narrows by non-air, then smaller volume, then ref order. |
 
@@ -253,6 +280,25 @@ result (I-4). A change during a match affects only a later attempt, which sees a
 view; it never refreshes a running one. Ids are never persisted, so persisted state keeps values
 (U8), never refs.
 
+### 4.8 Entity windows and change sets
+
+A section-grained read is blind to an entity that moves out of its cell while staying inside the
+same section, so a reader that depends on entities declares an `EntityWindow(Cuboid cells,
+NamespacedId type)`: the box one entity type may move in. Windows travel in the read closure
+(`ReadScope.entities`), next to the cells and the context keys.
+
+- `MAX_ENTITY_SPAN = 3`; a type whose body is wider than three cells on any axis is refused at
+  DESIGN (`SC-BAY-0110`), so a window is never blind to part of its occupant. A window is the
+  declared box inflated by that span.
+- Each tick, per window, the host compares the live `cell → EntityKey` set with the captured one;
+  a difference dirties every unit whose read closure names the window. Join and leave mark the
+  footprint. This is the outward-move witness `22` §5.4 names.
+- `ChangeSet(Set<LatticeKey> cells, Set<SectionKey> sections, Set<LatticeKey> payloads,
+  Set<EntityKey> entities, Set<NamespacedId> keys, long revision)` is what changed between two
+  revisions: `empty()` is the no-change value, `plus(other)` unions the five sets and keeps the
+  later revision, and `isEmpty()` is true only when all five are empty. `keys` is held sorted by
+  id so iteration is deterministic.
+
 ## 5. Reference sketch
 
 ```java
@@ -262,35 +308,60 @@ record ItemInventory(List<StackCount> stacks) { ItemInventory { stacks = List.co
 static final TraitKey<ItemInventory> ITEM_INVENTORY =
         new TraitKey<>(id("item_inventory"), ItemInventory.class);
 
-final class CapturedView implements WorldView {      // built by capture; indexes and order precomputed
+final class CapturedView implements WorldView {      // built by capture; sections and order precomputed
+    private final NamespacedId dimension;
     private final SnapshotId id;
-    private final Cuboid bounds;
-    private final CuboidSet readable;
-    private final Map<LatticePoint, ReadStatus> refused;       // DENIED / STALE / NOT_CAPTURED, in bounds
-    private final Map<LatticePoint, OccupantSnapshot> covered;  // non-air, by covered cell
-    private final List<OccupantSnapshot> elements;              // canonical order
+    private final int cellSize;                                 // 16 from the adapter
+    private final Map<SectionKey, SectionSlot> slots;           // Air, Present or Refused
+    private final List<OccupantSnapshot> elements;              // canonical order, air excluded
 
     @Override public SnapshotId snapshotId() { return id; }
-    @Override public Cuboid bounds() { return bounds; }
 
-    @Override public ReadStatus readStatus(LatticePoint cell) {
-        if (!bounds.contains(cell)) return ReadStatus.OUT_OF_BOUNDS;
-        ReadStatus here = refused.get(cell);
-        if (here != null) return here;
-        return readable.contains(cell) ? ReadStatus.READABLE : ReadStatus.NOT_CAPTURED;
+    @Override public SectionSlot slot(SectionKey key) {
+        SectionSlot slot = slots.get(key);
+        return slot != null ? slot
+                : new SectionSlot.Refused(ReadStatus.OUT_OF_BOUNDS, FindingCode.of(Family.OCC, 101));
     }
 
     @Override public @Nullable OccupantSnapshot occupant(LatticePoint cell) {
-        if (readStatus(cell) != ReadStatus.READABLE) return null;           // the biconditional
-        OccupantSnapshot o = covered.get(cell);
-        return o != null ? o : OccupantSnapshot.air(id, cell);
+        SectionSlot slot = slots.get(SectionKey.of(dimension, cell, cellSize));
+        if (slot == null || slot instanceof SectionSlot.Refused) return null;     // the biconditional
+        if (slot instanceof SectionSlot.Present present) {
+            OccupantSnapshot found = present.section().occupantAt(cell);
+            if (found != null) return found;
+        }
+        return OccupantSnapshot.air(id, cell);
     }
 
-    @Override public List<OccupantSnapshot> occupants(Cuboid box) {
+    @Override public @Nullable OccupantSnapshot occupant(OccupantRef ref) {
+        for (OccupantSnapshot e : elements) {
+            if (e.ref().equals(ref)) return e;
+        }
+        return null;
+    }
+
+    @Override public List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter) {
         List<OccupantSnapshot> out = new ArrayList<>();
-        for (OccupantSnapshot e : elements)      // sorted by ref once, in the capture constructor
-            if (e.footprint().intersects(box) && readStatus(e.ref().anchor()) == ReadStatus.READABLE) out.add(e);
+        for (OccupantSnapshot e : elements) {    // sorted by ref once, in the capture constructor
+            if (e.footprint().intersects(box) && readable(e.ref().anchor()) && filter.matches(e)) {
+                out.add(e);
+            }
+        }
         return List.copyOf(out);
+    }
+
+    @Override public @Nullable NestedView nested(LatticePoint cell) {
+        OccupantSnapshot occupant = occupant(cell);
+        return occupant == null ? null : occupant.nested();
+    }
+
+    @Override public long contentDigest(SectionKey key) {
+        return slots.get(key) instanceof SectionSlot.Present present
+                ? present.section().contentDigest() : 0L;
+    }
+
+    private boolean readable(LatticePoint cell) {
+        return slot(SectionKey.of(dimension, cell, cellSize)).readable();
     }
 }
 
@@ -312,14 +383,16 @@ static OccupantSnapshot golem(SnapshotId id, LatticePoint min) {   // 2x1 entity
 }
 
 static void inspect(WorldView view, Cuboid hallBox) {
+    NamespacedId overworld = NamespacedId.of("minecraft", "overworld");
+
     view.occupant(LatticePoint.of(3, 64, 4));                                    // one ref for both cells
-    view.occupants(Cuboid.of(3, 64, 4, 5, 65, 5));                               // the golem, listed once
+    view.occupants(Cuboid.of(3, 64, 4, 5, 65, 5), OccupantFilter.any());          // the golem, listed once
 
-    ReadStatus denied = view.readStatus(LatticePoint.of(4, 64, 9));              // DENIED
+    SectionSlot denied = view.slot(SectionKey.of(overworld, LatticePoint.of(4, 64, 9), 16));      // Refused(DENIED, …)
     OccupantSnapshot none = view.occupant(LatticePoint.of(4, 64, 9));            // null, never air
-    ReadStatus outside = view.readStatus(LatticePoint.of(-1, 64, 0));            // OUT_OF_BOUNDS
+    SectionSlot outside = view.slot(SectionKey.of(overworld, LatticePoint.of(-1, 64, 0), 16));    // Refused(OUT_OF_BOUNDS, …)
 
-    for (OccupantSnapshot o : view.occupants(hallBox)) {
+    for (OccupantSnapshot o : view.occupants(hallBox, OccupantFilter.ofKind(OccupantKind.NESTED))) {
         NestedView inner = o.nested();
         if (inner == null || inner.depth() > 2) continue;
         boolean sameCapture = inner.snapshotId().equals(view.snapshotId());      // true
@@ -335,6 +408,7 @@ static void inspect(WorldView view, Cuboid hallBox) {
 | Addon | a hatch needing an inventory; a furnace bay wanting a substructure's interior | `has(...)` as the free test, `trait(...)` as the priced one, `nested()` for the interior |
 | Addon | a door: two cells, two occupants, one expectation over the bay | `occupants(bayCuboid)` returns both whole; no voxel shape (R-06) |
 | Host | `LevelCapture` for `/cumulus validate`; a kernelTest fake view | the two SPIs and a `CapturedView` over a map: one code path for server and test |
+| Host | a watch after an entity walked out of its cell | the window diff marks the units whose read closure names the window; the next `check` re-runs only those |
 | Host | a build wand preview | deterministic `occupants` order: two previews of one snapshot are identical |
 
 ## 7. Proofs
@@ -344,9 +418,10 @@ static void inspect(WorldView view, Cuboid hallBox) {
    `base` and `space`. *Counterexample:* a host delegating to a live level satisfies the
    interface and breaks I-4 — a host promise, caught by the adapter's test that a view still
    answers after the level closes.
-2. **Immutability and the status invariant.** Canonicalising constructors, no setters;
-   `occupant` is `readStatus != READABLE ? null : getOrDefault(cell, air)`. *Counterexample:* a
-   descriptor handing out its caller's map would change a running match.
+2. **Immutability and the status invariant.** Canonicalising constructors, no setters; `occupant`
+   is `slot(SectionKey.of(dimension, cell, cellSize)) instanceof SectionSlot.Refused ? null :
+   section.occupantAt(cell)` with air for an unanswered cell of a readable section.
+   *Counterexample:* a descriptor handing out its caller's map would change a running match.
 3. **Multi-cell consistency.** One ref per occupant, mapped to every covered cell; `occupants`
    filters the element list, so dedup is by identity. *Counterexample:* a ref per cell ⇒ two
    elements, a doubled census, a double-booked claim.
@@ -362,7 +437,8 @@ static void inspect(WorldView view, Cuboid hallBox) {
 ## 8. Dependencies and open questions
 
 **Depends on.** U0: `NamespacedId`, `Checks`. U1: `LatticePoint`, `LatticeKey.of/toPoint`,
-`Cuboid.of/contains/intersects/volume`, `CuboidSet.contains`. **Consumed by.** U3, U4, U7, U8,
+`Cuboid.of/contains/intersects/volume`, `CuboidSet.contains`, `SectionKey.of`/`sectionOf`,
+`ChunkGrid`. **Consumed by.** U3, U4, U7, U8,
 U10, U11, A1.
 
 | # | Question | Position |

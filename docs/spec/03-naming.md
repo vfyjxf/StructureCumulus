@@ -17,8 +17,8 @@ JDK type. The practical rule:
 
 - If a Minecraft class with that name is likely to be imported in the same adapter file, the
   name is banned.
-- If the name is a `java.util.function` interface, a `java.util` collection, a `java.time`
-  value, or a `javax.tools`/`javax.swing`/`java.awt` UI type, the name is banned.
+- If the name is a `java.util.function` interface, a `java.util` collection or a `java.time`
+  value, the name is banned.
 - A banned concept gets a domain word, not a prefix. `Turn` beats `CumulusRotation`.
 - The adapter package is the namespace. Name adapter classes for their Minecraft-side role
   (`LevelSnapshot`, `LevelCapture`, `WorldEdits`), never with a mechanical `Mc`/`Vanilla`
@@ -53,7 +53,7 @@ type is the internal marker.
 
 | Suffix / shape | Meaning | Example |
 | --- | --- | --- |
-| `record` | immutable value with structural equality | `LatticePoint`, `Finding`, `Claim` |
+| `record` | immutable value with structural equality | `LatticePoint`, `Finding`, `Claim`, `KeyLocus` |
 | `sealed interface` + records | closed family the caller switches over | `MatchResult`, `Edit`, `Remedy` |
 | plain `interface` | extension point or read-only view | `Expectation`, `WorldView`, `ClaimLedger` |
 | `*Key<T>` | typed identity carrying a `Class<T>` token | `ContextKey<T>`, `TraitKey<T>` |
@@ -66,7 +66,7 @@ type is the internal marker.
 | `*Policy` | a small set of choices that changes behaviour | `OrientationPolicy`, `MatchPolicy` |
 | `*Mode` | an enum that selects one of a few semantics | `CacheMode` |
 | `*Options` | knobs for a host-facing call, with defaults | `FindingOptions`, `SolveOptions` |
-| `*Context` | what an extension may see during one call | `ExpectationContext`, `DerivationContext`, `RemedyContext` |
+| `*Context` | what an extension may see during one call | `ExpectationContext`, `DeriveContext`, `RemedyContext` |
 | `*Factory` | data-driven constructor registered in a catalog | `ExpectationFactory` |
 | `*Provider` | extension that returns several candidate answers | `RemedyProvider` |
 | `*Sink` | push consumer | `FindingSink` |

@@ -87,8 +87,8 @@ public sealed interface MatchResult extends AutoCloseable
 The siting is resolved before the request exists: there is no `Place` in the request and no
 orientation search inside `run()` (`22` §4.4). `ticket` is the coalescing token, `lease` a move — a
 request that is never dispatched receives no lease, and one that is dispatched owns it until the
-result or the scheduler takes it back. `blueprint` is a `BlueprintId`, resolved once against the
-catalog frozen at `apply`, before unit order is computed. The budget is the slot's object by
+result or the scheduler takes it back. `blueprint` is the `Blueprint` the catalog frozen at `apply`
+resolved, before unit order is computed. The budget is the slot's object by
 reference: `run()` spends against it and can never reset a counter. `MatchPolicy.defaults()` keeps
 `maxSectionsPerUnit` at 8, which covers a unit whose region straddles a chunk corner; the limit
 bounds the `(SectionKey, contentDigest)` list that `closureDigest` hashes (§4.7), not correctness.

@@ -274,7 +274,7 @@ MatchResult again = kernel.check(MatchRequest.at(record.lease(), furnace, at)
 The shell unit's read scope contains the changed cell, so its `cellStamp` moved and the unit
 re-runs; the mouth and the cavity units are reused because their read closures are disjoint from
 the change. A reuse is a result carried into the next attempt, never a blend inside this
-snapshot: the re-run captures again. The result is `Failed` with `SC-EXP-0002` (expected the
+snapshot: the re-run captures again. The result is `Failed` with `SC-EXP-0001` (expected the
 declared shell block, found air) and a `WORLD` label on the cell.
 
 `generation` is unchanged, because the instance did not re-form: a failed re-check leaves the

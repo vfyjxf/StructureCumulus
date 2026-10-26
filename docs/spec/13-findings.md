@@ -322,9 +322,10 @@ ones for which `FindingBundle`'s "no primary" ordering rank is reachable.
 | `SC-SPC-0001` | ERROR | ✓ | a `Locus` cannot be mapped into the requested frame for this siting |
 | `SC-OCC-0001` | ERROR | ✓ | the cell is `UNREADABLE`; the snapshot cannot answer, and "absent" is not "air" |
 | `SC-OCC-0002` | WARNING | ✓ | an occupant's footprint leaves the snapshot; only the intersection was compared |
-| `SC-EXP-0001` | ERROR | ✓ | a required occupant is absent from the bay |
-| `SC-EXP-0002` | ERROR | ✓ | the bay holds an occupant of another type than declared |
-| `SC-EXP-0003` | ERROR | ✓ | two parts of one span expectation disagree (the door case): one finding, two labels |
+| `SC-EXP-0001` | ERROR | ✓ | an element test failed: the subject is not the declared type, or is not air where air was declared; the default `mismatchCode` of every shipped test |
+| `SC-EXP-0002` | ERROR | ✓ | a negated test matched, so `not(child)` refutes |
+| `SC-EXP-0003` | ERROR | ✓ | two matches of one check bound one key to two different values: a bindings conflict, never an exception |
+| `SC-EXP-0004` | ERROR | ✓ | a threshold cannot be met: `atLeast(k)` with `k > n`, or fewer matching children than `k` can reach |
 | `SC-FOC-0101` | ERROR | ✓ | a focus found no subject where the bay requires one; primary over the bay's cell or the key |
 | `SC-FOC-0201` | ERROR | ✓ | more than one occupant could be the subject, so the binding is ambiguous |
 | `SC-FOC-0301` | ERROR | ✓ | a section in the unit's region was refused (`Refused(status, code)`); the value is `Missing`, never a short sum |
@@ -347,7 +348,7 @@ ones for which `FindingBundle`'s "no primary" ordering rank is reachable.
 | `SC-CHK-0101` | ERROR | ✓ | a check pairs a focus and an expectation whose `subject()` differ |
 | `SC-CHK-0102` | ERROR | ✓ | the computation/derivation DAG has a cycle |
 | `SC-CHK-0106` | ERROR | ✓ | a declaration that contradicts itself: `EXCLUSIVE` with a `None` footprint (R1), or checks that do not match the coverage (R4) |
-| `SC-CHK-0107` | ERROR | ✓ | a check belongs to no bay; a structure-level check is not representable |
+| `SC-CHK-0107` | ERROR | ✓ | a check belongs to no bay, or a bay asserts nothing: a structure-level check and a bay with an empty `Requirement` are both seams, not declarations |
 | `SC-CHK-0109` | ERROR | ✓ | a check reads a context key produced at a later stage |
 | `SC-DOC-0001` | ERROR | ✓ | `schemaVersion` is outside the supported range |
 | `SC-DOC-0002` | ERROR | ✓ | a required field is absent or of the wrong data kind |
@@ -366,7 +367,7 @@ ones for which `FindingBundle`'s "no primary" ordering rank is reachable.
 | `SC-CTX-0109` | ERROR | ✓ | the wrong verb for a key: a `put` targets a section-contributed key (`merge != null`), or a `contribute` targets a single-writer key; the write is refused |
 | `SC-CTX-0201` | WARNING | ✓ | a computation declined to produce its key (U8 owns the `SC-CTX` block) |
 | `SC-CTX-0202` | ERROR | ✓ | a reader required a key a frame does not hold; the value is absent, never a default |
-| `SC-CTX-0301` | WARNING | ✓ | a fold produced a non-finite total from finite inputs; the key is omitted |
+| `SC-CTX-0301` | WARNING | – | a fold produced a non-finite total from finite inputs; the key is omitted |
 | `SC-DIA-0001` | WARNING | – | the bundle was truncated: findings were elided by a cap or filtered by the floor |
 | `SC-DIA-0002` | WARNING | ✓ | a finding's severity disagrees with its code's registered severity |
 | `SC-DIA-0003` | WARNING | – | two findings shared a `FindingId`, so `related` is ambiguous |
@@ -601,7 +602,7 @@ kernel cannot detect a terminal — I-15 — so the host decides), `locale` (aff
 only, never the code, the labels or the structure). The human block for a wall mismatch:
 
 ```text
-error[SC-EXP-0002]: expected minecraft:bricks, found minecraft:stone_bricks
+error[SC-EXP-0001]: expected minecraft:bricks, found minecraft:stone_bricks
   --> structurecumulus:huge_furnace 14:21
    |
  14 |         "wall": { "expect": "minecraft:bricks" }

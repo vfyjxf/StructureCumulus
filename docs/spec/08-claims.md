@@ -18,8 +18,8 @@ the plan and planner, the `SC-CLM` codes. **Does not own** the bay's `Coverage`,
 | `Sharing` | `EXCLUSIVE`, `SHARED`: whether this claim excludes another over the same cell |
 | `Footprint` | `Box`, `Bound`, `Declared`, `None`: which cells a bay owns |
 | `ClaimRow` | `(world, cell, sharing, owner, siting, bay)`: one cell of one world held by one bay of one owner at one siting |
-| `ClaimSet` | `(rows, revision)`: one whole settlement, rows in canonical order |
-| `ClaimConflict` | `(rows, findings)`: the rows that failed the matrix plus the findings naming them |
+| `ClaimSet` | `(rows, revision)`: one whole settlement, rows in canonical order (`ClaimRow.ordered`) |
+| `ClaimConflict` | `(rows, findings)`: the held rows that block the settle, plus the request's own conflicting rows when the conflict is inside one request, plus the findings naming them |
 | `ClaimMatrix` | the one conflict predicate, `conflicts(a, b)`: one world, one cell, different ownership, at least one `EXCLUSIVE` |
 | `ClaimLedger` | host store, one handle per world: `world()`, `settle(SettleRequest)`, `release(OwnerId, Siting)` and `read(Cuboid)` |
 | `ClaimView` | one read: the rows intersecting a box, the revision read, and whether the store answered |
@@ -50,12 +50,16 @@ public record ClaimRow(World world, LatticeKey cell, Sharing sharing, OwnerId ow
                        NamespacedId bay) {}
 
 public record ClaimSet(List<ClaimRow> rows, long revision) {
-    public ClaimSet { rows = List.copyOf(rows); }                 // canonical order, §4.1
+    public ClaimSet { rows = ClaimRow.ordered(rows); }           // canonical order, §4.1
 }
 
 public sealed interface ClaimVerdict permits Settled, ClaimConflict, RevisionMoved {
-    record Settled(long revision, List<ClaimRow> rows) implements ClaimVerdict {}
-    record ClaimConflict(List<ClaimRow> rows, List<Finding> findings) implements ClaimVerdict {}
+    record Settled(long revision, List<ClaimRow> rows) implements ClaimVerdict {
+        public Settled { rows = ClaimRow.ordered(rows); }
+    }
+    record ClaimConflict(List<ClaimRow> rows, FindingBundle findings) implements ClaimVerdict {
+        public ClaimConflict { rows = ClaimRow.ordered(rows); }
+    }
     record RevisionMoved(long expected, long actual) implements ClaimVerdict {}
 }
 
@@ -74,10 +78,13 @@ public interface ClaimLedger {                                    // @NullMarked
     ClaimView read(Cuboid box);                                   // never null; an empty answer is available
 }
 
-public interface ClaimView {
-    List<ClaimRow> rows();                                        // rows intersecting the box, canonical order
-    long revision();                                              // the revision this answer was read at
-    boolean available();                                          // false = the store could not answer
+public record ClaimView(List<ClaimRow> rows, long revision, boolean available) {
+    public ClaimView {                                            // an unavailable view holds no rows
+        rows = ClaimRow.ordered(rows);
+        if (!available && !rows.isEmpty()) throw new IllegalArgumentException("an unavailable view holds no rows");
+    }
+    public static ClaimView unavailable() { return new ClaimView(List.of(), 0L, false); }
+    public List<ClaimRow> rowsIn(Cuboid box);                     // rows intersecting the box, canonical order
 }
 
 public sealed interface ClaimPlan permits ClaimPlan.Matched, ClaimPlan.Invalid {
@@ -111,7 +118,7 @@ themselves.
 | Thing | Total order |
 | --- | --- |
 | cell | U1's canonical order (`LatticeKey` natural order) |
-| `ClaimRow` | `(world, cell, owner, bay)`; the sharing value never breaks a tie |
+| `ClaimRow` | `(world, cell, owner, bay)`, implemented once by `ClaimRow.ordered(List<ClaimRow>)`; the sharing value never breaks a tie |
 | `ClaimSet.rows`, `Settled.rows`, `ClaimConflict.rows` | the `ClaimRow` order |
 
 **Replacement rule.** `settle` replaces *every* row of `(world, owner, siting)` in one CAS: there is
@@ -220,7 +227,8 @@ open (`22` §16 Q6).
 - On `RevisionMoved` the settler re-reads and re-checks **once** inside the transaction; a second
   movement is `Undecided(LEDGER_MOVED)` with a retry token, and never an invented conflict.
 - `Formed` exists only after `Settled`, and carries the `ClaimSet` plus the settled revision. A conflict
-  is `Failed(SC-CLM-0002)` with the incumbent rows; an unanswerable ledger is `Undecided`.
+  is `Failed(SC-CLM-0002)` carrying the held rows that block, and the request's own rows as well when
+  the conflict is inside one request; an unanswerable ledger is `Undecided`.
 - `release(owner, siting)` — on a handle for one world — deletes every row of that key in one
   transaction and bumps the revision; a released key reads empty, and the three lifecycle points that
   call it — instance removal, a move, a world unload — are `23` §5's.

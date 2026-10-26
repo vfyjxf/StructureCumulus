@@ -58,20 +58,20 @@ Each row is a test that must exist. "Prior" is the ArchitectCumulus finding it p
 | C-09 | P-69 | U3 | `ProbeSession.remaining()` decreases during a step; a predicate can refuse the next read without spending it. | live budget, not a step-entry snapshot |
 | C-10 | P-43 | U3, U7 | A multi-cell bay is tested once, by one expectation, and claims the whole cuboid atomically; a half-door mismatch yields one `MISMATCH` with two labels. | one call, atomic claim |
 | C-11 | P-37 | U7 | A `Formed` comes from `settle` alone and never from `check`; it binds every matched bay and settles every claim, so it never returns with an empty outcome or zero claims when the plan checked bays. | formed ⇒ `settle` wrote, outcome + claims present |
-| C-12 | P-38 | U5, U7 | A stage plan written from the public model executes end to end: every step kind has a carrier, and a missing carrier is `UNREADABLE`, not silently skipped. | no dead step kind |
-| C-13 | P-67 | U5, U7 | `ANCHOR`, `CENSUS` and `CLAIM` steps receive their carriers explicitly: `ANCHOR` the lease's view and the siting, `CENSUS` the view, `CLAIM` the host's frozen claim view — never through reflection. | no reflection |
+| C-12 | P-38 | U5, U7 | A `CheckPlan` written from the public model executes end to end: every computation, derivation and check receives its carrier, and a unit whose reads cannot answer is `UNREADABLE`, not silently skipped. | no dead plan entry |
+| C-13 | P-67 | U5, U7 | A computation, a derivation and a check each receive their context explicitly — `ComputationContext` for a section or an aggregate, `DeriveContext` for a derivation, `FocusContext` (bay, siting, view, folded context, stage, locus) for a check — never through reflection. | no reflection |
 | C-14 | P-70 | U7 | `Fingerprint` has a named algorithm and a `of(WorldView, Blueprint)` factory; the same content yields the same fingerprint across JVMs. | stable hash |
 | C-15 | P-31 | U7 | A zero budget for one resource does not report exhaustion if the others remain; exhaustion is reported only when a read is actually refused. | no false exhaustion |
-| C-16 | P-49 | U7 | `ReadSet` accumulation is amortised linear; a 170-cell walk is not quadratic. | linear enough |
+| C-16 | P-49 | U7 | `ReadScope` accumulation is amortised linear; a 170-cell walk is not quadratic. | linear enough |
 | C-17 | P-50 | U7 | A bounds/census step is charged as a box comparison, not as one cell read per cell. | cost matches kind |
-| C-18 | P-62 | U7, U8 | A deriver's reads are added to the result's `ReadSet`, so a change to the interior invalidates the formed instance. | derivation reads counted |
+| C-18 | P-62 | U7, U8 | A deriver's reads are added to the result's `ReadScope`, so a change to the interior invalidates the formed instance. | derivation reads counted |
 | C-19 | P-61 | U8 | Two augments writing one `AugmentKey` fold by the declared `AugmentFold`; a single augment still produces the key. | fold has a carrier |
-| C-20 | P-52 | U8 | A derivation step's `Arguments` reach the deriver through `DerivationContext`, including a bound bay's cuboid. | parameters delivered |
+| C-20 | P-52 | U8 | A derivation step's declared arguments reach the deriver through `DeriveContext`, including a bound bay's cuboid. | parameters delivered |
 | C-21 | P-53 | U8 | Derivation reads are charged to the budget and appear in `Spend`; a dropped augment is a finding, not silence. | charged and reported |
 | C-22 | P-12 | U6, U8 | A `ContextValue` decoded from `DataView` carries its `DataKind`; a type mismatch is a finding, not a cast. | kind discriminator |
 | C-23 | P-19 | U6 | At least one complete document compiles: validates, assembles and round-trips byte-for-byte after canonicalisation. | an admissible document exists |
 | C-24 | P-14 | U9 | Every shipped `FindingCode` has an `Explanation`; `render` never depends on map order; a cap keeps the primary finding. | explainable, ordered |
-| C-25 | P-07 | U9 | `FindingBundle.empty()` and `FindingBundle.none()` do not collide; the static factory has a distinct name. | legal Java |
+| C-25 | P-07 | U9 | `FindingBundle.empty()`, `of(List)` and `of(Finding...)` coexist without an ambiguous overload; the empty factory keeps a distinct name. | legal Java |
 | C-26 | P-11 | U9, U11 | Registry refusal (duplicate id, unknown family, late registration) has a stable code and a finding; no refusal is a bare exception. | refusal is data |
 | C-27 | P-68 | U2, U3 | A nested occupant exposes a `NestedView`; a predicate can descend, the depth is budgeted, and a change inside the child invalidates the parent. | descent has a door |
 | C-28 | P-44 | U11 | The kernel carries a `ClaimLedger` both entry points reach: `check` reads one revision and writes nothing, its `Admitted` carries the planned claim and that revision, a missing ledger leaves the plan `@Nullable` and the result `Undecided(LEDGER_UNAVAILABLE)`, and only `settle` writes rows. | ledger reachable; read-only in `check` |
@@ -91,7 +91,7 @@ Each row is a test that must exist. "Prior" is the ArchitectCumulus finding it p
 | C-42 | — | 20 | An addon expectation loops without a read; watchdog cancels, kernel's read-interval poll cannot interrupt it; scheduler degrades without killing the pool. | wedged custom step |
 | C-43 | — | 20 | `AUTO` dirty event: only `PROBE` runs; a pass submits `FORM` separately; no full `FORM` is hidden in the AUTO task. | AUTO stays cheap |
 | C-44 | — | 20 | Two overlapping snapshots with default settings own independent section copies; enabling `SectionStore` is the only path that shares them. | default per-snapshot |
-| C-45 | — | 20 | A cow moves out of an entity bay between checks; dispatch re-queries `ReadSet.entities`, detects the footprint change and does not reuse the old `MATCH`. | entity movement found at dispatch |
+| C-45 | — | 20 | A cow moves out of an entity bay between checks; dispatch re-queries `ReadScope.entities`, detects the footprint change and does not reuse the old `MATCH`. | entity movement found at dispatch |
 | C-46 | — | 20 | Parallel section checking is `MatchPolicy.parallel`, off by default; enabling it changes neither the result nor `Spend`. | parallel is opt-in |
 | C-47 | — | 20 | A plain `Expectation` is never cached as such; an entry is one unit's contributions or outcome, hit only on an equal `CacheKey(plan, siting, unit, closureDigest)`. | cacheability is `(unit, closureDigest)` |
 | C-48 | — | 21 | The compact furnace JSON normalises to the same `Blueprint` as the canonical JSON. | one runtime model |

@@ -116,8 +116,8 @@ Rules:
 ## 6. Builders and immutability
 
 - A value with more than four components gets a builder **only if** most components are
-  optional. `Blueprint` and `MatchRequest` qualify; `LatticePoint`, `Cuboid`, `Claim` and
-  `Finding` do not.
+  optional. `Blueprint`, `MatchRequest` and `Finding` qualify; `LatticePoint`, `Cuboid` and
+  `Claim` do not.
 - A builder is mutable, not thread-safe, and `build()` validates once. The built value is
   immutable.
 - Every value type is a `record` unless it must cache a derived field; a cached field is
@@ -228,13 +228,13 @@ public final class HatchExpectation implements Expectation {
     public Reply test(ExpectationContext ctx) {
         OccupantSnapshot occupant = ctx.occupantAt(ctx.cells().min());
         if (occupant == null) {
-            return Reply.unreadable(Finding.builder(Codes.UNREADABLE_CELL)
+            return Reply.unreadable(Finding.builder(FindingCode.of(Family.FOC, 301))
                     .stage(ctx.stage())
                     .label(ctx.locus(), "this cell was not readable")
                     .build());
         }
         if (!occupant.has(Traits.ITEM_INVENTORY)) {
-            return Reply.mismatch(Finding.builder(Codes.EXPECTED_INVENTORY)
+            return Reply.mismatch(Finding.builder(FindingCode.of(Family.EXP, 2))
                     .stage(ctx.stage())
                     .label(ctx.locus(), "expected an inventory-bearing hatch")
                     .note("found " + occupant.descriptor().type())

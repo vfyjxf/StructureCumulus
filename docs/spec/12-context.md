@@ -22,7 +22,7 @@ Intermediate state is not a separate mechanism: a computation writes the same `C
 | `ContextTier` | `BLUEPRINT`, `PROBE`, `FORM`, `SETTLE`: the stage projection of a frame |
 | `ContextFrame` | `(tier, revision, Map<ContextKey<?>, Object>)`, one publication |
 | `StructureContext` | `(instance, revision, frames)`; immutable, tier-stamped reads |
-| `ContextDraft` | one stage's writes: `put` (single writer) and `contribute` (section partial) |
+| `ContextDraft` | one stage's writes: `put` (single writer), `forSection` + `contribute` (section partial), `refuse`/`declined` (a decided absence) |
 | `ContextView` | `get` (nullable) / `require` (`Outcome`) / `at(tier)` |
 | `ContextStore` | one per instance: `context(instance)`, `draft(tier, baseRevision)`, `publish(draft)` |
 | `RuntimeState` | `(context, augments, contextRevision)` plus fold findings; the only persisted form |
@@ -52,7 +52,7 @@ public interface ContextView {
     <T> Outcome<T> require(ContextKey<T> key);     // Missing with a finding, never a bare null
     boolean has(ContextKey<?> key);
     Set<ContextKey<?>> keys();                     // ascending (id, type name)
-    ContextView at(ContextTier tier);              // narrow to `tier`, same frames
+    ContextView at(ContextTier tier);              // narrow to `tier`, same frames; a wider tier clamps
 }
 
 public record StructureContext(InstanceId instance, long revision, List<ContextFrame> frames)
@@ -65,7 +65,13 @@ public record StructureContext(InstanceId instance, long revision, List<ContextF
 public final class ContextDraft {                  // one stage's writes, not yet visible
     public ContextTier tier();  public long baseRevision();
     public <T> ContextDraft put(ContextKey<T> key, T value);          // merge == null only
-    public <T> ContextDraft contribute(ContextKey<T> key, T partial); // merge != null only
+    public ContextDraft forSection(SectionKey section);              // the scope contribute requires
+    public <T> ContextDraft contribute(ContextKey<T> key, T partial); // merge != null only; needs forSection
+    public <T> ContextDraft refuse(ContextKey<T> key);                // a section of the region was refused
+    public <T> ContextDraft declined(ContextKey<T> key);              // every section readable, nothing contributed
+    public <T> @Nullable T read(ContextKey<T> key);                   // the draft's own folded value
+    public boolean publishes(ContextKey<?> key);                      // decides the key, value or absence
+    public Set<ContextKey<?>> keys();                                 // every key this draft decides
 }
 
 public interface ContextStore {
@@ -95,6 +101,7 @@ public final class RuntimeState {
 | Declaration is catalog-owned | declarations are built with `ContextKeys.of(...)` and bound with `ContextKeys.register(draft, key)`; two registrations of one id are `SC-CTX-0102`; equality is `(id, type)` |
 | No raw `Map` | `ContextDraft` and `ContextView` are the only handles; a frame's map is never handed out |
 | Tier stamping | a reader at tier `t` sees values stamped at or below `t`; a publish at `t+1` never rewrites a frame at `t` |
+| Absence is published | a frame carries an entry for every key its draft decided; a decided key with no value is recorded as an absence marker, so the frame shadows an older value instead of letting a reader fall back to it |
 
 ## 4. Semantics
 
@@ -131,21 +138,29 @@ Projection -          -      -     RUNTIME
 - `publish` returns `Outcome<Void>`: a stale `baseRevision` is `Missing(SC-CTX-0108)` and nothing is
   written. Two different values for one key in one frame is `SC-CTX-0107`, refused rather than
   last-write-wins.
+- A draft that decides a key without a value publishes that absence: the frame records the marker,
+  so a reader at that tier or above answers `null`/`Missing` instead of an older frame's value.
 - **One writer.** The matcher publishes one draft per stage boundary and the store serializes
   publications per instance; no other component opens a draft for a tier.
 - Readers are tier-stamped: an aggregate reads `context()` at its stage's tier, a check reads through
-  `FocusContext`, and `StructureContext.at(t)` narrows the instance context to `t`.
+  `FocusContext`, and `StructureContext.at(t)` narrows the instance context to `t`; a tier above the
+  view's own is clamped to it, so `at` never widens.
 
 ### 4.3 Contributions and the fold
 
-- A section computation calls `draft.contribute(key, partial)` once per section in its region.
+- A section computation contributes through a section-scoped draft: `draft.forSection(section)` stamps
+  every `contribute(key, partial)` of that handle with the section, and `contribute` on a draft with no
+  section scope is refused.
 - At the barrier, contributions are sorted by `SectionKey` `(x, z, y)` and combined left-to-right
   with `merge.combine`. The fold starts at the first present contribution; there is no identity.
-- Any refused section in the region makes the key absent. A short sum is unrepresentable.
+- Any refused section in the region makes the key absent. A short sum is unrepresentable. A section
+  computation that could not produce its partial records `draft.refuse(key)`; one that read every
+  section and contributed nothing records `draft.declined(key)`, the only path to `whenAbsent`.
 - An aggregate computation or a check reads the folded value through `view.require(key)`; a
   `PartialKey`-style direct read does not exist.
 - A single-writer key (`merge == null`) is written once with `put`, by an aggregate computation or a
-  `Deriver`; a second write in one attempt is `SC-CTX-0107`.
+  `Deriver`; a second write of a different value in one attempt is `SC-CTX-0107`, and writing the same
+  value twice is accepted.
 - Parallel section passes are allowed: contributions are independent, and the fold order is fixed.
 
 ### 4.4 Augments
@@ -162,7 +177,8 @@ The fold lives on `AugmentKey`, so every contributor to one effect agrees on how
 `RuntimeState.of` stable-sorts by `AugmentKey` (`id`, fold ordinal), then folds each key left to right:
 key order canonical, within-key order the declaration order. Strict floating point makes that
 bit-reproducible. An unrepresented key is **absent**, never zero or one; a non-finite `amount` is
-refused at construction; a non-finite *total* from finite inputs is omitted with `SC-CTX-0301`.
+refused at construction; a non-finite *total* from finite inputs is omitted with `SC-CTX-0301`, a
+label-less `WARNING` whose message names the augment key.
 
 ### 4.5 Runtime state
 
@@ -233,7 +249,7 @@ Check<Integer> enoughFree = new Check<>(
 // host side: `store` is the instance's store (§4.2), one draft per stage boundary
 StructureContext before = store.context(instance);                     // revision 7, FORM frame
 ContextDraft draft = store.draft(ContextTier.FORM, before.revision());
-// the section pass calls draft.contribute(VOLUME, partial) once per section;
+// the section pass calls draft.forSection(section).contribute(VOLUME, partial) once per section;
 // the barrier folds; the aggregate calls draft.put(CAPACITY, 400).
 Outcome<Void> published = store.publish(draft);                        // Missing(SC-CTX-0108) if 7 moved
 if (published instanceof Outcome.Missing<Void> stale) {
@@ -317,7 +333,7 @@ decorative region? The field stays on `ContextKey` either way.
 | Test | Breaks | Expected |
 | --- | --- | --- |
 | Publish a draft whose `baseRevision` is one behind | P7 | `Missing(SC-CTX-0108)`, the newer frame intact |
-| Two units put one key in one draft | §4.2 | `SC-CTX-0107`, no frame written |
+| Two units put different values for one key in one draft | §4.2 | `SC-CTX-0107`, no frame written |
 | `put` on a key whose `merge` is non-null | §3 verb rule | `SC-CTX-0109` at DESIGN |
 | A `FORM` reader asks for a key first published at `SETTLE` | P8 | `null` at `ContextTier.FORM`, the value only at `SETTLE` |
 | One of three contributed sections is `Refused` | P1 / §4.3 | the key is absent, `require` returns `Missing`, never a short sum |

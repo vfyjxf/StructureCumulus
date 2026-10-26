@@ -7,7 +7,7 @@
 
 | Owns | Does not own |
 | --- | --- |
-| `NamespacedId` — the only naming type, its grammar and total order | Cells, cuboids, sitings (`05`) |
+| `NamespacedId`'s grammar and total order — the only naming type; the record itself is U0's (`kernel.base`, `01` §B) | Cells, cuboids, sitings (`05`) |
 | `Catalog<T>`, `Catalogs`, `ContextKeys` — the frozen extension snapshot and the only key factory | The stored types: `ExpectationFactory` (`07`), `FocusFactory`/`ComputationFactory` (`11`), `RemedyProvider` (`14`), `FindingCode`/`ExplainBook` (`13`) |
 | `StructureKernel` — nine operations, their invariants, thread contract | What a match, a computation or a remedy *means* (`11`, `12`, `14`) |
 | `Stability`, the shipped `Codes`, the I-8 line | The grammar (`10`), the code format (`13`), every host port |
@@ -22,9 +22,9 @@ is a static factory, not an operation.
 | Name | Shape | Definition |
 | --- | --- | --- |
 | `NamespacedId` | record `(namespace, path)`, `Comparable` | `ns:path`; the only naming type; ordered namespace then path |
-| `Catalog<T>` / `.Builder<T>` | interface / nested builder | one frozen, namespaced, insertion-ordered family; `get` is `@Nullable`; the builder is the only mutable shape |
+| `Catalog<T>` / `.Builder<T>` | final class / nested builder | one frozen, namespaced, insertion-ordered family, its own id on `family()`; `get` is `@Nullable`; the builder is the only mutable shape and refuses a second, different value for an id |
 | `Catalogs` | interface | seven frozen families plus the explanation book, for one kernel |
-| `ContextKeys` | final class | the only constructor of a `ContextKey`; registers into the `Catalogs` draft before `build()` (`SC-CTX-0102` on a re-registration) |
+| `ContextKeys` | final class | the only constructor of a `ContextKey` and its one registration funnel: `of(...)` builds, `register(draft, key)` binds into the draft `Catalogs.Builder` implements, and a re-registration is refused then (`SC-CTX-0102`) |
 | `StructureKernel` | interface, static factories | nine operations: `document`, `compile`, `siting`, `check`, `settle`, `derive`, `solve`, `explain`, `ledger`; `create` is a static factory |
 | `MatchResult` | sealed interface, `AutoCloseable` | `Admitted`, `Dropped`, `Formed`, `Failed`, `Undecided`, `Deferred`; only `Formed` carries claims and a revision, and only `settle` produces it |
 | `Host` | nested record | read-only ports fixed at create: `DocumentSource`, `SegmentLibrary`, `@Nullable ClaimLedger` |
@@ -34,7 +34,7 @@ is a static factory, not an operation.
 ## 3. API design
 
 ```java
-package dev.vfyjxf.cumulus.kernel.spi;                              // @NullMarked
+package dev.vfyjxf.cumulus.kernel.base;                             // @NullMarked
 
 public record NamespacedId(String namespace, String path) implements Comparable<NamespacedId> {
     public static final String DEFAULT_NAMESPACE = "structurecumulus";
@@ -44,18 +44,29 @@ public record NamespacedId(String namespace, String path) implements Comparable<
     public String text();                                           // "ns:path"
     @Override public int compareTo(NamespacedId other);             // namespace, then path, code point
 }
+```
 
-public interface Catalog<T> {
-    NamespacedId id();                                              // the family
-    @Nullable T get(NamespacedId id);                               // null = not registered
-    List<NamespacedId> ids();                                       // frozen, registration order
-    SequencedMap<NamespacedId, T> asMap();                          // unmodifiable, same order
-    int size();  boolean isEmpty();
-    static <T> Builder<T> builder(NamespacedId family);
-    static <T> Catalog<T> empty(NamespacedId family);
-    interface Builder<T> {
-        Builder<T> put(NamespacedId id, T value);                   // records a duplicate for build() to refuse
-        Catalog<T> build();                                         // IAE on a repeated id; idempotent
+`NamespacedId` is `kernel.base`'s, beside the other ids; this unit only uses it.
+
+```java
+package dev.vfyjxf.cumulus.kernel.spi;                              // @NullMarked
+
+public final class Catalog<T> {
+    public NamespacedId family();                                   // the family's own id
+    public @Nullable T get(NamespacedId id);                        // null = not registered
+    public T require(NamespacedId id);                              // IAE naming the family and the id
+    public boolean has(NamespacedId id);
+    public List<NamespacedId> ids();                                // frozen, registration order
+    public Map<NamespacedId, T> asMap();                            // unmodifiable, same order
+    public int size();  public boolean isEmpty();
+    public static <T> Catalog<T> empty(NamespacedId family);
+    public static <T> Builder<T> builder(NamespacedId family);
+
+    public static final class Builder<T> {
+        public Builder<T> put(NamespacedId id, T value);            // a different value for one id is an IAE here
+        public Builder<T> putAll(Catalog<T> catalog);
+        public Builder<T> fill(Map<NamespacedId, T> values);
+        public Catalog<T> build();                                  // frozen copy, ids in registration order
     }
 }
 
@@ -85,12 +96,11 @@ public interface Catalogs {
     }
 }
 
-public final class ContextKeys {
-    public static <T> ContextKey<T> register(Catalogs.Builder draft, NamespacedId id, Class<T> type,
-                                             Retention retention, @Nullable Merge<T> merge,
-                                             @Nullable T whenAbsent);
-    public static <T> ContextKey<T> register(Catalogs.Builder draft, ContextKey<T> declared);
-    // A repeated id is refused by draft.build() as an IAE whose message names SC-CTX-0102 (§4.8).
+public final class ContextKeys {                                    // kernel.context
+    public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention,
+                                       @Nullable Merge<T> merge, @Nullable T whenAbsent);
+    public static <T> ContextKey<T> register(CatalogsDraft draft, ContextKey<T> declared);
+    // A repeated id is refused when it registers, not at build(); the message names SC-CTX-0102 (§4.8).
 }
 
 public interface StructureKernel {
@@ -140,9 +150,10 @@ public sealed interface MatchResult extends AutoCloseable {
 
 `create` fixes `(Catalogs, Host)`; no member mutates either and nothing else is stored. `asMap()`
 exists because `Catalog` is also consumed by `context`'s plan compiler, which takes
-`Map<NamespacedId, …>` and may not import `spi` (`02` §2). `ContextKeys` lives here rather than with
-the key types for the same reason: it is *registration* — it takes the draft and returns the key —
-and the draft type is this unit's.
+`Map<NamespacedId, …>` and may not import `spi` (`02` §2). `ContextKeys` sits with the key types in
+`kernel.context` for the same reason: it is *registration* — it takes the draft and returns the key —
+and the draft is `kernel.context`'s `CatalogsDraft`, an interface this unit's `Catalogs.Builder`
+implements, so no `context` type imports `spi`.
 
 `Formed` is the only arm that carries a `ClaimSet`, and only `settle` produces it: `Admitted` has no
 id and no claims (`derive` refuses it) and carries instead the planned claim and the ledger revision
@@ -171,10 +182,11 @@ tie every document, catalog id and code to a version although none names a block
 
 ### 4.2 `Catalog<T>`: freeze, and why not a static registry
 
-`put` stores the instance by reference, never cloned; `build()` copies ids into a frozen list plus an
-index in one pass and refuses a repeated id with `IllegalArgumentException` naming both values. The
-frozen type has no mutator, so `get`/`ids`/`asMap` are `O(1)` and cannot fail: freezing is a type
-fact, not a runtime flag.
+`put` stores the instance by reference, never cloned, and refuses a second, *different* value for one
+id immediately with `IllegalArgumentException` naming the family and the id; re-putting the identical
+instance is a no-op. `build()` copies ids into a frozen list plus an index in one pass. The frozen
+type has no mutator, so `get`/`ids`/`asMap` are `O(1)` and cannot fail: freezing is a type fact, not a
+runtime flag.
 
 A static registry would be global mutable state (I-15), depend on class-load order, allow one
 snapshot per JVM (no golden comparison, no parallel tests) and have no freeze, adding a hidden
@@ -208,7 +220,7 @@ id cannot be shadowed (refused, not honoured). An addon is added by calling its
 `Catalog.builder(...).put(...).build()` methods and passing them to `Catalogs.builder()` before the
 single `create`; the addon never sees the kernel. `ContextKeys.register(draft, …)` is how a key
 enters `:contextKeys`: the draft is the only place a declaration can be validated against the
-catalog that will freeze with it, and a second registration of one id is refused at `build()`
+catalog that will freeze with it, and a second registration of one id is refused when it registers
 (`SC-CTX-0102`), whatever the two records' other components.
 
 ### 4.4 The nine operations
@@ -469,7 +481,7 @@ severity against — either `Explanation` gains `Severity` (U9) or the entry bec
 
 | # | Claim | Test that breaks it |
 | --- | --- | --- |
-| F1 | a clash is refused, never resolved | two catalogs register `mymod:hatch`, two `ContextKeys.register` calls take one id, or two namespaces register `SC-EXP-1234`: `build()` throws naming both keys and no kernel holds either pair. Keeping the first silently is the bug. |
+| F1 | a clash is refused, never resolved | two catalogs register `mymod:hatch`, two `ContextKeys.register` calls take one id, or two namespaces register `SC-EXP-1234`: the second `put`/registration throws naming the family and the id and no kernel holds either pair, while re-putting the identical instance is a no-op. Keeping the first silently is the bug. |
 | F2 | a kernel never changes after catalog mutation | retain both builders, build the kernel, `put` more entries and build again: `check`, `settle`, `derive`, `solve`, `explain` are identical to a fresh kernel's. |
 | F3 | no facade operation reads the world | count reads on the `WorldView`; call `document`, `compile`, `explain`, `explainOrFallback`, `ledger`: count stays zero. Then `check` with a *different* stub as the request's view: only that one is read, and `siting` reads exactly one cell of its own argument. |
 | F4 | no addon needs a kernel subclass | write an addon that changes the engine's step order, adds a tenth operation, or shadows a shipped code. If any is expressible without editing `kernel.spi`, "one kernel, many extensions" is false; today all three are refused by the frozen types. |

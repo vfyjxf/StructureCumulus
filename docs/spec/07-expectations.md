@@ -49,8 +49,10 @@ public sealed interface Outcome<T> permits Outcome.Found, Outcome.Missing {
 
 public enum DecisionKind { EVERY_CELL, ONE_SUBJECT, ANY_SUBJECT }
 
-public record ExpectationMeta(NamespacedId id, int specificity, Set<TraitKey<?>> requires) {
-    public static ExpectationMeta anonymous();   // structurecumulus:anonymous, 0, empty
+public record ExpectationMeta(NamespacedId id, int specificity, Set<ContextKey<?>> requires,
+                              FindingCode mismatchCode) {
+    public static ExpectationMeta anonymous();   // structurecumulus:anonymous, 0, empty, SC-EXP-0001
+    public static ExpectationMeta of(NamespacedId id, int specificity, FindingCode mismatchCode);
 }
 
 public enum Verdict { MATCH, MISMATCH, ABSTAIN, UNREADABLE }
@@ -66,36 +68,33 @@ public record Reply(Verdict verdict, Bindings bindings, FindingBundle findings) 
 }
 
 public interface FocusContext extends AggregateContext {          // read, occupants, context
-    Cuboid cells();  Siting siting();  Stage stage();
-    ContextView context();                                        // the key channel: get / require
-}
-
-public interface CheckContext extends FocusContext {              // the argument of Check.run
-    <V> ExpectationContext<V> with(V value, List<OccupantRef> subjects);
+    BayView bay();  WorldView view();  Siting siting();           // bay() carries the id and the cells
+    Cuboid cells();  Stage stage();  Locus locus();               // locus() is this check's label frame
 }
 
 public interface ExpectationContext<T> extends FocusContext {     // what a test may see
     T subject();  List<OccupantRef> subjects();
-    WorldView view();  NamespacedId bay();  Locus locus();  Budget budget();
-    ProbeSession session();  @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    <V> ExpectationContext<V> withSubject(V subject, List<OccupantRef> subjects);   // one cell of a bay test
+    static <T> ExpectationContext<T> of(FocusContext base, T subject, List<OccupantRef> subjects);
+    Budget budget();  ProbeSession session();
+    @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
 }
 ```
 
 | Type | Signature |
 | --- | --- |
 | `Bindings` / `BindingKey<T>` | `EMPTY`, `of`, `<T> @Nullable T get(key)`, `merge(Bindings, Bindings, Locus): Reply`; key is `(NamespacedId id, Class<T> type)` |
-| `FocusContext` | `extends AggregateContext` and adds `cells()`, `siting()`, `stage()`, `context()`; a check therefore reads `ContextKey`s through `context()` and nothing else |
-| `CheckContext` | `extends FocusContext` and adds `with(value, subjects): ExpectationContext<V>`; the argument of `Check.run` |
-| `ExpectationContext<T>` | `extends FocusContext` and adds `subject(): T`, `subjects()`, `view()`, `bay()`, `locus()`, `budget()`, `session()`, `occupantAt(p)` — null ⇔ `readStatus(p) != READABLE` |
+| `FocusContext` | `extends AggregateContext` (which answers `read(key)`, `occupants(box)` and `context()`) and adds `bay(): BayView`, `view()`, `siting()`, `cells()`, `stage()`, `locus()`; a check therefore reads `ContextKey`s through `context()` and nothing else |
+| `ExpectationContext<T>` | `extends FocusContext` and adds `subject(): T`, `subjects()`, `withSubject(value, subjects): ExpectationContext<V>` — the one way to re-type the subject for a single cell of a bay test —, the static `of(base, subject, subjects)`, `budget()`, `session()`, `occupantAt(p)` — null ⇔ the cell's section is not readable |
 | `ProbeSession` | `occupant(LatticePoint)`, `claimsAt(LatticePoint): List<Claim>` (frozen ledger only; session reservations stay private), `<T> @Nullable T binding(BindingKey<T>)`, `remaining(): Budget`, `stage(): Stage` |
-| `Expectations` | `allOf`, `anyOf`, `not`, `sequence`, `atLeast(k)`, `atMost(k)`, `exactly(k)`, `block`, `air`, `trait`, `anyOccupant`, `nothing`, `custom(meta, body)` — each returns an `Expectation<T>` of its children's subject type |
+| `Expectations` | `allOf`, `anyOf`, `not`, `sequence`, `atLeast(k)`, `atMost(k)`, `exactly(k)`, `block`, `air`, `eachCell(element)`, `trait`, `anyOccupant`, `nothing`, `custom(meta, body)` — each returns an `Expectation<T>` of its children's subject type; `eachCell` is the only one that changes it (`Expectation<OccupantSnapshot>` → `Expectation<BayView>`) |
 | `ExpectationFactory` / `FactoryContext` | `id()`, `create(DataView, FactoryContext): @Nullable Expectation<?>`; `factory(id)`, `source()`, `range()`, `report(Finding)` |
 
 `subject()` is the one type a test accepts: `Check<T>` refuses a focus and an expectation whose
 `subject()` differ (`SC-CHK-0101`), so a `DoorView` test cannot be paired with a `BayView` focus.
 `meta().specificity` is a tie-break, never a budget input; `requires` is a **coverage** demand
 (§4.5). `reads()` defaults to `ReadScope.none()`, and an expectation that reads outside the bay's
-decision cells — a trait's source, a neighbour cell, a `ContextKey` — must declare it, because
+decision cells — a neighbour cell, an entity window, a `ContextKey` — must declare it, because
 `Check.reads(bayCells)` is `focus.reads(bayCells).union(expectation.reads())` and that read closure is
 what the engine charges in cells and sections (`22` §6.1, §9.5). There is no `cost` field and no
 per-unit number at all: the budget is a coarse resource cap on cells and sections. `Reply` is **not** generic:
@@ -133,10 +132,11 @@ A focus answers `Outcome<T>`, an expectation answers `Reply`, and a `Check` is t
 channels meet:
 
 ```java
-public CheckResult run(CheckContext ctx) {
+public CheckResult run(FocusContext ctx) {
     Outcome<T> taken = focus.take(ctx);
     if (taken instanceof Outcome.Found<T> found) {
-        return new CheckResult(expectation.test(ctx.with(found.value(), found.subjects())),
+        return new CheckResult(
+                expectation.test(ExpectationContext.of(ctx, found.value(), found.subjects())),
                 found.subjects(), found.notes());
     }
     Outcome.Missing<T> missing = (Outcome.Missing<T>) taken;
@@ -151,11 +151,14 @@ public CheckResult run(CheckContext ctx) {
 | a section the focus needed was refused | `Outcome.Missing` | `SC-FOC-0301` |
 | a partial contribution is missing at the barrier | the key is `Outcome.Missing`, every reader is `unreadable` | `SC-FOC-0302` |
 
-- `Missing` carries findings labelled on a `Locus` (`KEY` for a context-key absence,
-  `WORLD`/`LOCAL` for a cell), so the label points at the absence, not at the bay's other cells.
+- `Missing` carries findings labelled on a `Locus` (`LOCAL` for a context-key absence, `WORLD`/`LOCAL`
+  for a cell), so the label points at the absence, not at the bay's other cells.
 - A key-reading focus is `Focuses.context(key)` on a `ContextKey<T>`: it is exactly
-  `ctx.context().require(key)`, so an absent key is `Outcome.Missing` with a `KEY` locus, never a
-  `Found` holding null and never a zero.
+  `ctx.context().require(key)`, so an absent key is `Outcome.Missing` carrying `SC-FOC-0302` — message
+  naming the key, label on a `LOCAL` locus that holds no cell and no key of its own — never a `Found`
+  holding null and never a zero. The key is declared once, in `reads()`; and the same absence also
+  travels as `ContextView.require`'s own finding in `CheckResult.notes` (§4.2's sketch), so it is
+  reported twice, in two frames.
 - A missing subject is never `test(null)` and never silence: `fold`'s second arm does not call the
   expectation at all, and the reply is `UNREADABLE` carrying the focus's findings.
   `describeMissing()` supplies their wording.
@@ -211,8 +214,8 @@ looking for a `MISMATCH`, which would otherwise read `Undecided` where `Failed` 
 
 Specificity is `max` for `allOf`/`sequence`, `min` for `anyOf` and thresholds with `k < n` (a test
 satisfiable while skipping a child cannot claim its narrowness), and `0` for `not`. `requires` is
-the union, `anyOf` included, because it is a demand on *coverage*: an unserved trait makes the bay
-`UNREADABLE` before any cell is read, whereas treating it as a miss turns "I did not look" into
+the union, `anyOf` included, because it is a demand on *coverage*: an unserved `ContextKey` makes the
+bay `UNREADABLE` before any cell is read, whereas treating it as a miss turns "I did not look" into
 `MISMATCH`. `reads()` is the union of the children's scopes and `subject()` their common `T`;
 neither is a price — the read scope is what the engine bills in cells and sections at run time (§4.7).
 
@@ -223,16 +226,18 @@ only ever sees the subject.
 
 | Focus kind | Subject type | `DecisionKind` |
 | --- | --- | --- |
-| `block` | `BlockView` | `ONE_SUBJECT` or `EVERY_CELL`, depending on whether its cells cover the bay |
-| `allCells`, `bay` | `BayView` | `EVERY_CELL` |
-| `occupant` | `OccupantView` | `ONE_SUBJECT` |
-| `entity` | `EntityView` | `ONE_SUBJECT` |
+| `bay` | `BayView` | `EVERY_CELL` |
+| `allCells` | `List<OccupantSnapshot>` | `EVERY_CELL` |
+| `occupant` | `OccupantSnapshot` | `ONE_SUBJECT` |
+| `entity` | `EntitySnapshot` | `ONE_SUBJECT` |
 | `nested` | `NestedView` | `ONE_SUBJECT` |
 | `context` | `T` | `ANY_SUBJECT` |
-| `door` | `DoorView` (two `OccupantRef`s, one combined state) | `ONE_SUBJECT` or `EVERY_CELL` |
+| `door` | `DoorView` (two `OccupantRef`s, one combined state) | `ONE_SUBJECT` |
 
 | Rule | Statement |
 | --- | --- |
+| element | the element tests are `Expectations.block(type)` and `Expectations.air()`, both on an `OccupantSnapshot`; the focus that binds that subject is `occupant`, and `door` is a focus (`Focuses.door`), never a combinator |
+| bay test | a test over a whole bay is `Expectations.eachCell(element)` on a `BayView`, paired with `bay`; the element sees one cell at a time through `withSubject` |
 | geometry | the focus's decision cells are `CuboidSet`s inside `bay.cells`, computed at DESIGN by `staticDecisionCells(bayCells)`; a dynamic kind (`occupant`, `entity`, `nested`, `context`) has none |
 | subject | `focus: door` yields a `DoorView`; a door expectation consumes `DoorView` and never `BayView`, so pairing it with a `BayView` focus is `SC-CHK-0101`, not a cast |
 | atomicity | one `Check`, one `Reply`: the focus takes its subject once, the expectation answers once, and the subjects that were bound travel in `Found.subjects` |
@@ -255,14 +260,16 @@ per-unit cost: the engine charges the declared read closure in `cells` and `sect
 ## 5. Reference sketch
 
 ```java
-final class HatchExpectation implements Expectation<OccupantView> {   // three outcomes, one binding
+final class HatchExpectation implements Expectation<OccupantSnapshot> {   // three outcomes, one binding
+    static final NamespacedId ITEM_INVENTORY = NamespacedId.of("minecraft", "item_inventory");
     static final BindingKey<OccupantRef> HATCH = BindingKey.of(ID("hatch"), OccupantRef.class);
-    public Class<OccupantView> subject() { return OccupantView.class; }
-    public ExpectationMeta meta() { return new ExpectationMeta(ID("hatch"), 80, Set.of(Traits.ITEM_INVENTORY)); }
+    public Class<OccupantSnapshot> subject() { return OccupantSnapshot.class; }
+    public ExpectationMeta meta() { return ExpectationMeta.of(ID("hatch"), 80, SC_EXP_0001); }
 
-    public Reply test(ExpectationContext<OccupantView> ctx) {
-        OccupantView o = ctx.subject();                                  // never null: absence is Missing
-        if (!o.has(Traits.ITEM_INVENTORY)) return Reply.mismatch(Finding.builder(SC_EXP_0001)
+    public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
+        OccupantSnapshot o = ctx.subject();                              // never null: absence is Missing
+        if (!o.hasTrait(ITEM_INVENTORY)) return Reply.mismatch(Finding.builder(SC_EXP_0001)
+                .message("expected an inventory-bearing hatch")
                 .label(ctx.locus(), "expected an inventory-bearing hatch")
                 .note("found " + o.descriptor().type()).build());
         return Reply.match(Bindings.of(HATCH, o.ref()));
@@ -273,7 +280,7 @@ final class OakDoorExpectation implements Expectation<DoorView> {     // one bay
     private static final NamespacedId OAK = NamespacedId.of("minecraft", "oak_door");
 
     public Class<DoorView> subject() { return DoorView.class; }
-    public ExpectationMeta meta() { return new ExpectationMeta(ID("oak_door"), 90, Set.of()); }
+    public ExpectationMeta meta() { return ExpectationMeta.of(ID("oak_door"), 90, SC_EXP_0001); }
 
     public Reply test(ExpectationContext<DoorView> ctx) {
         DoorView door = ctx.subject();                                   // both halves, already bound
@@ -295,14 +302,14 @@ final class OakDoorExpectation implements Expectation<DoorView> {     // one bay
 
 // block+trait on one cell, an anyOf fallback, and a pair whose members may ABSTAIN.
 var core  = Expectations.allOf(Expectations.block(NamespacedId.of("minecraft", "barrel")),
-                               Expectations.trait(Traits.ITEM_INVENTORY));
+                               Expectations.trait(NamespacedId.of("minecraft", "item_inventory")));
 var panel = Expectations.anyOf(Expectations.custom(PANEL_META, ctx -> {
     OccupantSnapshot s = ctx.occupantAt(ctx.cells().min());
     return s == null ? Reply.unreadable(/* as above */)
             : s.descriptor().tags().contains(Tags.STONE_FAMILY) ? Reply.match() : Reply.abstain();
 }), new WoodPanel());
-// not `anyOf(HatchExpectation, Expectations.block(...))`: an `OccupantView` child and a `BlockView`
-// child are different subject types, so a hatch-or-bars bay is two bays, or one occupant test.
+// `anyOf(HatchExpectation, Expectations.block(mc("bars")))` is one `Expectation<OccupantSnapshot>`:
+// a hatch-or-bars cell is one occupant focus and two element tests, not two bays.
 ```
 
 A panel of neither stone nor wood makes both children abstain, so `anyOf` abstains and the engine
@@ -351,8 +358,9 @@ uncheckable at DESIGN and would put a host class name into a kernel decision (I-
 ## 8. Dependencies and open questions
 
 Depends on U0 `base` (`NamespacedId`, `Budget`, `Stage`), U1 `space` (`Cuboid`, `CuboidSet`, `Locus`,
-`Siting`), U2 `occupant` (`WorldView`, `ReadStatus`, `OccupantSnapshot`, `OccupantRef`, `TraitKey`),
-U4 `claim` (`Claim`) and U9 `finding` (`Finding`, `FindingBundle`, `FindingCode`, `SourceSpan`). U5
+`Siting`), U2 `occupant` (`WorldView`, `ReadStatus`, `OccupantSnapshot`, `OccupantRef`), U8
+`context` (`ContextKey`, `ContextView`, `AggregateContext`), U4 `claim` (`Claim`) and U9 `finding`
+(`Finding`, `FindingBundle`, `FindingCode`, `SourceSpan`). U5
 owns `Bay` and supplies it to `staticDecisionCells`; U7 charges the check's read closure and then
 calls the focus and the expectation.
 

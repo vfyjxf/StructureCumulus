@@ -502,3 +502,54 @@ L 另外指出四句引用需要改口径（方向不变）：`Bay.java` 里的 
 ### 8.5 被我在上一版丢掉、仍然有效的条目
 
 `A3`（`claim` 缺 `finding` 依赖）、`A8`（`Checks` 不在内核类路径）、`A10`（`Finding` 例外于"值类型"规则）、`C-6`/`C-8`/`C-9`/`C-10`/`C-11`（占据物过滤、`Refused` 记录、枚举常量数、`contentDigest`、覆盖格的读状态）、`E RULE-2`/`RULE-3`（自洽检查与修订校验的先后、重叠诊断的产出者）、`F9`/`F10`（`Overlap` 的位置、重复键的生产者）、`G15`（`InstanceBudget` 的位置）、`H14`/`H15`（`at(tier)` 的语义、`ContextKeys` 与 `SC-CTX-0102`）、`I` 的 U6/U10 单元表行。逐条见九个分片报告。
+
+## 9. `CODE` 批次的执行结果与连带修改
+
+按你最新的一条规则执行：**代码里的设计更好就写进文档；代码有问题、或两边都没定好，就留待定**。因此这一批只动"代码对、文档改"的行。
+
+### 9.1 已回填
+
+三组并行，逐行的 applied/held/stale 清单在 `_work/regen/apply-g1.md`、`apply-g2.md`、`apply-g3.md`：
+
+| 组 | 覆盖文件 | 行数 |
+| --- | --- | --- |
+| G1 | `01`、`03`、`04`、`05`、`06` | 9（`A10`–`A14`、`B-7`、`C-2`、`C-3`、`C-8`） |
+| G2 | `07`、`08`、`09`、`13` | 12（`d-D2`、`d-D6`、`d-D10`、`d-D11`、`d-D13`、`d-D15`、`e-D8`–`e-D10`、`e-D15`、`f-F6`、`f-F14`；`f-F14` 的 `Stage` 一半被 F2 待定挡住） |
+| G3 | `11`、`12`、`15`、`16`、`18` | 12 |
+
+没有一行被 R 记录挡下，也没有一行因锚点失效而作废。
+
+### 9.2 因回填而必须一起改的文档
+
+- **`C-8` 方向反转。** 该行标的是 `CODE`，但它自己的理由与 `stage3-audit.md` §4 都说该改代码（`FindingCode` 在 `base`，每个码携带者都是 `FindingCode`；`OccupantReadModelTest.java:64` 已经在传一个 `13` 不发布的 id）。已按"文档对、代码滞后"回退：`06` §3.3 的 `Refused` 回到 `FindingCode`，`06` §5 的示例同步为 `FindingCode.of(Family.OCC, 101)`，并新登记 **R38**。
+- **逐块门面撤销。** `C-2` 把 `06` 改成区段模型后，`WorldView.summary()/chunkGrid()/chunk()` 已无载体，`OccupancySummary`/`ChunkContent` 两个类型在任何单元里都没有使用者。已从 `01` §D 撤两行、从 `16` §3 的 `LevelSnapshot` 删三个 `@Override`、从 `20` §6.1 删 `ChunkContent` 与"`WorldView` gains …"那段，并把 `ChunkGrid`/`ChunkKey` 的作用限定为"给格子定尺寸"。同一处把 `SectionSlot.Air` 的三分量对齐成 `06` 的 `Air(long revision)`（`20` §4.2 的伪码随之改）。全部并入 R38。
+- **`01` §L `EditExecutor.begin`** 改成五参 `(WorldView, Siting, ClaimView, long ledgerRevision, PlanDigest)`，与 `14` §5、`17` §3 一致（`I-13`）。
+- **`03` §4 的 `*Context` 行** `DerivationContext` → `DeriveContext`，与代码、`22`、`18` C-13/C-20 一致。
+- **`13` §4.3 的 `SC-CTX-0301`**：`P` 由 `✓` 改 `–`（该码的 finding 没有 label，subject 是 `AugmentKey`），`H8`。
+- **`SC-EXP` 的重编号跟着走下去**：`d-D13` 把 `0001` 定为"元素测试失败（默认 `mismatchCode`）"后，`17:277` 的例子还写着 `SC-EXP-0002`，已改 `0001`。
+- **`01` §E/§F 的六行**按 G2 写进 `07`/`08` 的事实对齐：`ExpectationMeta` 的四分量（`Set<ContextKey<?>> requires` + `FindingCode mismatchCode`，`anonymous()`/`of(...)`）、`ExpectationContext` 的继承与 `withSubject`/`of`、`Focus` 的类型清单（删掉 `block`，补每个 kind 绑定的 subject）、`ClaimView` 的记录形态（`unavailable()`/`rowsIn`）、`ClaimConflict` 的 `FindingBundle`。
+- **`22` 的两处**：§6.3 的 `Focuses.door` 返回 `Focus<DoorView>`，§10.1 的 `ClaimConflict` 用 `FindingBundle`。
+
+### 9.3 明确推迟的条目（不是漏掉）
+
+| 条目 | 为什么推迟 |
+| --- | --- |
+| `Codes` 在 `12:246`、`13:658-726`、`14:341-345`、`15:32` 的其余引用 | `Codes` 这个类型存不存在是 `Q19`，待定 |
+| `01` §I 的 `ReadSet` 行（与 `ReadScope` 重复） | 一个类型还是两个是 `Q4`，待定 |
+| `ChangeSet` 的两套分量（`01:213` vs `06` §4.8） | `MQ-11`，待定 |
+| `NestedView` 还是 `NestedLevelSnapshot` | `C-14` 是 `RULE` 行，待定 |
+| `06` §3.4 的捕获 SPI（`CaptureResult`/`SnapshotPolicy`/`OccupantResolver`） | `C-15` 是 `RULE` 行，待定；且代码里这些都还不存在 |
+| `18` §2 的测试层名（`.../expectation`、`.../finding`、`.../remedy`） | 打包归属是 `DOC` 判定，属代码迁移 |
+| `kernel.expectation` 还是 `kernel.predicate`（`07` 标题、`00` §5、`03` §3、`01` §E 头、`06` §1） | `d-D1` 是 `DOC` 判定：文档的 `expectation` 为准，代码的 `predicate` 在迁移批里改 |
+| `01:83`/`01:84` 之外的 `OccupancySummary` 提及 | 已随 9.2 清完，无残留 |
+
+### 9.4 这一批新发现、原先没人报的几处
+
+都不改，因为要么落在 U10（`Q18` 未审），要么是"文档声明的目标态、代码还没实现"：
+
+- `01` §L 的 `ApplyReport` 行写 `(boolean success, List<Finding> findings, Spend spend)`，而 `14` §5 的记录是 `(boolean success, List<Finding> findings, RemedyContext context)`。
+- `14:74` 与 `22` §11.3 的 `RemedyContext` 都写 `@Nullable ClaimView claims`，而 `ClaimView.unavailable()` 已经表达"不能回答"；两种风格并存，属 U10 的形态问题。
+- `ExpectationContext` 的 `budget()`、`session()`、`occupantAt(p)` 三个成员、`ProbeSession` 整个类型，以及 `Expectations` 的 `sequence`/`atMost`/`exactly`/`trait`/`anyOccupant`/`nothing`/`custom` 七个组合子，文档都声明了、内核里都没有。这是 U3 的目标态，不是文档错误。
+- `07` 缺 `eachCell` 一行，已补（代码里有、`09` §5 的示例也在用），并注明它是唯一改变 subject 类型的组合子。
+
+

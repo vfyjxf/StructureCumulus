@@ -44,15 +44,15 @@ Behaviour is §4's; a constructor throws only for a malformed value (`04` §5).
 
 | Type | Signature surface |
 | --- | --- |
-| `LatticePoint` | `record (int x, int y, int z) implements Comparable<LatticePoint>`; `static of(int,int,int)`, `ORIGIN`, `static boolean inLattice(int,int,int)`, `@Nullable offset(int,int,int)`, `key()`, `compareTo` |
-| `LatticeKey` | `record (long packed) implements Comparable<LatticeKey>`; `static of(LatticePoint)`, `toPoint()`, `compareTo` delegating to `toPoint()` (`y,z,x`) |
+| `LatticePoint` | `record (int x, int y, int z) implements Comparable<LatticePoint>`; `static of(int,int,int)`, `ORIGIN`, `static boolean inLattice(int,int,int)`, `MIN_XZ`, `MAX_XZ`, `MIN_Y`, `MAX_Y` (the packing range), `@Nullable offset(int,int,int)`, `key()`, `compareTo` |
+| `LatticeKey` | `record (long packed) implements Comparable<LatticeKey>`; `static of(LatticePoint)`, `x()`, `z()`, `y()`, `toPoint()`, `compareTo` delegating to `toPoint()` (`y,z,x`) |
 | `Cuboid` | `record (LatticePoint min, LatticePoint max) implements Comparable<Cuboid>`; `static of(int minX,int minY,int minZ,int maxX,int maxY,int maxZ)`, `of(LatticePoint,LatticePoint)`, `of(LatticePoint)`; `isEmpty`, `contains(LatticePoint)`, `contains(Cuboid)`, `intersects`, `@Nullable intersect`, `bounding`, `@Nullable translate(int,int,int)`, `long volume()`, `asSet()` |
-| `CuboidSet` | `static empty()`, `of(Cuboid...)`, `of(Collection<Cuboid>)`; `List<Cuboid> boxes()`, `boxCount()`, `long volume()`, `@Nullable Cuboid bounds()`, `contains(LatticePoint)`, `containsAll(CuboidSet)`, `intersects(CuboidSet)`, `union`, `intersect`, `subtract` (set and cuboid forms), `@Nullable translate` |
+| `CuboidSet` | `static empty()`, `of(Cuboid...)`, `of(Collection<Cuboid>)`; `List<Cuboid> boxes()`, `boxCount()`, `isEmpty()`, `long volume()`, `@Nullable Cuboid bounds()`, `contains(LatticePoint)`, `containsAll(CuboidSet)`, `intersects(CuboidSet)`, `union`, `intersect`, `subtract` (set and cuboid forms), `@Nullable translate` |
 | `Heading` | `enum { NORTH, SOUTH, WEST, EAST, UP, DOWN }`; `opposite()`, `axis()`, `step()` |
 | `Turn` | `enum { NONE, CLOCKWISE, HALF, COUNTERCLOCKWISE }`; `compose(Turn)`, `inverse()` |
 | `Tilt` | `enum { LEVEL, PITCH_UP, PITCH_DOWN, ROLL_LEFT, ROLL_RIGHT, INVERTED }`; `Heading up()` |
 | `Flip` | `enum { NONE, LEFT_RIGHT, FRONT_BACK }`; `boolean isMirror()` |
-| `Orientation` | `record (int ordinal) implements Comparable<Orientation>`; `IDENTITY`, `static of(Turn,Tilt,Flip)`, `compose`, `inverse`, `Heading apply(Heading)`, `@Nullable apply(LatticePoint)`, `@Nullable apply(Cuboid)`, `@Nullable apply(CuboidSet)`, `Turn turn()`, `Tilt tilt()`, `isMirror()`, `static List<Orientation> all()` |
+| `Orientation` | `record (int ordinal) implements Comparable<Orientation>`; `IDENTITY`, `static of(Turn,Tilt,Flip)`, `compose`, `then` (this element first), `inverse`, `Heading apply(Heading)`, `@Nullable apply(LatticePoint)`, `@Nullable apply(Cuboid)`, `@Nullable apply(CuboidSet)`, `Turn turn()`, `Tilt tilt()`, `isMirror()`, `id()`, `static List<Orientation> all()` |
 | `Placement` | `record (Orientation, LatticePoint offset)`; `IDENTITY`, `compose`, `inverse`, `@Nullable apply(...)` |
 | `Siting` | `record (LatticePoint origin, Placement)`; `static of(origin, Orientation)`, `of(origin, Placement)`, `withOrigin`, `withPlacement`, `static @Nullable anchoring(anchorTarget, anchorLocal, Placement)`, `@Nullable toWorld(...)`, `@Nullable toLocal(...)` |
 | `Locus` | `record (LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @Nullable SourceSpan)`; `static definition(SourceSpan)`, `local(CuboidSet)`, `local(CuboidSet, SourceSpan)`, `world(CuboidSet)`, `key(InstanceId, NamespacedId)`, `withSource(SourceSpan)` |

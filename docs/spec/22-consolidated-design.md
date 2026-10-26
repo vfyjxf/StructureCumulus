@@ -156,7 +156,7 @@ record EntityWindow(Cuboid cells, NamespacedId type) {}
 ```java
 interface SnapshotLease extends AutoCloseable {
     SnapshotId id();
-    LevelSnapshot view();
+    WorldView view();
     long changeCount();                                 // marks since capture; zero means untouched
     boolean isValid();                                  // the world still exists and this handle is open
     Outcome<SnapshotLease> retain(PinBudget budget);   // Pinned | PinRefused
@@ -249,7 +249,7 @@ Focus<BayView> Focuses.bay();
 Focus<T> Focuses.context(ContextKey<T> key);
 Focus<EntitySnapshot> Focuses.entity(UUID id);
 Focus<NestedView> Focuses.nested(LatticeKey cell);
-Focus<T> Focuses.door(LatticeKey origin);
+Focus<DoorView> Focuses.door(LatticeKey origin);
 ```
 
 - `Focuses.context(key)` is exactly `ctx.context().require(key)`; absence is `Missing`, never a
@@ -432,9 +432,16 @@ record ContextFrame(ContextTier tier, long revision, Map<ContextKey<?>, Object> 
 record StructureContext(InstanceId instance, long revision, List<ContextFrame> frames)
         implements ContextView {}
 
-interface ContextDraft {
-    <T> ContextDraft put(ContextKey<T> key, T value);
-    <T> ContextDraft contribute(ContextKey<T> key, T partial);
+public final class ContextDraft {                  // one stage's writes, not yet visible
+    public ContextTier tier();  public long baseRevision();
+    public <T> ContextDraft put(ContextKey<T> key, T value);          // merge == null only
+    public ContextDraft forSection(SectionKey section);              // the scope contribute requires
+    public <T> ContextDraft contribute(ContextKey<T> key, T partial); // merge != null only; needs forSection
+    public <T> ContextDraft refuse(ContextKey<T> key);                // a section of the region was refused
+    public <T> ContextDraft declined(ContextKey<T> key);              // every section readable, nothing contributed
+    public <T> @Nullable T read(ContextKey<T> key);                   // the draft's own folded value
+    public boolean publishes(ContextKey<?> key);                      // decides the key, value or absence
+    public Set<ContextKey<?>> keys();                                 // every key this draft decides
 }
 
 interface ContextView {
@@ -525,7 +532,7 @@ contributions and unit outcomes, never folded values. `cacheBytes` is LRU and se
 ```java
 sealed interface ClaimVerdict permits Settled, ClaimConflict, RevisionMoved {
     record Settled(long revision, List<ClaimRow> rows) implements ClaimVerdict {}
-    record ClaimConflict(List<ClaimRow> rows, List<Finding> findings) implements ClaimVerdict {}
+    record ClaimConflict(List<ClaimRow> rows, FindingBundle findings) implements ClaimVerdict {}
     record RevisionMoved(long expected, long actual) implements ClaimVerdict {}
 }
 

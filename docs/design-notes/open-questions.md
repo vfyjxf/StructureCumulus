@@ -24,7 +24,7 @@
 | 诊断码 `SC-*` | 错误/警告的稳定编号，分配后永不复用 |
 | 单元（U0–U11） | 文档的十二个内核对分包，与代码包一一对应是设计意图 |
 
-已知滞后（代码落后于文档，有 R 记录覆盖，不在本清单里）：R8（`OccupantRef` 带 `SnapshotId`）、R27/R37（两个入口点、`Stage` 移出请求、`SnapshotInfo` 删除）、R32（`Sharing`/`Footprint`/`Coverage`）、R35（`ClaimRow` 带 `World`）、R36（计划不携带行）。
+已知滞后（代码落后于文档，有 R 记录覆盖，不在本清单里）：R8（`OccupantRef` 带 `SnapshotId`）、R27/R37（两个入口点、`Stage` 移出请求、`SnapshotInfo` 删除）、R32（`Sharing`/`Footprint`/`Coverage`）、R35（`ClaimRow` 带 `World`）、R36（计划不携带行）、R38（`SectionSlot.Refused` 带 `FindingCode`、逐块门面撤销）。
 
 ## 1. 怎么回答
 

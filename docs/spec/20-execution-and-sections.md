@@ -167,9 +167,9 @@ final class SectionSnapshot {
     SectionKey key(); FrozenStates states(); long captureRevision(); long[] payloadCells();
 }
 sealed interface SectionSlot permits Air, Present, Refused {
-    record Air(SectionKey key, long captureRevision) implements SectionSlot {}
+    record Air(long revision) implements SectionSlot {}
     record Present(SectionSnapshot section) implements SectionSlot {}
-    record Refused(SectionKey key, ReadStatus status, FindingCode code) implements SectionSlot {}
+    record Refused(ReadStatus status, FindingCode code) implements SectionSlot {}
 }
 record CellPayload(LatticeKey cell, OccupantDescriptor descriptor, List<Trait<?>> traits) {}
 final class LevelSnapshot implements WorldView {
@@ -179,15 +179,12 @@ final class LevelSnapshot implements WorldView {
     @Nullable CellPayload payload(LatticePoint cell);
     List<CapturedEntity> entities(Cuboid box);
     List<Finding> findings();
-    @Override default @Nullable OccupancySummary summary(Cuboid box) { ... }
-    @Override ChunkGrid chunkGrid();
-    @Override @Nullable ChunkContent chunk(ChunkKey key);
 }
 final class NestedLevelSnapshot implements NestedView { /* child frame over the same bytes */ }
 
 interface SnapshotLease extends AutoCloseable {     // one owner: InstanceRecord
     SnapshotId id();
-    LevelSnapshot view();
+    WorldView view();
     long changeCount();                                 // marks since capture; zero means untouched
     boolean isValid();                                  // the world still exists and this handle is open
     Outcome<SnapshotLease> retain(PinBudget budget);    // Pinned | Missing(SC-MC-0502)
@@ -197,8 +194,8 @@ interface SnapshotLease extends AutoCloseable {     // one owner: InstanceRecord
 ```
 
 - `SectionKey` is the world 16³ index (`x >> 4` etc.); it is not a cache key.
-- `Air` is read and empty: `READABLE`, with a `captureRevision` for dirty/cache checks. It is not
-  `NOT_CAPTURED`.
+- `Air` is read and empty: `READABLE`, with a `revision` (the content epoch) for dirty/cache checks.
+  It is not `NOT_CAPTURED`.
 - `Refused` carries a `ReadStatus` and a finding code; `occupant` is `null`.
 - `CellPayload` carries a resolved descriptor and trait list for a watched BE or entity;
   `occupant(cell)` stamps the final `SnapshotId` into the `OccupantRef` lazily. Block states are
@@ -221,7 +218,7 @@ for each section in y,z,x order:
     chunk = serverChunkCache.getChunkNow(sx, sz)   // never Level.getChunk
     if chunk == null || !chunk.isLoaded()          -> Refused(NOT_CAPTURED, SC-MC-0306)
     if index outside build height                  -> Refused(OUT_OF_BOUNDS, SC-MC-0505)
-    if section.hasOnlyAir()                        -> Air(key, contentEpoch++)
+    if section.hasOnlyAir()                        -> Air(contentEpoch++)
     if section/cap/byte limit exceeded              -> TooLarge or Refused(NOT_CAPTURED, SC-MC-0501)
     else                                            -> Present(store.intern(key, states.copy(), contentEpoch++))
 for each Present section:
@@ -401,19 +398,12 @@ record ChunkGrid(int cellSize, LatticePoint origin) {
     int chunkCount(Cuboid box);
     List<ChunkKey> chunksOf(Cuboid box);
 }
-interface ChunkContent {
-    Cuboid bounds(); ReadStatus status(); boolean allAir();
-    boolean maybeHasBlock(NamespacedId type);
-    int countBlock(NamespacedId type);  // -1 = cannot answer
-    @Nullable OccupantSnapshot occupant(LatticePoint p);
-    ReadStatus readStatus(LatticePoint p);
-}
 ```
 
-`WorldView` gains `@Nullable ChunkGrid chunkGrid()`, `@Nullable ChunkContent chunk(ChunkKey)` and
-`@Nullable OccupancySummary summary(Cuboid)`. `cellSize` is data, not a constant; the adapter
-passes 16. `chunkOf` uses `floorDiv`, never `>>` or `/`, so negative `y` and non-zero origins
-work.
+`ChunkGrid`/`ChunkKey` size the lattice only; a read is answered per section, through
+`WorldView.slot(SectionKey)` (`06` §3.3). There is no per-chunk facade on `WorldView`: `cellSize` is
+data, not a constant; the adapter passes 16. `chunkOf` uses `floorDiv`, never `>>` or `/`, so negative
+`y` and non-zero origins work.
 
 ### 6.2 Section pass and barrier
 
@@ -561,8 +551,9 @@ interface AttemptCache {                        // CacheKey is 11 §4.7
   add `MatchScheduler`, `DirtyIndex` with the window index, mixins, frozen claim view,
   `AttemptCache`; keep `SavedClaims` settle server-only.
 - `02`: server/worker table; one scheduler per server; snapshot/store/dirty ownership; no tick.
-- `06`: `WorldView` default `chunkGrid()`/`chunk()`/`summary()`; `ChunkContent`,
-  `OccupancySummary`; `NestedLevelSnapshot` naming.
+- `06`: `WorldView` is the section model only — `slot(SectionKey)` answers a read, and the
+  `chunkGrid()`/`chunk()`/`summary()` facades with `ChunkContent`/`OccupancySummary` are withdrawn;
+  `NestedLevelSnapshot` naming.
 - `07`: `ProbeSession.claimsAt` reads the frozen claim view only; `ExpectationMeta.cost` work
   units; custom expectation cancellation contract.
 - `08`: claims serial after the match; no per-section reservation; one `ClaimMatrix` predicate.
