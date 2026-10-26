@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +34,7 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
+import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
@@ -49,6 +51,8 @@ import dev.vfyjxf.cumulus.kernel.structure.FocusResult;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
 import dev.vfyjxf.cumulus.kernel.structure.Reply;
+import dev.vfyjxf.cumulus.kernel.structure.SectionComputation;
+import dev.vfyjxf.cumulus.kernel.structure.SectionContext;
 import dev.vfyjxf.cumulus.kernel.world.OccupantDescriptor;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
@@ -155,6 +159,11 @@ class ScenarioTest {
         assertEquals(1L, context.get(air));
         assertEquals(10L, context.get(capacity));
         assertEquals(2, context.revision());
+        assertEquals(formed.outcome().spend(), context.spend());
+        StructureContext again = MatchEngine.derive(formed, campfire.derivations(), derivers,
+                store);
+        assertEquals(formed.outcome().spend(), again.spend());
+        assertEquals(3, again.revision());
     }
 
     @Test
@@ -264,6 +273,8 @@ class ScenarioTest {
         MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class,
                 MatchEngine.check(request));
         assertEquals(UndecidedReason.BUDGET_EXHAUSTED, undecided.reason());
+        assertTrue(undecided.findings().findings().stream()
+                .anyMatch(finding -> finding.code().equals(Codes.BUDGET_EXHAUSTED.code())));
         lease.invalidate();
         assertInstanceOf(MatchResult.Dropped.class, MatchEngine.check(request));
     }
@@ -545,5 +556,81 @@ class ScenarioTest {
                 MatchEngine.settle(request, forged, ledger, ContextStore.inMemory()));
         assertTrue(failed.findings().findings().stream()
                 .anyMatch(finding -> finding.code().equals(Codes.BINDING_INVALID.code())));
+    }
+
+    @Test
+    void sectionComputationMapsThroughSiting() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(),
+                Sharing.EXCLUSIVE);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.INSTANCE,
+                Merges.sum(), null);
+        Blueprint blueprint = Blueprint.builder(id("section_offset"))
+                .bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN),
+                        Expectations.air()))
+                .computation(Computations.air(air, cells)).build();
+        LatticePoint world = LatticePoint.of(10, 64, 10);
+        TestWorld.View view = new TestWorld.View().air(world)
+                .refuseSection(SectionKey.of(TestWorld.WORLD, 0, LatticePoint.ORIGIN, 16));
+        Siting siting = Siting.of(world, Orientation.IDENTITY);
+        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        MatchRequest request = MatchRequest.of(blueprint, siting, new TestWorld.Lease(view),
+                INSTANCE, OWNER, Budget.unbounded(), new ClaimView(List.of(), 0, true));
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class,
+                MatchEngine.check(request));
+        assertEquals(1L, admitted.outcome().value(air).fold(v -> v, () -> -1L));
+        MatchResult.Formed formed = assertInstanceOf(MatchResult.Formed.class,
+                MatchEngine.settle(request, admitted, ledger, ContextStore.inMemory()));
+        assertEquals(world.key(), formed.claims().rows().get(0).cell());
+    }
+
+    @Test
+    void aMissingSectionContributionIsAComputationFailure() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        ContextKey<Long> key = ContextKeys.of(id("missing"), Long.class, Retention.INSTANCE,
+                Merges.sum(), null);
+        SectionComputation<Long> missing = new SectionComputation<>() {
+            @Override
+            public Outcome<Long> compute(SectionContext ctx) {
+                return Outcome.missing();
+            }
+
+            @Override
+            public NamespacedId id() {
+                return ScenarioTest.id("missing");
+            }
+
+            @Override
+            public ContextKey<Long> output() {
+                return key;
+            }
+
+            @Override
+            public Set<ContextKey<?>> inputs() {
+                return Set.of();
+            }
+
+            @Override
+            public CuboidSet region() {
+                return cells;
+            }
+        };
+        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(),
+                Sharing.EXCLUSIVE);
+        Blueprint blueprint = Blueprint.builder(id("missing_section"))
+                .bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN),
+                        Expectations.air()))
+                .computation(missing).build();
+        TestWorld.View view = new TestWorld.View().air(LatticePoint.ORIGIN);
+        MatchRequest request = MatchRequest.of(blueprint, AT_ORIGIN, new TestWorld.Lease(view),
+                INSTANCE, OWNER, Budget.unbounded(), new ClaimView(List.of(), 0, true));
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class,
+                MatchEngine.check(request));
+        assertTrue(admitted.findings().findings().stream()
+                .anyMatch(finding -> finding.code().equals(Codes.COMPUTATION_FAILED.code())));
+        assertFalse(admitted.findings().findings().stream()
+                .anyMatch(finding -> finding.code().equals(Codes.FOLD_REFUSED.code())));
     }
 }

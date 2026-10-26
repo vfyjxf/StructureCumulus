@@ -89,6 +89,7 @@ public record SourceSpan(NamespacedId document, int start, int end) {
 
 public record Budget(int cells, int sections) {
     public static final Budget ZERO;
+    public static final Budget UNBOUNDED;
     public Budget { if (cells < 0 || sections < 0) throw new IllegalArgumentException("non-negative"); }
     public static Budget of(int cells, int sections);
     public static Budget unbounded();
@@ -248,7 +249,7 @@ vocabulary of a lookup, not a report.
 
 **L4 — key identity.** `ContextKey` equality is the full record: id, type, retention, merge and
 `whenAbsent`. A catalog owns uniqueness by id; two keys with one id and different types are a
-catalog error (`SC-CTX-0002`). `ContextKeys.of` is the only constructor that the kernel uses; the
+catalog error (`SC-SPI-0003`). `ContextKeys.of` is the only constructor that the kernel uses; the
 canonical constructor validates and `ContextKeys` is the intended factory.
 
 **L5 — merge is associative, with no identity.** `merge.combine` must be associative; the kernel
@@ -261,9 +262,8 @@ units of the same attempt; they are never published. `INSTANCE` values are publi
 successful `settle` or `derive`, keyed by `InstanceId`.
 
 **L7 — value tree order and equality.** `Value.ObjectValue.members()` iterates in ascending Unicode
-code-point order; `ArrayValue` preserves order. `Value.equals` includes the span (structural);
-`Values.contentEquals` ignores spans and is what document round-trips use. A span is provenance,
-never content.
+code-point order; `ArrayValue` preserves order. `Value.equals` and `Values.contentEquals` ignore
+spans; a span is provenance, never content.
 
 **L8 — catalog freeze.** `put(id, value)` refuses a second, different value for one id with
 `IllegalArgumentException`; re-putting the identical instance is a no-op. `build()` copies ids and

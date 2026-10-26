@@ -2,7 +2,6 @@ package dev.vfyjxf.cumulus.kernel.spi;
 
 import dev.vfyjxf.cumulus.kernel.context.Deriver;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
-import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
 import dev.vfyjxf.cumulus.kernel.structure.ComputationFactory;

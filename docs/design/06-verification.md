@@ -70,7 +70,7 @@ They are the acceptance suite; a module test that does not feed one of them is o
 | Module | Must test |
 | --- | --- |
 | `core` | id grammar, catalog freeze, Value content equality, budget, key equality |
-| `space` | packing bijection, cuboid edges, CuboidSet canonical laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
+| `space` | packing bijection, cuboid edges, CuboidSet normalization and semantic-equality laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
 | `finding` | code parse, `Codes.ALL` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
 | `world` | air vs refused, statusOf, multi-cell, nested frame/ref, section digest, descriptor/trait, window |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution |

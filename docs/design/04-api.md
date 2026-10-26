@@ -265,7 +265,7 @@ public final class StructureKernel {
     public @Nullable ClaimLedger ledger();
 
     public CompileResult compile(Document document);
-    public Outcome<Siting> siting(Blueprint blueprint, LatticePoint origin, WorldView view);
+    public SitingResult siting(Blueprint blueprint, LatticePoint origin, WorldView view);
     public MatchResult check(MatchRequest request);
     public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted);
     public StructureContext derive(MatchResult.Formed formed, List<DerivationSpec> derivations);

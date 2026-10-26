@@ -170,4 +170,27 @@ class DocumentCompilerTest {
         assertEquals(FindingCode.of(FindingCode.Family.DOC, 6),
                 missing.findings().primary().code());
     }
+
+    @Test
+    void documentBuildErrorsKeepTheirSpecificCode() {
+        CuboidSet cell = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        Value air = Value.object(Map.of("kind", Value.string("air")));
+        BlueprintSpec root = new BlueprintSpec(id("overlap"), Cuboid.of(0, 0, 0, 1, 1, 1),
+                Value.object(),
+                List.of(new BaySpec(id("a"), cell, Coverage.EVERY_CELL, Footprint.box(),
+                                Sharing.EXCLUSIVE, null, null),
+                        new BaySpec(id("b"), cell, Coverage.EVERY_CELL, Footprint.box(),
+                                Sharing.EXCLUSIVE, null, null)),
+                List.of(),
+                List.of(new CheckSpec(id("a_check"), id("a"), id("bay"), Value.object(),
+                                id("each_cell"), Value.object(Map.of("element", air)), null, null),
+                        new CheckSpec(id("b_check"), id("b"), id("bay"), Value.object(),
+                                id("each_cell"), Value.object(Map.of("element", air)), null, null)),
+                List.of(), List.of(), List.of(), List.of(), null, List.of(), Map.of(), null);
+        CompileResult result = DocumentCompiler.compile(
+                new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        assertEquals(FindingCode.of(FindingCode.Family.BPT, 2),
+                result.findings().primary().code());
+    }
 }

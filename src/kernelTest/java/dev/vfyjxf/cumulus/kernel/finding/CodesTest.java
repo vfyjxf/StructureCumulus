@@ -69,7 +69,6 @@ class CodesTest {
             SC-RMD-0001 ERROR
             SC-RMD-0002 ERROR
             SC-SPI-0001 ERROR
-            SC-SPI-0002 ERROR
             SC-SPI-0003 ERROR
             """;
 
@@ -81,7 +80,7 @@ class CodesTest {
                 rows.add(line);
             }
         }
-        assertEquals(56, rows.size());
+        assertEquals(55, rows.size());
         assertEquals(rows.size(), Codes.ALL.size());
 
         Set<FindingCode> seen = new HashSet<>();

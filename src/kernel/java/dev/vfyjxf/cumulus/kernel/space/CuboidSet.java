@@ -73,7 +73,7 @@ public final class CuboidSet {
                 int hi = intervals.get(0).hi();
                 for (int i = 1; i < intervals.size(); i++) {
                     Interval next = intervals.get(i);
-                    if (next.lo() < hi) {
+                    if (next.lo() <= hi) {
                         hi = Math.max(hi, next.hi());
                     } else {
                         result.add(Cuboid.of(x0, lo, z0, x1, hi, z1));
@@ -256,12 +256,26 @@ public final class CuboidSet {
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof CuboidSet set && boxes.equals(set.boxes);
+        return other instanceof CuboidSet set && contentEquals(set);
     }
 
     @Override
     public int hashCode() {
-        return boxes.hashCode();
+        long sumX = 0;
+        long sumY = 0;
+        long sumZ = 0;
+        long volume = 0;
+        for (Cuboid box : boxes) {
+            long nx = (long) box.max().x() - box.min().x();
+            long ny = (long) box.max().y() - box.min().y();
+            long nz = (long) box.max().z() - box.min().z();
+            long cells = nx * ny * nz;
+            sumX += nx * ((long) box.min().x() + box.max().x() - 1) / 2 * ny * nz;
+            sumY += ny * ((long) box.min().y() + box.max().y() - 1) / 2 * nx * nz;
+            sumZ += nz * ((long) box.min().z() + box.max().z() - 1) / 2 * nx * ny;
+            volume += cells;
+        }
+        return Long.hashCode(31L * sumX + 37L * sumY + 41L * sumZ + 43L * volume);
     }
 
     @Override

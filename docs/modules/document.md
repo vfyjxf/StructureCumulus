@@ -13,7 +13,8 @@
 **Does not own:** JSON/SNBT parsing (`mc` supplies a reader), catalogs (`spi`), the blueprint's
 validation (`structure`), the `Value` tree (`core`), the run-time meaning of a factory (`structure`).
 
-**Imports:** `core`, `space`, `finding`, `world`, `structure`, `context`.
+**Imports:** `core`, `space`, `finding`, `claim` (only `Footprint`/`Sharing`), `world`, `structure`,
+`context`.
 
 ## 2. Types
 
@@ -138,7 +139,7 @@ public interface DocumentWriter {
 merging is an error (`SC-BPT-0001`).
 
 A box is `[x, y, z, sizeX, sizeY, sizeZ]` (origin + size). A bay has `box` or `boxes` plus optional
-`minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a canonical set; the compiler
+`minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a normalized set; the compiler
 canonicalises again.
 
 A definition is the same `BlueprintSpec` shape without `schemaVersion`; its `id` is the map key. A
@@ -231,3 +232,22 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
 
 `core`, `space`, `finding`, `world`, `structure`, `context`. It does not import `engine`, `remedy`,
 `spi` or any parser library.
+
+## 8. Laws
+
+- One schema version. A reader that sees anything else emits `SC-DOC-0001`; it never guesses.
+- A definition is geometry: bays, seams and placements only. Every check, computation, key and
+  derivation is written once in the root.
+- Kind ids are lowercase snake_case. Built-in structural forms are grammar, not catalog entries;
+  an unqualified kind resolves in `structurecumulus`.
+- The declared output key is authoritative. A factory that returns a different output key is
+  `SC-DOC-0003`; the compiler never silently retargets.
+- Document content never throws. Every malformed field, cycle, unknown factory or invalid blueprint
+  becomes a located finding; `CompileResult.blueprint()` is null whenever an ERROR exists.
+
+## 9. Pipeline
+
+`DocumentCompiler.compile(document, context)` flattens placements, builds keys, bays, seams,
+checks, computations and derivations, validates them through `BlueprintBuilder`, and returns the
+same `Blueprint` a Java builder would. The result is either one blueprint or a `FindingBundle`; the
+engine never sees a half-built blueprint.

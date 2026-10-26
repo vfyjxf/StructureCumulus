@@ -55,7 +55,7 @@ module file.
 | 6 | every `SC-` code in code is in `Codes.ALL`, and every `Codes.ALL` entry is in a producer row | registry test |
 | 7 | no `TODO`/`FIXME`/`UnsupportedOperationException`/empty public body | grep |
 | 8 | two runs over one tuple are equal | golden test |
-| 9 | the facade examples in `04-api.md` compile as test sources | `ApiExamplesTest` |
+| 9 | the campfire/furnace examples in `04-api.md` compile as test sources | `ScenarioTest`; the document form in `DocumentCompilerTest` |
 | 10 | the old `docs/spec`, `docs/design-notes`, `docs/guide.zh.md`, `docs/README.zh.md` and the old
     kernel sources are gone | `git status`; only the new set remains |
 

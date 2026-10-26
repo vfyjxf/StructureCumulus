@@ -4,8 +4,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.core.Outcome;
-import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
 import dev.vfyjxf.cumulus.kernel.document.CompilerContext;
 import dev.vfyjxf.cumulus.kernel.document.Document;
@@ -25,10 +23,10 @@ import dev.vfyjxf.cumulus.kernel.remedy.RemedyContext;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
 import dev.vfyjxf.cumulus.kernel.remedy.SolveResult;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.Anchors;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
+import dev.vfyjxf.cumulus.kernel.structure.SitingResult;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
@@ -39,7 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
-/** The facade: five pipeline operations, three helpers and four lookups. */
+/** The facade: five pipeline operations, three helpers and three lookups. */
 public final class StructureKernel {
 
     private final Catalogs catalogs;
@@ -79,7 +77,7 @@ public final class StructureKernel {
         return DocumentCompiler.compile(document, context);
     }
 
-    public Outcome<Siting> siting(Blueprint blueprint, LatticePoint origin, WorldView view) {
+    public SitingResult siting(Blueprint blueprint, LatticePoint origin, WorldView view) {
         return Anchors.resolve(blueprint, origin, view);
     }
 
@@ -152,7 +150,7 @@ public final class StructureKernel {
         Finding.Builder builder = Finding.builder(entry).phase(finding.phase()).message(message);
         Label primary = finding.primaryLabel();
         if (primary != null) {
-            builder.label(Label.secondary(primary.locus(), message));
+            builder.label(Label.primary(primary.locus(), message));
         }
         return builder.build();
     }

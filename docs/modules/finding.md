@@ -210,7 +210,6 @@ public final class Codes {
     public static final CodeEntry REMEDY_FAILED = ...;             // SC-RMD-0001
     public static final CodeEntry REMEDY_MALFORMED = ...;          // SC-RMD-0002
     public static final CodeEntry EXTENSION_FAILED = ...;          // SC-SPI-0001
-    public static final CodeEntry EXTENSION_UNKNOWN = ...;         // SC-SPI-0002
     public static final CodeEntry CATALOG_DUPLICATE = ...;         // SC-SPI-0003
     public static final java.util.List<CodeEntry> ALL;
     private Codes() {}
@@ -337,7 +336,6 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-RMD-0001` | ERROR | ✓ | a remedy provider threw | `StructureKernel.solve` guard |
 | `SC-RMD-0002` | ERROR | ✓ | a provider returned a malformed remedy | `StructureKernel.solve` |
 | `SC-SPI-0001` | ERROR | ✓ | an extension threw or returned a malformed finding | `engine` guard |
-| `SC-SPI-0002` | ERROR | ✓ | a document names an unregistered factory | `DocumentCompiler` |
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
 | `SC-MC-*` | — | — | adapter-only; not produced by the kernel | adapter |
 

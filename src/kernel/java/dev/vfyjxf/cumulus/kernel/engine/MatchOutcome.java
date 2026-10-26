@@ -28,8 +28,13 @@ public record MatchOutcome(WorldView view, Map<ContextKey<?>, Object> values,
         Objects.requireNonNull(spend, "spend");
         TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(KEY_ORDER);
         for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
-            sorted.put(Objects.requireNonNull(entry.getKey(), "key"),
-                    Objects.requireNonNull(entry.getValue(), "value"));
+            ContextKey<?> key = Objects.requireNonNull(entry.getKey(), "key");
+            Object value = Objects.requireNonNull(entry.getValue(), "value");
+            if (!key.type().isInstance(value)) {
+                throw new IllegalArgumentException(
+                        "value for " + key.id() + " is not a " + key.type().getName());
+            }
+            sorted.put(key, value);
         }
         values = Collections.unmodifiableMap(sorted);
         bindings = List.copyOf(bindings);

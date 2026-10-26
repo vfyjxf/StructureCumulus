@@ -186,7 +186,7 @@ A derive pass publishes one revision. A `MATCH` key produced by a deriver is rej
 owner, budget, claims, cancellation)`. It carries no stage, no policy, no ticket, no record, no pin
 budget. `instance` is allocated by the host before the check; `check` does not mint it. `claims` is
 the frozen ledger view the host read; `check` never reads a live ledger. `cancel` is checked at unit
-boundaries and inside built-in loops; `CancelToken.never()` is the default factory.
+boundaries; a long extension checks its own token. `CancelToken.never()` is the default factory.
 
 ### 7.2 Outcome
 

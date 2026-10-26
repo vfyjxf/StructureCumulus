@@ -314,11 +314,6 @@ public final class Codes {
             "An extension threw or returned a malformed finding.",
             "The engine caught a failure from an extension. Check the extension and its inputs.");
 
-    public static final CodeEntry EXTENSION_UNKNOWN = entry(FindingCode.Family.SPI, 2,
-            Severity.ERROR,
-            "A document names an unregistered factory.",
-            "The catalog has no entry for this factory id. Register it or fix the document.");
-
     public static final CodeEntry CATALOG_DUPLICATE = entry(FindingCode.Family.SPI, 3,
             Severity.ERROR,
             "A catalog build found a duplicate entry.",
@@ -379,7 +374,6 @@ public final class Codes {
             REMEDY_FAILED,
             REMEDY_MALFORMED,
             EXTENSION_FAILED,
-            EXTENSION_UNKNOWN,
             CATALOG_DUPLICATE);
 
     private Codes() {

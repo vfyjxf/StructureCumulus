@@ -158,7 +158,7 @@ that owns nothing. `Footprint` does not decide whether a `Match` is complete; th
 ### 4.6 Conflict findings
 
 The engine builds one finding per `(owner, bay)` pair, not per cell: the contested cells form one
-`CuboidSet` locus, the primary label sits on the canonically first contested cell, a note gives the
+`CuboidSet` locus, the primary label sits on the first contested cell in row order, a note gives the
 count, and the two sharing values are named in the message. `Conflict.findings` is the report; the
 ledger never renders. The incumbent rows are carried so a caller can name both owners without
 re-reading.

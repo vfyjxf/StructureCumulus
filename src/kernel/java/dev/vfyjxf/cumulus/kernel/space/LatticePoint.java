@@ -1,8 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.space;
 
 import org.jspecify.annotations.Nullable;
-
-import java.util.Objects;
 /** An integer point inside Minecraft's packing range. */
 public record LatticePoint(int x, int y, int z) implements Comparable<LatticePoint> {
 

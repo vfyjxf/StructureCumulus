@@ -1,6 +1,5 @@
 package dev.vfyjxf.cumulus.kernel.spi;
 
-import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.Value;
@@ -38,7 +37,7 @@ final class BuiltinSupport {
                 || y < Integer.MIN_VALUE || y > Integer.MAX_VALUE
                 || z < Integer.MIN_VALUE || z > Integer.MAX_VALUE
                 || !LatticePoint.inLattice((int) x, (int) y, (int) z)) {
-            report(ctx, Codes.DOCUMENT_FIELD, "cell out of the lattice at " + key);
+            report(ctx, Codes.CUBOID_OFF_LATTICE, "cell out of the lattice at " + key);
             return null;
         }
         return LatticePoint.of((int) x, (int) y, (int) z);
@@ -61,10 +60,6 @@ final class BuiltinSupport {
             builder.label(Label.primary(locus, message));
         }
         ctx.report().accept(builder.build());
-    }
-
-    static FindingCode code(FindingCode.Family family, int number) {
-        return FindingCode.of(family, number);
     }
 
     private BuiltinSupport() {

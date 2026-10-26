@@ -63,7 +63,7 @@ public final class StructureKernel {
     public @Nullable ClaimLedger ledger();
 
     public CompileResult compile(Document document);
-    public Outcome<Siting> siting(Blueprint blueprint, LatticePoint origin, WorldView view);
+    public SitingResult siting(Blueprint blueprint, LatticePoint origin, WorldView view);
     public MatchResult check(MatchRequest request);
     public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted);
     public StructureContext derive(MatchResult.Formed formed,
@@ -120,7 +120,7 @@ created without a host can compile and check, but `settle` with claimable rows i
 - **`compile(document)`** builds a `CompilerContext` from the catalogs, the host's types and the
   host's documents, then calls `DocumentCompiler.compile`. It never throws for bad data.
 - **`siting(blueprint, origin, view)`** calls `Anchors.resolve`; a null policy is
-  `Missing(SC-BPT-0006)`.
+  `SitingResult(Outcome.Missing, SC-BPT-0006)`.
 - **`check(request)`** calls `MatchEngine.check`. The request carries its own frozen `ClaimView`; the
   facade's ledger is not read.
 - **`settle(request, admitted)`** calls `MatchEngine.settle` with the host's ledger and context
@@ -169,9 +169,9 @@ it resolves no class by reflection and holds no static mutable state.
 
 ## 6. Codes
 
-`SC-SPI-0001` (extension threw / malformed finding; engine guard), `SC-SPI-0002` (a document names an
-unregistered factory; `DocumentCompiler`), `SC-SPI-0003` (a catalog build found a duplicate/different
-entry; `Catalogs.Builder.build`).
+`SC-SPI-0001` (extension threw / malformed finding; engine guard), `SC-SPI-0003` (a catalog build
+found a duplicate/different entry; `Catalogs.Builder.build`). A document naming an unknown factory is
+`SC-DOC-0003` (the document compiler owns that surface).
 
 ## 7. Tests
 

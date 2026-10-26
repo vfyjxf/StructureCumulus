@@ -258,7 +258,9 @@ public final class BlueprintBuilder {
             if (!outputs.add(computation.output().id())) {
                 fail("SC-BPT-0007", "two computations produce " + computation.output().id());
             }
-            byOutput.put(computation.output().id(), computation);
+            if (byOutput.putIfAbsent(computation.output().id(), computation) != null) {
+                fail("SC-BPT-0007", "duplicate context key " + computation.output().id());
+            }
             if (computation instanceof SectionComputation<?> && !computation.inputs().isEmpty()) {
                 fail("SC-BPT-0007", "section computation " + computation.id() + " has inputs");
             }
@@ -270,10 +272,18 @@ public final class BlueprintBuilder {
                             + " reads unknown key " + input.id());
                 }
             }
-            if (computation instanceof SectionComputation<?>
-                    && computation.output().merge() == null) {
-                fail("SC-BPT-0007", "section computation " + computation.id()
-                        + " needs a contributed output key");
+            if (computation.region().isEmpty()) {
+                fail("SC-BPT-0007", "computation " + computation.id() + " has an empty region");
+            }
+            if (computation instanceof SectionComputation<?>) {
+                if (computation.output().merge() == null) {
+                    fail("SC-BPT-0007", "section computation " + computation.id()
+                            + " needs a contributed output key");
+                }
+                if (!computation.inputs().isEmpty()) {
+                    fail("SC-BPT-0007", "section computation " + computation.id()
+                            + " reads context, but a section sees only its snapshot");
+                }
             }
         }
         Set<ContextKey<?>> produced = new HashSet<>();

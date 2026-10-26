@@ -45,6 +45,7 @@ import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
+import dev.vfyjxf.cumulus.kernel.structure.SitingResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -121,5 +122,23 @@ class FacadeTest {
         assertEquals(2, result.remedies().size());
         assertInstanceOf(Remedy.Repair.class, result.remedies().get(0));
         assertTrue(result.findings().isEmpty());
+    }
+
+    @Test
+    void sitingReportsWhyItCannotPlace() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(),
+                Sharing.EXCLUSIVE);
+        Blueprint blueprint = Blueprint.builder(id("unplaced"))
+                .bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN),
+                        Expectations.air())).build();
+        TestWorld.View view = new TestWorld.View().air(LatticePoint.ORIGIN);
+        StructureKernel kernel = StructureKernel.create(Catalogs.builtin());
+        SitingResult result =
+                kernel.siting(blueprint, LatticePoint.ORIGIN, view);
+        assertFalse(result.succeeded());
+        assertNotNull(result.findings().primary());
+        assertEquals(Codes.ANCHOR_INVALID.code(), result.findings().primary().code());
     }
 }

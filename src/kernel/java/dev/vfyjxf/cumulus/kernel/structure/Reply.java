@@ -1,6 +1,5 @@
 package dev.vfyjxf.cumulus.kernel.structure;
 
-import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 

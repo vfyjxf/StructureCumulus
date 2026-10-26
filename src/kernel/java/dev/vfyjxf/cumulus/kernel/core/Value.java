@@ -24,6 +24,16 @@ public sealed interface Value permits Value.ObjectValue, Value.ArrayValue, Value
             }
             members = Collections.unmodifiableMap(sorted);
         }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof ObjectValue object && members.equals(object.members);
+        }
+
+        @Override
+        public int hashCode() {
+            return members.hashCode();
+        }
     }
 
     record ArrayValue(List<Value> elements, @Nullable SourceSpan span) implements Value {
@@ -35,21 +45,68 @@ public sealed interface Value permits Value.ObjectValue, Value.ArrayValue, Value
             }
             elements = List.copyOf(copy);
         }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof ArrayValue array && elements.equals(array.elements);
+        }
+
+        @Override
+        public int hashCode() {
+            return elements.hashCode();
+        }
     }
 
     record StringValue(String value, @Nullable SourceSpan span) implements Value {
         public StringValue {
             Objects.requireNonNull(value, "value");
         }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof StringValue string && value.equals(string.value);
+        }
+
+        @Override
+        public int hashCode() {
+            return value.hashCode();
+        }
     }
 
     record NumberValue(long value, @Nullable SourceSpan span) implements Value {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof NumberValue number && value == number.value;
+        }
+
+        @Override
+        public int hashCode() {
+            return Long.hashCode(value);
+        }
     }
 
     record BooleanValue(boolean value, @Nullable SourceSpan span) implements Value {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof BooleanValue bool && value == bool.value;
+        }
+
+        @Override
+        public int hashCode() {
+            return Boolean.hashCode(value);
+        }
     }
 
     record NullValue(@Nullable SourceSpan span) implements Value {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof NullValue;
+        }
+
+        @Override
+        public int hashCode() {
+            return 0;
+        }
     }
 
     static Value object(Map<String, Value> members) {

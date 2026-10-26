@@ -47,7 +47,7 @@ Then the module files, in dependency order:
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-26): the kernel compiles with `javac --release 21` and JSpecify only; 81
+- Verification (2026-10-26): the kernel compiles with `javac --release 21` and JSpecify only; 94
   JUnit 5 tests pass; `tools/spec-check.py` is clean; the adapter is specified, not implemented.
   Gradle could not run in the generation sandbox, so `./gradlew check` is the first thing to run on
   a normal machine (it also applies the project formatter).

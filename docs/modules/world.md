@@ -118,6 +118,7 @@ public interface WorldView {
     SnapshotId snapshotId();
     int frame();
     int depth();
+    LatticePoint origin();
     @Nullable WorldView parent();
     int cellSize();
     SectionKey sectionOf(LatticePoint cell);
@@ -243,9 +244,10 @@ primitive, `NamespacedId`, an immutable record/collection); a live host object i
 ### 4.8 Entity windows
 
 An entity can move within a section without a block change, so an entity check declares a window:
-the bay box inflated by `MAX_ENTITY_SPAN` on every axis, clamped to the lattice. A type whose body is
-wider than three cells on any axis is rejected at `Blueprint.build` (`SC-BPT-0006`). The window is a
-read-scope entry, not a capture bound; `SnapshotPolicy.windows` asks the host to include it.
+the bay box inflated by `MAX_ENTITY_SPAN` on every axis, clamped to the lattice. The window is a
+read-scope entry, not a capture bound; `SnapshotPolicy.windows` asks the host to include it. The
+kernel has no type-body data, so a body wider than one section is the host's capture concern, not a
+blueprint build error.
 
 ## 5. Pipeline role
 

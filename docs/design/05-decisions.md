@@ -253,6 +253,13 @@ before a view read, and every subject footprint is world-framed. `BayView`/`Focu
 mapping once; a raw `view.occupant(local)` in a check would be a frame bug. Nested subjects
 (`frame != 0`) are readable but cannot back a claim.
 
+### D-23 — The document IR names `Footprint` and `Sharing`
+
+A `BaySpec` carries `Footprint` and `Sharing` directly, so `document` imports `claim`; the edge is
+recorded in the module table. The alternative — duplicating the two enums in `document` — would
+create a second vocabulary and a lossy conversion. `document` still does not import `engine` or
+`remedy`.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is

@@ -47,7 +47,7 @@
   SC-MC-0003)` and a finding.
 - `SnapshotId` is stamped last from the per-world counter; a content-equal refresh may return the
   same view object (no new id).
-- Caps: `maxElements`, `maxSections` from `SnapshotPolicy`; exceeding one returns
+- Caps: the host's own capture limits (`maxElements`, `maxSections`); exceeding one returns
   `CaptureResult.TooLarge`, never a partial capture.
 
 ## 4. Lease and gate

@@ -16,6 +16,8 @@ public interface WorldView {
 
     int depth();
 
+    LatticePoint origin();
+
     @Nullable WorldView parent();
 
     int cellSize();

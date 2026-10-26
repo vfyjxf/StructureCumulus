@@ -148,7 +148,7 @@ public final class Focuses {
             Map<OccupantRef, OccupantSnapshot> found = new LinkedHashMap<>();
             for (OccupantSnapshot candidate : ctx.view().occupants(bounds, OccupantFilter.ofType(type))) {
                 if (candidate.ref().kind().equals(OccupantKind.ENTITY)
-                        && worldCells.intersects(candidate.footprint().asSet())) {
+                        && worldCells.containsAll(candidate.footprint().asSet())) {
                     found.putIfAbsent(candidate.ref(), candidate);
                 }
             }
@@ -163,7 +163,11 @@ public final class Focuses {
                         "SC-OCC-0001: more than one " + type + " in the bay"));
             }
             OccupantSnapshot entity = entities.get(0);
-            return new FocusResult.Taken<>(entity, List.of(entity), footprintWarning(ctx, entity));
+            FindingBundle warning = footprintWarning(ctx, entity);
+            if (!warning.isEmpty()) {
+                return new FocusResult.Unavailable<>(warning);
+            }
+            return new FocusResult.Taken<>(entity, List.of(entity), FindingBundle.empty());
         }
 
         @Override
@@ -193,11 +197,22 @@ public final class Focuses {
         @Override
         public FocusResult<WorldView> take(FocusContext ctx) {
             OccupantSnapshot occupant = ctx.occupantAt(cell);
-            LatticePoint world = ctx.siting().toWorld(cell);
-            WorldView child = world == null ? null : ctx.view().nested(world);
-            if (occupant == null || child == null) {
+            if (occupant == null) {
                 return new FocusResult.Unavailable<>(missing(ctx,
                         "SC-OCC-0001: no nested structure at " + cell));
+            }
+            LatticePoint world = ctx.siting().toWorld(cell);
+            WorldView child = world == null ? null : ctx.view().nested(world);
+            if (child == null) {
+                Locus locus = world == null
+                        ? Locus.local(CuboidSet.of(Cuboid.of(cell)))
+                        : Locus.world(CuboidSet.of(Cuboid.of(world)));
+                Finding finding = Finding.builder(Codes.NESTED_CUT)
+                        .phase(ctx.phase())
+                        .message("the nested view at " + cell + " was cut by depth")
+                        .label(Label.primary(locus, "nested view cut"))
+                        .build();
+                return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
             }
             return new FocusResult.Taken<>(child, List.of(occupant), FindingBundle.empty());
         }

@@ -7,7 +7,6 @@ import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.finding.Label;
 import dev.vfyjxf.cumulus.kernel.finding.Severity;
-import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -31,6 +30,11 @@ public record Check<T>(NamespacedId id, Bay bay, Focus<T> focus, Expectation<T> 
     public static <T> Check<T> of(NamespacedId id, Bay bay, Focus<T> focus,
                                   Expectation<T> expectation) {
         return new Check<>(id, bay, focus, expectation, null);
+    }
+
+    public static <T> Check<T> of(NamespacedId id, Bay bay, Focus<T> focus,
+                                  Expectation<T> expectation, @Nullable String description) {
+        return new Check<>(id, bay, focus, expectation, description);
     }
 
     public ReadScope reads() {

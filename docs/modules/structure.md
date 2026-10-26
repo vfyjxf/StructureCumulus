@@ -11,7 +11,8 @@
 `ReadScope`, `BayView`, `DoorView`, `Seam`, `SeamId`, `SeamKind`, `AnchorSpec`, `AnchorRoles`,
 `OrientationPolicy`, `Anchors`, `DerivationSpec`, `Blueprint`, `BlueprintBuilder`, `Plan`,
 `Computation`, `SectionComputation`, `AggregateComputation`, `SectionContext`, `AggregateContext`,
-`Computations`, `FocusFactory`, `ExpectationFactory`, `ComputationFactory`, `FactoryContext`.
+`Computations`, `FocusFactory`, `ExpectationFactory`, `ComputationFactory`, `FactoryContext`,
+`SitingResult`.
 
 **Does not own:** `Sharing`/`Footprint` (`claim`), the occupant model (`world`), context values or
 their store (`context`), the engine loop (`engine`), the document IR (`document`).
@@ -222,9 +223,9 @@ public record Seam(SeamId id, Cuboid cells, SeamKind kind,
 public record AnchorSpec(NamespacedId role, String property, String value) { }
 
 public final class AnchorRoles {
-    public static final NamespacedId PRIMARY;
-    public static final NamespacedId FRONT;
-    public static final NamespacedId CENTER;
+    public static final NamespacedId PRIMARY = NamespacedId.of("primary");
+    public static final NamespacedId FRONT = NamespacedId.of("front");
+    public static final NamespacedId CENTER = NamespacedId.of("center");
     private AnchorRoles() {}
 }
 
@@ -241,8 +242,12 @@ public record OrientationPolicy(NamespacedId primaryRole, java.util.List<Orienta
     }
 }
 
+public record SitingResult(Outcome<Siting> outcome, FindingBundle findings) {
+    public boolean succeeded();
+}
+
 public final class Anchors {
-    public static Outcome<Siting> resolve(Blueprint blueprint, LatticePoint origin, WorldView view);
+    public static SitingResult resolve(Blueprint blueprint, LatticePoint origin, WorldView view);
     private Anchors() {}
 }
 
@@ -340,7 +345,7 @@ public final class Blueprint {
     public static BlueprintBuilder builder(NamespacedId id);
     @Override public boolean equals(Object other);
     @Override public int hashCode();
-    private Blueprint() {}
+    Blueprint() {}
 }
 
 public final class BlueprintBuilder {
@@ -460,16 +465,19 @@ uses `context().get(key)` for a key it did not declare is a review defect.
 
 ### 4.7 Blueprint
 
-`Blueprint` is a final class with a private constructor. The builder is the only construction path.
+`Blueprint` is a final class with a package-private constructor. The builder is the only public
+construction path.
 It is immutable: private final fields, copied collections, a cached `Plan` and cached `bayCells()`
 (excluded from equality). `equals` is structural over the declarations (id, bounds, bays, checks,
 computations, seams, anchors, orientation, derivations, arguments); it excludes `source`, `plan` and
 `bayCells()`.
 
 `plan()` returns the cached `Plan`: sections in declaration order, aggregates in a topological order
-of `inputs()`, checks in declaration order. A computation input must be produced by another
-computation in the same blueprint; a derivation output is not available at check time and a check
-that reads one is a build error. A cycle or a missing producer is `SC-BPT-0007`.
+of `inputs()`, checks in declaration order. An **aggregate** input must be produced by another
+computation in the same blueprint; a section computation has no inputs (its `SectionContext` exposes
+the snapshot, not context keys); a derivation output is not available at check time and a check that
+reads one is a build error. A cycle, a missing producer, a section input, or a duplicate output key
+is `SC-BPT-0007`.
 
 ### 4.8 Build validation
 
@@ -483,7 +491,7 @@ that reads one is a build error. A cycle or a missing producer is `SC-BPT-0007`.
 | duplicate bay/check/seam id, or two different bays with one id | `SC-BPT-0004` |
 | coverage/footprint R1–R4, `None + EXCLUSIVE`, `Declared` outside bounds | `SC-BPT-0005` |
 | anchor roles duplicated, primary role absent, allowed empty/duplicate/not upright, anchors without a policy | `SC-BPT-0006` |
-| computation DAG cycle/missing input/duplicate output | `SC-BPT-0007` |
+| computation DAG cycle/missing input/duplicate output/empty region/section input | `SC-BPT-0007` |
 | derivation order negative/duplicate, output duplicate/also a computation output | `SC-BPT-0008` |
 | seam outside every bay | `SC-BPT-0009` |
 | a focus's static cells leave its bay, a check reads a derivation output, or a required key is produced by no computation | `SC-CHK-0002/0003` |
@@ -511,13 +519,15 @@ missing property, a value that is not a heading, no admissible orientation, or a
 `AggregateContext`, which has no `contribute`. This is a compile-time guarantee, not a convention.
 
 A section computation runs once per section of `region ∩ captured sections` and returns one partial
-value; a `Missing` makes the whole key absent for that attempt. An aggregate computation runs once
-after the fold and returns one value; a `Missing` makes the key absent. A computation may call
-`report` for its own findings; the engine adds `SC-CTX-0001` when a computation returns `Missing`
-without reporting.
+value; it reads only `SectionContext` (the snapshot slice) and has no `inputs()`. An aggregate
+computation runs once after the fold and returns one value; it reads the folded values through
+`inputs()`. A `Missing` makes the key absent for that attempt. A computation may call
+`report` for its own findings; the engine adds `SC-CTX-0001` when an aggregate computation returns `Missing`
+without reporting; a missing section contribution makes the key absent and records `SC-CTX-0006`.
 
-`Computations.count` counts non-air occupants in the slice; `volume` counts cells; `air` counts air
-cells. All three are section computations; folding is the key's `Merge`.
+`Computations.count` counts non-air occupants whose anchor is in the slice; `volume` counts cells;
+`air` counts air cells. An occupant spanning a section boundary belongs to the section of its
+anchor, so a fold never counts it twice. All three are section computations; folding is the key's `Merge`.
 
 ## 5. Pipeline role
 

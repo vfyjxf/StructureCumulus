@@ -82,6 +82,26 @@ def main() -> int:
         print(f"codes in code but not in docs: {', '.join(unknown)}")
         problems += 1
 
+    # Package edges: every kernel import in code must be allowed by the 03-modules table.
+    table = (ROOT / "docs" / "design" / "03-modules.md").read_text()
+    table = table[table.find("The edges, exactly:"):table.find("Notes:", table.find("The edges, exactly:"))]
+    allowed: dict[str, set[str]] = {}
+    row = re.compile(r"^\|\s*`([a-z]+)`\s*\|\s*(.*?)\s*\|$", re.M)
+    for match in row.finditer(table):
+        package = match.group(1)
+        allowed[package] = set(re.findall(r"`([a-z]+)`", match.group(2)))
+    allowed.setdefault("spi", set(MODULES))
+    base = ROOT / "src" / "kernel" / "java" / "dev" / "vfyjxf" / "cumulus" / "kernel"
+    for package in MODULES:
+        for path in (base / package).rglob("*.java"):
+            for imported in re.findall(r"^import dev\.vfyjxf\.cumulus\.kernel\.([a-z]+)\.",
+                                       path.read_text(), re.M):
+                if imported == package or imported not in MODULES or package == "spi":
+                    continue
+                if imported not in allowed.get(package, set()):
+                    print(f"{package}: imports {imported}, absent from 03-modules")
+                    problems += 1
+
     if problems:
         return 1
     print("spec-check: ok")

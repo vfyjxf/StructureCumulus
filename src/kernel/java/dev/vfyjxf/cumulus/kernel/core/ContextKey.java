@@ -19,6 +19,10 @@ public record ContextKey<T>(NamespacedId id, Class<T> type, Retention retention,
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(retention, "retention");
+        if (whenAbsent != null && !type.isInstance(whenAbsent)) {
+            throw new IllegalArgumentException(
+                    "whenAbsent is not a " + type.getName() + ": " + whenAbsent);
+        }
     }
 
     public boolean contributed() {

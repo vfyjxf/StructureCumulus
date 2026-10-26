@@ -2,7 +2,6 @@ package dev.vfyjxf.cumulus.kernel.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,12 +52,13 @@ class CoreTest {
     }
 
     @Test
-    void valueContentIgnoresSpan() {
+    void valueEqualityIgnoresSpan() {
         SourceSpan span = new SourceSpan(NamespacedId.of("doc"), 1, 3);
         Value a = Value.object(Map.of("b", Value.number(2), "a", Value.string("x")));
         Value b = Value.withSpan(Value.object(Map.of("a", Value.string("x"),
                 "b", Value.number(2))), span);
-        assertNotEquals(a, b);
+        assertEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
         assertTrue(Values.contentEquals(a, b));
         assertEquals(List.of("a", "b"), List.copyOf(a.members().keySet()));
         assertEquals(2, a.get("b").asNumber(0));

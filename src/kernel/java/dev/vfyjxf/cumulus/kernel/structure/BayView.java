@@ -47,7 +47,7 @@ public record BayView(NamespacedId id, CuboidSet cells, WorldView view, Siting s
         }
         Map<OccupantRef, OccupantSnapshot> unique = new LinkedHashMap<>();
         for (OccupantSnapshot candidate : view.occupants(bounds, filter)) {
-            if (worldCells.intersects(candidate.footprint().asSet())) {
+            if (worldCells.containsAll(candidate.footprint().asSet())) {
                 unique.putIfAbsent(candidate.ref(), candidate);
             }
         }

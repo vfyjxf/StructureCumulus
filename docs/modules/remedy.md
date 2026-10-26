@@ -118,5 +118,5 @@ through its own executor.
 
 ## 8. Dependencies
 
-`core`, `space`, `finding`, `world`, `claim`, `structure`, `context`. It does not import `engine`,
-`document` or `spi`.
+`core`, `space`, `finding`, `world`, `claim`, `structure`, `context`, `engine` (only the
+`MatchOutcome` value in `RemedyContext`). It does not import `document` or `spi`.

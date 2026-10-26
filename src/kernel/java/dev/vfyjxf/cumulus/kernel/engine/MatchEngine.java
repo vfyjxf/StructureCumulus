@@ -18,7 +18,6 @@ import dev.vfyjxf.cumulus.kernel.core.CancelToken;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextView;
-import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Merge;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -31,7 +30,6 @@ import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.finding.Label;
-import dev.vfyjxf.cumulus.kernel.finding.Severity;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -42,7 +40,6 @@ import dev.vfyjxf.cumulus.kernel.structure.AggregateComputation;
 import dev.vfyjxf.cumulus.kernel.structure.AggregateContext;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.BayView;
-import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.CheckResult;
 import dev.vfyjxf.cumulus.kernel.structure.Computation;
@@ -66,7 +63,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -90,6 +86,8 @@ public final class MatchEngine {
 
         for (SectionComputation<?> computation : plan.sections()) {
             if (session.cancelled()) {
+                session.findings.add(code(Codes.CANCELLED, phase,
+                        "the attempt was cancelled", null));
                 return undecided(phase, UndecidedReason.CANCELLED, session);
             }
             if (computation.output().merge() == null) {
@@ -98,34 +96,57 @@ public final class MatchEngine {
                         Locus.local(computation.region())));
                 return undecided(phase, UndecidedReason.DESIGN_DEFECT, session);
             }
-            for (SectionKey section : sectionsOf(computation.region(), request.lease().view())) {
+            CuboidSet worldRegion = request.siting().toWorld(computation.region());
+            if (worldRegion == null) {
+                session.report(code(Codes.LOCUS_UNMAPPED, phase,
+                        "computation " + computation.id() + " leaves the lattice",
+                        Locus.local(computation.region())));
+                session.missing(computation.output(), computation.region(), true);
+                continue;
+            }
+            for (SectionKey section : sectionsOf(worldRegion, request.lease().view())) {
                 if (session.cancelled()) {
+                    session.findings.add(code(Codes.CANCELLED, phase,
+                            "the attempt was cancelled", null));
                     return undecided(phase, UndecidedReason.CANCELLED, session);
+                }
+                CuboidSet worldSlice = worldRegion.intersect(
+                        sectionBounds(section, request.lease().view().cellSize()));
+                if (worldSlice.isEmpty()) {
+                    continue;
+                }
+                CuboidSet localSlice = request.siting().toLocal(worldSlice);
+                if (localSlice == null) {
+                    session.report(code(Codes.LOCUS_UNMAPPED, phase,
+                            "a section of " + computation.id() + " leaves the lattice",
+                            Locus.local(computation.region())));
+                    session.missing(computation.output(), computation.region(), true);
+                    continue;
                 }
                 SectionSlot slot = request.lease().view().slot(section);
                 if (!slot.readable()) {
-                    session.refuse(computation.output(), section, computation.region());
+                    session.refuse(computation.output(), section, localSlice);
                     continue;
                 }
-                CuboidSet slice = computation.region()
-                        .intersect(sectionBounds(section, request.lease().view().cellSize()));
-                if (slice.isEmpty()) {
-                    continue;
-                }
-                if (!session.charge(slice.volume(), 1)) {
+                if (!session.charge(worldSlice.volume(), 1)) {
+                    session.findings.add(code(Codes.BUDGET_EXHAUSTED, phase,
+                            "the budget ran out after " + session.spend.cells() + " cells",
+                            Locus.local(localSlice)));
                     return undecided(phase, UndecidedReason.BUDGET_EXHAUSTED, session);
                 }
-                SectionContext ctx = new SectionCtx(request, session, section, slice);
+                int before = session.findings.size();
+                SectionContext ctx = new SectionCtx(request, session, section, localSlice);
                 try {
                     Outcome<?> result = computation.compute(ctx);
                     if (result instanceof Outcome.Found<?> found) {
                         session.contribute(computation.output(), section, found.value());
                     } else {
-                        session.refuse(computation.output(), section, computation.region());
+                        session.missing(computation.output(), localSlice,
+                                session.findings.size() > before);
                     }
                 } catch (RuntimeException failure) {
-                    session.report(extensionFailure(phase, computation.id(), failure));
-                    session.refuse(computation.output(), section, computation.region());
+                    session.report(extensionFailure(phase, computation.id(), failure, Locus.local(computation.region())));
+                    session.missing(computation.output(), localSlice, true);
                 }
             }
         }
@@ -135,6 +156,8 @@ public final class MatchEngine {
 
         for (AggregateComputation<?> computation : plan.aggregates()) {
             if (session.cancelled()) {
+                session.findings.add(code(Codes.CANCELLED, phase,
+                        "the attempt was cancelled", null));
                 return undecided(phase, UndecidedReason.CANCELLED, session);
             }
             int before = session.findings.size();
@@ -142,23 +165,35 @@ public final class MatchEngine {
             try {
                 Outcome<?> result = computation.compute(ctx);
                 if (result instanceof Outcome.Found<?> found) {
-                    session.values.put(computation.output(), found.value());
+                    if (!computation.output().type().isInstance(found.value())) {
+                        session.report(code(Codes.DESIGN_DEFECT, phase,
+                                "computation " + computation.id() + " returned "
+                                        + found.value().getClass().getName(),
+                                Locus.local(computation.region())));
+                    } else {
+                        session.values.put(computation.output(), found.value());
+                    }
                 } else if (session.findings.size() == before) {
                     session.report(code(Codes.COMPUTATION_FAILED, phase,
                             "computation " + computation.id() + " produced no value",
                             Locus.local(computation.region())));
                 }
             } catch (RuntimeException failure) {
-                session.report(extensionFailure(phase, computation.id(), failure));
+                session.report(extensionFailure(phase, computation.id(), failure, Locus.local(computation.region())));
             }
         }
 
         List<Run> runs = new ArrayList<>();
         for (Check<?> check : plan.checks()) {
             if (session.cancelled()) {
+                session.findings.add(code(Codes.CANCELLED, phase,
+                        "the attempt was cancelled", null));
                 return undecided(phase, UndecidedReason.CANCELLED, session);
             }
             if (!session.chargeScope(check.reads(), request.lease().view())) {
+                session.findings.add(code(Codes.BUDGET_EXHAUSTED, phase,
+                        "the budget ran out before check " + check.id(),
+                        Locus.local(check.bay().cells())));
                 return undecided(phase, UndecidedReason.BUDGET_EXHAUSTED, session);
             }
             FindingBundle absent = missingKeys(request, session, check);
@@ -175,7 +210,7 @@ public final class MatchEngine {
                 runs.add(new Run(check, result));
             } catch (RuntimeException failure) {
                 FindingBundle bundle = FindingBundle.of(List.of(
-                        extensionFailure(phase, check.id(), failure)));
+                        extensionFailure(phase, check.id(), failure, Locus.local(check.bay().cells()))));
                 session.findings.addAll(bundle.findings());
                 runs.add(new Run(check, new CheckResult(Reply.unreadable(bundle), List.of(),
                         FindingBundle.empty())));
@@ -233,7 +268,7 @@ public final class MatchEngine {
             return new MatchResult.Undecided(phase, UndecidedReason.LEDGER_UNAVAILABLE,
                     FindingBundle.of(session.findings), outcome);
         }
-        Finding invalid = validateBindings(request, outcome.bindings());
+        Finding invalid = validateBindings(request, phase, outcome.bindings());
         if (invalid != null) {
             session.findings.add(invalid);
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
@@ -277,7 +312,7 @@ public final class MatchEngine {
                     "the snapshot is no longer current; nothing is written", null));
             return new MatchResult.Dropped(phase, FindingBundle.of(findings));
         }
-        Finding invalid = validateBindings(request, admitted.outcome().bindings());
+        Finding invalid = validateBindings(request, phase, admitted.outcome().bindings());
         if (invalid != null) {
             findings.add(invalid);
             return new MatchResult.Failed(phase, FindingBundle.of(findings));
@@ -358,23 +393,27 @@ public final class MatchEngine {
             Deriver<?> deriver = derivers.get(spec.deriver());
             if (deriver == null) {
                 findings.add(code(Codes.DERIVER_MISSING, Phase.SETTLE,
-                        "no deriver is registered as " + spec.deriver(), null));
+                        "no deriver is registered as " + spec.deriver(),
+                        Locus.key(formed.instance(), spec.output())));
                 continue;
             }
             if (!deriver.output().id().equals(spec.output())) {
                 findings.add(code(Codes.DERIVER_FAILED, Phase.SETTLE,
                         "deriver " + spec.deriver() + " produces " + deriver.output().id()
-                                + ", not " + spec.output(), null));
+                                + ", not " + spec.output(),
+                        Locus.key(formed.instance(), spec.output())));
                 continue;
             }
             if (deriver.output().retention() != Retention.INSTANCE) {
                 findings.add(code(Codes.DERIVER_FAILED, Phase.SETTLE,
-                        "deriver " + spec.deriver() + " must produce an INSTANCE key", null));
+                        "deriver " + spec.deriver() + " must produce an INSTANCE key",
+                        Locus.key(formed.instance(), spec.output())));
                 continue;
             }
             if (!values.keySet().containsAll(deriver.requires())) {
                 findings.add(code(Codes.KEY_ABSENT, Phase.SETTLE,
-                        "deriver " + spec.deriver() + " misses a required key", null));
+                        "deriver " + spec.deriver() + " misses a required key",
+                        Locus.key(formed.instance(), spec.output())));
                 continue;
             }
             MapContextView view = new MapContextView(values);
@@ -383,13 +422,20 @@ public final class MatchEngine {
             try {
                 Outcome<?> result = deriver.derive(ctx, spec.arguments());
                 if (result instanceof Outcome.Found<?> found) {
-                    values.put(deriver.output(), found.value());
+                    if (!deriver.output().type().isInstance(found.value())) {
+                        findings.add(code(Codes.DERIVER_FAILED, Phase.SETTLE,
+                                "deriver " + spec.deriver() + " returned "
+                                        + found.value().getClass().getName(),
+                                Locus.key(formed.instance(), spec.output())));
+                    } else {
+                        values.put(deriver.output(), found.value());
+                    }
                 } else if (findings.size() == before) {
                     findings.add(code(Codes.DERIVER_FAILED, Phase.SETTLE,
                             "deriver " + spec.deriver() + " produced no value", null));
                 }
             } catch (RuntimeException failure) {
-                findings.add(extensionFailure(Phase.SETTLE, spec.deriver(), failure));
+                findings.add(extensionFailure(Phase.SETTLE, spec.deriver(), failure, Locus.key(formed.instance(), spec.output())));
             }
         }
         Map<ContextKey<?>, Object> published = new LinkedHashMap<>();
@@ -399,7 +445,7 @@ public final class MatchEngine {
             }
         }
         return contexts.publish(formed.instance(), published, FindingBundle.of(findings),
-                formed.outcome().spend());
+                Spend.ZERO);
     }
 
     private static StructureContext publish(ContextStore contexts, MatchRequest request,
@@ -414,38 +460,40 @@ public final class MatchEngine {
                 outcome.spend());
     }
 
-    private static @Nullable Finding validateBindings(MatchRequest request,
+    private static @Nullable Finding validateBindings(MatchRequest request, Phase phase,
                                                       List<BayBinding> bindings) {
         Map<NamespacedId, BayBinding> byBay = new LinkedHashMap<>();
         for (BayBinding binding : bindings) {
             Bay bay = request.blueprint().bay(binding.bay().id());
             if (bay == null || !bay.equals(binding.bay())) {
-                return code(Codes.BINDING_INVALID, Phase.CHECK,
-                        "a binding names a bay this blueprint does not declare", null);
+                return code(Codes.BINDING_INVALID, phase,
+                        "a binding names a bay this blueprint does not declare",
+                        Locus.local(request.blueprint().bayCells()));
             }
             byBay.put(binding.bay().id(), binding);
         }
         for (Bay bay : request.blueprint().bays()) {
             BayBinding binding = byBay.get(bay.id());
             if (binding == null) {
-                return code(Codes.BINDING_INVALID, Phase.CHECK,
-                        "no binding for bay " + bay.id(), null);
+                return code(Codes.BINDING_INVALID, phase,
+                        "no binding for bay " + bay.id(), Locus.local(bay.cells()));
             }
             CuboidSet bayWorld = request.siting().toWorld(bay.cells());
             if (bayWorld == null) {
-                return code(Codes.LOCUS_UNMAPPED, Phase.CHECK,
-                        "bay " + bay.id() + " leaves the lattice", null);
+                return code(Codes.LOCUS_UNMAPPED, phase,
+                        "bay " + bay.id() + " leaves the lattice", Locus.local(bay.cells()));
             }
             CuboidSet bound = CuboidSet.empty();
             for (OccupantSnapshot subject : binding.subjects()) {
                 if (!subject.ref().snapshot().equals(request.lease().id())
                         || subject.ref().frame() != 0) {
-                    return code(Codes.BINDING_INVALID, Phase.CHECK,
-                            "a subject is not from this capture's root frame", null);
+                    return code(Codes.BINDING_INVALID, phase,
+                            "a subject is not from this capture's root frame",
+                            Locus.local(bay.cells()));
                 }
                 if (!bayWorld.containsAll(subject.footprint().asSet())) {
-                    return code(Codes.BINDING_INVALID, Phase.CHECK,
-                            "a subject leaves bay " + bay.id(), null);
+                    return code(Codes.BINDING_INVALID, phase,
+                            "a subject leaves bay " + bay.id(), Locus.local(bay.cells()));
                 }
                 if (!subject.isAir()) {
                     bound = bound.union(subject.footprint().asSet());
@@ -453,14 +501,14 @@ public final class MatchEngine {
             }
             if (bay.coverage() == Coverage.ONE_SUBJECT
                     && !bound.contentEquals(bayWorld)) {
-                return code(Codes.BINDING_INVALID, Phase.CHECK,
+                return code(Codes.BINDING_INVALID, phase,
                         "ONE_SUBJECT bay " + bay.id() + " is not equal to its bound footprint",
-                        null);
+                        Locus.local(bay.cells()));
             }
             if (bay.sharing() == Sharing.EXCLUSIVE && bay.footprint() instanceof Footprint.Bound
                     && bound.isEmpty()) {
-                return code(Codes.BOUND_EMPTY, Phase.CHECK,
-                        "exclusive bay " + bay.id() + " bound no cell", null);
+                return code(Codes.BOUND_EMPTY, phase,
+                        "exclusive bay " + bay.id() + " bound no cell", Locus.local(bay.cells()));
             }
         }
         return null;
@@ -483,27 +531,45 @@ public final class MatchEngine {
 
     private static List<Finding> conflicts(Phase phase, List<ClaimRow> requested,
                                            List<ClaimRow> held) {
-        List<Finding> findings = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
+        Map<String, Conflict> byPair = new LinkedHashMap<>();
         for (ClaimRow row : requested) {
             for (ClaimRow incumbent : held) {
-                if (ClaimMatrix.conflicts(row, incumbent)) {
-                    String pair = row.bay() + "|" + incumbent.owner().id() + "|" + incumbent.bay();
-                    if (seen.add(pair)) {
-                        Locus locus = Locus.world(CuboidSet.of(Cuboid.of(row.cell().point())));
-                        findings.add(Finding.builder(Codes.CLAIM_CONFLICT)
-                                .phase(phase)
-                                .message(incumbent.owner().id() + ":" + incumbent.bay()
-                                        + " already holds cell " + row.cell().point())
-                                .label(Label.primary(locus, "contested cell"))
-                                .note("this bay asks " + row.sharing(), locus)
-                                .note("the incumbent holds " + incumbent.sharing(), null)
-                                .build());
-                    }
+                if (!ClaimMatrix.conflicts(row, incumbent)) {
+                    continue;
                 }
+                String pair = row.bay() + "|" + incumbent.owner().id() + "|" + incumbent.bay();
+                Conflict conflict = byPair.computeIfAbsent(pair, ignored -> new Conflict(
+                        row, incumbent, CuboidSet.empty()));
+                conflict.cells = conflict.cells.union(Cuboid.of(row.cell().point()));
             }
         }
+        List<Finding> findings = new ArrayList<>();
+        for (Conflict conflict : byPair.values()) {
+            Locus locus = Locus.world(conflict.cells);
+            findings.add(Finding.builder(Codes.CLAIM_CONFLICT)
+                    .phase(phase)
+                    .message(conflict.incumbent.owner().id() + ":"
+                            + conflict.incumbent.bay() + " already holds "
+                            + conflict.cells.volume() + " cell(s) of "
+                            + conflict.requested.bay())
+                    .label(Label.primary(locus, "contested cells"))
+                    .note("this bay asks " + conflict.requested.sharing(), locus)
+                    .note("the incumbent holds " + conflict.incumbent.sharing(), null)
+                    .build());
+        }
         return findings;
+    }
+
+    private static final class Conflict {
+        private final ClaimRow requested;
+        private final ClaimRow incumbent;
+        private CuboidSet cells;
+
+        private Conflict(ClaimRow requested, ClaimRow incumbent, CuboidSet cells) {
+            this.requested = requested;
+            this.incumbent = incumbent;
+            this.cells = cells;
+        }
     }
 
     private static List<SectionKey> sectionsOf(CuboidSet cells, WorldView view) {
@@ -569,11 +635,13 @@ public final class MatchEngine {
         return builder.build();
     }
 
-    private static Finding extensionFailure(Phase phase, NamespacedId unit, RuntimeException failure) {
+    private static Finding extensionFailure(Phase phase, NamespacedId unit, RuntimeException failure,
+                                           Locus locus) {
         String message = "extension " + unit + " failed: " + failure.getClass().getSimpleName();
         return Finding.builder(Codes.EXTENSION_FAILED)
                 .phase(phase)
                 .message(message)
+                .label(Label.primary(locus, message))
                 .note(failure.getMessage() == null ? "no message" : failure.getMessage())
                 .build();
     }
@@ -587,6 +655,7 @@ public final class MatchEngine {
         private final Map<ContextKey<?>, TreeMap<SectionKey, Object>> contributions =
                 new LinkedHashMap<>();
         private final Set<ContextKey<?>> refused = new HashSet<>();
+        private final Set<ContextKey<?>> missing = new HashSet<>();
         private final Map<ContextKey<?>, Object> values = new LinkedHashMap<>();
         private final List<Finding> findings = new ArrayList<>();
         private final Map<NamespacedId, LinkedHashMap<OccupantRef, OccupantSnapshot>> subjects =
@@ -644,7 +713,26 @@ public final class MatchEngine {
         }
 
         private void contribute(ContextKey<?> key, SectionKey section, Object value) {
+            if (!key.type().isInstance(value)) {
+                findings.add(code(Codes.DESIGN_DEFECT, Phase.CHECK,
+                        "a section of " + key.id() + " produced " + value.getClass().getName(),
+                        Locus.local(computationRegion(key, section))));
+                return;
+            }
             contributions.computeIfAbsent(key, ignored -> new TreeMap<>()).put(section, value);
+        }
+
+        private CuboidSet computationRegion(ContextKey<?> key, SectionKey section) {
+            for (Computation<?> computation : request.blueprint().computations()) {
+                if (computation.output().equals(key)) {
+                    CuboidSet slice = computation.region().intersect(
+                            sectionBounds(section, request.lease().view().cellSize()));
+                    if (!slice.isEmpty()) {
+                        return slice;
+                    }
+                }
+            }
+            return request.blueprint().bayCells();
         }
 
         private void refuse(ContextKey<?> key, SectionKey section, CuboidSet region) {
@@ -654,9 +742,16 @@ public final class MatchEngine {
             }
         }
 
+        private void missing(ContextKey<?> key, CuboidSet region, boolean reported) {
+            if (missing.add(key) && !reported) {
+                findings.add(code(Codes.COMPUTATION_FAILED, Phase.CHECK,
+                        "a section of " + key.id() + " produced no value", Locus.local(region)));
+            }
+        }
+
         @SuppressWarnings("unchecked")
         private void fold(ContextKey<?> key, Phase phase) {
-            if (refused.contains(key)) {
+            if (refused.contains(key) || missing.contains(key)) {
                 return;
             }
             TreeMap<SectionKey, Object> parts = contributions.get(key);
@@ -700,6 +795,38 @@ public final class MatchEngine {
             }
             return new MatchOutcome(request.lease().view(), values, bindings, reads, spend);
         }
+    }
+
+    private static List<OccupantSnapshot> occupantsAnchoredIn(WorldView view, CuboidSet cells) {
+        Cuboid bounds = cells.bounds();
+        if (bounds == null) {
+            return List.of();
+        }
+        Map<OccupantRef, OccupantSnapshot> unique = new LinkedHashMap<>();
+        for (OccupantSnapshot candidate : view.occupants(bounds, OccupantFilter.any())) {
+            if (cells.contains(candidate.ref().anchor())) {
+                unique.putIfAbsent(candidate.ref(), candidate);
+            }
+        }
+        List<OccupantSnapshot> result = new ArrayList<>(unique.values());
+        result.sort(Comparator.comparing(OccupantSnapshot::ref));
+        return List.copyOf(result);
+    }
+
+    private static List<OccupantSnapshot> occupantsIn(WorldView view, CuboidSet cells) {
+        Cuboid bounds = cells.bounds();
+        if (bounds == null) {
+            return List.of();
+        }
+        Map<OccupantRef, OccupantSnapshot> unique = new LinkedHashMap<>();
+        for (OccupantSnapshot candidate : view.occupants(bounds, OccupantFilter.any())) {
+            if (cells.containsAll(candidate.footprint().asSet())) {
+                unique.putIfAbsent(candidate.ref(), candidate);
+            }
+        }
+        List<OccupantSnapshot> result = new ArrayList<>(unique.values());
+        result.sort(Comparator.comparing(OccupantSnapshot::ref));
+        return List.copyOf(result);
     }
 
     private static final class SectionCtx implements SectionContext {
@@ -746,18 +873,15 @@ public final class MatchEngine {
         @Override
         public List<OccupantSnapshot> occupants() {
             CuboidSet world = request.siting().toWorld(cells);
-            Cuboid bounds = world == null ? null : world.bounds();
-            return bounds == null ? List.of()
-                    : request.lease().view().occupants(bounds,
-                            OccupantFilter.any());
+            return world == null ? List.of()
+                    : occupantsAnchoredIn(request.lease().view(), world);
         }
 
         @Override
         public List<OccupantSnapshot> occupants(Cuboid local) {
             Cuboid world = request.siting().toWorld(local);
             return world == null ? List.of()
-                    : request.lease().view().occupants(world,
-                            OccupantFilter.any());
+                    : occupantsAnchoredIn(request.lease().view(), world.asSet());
         }
 
         @Override
@@ -805,8 +929,7 @@ public final class MatchEngine {
         public List<OccupantSnapshot> occupants(Cuboid local) {
             Cuboid world = request.siting().toWorld(local);
             return world == null ? List.of()
-                    : request.lease().view().occupants(world,
-                            OccupantFilter.any());
+                    : occupantsIn(request.lease().view(), world.asSet());
         }
 
         @Override

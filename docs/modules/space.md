@@ -22,7 +22,7 @@ structure owns (`claim`), the text a source span points into (`core`).
 | `LatticeKey` | record | one `long`, x:26 / z:26 / y:12; `Comparable` by point order |
 | `Axis` | enum | `X`, `Y`, `Z` |
 | `Cuboid` | record | half-open `[min,max)`; empty is legal; no union/difference |
-| `CuboidSet` | final class | canonical, disjoint, sorted, empty-free boxes |
+| `CuboidSet` | final class | normalized, disjoint, sorted, empty-free boxes; equality by cells |
 | `SectionKey` | record | `(world, frame, x, y, z)`; the view's section index |
 | `Heading` | enum | `NORTH,SOUTH,WEST,EAST,UP,DOWN` |
 | `Turn` | enum | yaw quarter turn, cyclic order 4 |
@@ -115,6 +115,7 @@ public enum Heading {
     public Heading opposite();
     public Axis axis();
     public int stepX();  public int stepY();  public int stepZ();
+    public static Heading ofStep(int x, int y, int z);
 }
 
 public enum Turn {
@@ -168,7 +169,10 @@ public record Siting(LatticePoint origin, Placement placement) {
     public @Nullable Cuboid toLocal(Cuboid world);
 }
 
-public enum LocusFrame { DEFINITION, LOCAL, WORLD, KEY }
+public enum LocusFrame {
+    DEFINITION, LOCAL, WORLD, KEY;
+    public int rank();
+}
 
 public record KeyLocus(InstanceId instance, NamespacedId key) { }
 
@@ -221,14 +225,15 @@ wrong and the javadoc says so.
 
 1. drop empty boxes;
 2. cut at every distinct `x` and `z` boundary, producing slab-columns;
-3. merge overlapping `y` intervals inside a column (touching intervals stay separate);
+3. merge overlapping or touching `y` intervals inside a column;
 4. sort by `(min.y, min.z, min.x, max.y, max.z, max.x)`.
 
-The result has no empty box, no overlap, no mergeable pair **inside one slab-column**, and is
-idempotent. Boxes in neighbouring columns may be adjacent (a union that happens to be a box is not
-re-cut into one); irredundance is not minimality. `equals` is structural;
-`contentEquals` is semantic (`containsAll` both ways). Every algebra member returns `of(...)`, so it
-is canonical by construction. `volume` saturates. No member enumerates cells; `ClaimPlanner` may
+The result has no empty box, no overlap, no mergeable pair **inside one slab-column** (touching
+`y` intervals are merged), and is idempotent. Boxes in neighbouring columns may be adjacent (a
+union that happens to be a box is not re-cut into one); irredundance is not minimality. `equals`
+and `contentEquals` are both semantic (`containsAll` both ways); the box decomposition is not part
+of value equality. Every algebra member returns `of(...)`, so the box list is normalised again.
+`volume` saturates. No member enumerates cells; `ClaimPlanner` may
 iterate `boxes()` and nested coordinates to emit rows, which is the one bounded enumeration in the
 kernel.
 
@@ -298,7 +303,7 @@ lattice. `SC-SPC-0002` (ERROR): a `CuboidSet` operation would leave the lattice.
 - Pack/unpack is a bijection over the in-range set; out-of-range is rejected; `compareTo` is point
   order, not packed order.
 - Cuboid edge cases: empty, across the origin, mirrored image, `ofSize` vs `of`.
-- `CuboidSet`: canonical idempotence; disjointness; subtraction; union; `contentEquals` vs `equals`;
+- `CuboidSet`: idempotence; disjointness; subtraction; union; semantic `equals` and content hash;
   no merge of touching boxes; box order total.
 - Orientation: `all().size() == 48`; distinct; inverse; composition; volume invariant; the
   `1 -` mirror case; `of` normalises the 72 triples.

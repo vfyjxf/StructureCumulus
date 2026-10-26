@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
+import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
@@ -64,5 +65,40 @@ class ClaimTest {
                 ((Footprint.Declared) Footprint.declared(
                         CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1))))
                         .cells().bounds());
+    }
+
+    @Test
+    void aNoOpReleaseKeepsRevisionZero() {
+        ClaimLedger ledger = new ClaimLedger() {
+            @Override
+            public World world() {
+                return new World(
+                        NamespacedId.of("w"));
+            }
+
+            @Override
+            public long revision() {
+                return 0;
+            }
+
+            @Override
+            public ClaimVerdict settle(SettleRequest request) {
+                return new ClaimVerdict.Settled(request.expectedRevision(), List.of());
+            }
+
+            @Override
+            public ClaimVerdict release(OwnerId owner, Siting siting) {
+                return new ClaimVerdict.Settled(0, List.of());
+            }
+
+            @Override
+            public ClaimView read(Cuboid box) {
+                return new ClaimView(List.of(), 0, true);
+            }
+        };
+        ClaimVerdict released = ledger.release(B, SITING);
+        assertTrue(released instanceof ClaimVerdict.Settled);
+        assertEquals(0, ((ClaimVerdict.Settled) released).revision());
+        assertEquals(0, ledger.revision());
     }
 }

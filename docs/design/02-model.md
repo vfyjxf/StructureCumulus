@@ -14,7 +14,7 @@
 | phase | `Phase` | core | `COMPILE`, `CHECK`, `SETTLE` |
 | cell | `LatticePoint` | space | integer `(x,y,z)` in a blueprint's local frame |
 | box | `Cuboid` | space | half-open axis-aligned box |
-| region | `CuboidSet` | space | canonical disjoint box set |
+| region | `CuboidSet` | space | normalized disjoint box set; value equality is by cells |
 | orientation | `Orientation` | space | one of 48 signed axis permutations |
 | siting | `Siting` | space | origin + placement: where a blueprint stands |
 | locus | `Locus` | space | where a finding points: definition, local, world or key |
@@ -34,7 +34,7 @@
 | ledger | `ClaimLedger` | claim | per-world claim store |
 | finding | `Finding` | finding | one report with a stable code |
 | bundle | `FindingBundle` | finding | ordered, deduplicated, capped report |
-| remedy | `Remedy` | remedy | a repair, a preview or an explanation |
+| remedy | `Remedy` | remedy | a repair or a preview |
 | document | `Document` | document | the data form of a blueprint |
 | kernel | `StructureKernel` | spi | the facade: five operations and two lookups |
 

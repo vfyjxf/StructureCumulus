@@ -43,7 +43,7 @@ The edges, exactly:
 | `claim` | `core`, `space`, `finding` |
 | `structure` | `core`, `space`, `finding`, `world`, `claim` |
 | `context` | `core`, `space`, `finding`, `world`, `structure` |
-| `document` | `core`, `space`, `finding`, `world`, `structure`, `context` |
+| `document` | `core`, `space`, `finding`, `claim`, `world`, `structure`, `context` |
 | `engine` | `core`, `space`, `finding`, `world`, `claim`, `structure`, `context`, `document` |
 | `remedy` | `core`, `space`, `finding`, `world`, `claim`, `structure`, `context`, `engine` |
 | `spi` | all kernel packages |

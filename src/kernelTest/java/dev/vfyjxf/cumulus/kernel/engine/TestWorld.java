@@ -6,7 +6,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimSet;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
-import dev.vfyjxf.cumulus.kernel.core.Checks;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
@@ -17,7 +16,6 @@ import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.finding.Label;
-import dev.vfyjxf.cumulus.kernel.finding.Severity;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -34,16 +32,17 @@ import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.SectionSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.Trait;
-import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 final class TestWorld {
 
@@ -76,6 +75,7 @@ final class TestWorld {
 
         private final Map<LatticePoint, OccupantSnapshot> occupants = new LinkedHashMap<>();
         private final TreeSet<LatticePoint> refused = new TreeSet<>();
+        private final Set<SectionKey> refusedSections = new LinkedHashSet<>();
 
         View put(OccupantSnapshot occupant) {
             occupants.put(occupant.ref().anchor(), occupant);
@@ -84,6 +84,11 @@ final class TestWorld {
 
         View air(LatticePoint cell) {
             occupants.put(cell, airOccupant(cell));
+            return this;
+        }
+
+        View refuseSection(SectionKey key) {
+            refusedSections.add(key);
             return this;
         }
 
@@ -108,6 +113,11 @@ final class TestWorld {
         }
 
         @Override
+        public LatticePoint origin() {
+            return LatticePoint.ORIGIN;
+        }
+
+        @Override
         public @Nullable WorldView parent() {
             return null;
         }
@@ -124,6 +134,10 @@ final class TestWorld {
 
         @Override
         public SectionSlot slot(SectionKey key) {
+            if (refusedSections.contains(key)) {
+                return new SectionSlot.Refused(ReadStatus.NOT_CAPTURED,
+                        FindingCode.of(FindingCode.Family.OCC, 3));
+            }
             if (!key.world().equals(WORLD) || key.frame() != 0) {
                 return new SectionSlot.Refused(ReadStatus.OUT_OF_BOUNDS,
                         FindingCode.of(

@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.space;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 class SpaceTest {
 
     @Test
@@ -163,5 +163,16 @@ class SpaceTest {
         assertNull(LocusMap.of(siting).toWorld(Locus.key(
                 new InstanceId(
                         World.of(NamespacedId.of("w")), 1), NamespacedId.of("k"))));
+    }
+
+    @Test
+    void cuboidSetEqualityIsByCellsNotByDecomposition() {
+        CuboidSet split = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1),
+                Cuboid.of(1, 0, 0, 2, 1, 1));
+        CuboidSet whole = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
+        assertEquals(whole, split);
+        assertEquals(whole.hashCode(), split.hashCode());
+        assertEquals(whole, CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1)));
+        assertNotEquals(whole, CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)));
     }
 }
