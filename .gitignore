@@ -44,3 +44,6 @@ visual/node_modules/
 visual/dist/
 visual/.vite/
 node_modules/
+
+# review captures
+visual/review/
