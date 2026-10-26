@@ -55,6 +55,10 @@ sourceSets {
     }
 }
 
+// The kernel is part of the mod's runtime output; without this the NeoForge run classpath
+// sees main classes but not the kernel interfaces they implement.
+sourceSets.main.output.dir(sourceSets.kernel.output, builtBy: tasks.named('kernelClasses'))
+
 configurations {
     runtimeClasspath.extendsFrom localRuntime
 }
@@ -91,6 +95,14 @@ neoForge {
             server()
             gameDirectory = project.file('runs/server')
             programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            server()
+            gameDirectory = project.file('runs/gameTest')
+            programArgument '--nogui'
+            systemProperty 'neoforge.gameTestServer', 'true'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -176,7 +188,7 @@ tasks.named('check') {
 }
 
 tasks.named('jar', Jar) {
-    from sourceSets.kernel.output
+    // kernel classes are already in the main output
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
