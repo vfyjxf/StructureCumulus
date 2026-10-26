@@ -290,6 +290,62 @@ Q<n>: <选项字母> [+ 一句理由，可选]
 推荐 (c)，并单独修 `guide.zh`/`README`/R 记录（这些只需改文档，不需要裁决）。
 裁决:
 
+#### Q20 占据物的特质模型
+
+为什么必须现在定：`06` §3.2/§4.4 的"在场但无值"语义靠它，`SnapshotPolicy` 的需求载体也靠它。
+
+事实：文档是 `List<Trait<?>>` 加 `find`/`trait`/`has`，`Trait<T>(TraitKey<T>, @Nullable T)` 能区分"缺席"与"在场无值"；代码是 `Set<NamespacedId> traits` 加 `hasTrait(NamespacedId)`，只能表达"有没有"。`TraitKey<T>`/`Trait<T>` 在内核里不存在。
+
+- (a) 保留文档的带值模型，代码补 `TraitKey`/`Trait`。
+- (b) 采用代码的 id 集合，删掉"在场无值"的语义，`06` §4.4 相应改写。
+- (c) 两层：`Set<NamespacedId>` 表示在场，另设一张按需读取的值表。
+
+推荐 (a)：`06` §4.4 的"在场但 `value() == null` 是确定事实"是判定语义的一部分，(b) 会丢掉它。
+裁决:
+
+#### Q21 `OccupantDescriptor` 的形状
+
+事实：文档 `(type, kind, Map<String,String> properties, List<NamespacedId> tags)` 加 `property(key)`；代码 `(NamespacedId type, Set<NamespacedId> traits)` 加 `hasTrait`。
+
+- (a) 文档形态：属性是开放的键值对，适合宿主扩展。
+- (b) 代码形态：只有类型与特质集合，简单但不可表达方块状态等细节。
+- (c) 文档形态 + 特质集合并存。
+
+推荐 (a)，与 Q20 的结论配套。
+裁决:
+
+#### Q22 `OccupantKind` 是否保留第五个 `OTHER`
+
+事实：文档五个常量，`OTHER` 携带宿主 id；代码四个，无 `OTHER`，且无 `compareTo`，于是 `06` §7.6 的 `OccupantRef` 排序尾部（`kind.id, type`）无法实现。
+
+- (a) 补 `OTHER`（携带 `NamespacedId`）与 `Comparable`，排序按文档。
+- (b) 删 `OTHER`，改为"类型 id 自带命名空间即可表达扩展"，排序改为 `(type)`。
+- (c) 保留四个常量，另设 `OccupantKind.extensions()` 映射。
+
+推荐 (b)：`Other(NamespacedId id)` 与"某个具体扩展类型"在语义上重复，直接用 `NamespacedId type` 表达扩展更少概念。
+裁决:
+
+#### Q23 `ClaimMatrix` 的公开面与 `Overlap` 的类型
+
+事实：文档只给 `conflicts(a, b)`；代码公开八个成员，外加 `OVERLAP_CODE`/`CONFLICT_CODE` 常量，并对同蓝图重叠发 `SC-CLM-0001`（`08` §4.2 要求 `SC-BPT-0002`）。`ClaimPlan.Overlap(low, high)` 与代码的 `Overlap(challenger, incumbent, cells)` 是两个不同东西。
+
+- (a) 文档补全 `ClaimMatrix` 的公开成员表，`Overlap` 取代码的三分量形态，诊断码按 Q6 的结论统一。
+- (b) 文档保留最小面，代码把八个成员收为包私有，`Overlap` 取文档形态。
+- (c) 分两层：`ClaimMatrix` 公开最小面，内部另设 `OverlapScanner`。
+
+推荐 (a)。(b) 会让 `SavedClaims` 无法复用重叠扫描。
+裁决:
+
+#### Q24 `MatchSession` 的成员与可见性
+
+事实：文档说"`run()` 幂等、`spend()`/`remaining()`/`readSet()`/`probe()` 五个成员、变更器包私有"；代码是公开类、公开构造器、只有 `run()`，其余四个没有签名。
+
+- (a) 文档的五个成员全部写进签名，代码补齐，类与变更器包私有。
+- (b) 文档缩到一个 `run()`，删掉其余四个提到的地方。
+- (c) 保留五个成员但把 `spend()`/`remaining()` 移到结果对象上。
+
+推荐 (a)：`17`/`18` 的示例按这套成员写。
+
 ## 4. 不需要裁决、只需改文档的
 
 以下已在 `alignment-report.md` §4 按文件列出，这里只列类别，避免重复：
