@@ -127,7 +127,7 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: `./gradlew check` is green; the transcript below is the direct javac/JUnit harness.</div>
+            <div className="warn">check: ./gradlew check is green; the transcript below is the direct javac/JUnit harness.</div>
             <div style={{ height: 14 }} />
             <div className="cmd">{zh ? '下一个攻击点：adapter 剩余部分（commands、persistence、GameTests），不是 kernel。' : 'Next attack: the rest of the adapter (commands, persistence, GameTests), not the kernel.'}</div>
           </div>

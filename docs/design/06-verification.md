@@ -14,9 +14,9 @@
 | **No stubs** | grep | no `TODO`, `FIXME`, `UnsupportedOperationException`, empty public method body |
 | **Determinism** | golden test | two runs over one tuple produce equal values, orders and spend |
 
-Gradle is the shipping build (`./gradlew compileKernelJava kernelPurity kernelTest`). The session that
-regenerates the kernel may not be able to run Gradle (the wrapper cache is outside the sandbox); it
-must still run `javac` and the JUnit launcher directly and record the commands.
+Gradle is the shipping build (`./gradlew check`, including Spotless and the kernel gates). A
+regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
+and record the commands.
 
 ## 2. Requirement → module → test
 
