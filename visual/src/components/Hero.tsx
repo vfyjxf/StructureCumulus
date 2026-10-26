@@ -1,4 +1,4 @@
-import { GATES } from '../data/site';
+import { HERO_STATS } from '../data/site';
 import type { SectionId } from '../data/site';
 
 export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
@@ -12,7 +12,7 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
         </h1>
         <p className="hero-lede">
           Eleven kernel packages. Three phases. One typed key. A design where the blueprint is a value,
-          every settlement is a single write, and every module is checked by the direction of its edges.
+          every settlement writes claims once and publishes once, and every module is checked by the direction of its edges.
         </p>
         <div className="hero-actions">
           <button className="btn btn-solid" type="button" onClick={() => onNavigate('lattice')}>
@@ -92,7 +92,7 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
       </div>
 
       <div className="hero-stats">
-        {GATES.map((gate) => (
+        {HERO_STATS.map((gate) => (
           <div className="hero-stat" key={gate.label}>
             <span className="n">{gate.value}</span>
             <span className="l">{gate.label} · {gate.note}</span>
@@ -101,7 +101,7 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
       </div>
 
       <div className="hero-foot">
-        <span>Reviewed 2026.10.26 · commit 0d1218e</span>
+        <span>Reviewed 2026.10.26 · kernel commit 0d1218e</span>
         <span>English source only · adapter specified, not implemented</span>
       </div>
     </header>

@@ -21,7 +21,7 @@ export function Thesis() {
             <h3>
               A blueprint is a <em>declaration</em>.<br />
               A match is an <em>argument</em>.<br />
-              A settlement is a <em>single write</em>.
+              A settlement is one claim write and one <em>publication</em>.
             </h3>
             <p>
               There is no stage machine to advance, no mutable context draft to patch, and no claim plan
@@ -39,7 +39,7 @@ export function Thesis() {
               </div>
               <div>
                 <dt>One ledger</dt>
-                <dd>Rows are per cell and per world. <code>Admitted</code> carries bindings and a revision, never rows.</dd>
+                <dd>Claims are per world; rows carry cell × owner × siting × bay. <code>Admitted</code> carries bindings and a revision, never rows.</dd>
               </div>
               <div>
                 <dt>One direction</dt>

@@ -1,13 +1,14 @@
 {
-  "name": "structurecumulus-visual",
+  "name": "structurecumulus-review",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "NASA-punk interaction atlas for the StructureCumulus design",
+  "description": "Interactive, adversarial design review of the StructureCumulus kernel",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "data": "python3 scripts/extract-review-data.py"
   },
   "dependencies": {
     "react": "^19.1.1",

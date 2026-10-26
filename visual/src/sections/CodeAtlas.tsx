@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CODE_COUNT, codes } from '../data/codes';
 import { Reveal, SectionHead } from '../components/ui';
+import { BundleLab } from '../components/BundleLab';
 
 const FAMILY_ORDER = ['SPC', 'OCC', 'EXP', 'CLM', 'BPT', 'CHK', 'DOC', 'CTX', 'ENG', 'DIA', 'RMD', 'SPI'];
 
@@ -15,16 +16,27 @@ export function CodeAtlas() {
   const [family, setFamily] = useState('all');
   const [selected, setSelected] = useState('SC-CLM-0001');
 
+  const ordered = useMemo(() => [...codes].sort((a, b) => {
+    const familyDelta = FAMILY_ORDER.indexOf(a.family) - FAMILY_ORDER.indexOf(b.family);
+    return familyDelta !== 0 ? familyDelta : a.number - b.number;
+  }), []);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return codes.filter((entry) => {
+    return ordered.filter((entry) => {
       if (family !== 'all' && entry.family !== family) return false;
       if (!q) return true;
       return `${entry.code} ${entry.summary} ${entry.body} ${entry.producer}`.toLowerCase().includes(q);
     });
-  }, [query, family]);
+  }, [query, family, ordered]);
 
-  const selectedCode = codes.find((entry) => entry.code === selected) ?? codes[0];
+  const selectedCode = filtered.find((entry) => entry.code === selected) ?? filtered[0] ?? null;
+
+  useEffect(() => {
+    if (filtered.length > 0 && !filtered.some((entry) => entry.code === selected)) {
+      setSelected(filtered[0].code);
+    }
+  }, [filtered, selected]);
   const familyCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const entry of codes) map.set(entry.family, (map.get(entry.family) ?? 0) + 1);
@@ -39,6 +51,10 @@ export function CodeAtlas() {
         title={<>A finding is a <em>value</em>, not an event.</>}
         note={<>One code table, one severity, one producer. The bundle sorts, dedupes and caps; the engine never prints and the renderer never decides.</>}
       />
+
+      <Reveal>
+        <BundleLab />
+      </Reveal>
 
       <Reveal>
         <div className="code-layout">
@@ -77,7 +93,7 @@ export function CodeAtlas() {
                 <span><i style={{ background: 'var(--ochre)' }} />warning</span>
                 <span><i style={{ background: 'var(--blue)' }} />info</span>
               </div>
-              <span className="mono muted">{filtered.length} / {CODE_COUNT} codes · 12 families + host</span>
+              <span className="mono muted">{filtered.length} / {CODE_COUNT} codes · 12 kernel families + MC</span>
             </div>
 
             <div className="atlas-list">
@@ -106,21 +122,26 @@ export function CodeAtlas() {
           </div>
 
           <aside className="code-side">
+            {selectedCode ? (
+              <>
             <div className="eyebrow">Selected code</div>
             <div className="big-code" style={{ marginTop: 8 }}>{selectedCode.code}</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
               <span className={`tag ${severityClass(selectedCode.severity)}`}>{selectedCode.severity}</span>
               <span className="tag">{selectedCode.family}</span>
             </div>
+            <div className="code-anatomy">
+              <span>SC</span><span>{selectedCode.family}</span><span>{String(selectedCode.number).padStart(4, '0')}</span>
+            </div>
             <div className="code-detail">
               <h4>{selectedCode.summary}</h4>
               <p>{selectedCode.body}</p>
               <div className="producer">
-                <strong>Producer</strong>
+                <strong>Producer</strong>{" "}
                 {selectedCode.producer || 'documented host boundary'}
               </div>
               <div className="producer">
-                <strong>Stable identity</strong>
+                <strong>Stable identity</strong>{" "}
                 {selectedCode.code} · never reused, never renumbered
               </div>
             </div>
@@ -132,8 +153,12 @@ export function CodeAtlas() {
               human and JSON projections share one value
             </div>
             <div style={{ marginTop: 18 }}>
-              <div className="tag tag-green"><span className="dot" /> 55 registered · 0 dead</div>
+              <div className="tag tag-green"><span className="dot" /> 55 registered · one table</div>
             </div>
+              </>
+            ) : (
+              <div className="code-empty" style={{ marginTop: 0 }}>No code matches this filter.</div>
+            )}
           </aside>
         </div>
       </Reveal>

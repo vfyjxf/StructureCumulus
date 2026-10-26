@@ -133,6 +133,7 @@ class ScenarioTest {
         MatchResult settled = MatchEngine.settle(request, admitted, ledger, store);
         MatchResult.Formed formed = assertInstanceOf(MatchResult.Formed.class, settled);
         assertEquals(27, formed.claims().rows().size());
+        assertEquals(new Spend(28, 4), formed.outcome().spend());
         assertEquals(1, formed.contextRevision());
         assertEquals(1, ledger.revision());
 
@@ -632,5 +633,30 @@ class ScenarioTest {
                 .anyMatch(finding -> finding.code().equals(Codes.COMPUTATION_FAILED.code())));
         assertFalse(admitted.findings().findings().stream()
                 .anyMatch(finding -> finding.code().equals(Codes.FOLD_REFUSED.code())));
+    }
+
+    @Test
+    void aClippedEntityFootprintIsUnreadable() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
+        Bay bay = Bay.of(id("pen"), cells, Coverage.ANY_SUBJECT, Footprint.bound(),
+                Sharing.SHARED);
+        Blueprint blueprint = Blueprint.builder(id("pen"))
+                .bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
+                .check(Check.of(id("cow"), bay, Focuses.entity(mc("cow")),
+                        Expectations.anyOccupant())).build();
+        OccupantRef ref = new OccupantRef(TestWorld.SNAPSHOT, 0, mc("cow"),
+                OccupantKind.ENTITY, LatticePoint.ORIGIN);
+        OccupantSnapshot cow = new OccupantSnapshot(ref,
+                new OccupantDescriptor(mc("cow"), OccupantKind.ENTITY, Map.of(), List.of()),
+                Cuboid.of(0, 0, 0, 2, 1, 1), List.of());
+        TestWorld.View view = new TestWorld.View().put(cow).sectionSize(1)
+                .refuseSection(SectionKey.of(TestWorld.WORLD, 0, LatticePoint.of(1, 0, 0), 1));
+        MatchRequest request = MatchRequest.of(blueprint, AT_ORIGIN, new TestWorld.Lease(view),
+                INSTANCE, OWNER, Budget.unbounded(), new ClaimView(List.of(), 0, true));
+        MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class,
+                MatchEngine.check(request));
+        assertEquals(UndecidedReason.UNREADABLE, undecided.reason());
+        assertTrue(undecided.findings().findings().stream()
+                .anyMatch(finding -> finding.code().equals(Codes.FOOTPRINT_CLIPPED.code())));
     }
 }

@@ -76,6 +76,7 @@ final class TestWorld {
         private final Map<LatticePoint, OccupantSnapshot> occupants = new LinkedHashMap<>();
         private final TreeSet<LatticePoint> refused = new TreeSet<>();
         private final Set<SectionKey> refusedSections = new LinkedHashSet<>();
+        private int sectionSize = 16;
 
         View put(OccupantSnapshot occupant) {
             occupants.put(occupant.ref().anchor(), occupant);
@@ -89,6 +90,11 @@ final class TestWorld {
 
         View refuseSection(SectionKey key) {
             refusedSections.add(key);
+            return this;
+        }
+
+        View sectionSize(int size) {
+            this.sectionSize = size;
             return this;
         }
 
@@ -124,12 +130,12 @@ final class TestWorld {
 
         @Override
         public int cellSize() {
-            return 16;
+            return sectionSize;
         }
 
         @Override
         public SectionKey sectionOf(LatticePoint cell) {
-            return SectionKey.of(WORLD, 0, cell, 16);
+            return SectionKey.of(WORLD, 0, cell, sectionSize);
         }
 
         @Override

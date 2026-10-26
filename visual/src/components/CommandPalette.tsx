@@ -19,6 +19,7 @@ export function CommandPalette({
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const items = useMemo<Item[]>(() => {
     const sections: Item[] = NAV.map((entry) => ({
@@ -43,10 +44,17 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!open) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     setQuery('');
     setIndex(0);
     const timer = window.setTimeout(() => inputRef.current?.focus(), 20);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      document.body.style.overflow = overflow;
+      previous?.focus();
+    };
   }, [open]);
 
   useEffect(() => {
@@ -68,6 +76,18 @@ export function CommandPalette({
         if (item.kind === 'section') onSection(item.id);
         else onModule(item.id);
         onClose();
+      } else if (event.key === 'Tab') {
+        const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('input, button, [href]') ?? []);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -82,13 +102,13 @@ export function CommandPalette({
 
   return (
     <div className="palette-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="Review index">
+      <div ref={dialogRef} className="palette" role="dialog" aria-modal="true" aria-label="Review index">
         <input
           ref={inputRef}
           className="palette-input"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Jump to a chapter, package or law…"
+          placeholder="Jump to a chapter or package…"
           aria-label="Search review index"
         />
         <div className="palette-list">

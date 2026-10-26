@@ -1,6 +1,7 @@
 import { Reveal, SectionHead } from '../components/ui';
 import { LatticeGraph } from '../components/LatticeGraph';
 import type { ModuleId } from '../data/site';
+import '../styles/lattice.css';
 
 export function Lattice({ focus }: { focus: ModuleId | null }) {
   return (

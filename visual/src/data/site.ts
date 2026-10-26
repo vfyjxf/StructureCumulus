@@ -18,7 +18,7 @@ export const MODULES: Module[] = [
   { id: 'space', rank: 1, x: 15.5, y: 50, owns: 'lattice · cuboid set · orientation · siting', imports: ['core'], law: 'Geometry is a value; a siting maps local to world once.', doc: 'docs/modules/space.md' },
   { id: 'finding', rank: 2, x: 26.5, y: 27, owns: 'finding · bundle · code table · renderer', imports: ['core', 'space'], law: 'A finding is a value; a bundle is the only aggregator.', doc: 'docs/modules/finding.md' },
   { id: 'world', rank: 2, x: 26.5, y: 73, owns: 'occupant · trait · section · capture lease', imports: ['core', 'space'], law: 'A snapshot is immutable; the lease is only isCurrent().', doc: 'docs/modules/world.md' },
-  { id: 'claim', rank: 3, x: 37.5, y: 50, owns: 'row · sharing · footprint · ledger port', imports: ['core', 'space', 'finding'], law: 'One row per cell; one conflict predicate.', doc: 'docs/modules/claim.md' },
+  { id: 'claim', rank: 3, x: 37.5, y: 50, owns: 'row · sharing · footprint · ledger port', imports: ['core', 'space', 'finding'], law: 'One row per cell × owner × siting; one conflict predicate.', doc: 'docs/modules/claim.md' },
   { id: 'structure', rank: 4, x: 48.5, y: 50, owns: 'bay · check · blueprint · focus · plan', imports: ['core', 'space', 'finding', 'world', 'claim'], law: 'A bay owns cells; a check is a focus × an expectation.', doc: 'docs/modules/structure.md' },
   { id: 'context', rank: 5, x: 59.5, y: 50, owns: 'store · key semantics · fold · deriver', imports: ['core', 'space', 'finding', 'world', 'structure'], law: 'One key, two retentions, one publication.', doc: 'docs/modules/context.md' },
   { id: 'document', rank: 6, x: 70.5, y: 50, owns: 'IR · compiler · reader/writer ports', imports: ['core', 'space', 'finding', 'claim', 'world', 'structure', 'context'], law: 'Data in; one blueprint or a finding bundle out.', doc: 'docs/modules/document.md' },
@@ -81,11 +81,20 @@ export const DOCS = [
   { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (spec only)' },
 ];
 
+export const HERO_STATS = [
+  { value: '95', label: 'tests', note: 'JUnit 5 · direct harness' },
+  { value: '55', label: 'codes', note: '12 kernel families + MC' },
+  { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
+  { value: '23', label: 'decisions', note: 'rulings, not preferences' },
+];
+
 export const GATES = [
-  { label: 'javac', value: '21', note: 'release · -Werror' },
-  { label: 'tests', value: '94', note: 'JUnit 5 · 15 containers' },
-  { label: 'codes', value: '55', note: '12 families + MC' },
-  { label: 'purity', value: '0', note: 'Minecraft names' },
+  { label: 'Compile', value: 'PASS', note: 'javac 21 · Gradle/spotless unrun' },
+  { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
+  { label: 'Tests', value: '95/95', note: 'JUnit 5 · 15 containers' },
+  { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 55 codes' },
+  { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
+  { label: 'Determinism', value: 'N/R', note: 'not run in this sandbox' },
 ];
 
 export const PRINCIPLES = [

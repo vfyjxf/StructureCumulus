@@ -21,6 +21,8 @@ table defines who may emit each finding code.
 7. [design/06-verification.md](design/06-verification.md) — gates, scenario tests, code producers.
 8. [design/07-regeneration.md](design/07-regeneration.md) — how the kernel is rebuilt from this set.
 
+There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth.
+
 Then the module files, in dependency order:
 
 | Rank | Module | File |
@@ -47,7 +49,7 @@ Then the module files, in dependency order:
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-26): the kernel compiles with `javac --release 21` and JSpecify only; 94
+- Verification (2026-10-26): the kernel compiles with `javac --release 21` and JSpecify only; 95
   JUnit 5 tests pass; `tools/spec-check.py` is clean; the adapter is specified, not implemented.
   Gradle could not run in the generation sandbox, so `./gradlew check` is the first thing to run on
   a normal machine (it also applies the project formatter).

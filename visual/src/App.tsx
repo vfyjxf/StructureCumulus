@@ -68,13 +68,24 @@ export default function App() {
       }
       setActive(current);
     };
+    let debounce = 0;
     const onScroll = () => {
       if (!frame) frame = window.requestAnimationFrame(update);
+      window.clearTimeout(debounce);
+      debounce = window.setTimeout(update, 90);
     };
+    const settle = () => update();
+    const timers = [250, 700, 1400, 2200].map((delay) => window.setTimeout(update, delay));
     update();
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('scrollend', settle);
+    window.addEventListener('resize', settle);
     return () => {
       window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scrollend', settle);
+      window.removeEventListener('resize', settle);
+      window.clearTimeout(debounce);
+      timers.forEach((timer) => window.clearTimeout(timer));
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, []);
@@ -135,10 +146,10 @@ export default function App() {
           </div>
           <div className="rail-bar"><span style={{ width: `${progress}%` }} /></div>
           <div className="rail-gates">
-            <div className="rail-gate">tests<strong>94/94</strong></div>
+            <div className="rail-gate">tests<strong>95/95</strong></div>
             <div className="rail-gate">codes<strong>55</strong></div>
             <div className="rail-gate">purity<strong>0</strong></div>
-            <div className="rail-gate">gates<strong>4/4</strong></div>
+            <div className="rail-gate">rulings<strong>23</strong></div>
           </div>
         </div>
       </aside>
@@ -150,6 +161,7 @@ export default function App() {
             <strong>SC//REVIEW</strong>
             <span className="hide-sm">/ {activeEntry.no} {activeEntry.label}</span>
             <span className="hide-sm" style={{ color: 'var(--faint)' }}>— {activeEntry.sub}</span>
+            <span className="topbar-active-mobile">{activeEntry.no} / {activeEntry.label}</span>
           </div>
           <div className="topbar-actions">
             <button type="button" className="icon-btn" onClick={() => setPalette(true)}>
@@ -181,9 +193,9 @@ export default function App() {
               </h3>
               <div className="footer-meta">
                 StructureCumulus / design review 1.0<br />
-                8 design files · 12 module files<br />
-                kernel 11 packages · 55 codes · 94 tests<br />
-                commit 0d1218e
+                8 design files · 11 kernel modules + adapter spec<br />
+                kernel 11 packages · 55 codes · 95 tests<br />
+                kernel commit 0d1218e
               </div>
             </div>
             <div className="footer-rule rule" />

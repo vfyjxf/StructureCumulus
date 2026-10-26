@@ -5,6 +5,11 @@ export function Reveal({ children, className = '', delay = 0 }: { children: Reac
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
+    const rect = node.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.92 && rect.bottom > 0) {
+      node.dataset.in = 'true';
+      return;
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {

@@ -11,7 +11,7 @@ export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/core/CoreTest.java", "package": "core", "className": "CoreTest", "count": 8},
   {"file": "dev/vfyjxf/cumulus/kernel/document/DocumentCompilerTest.java", "package": "document", "className": "DocumentCompilerTest", "count": 4},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/FacadeTest.java", "package": "engine", "className": "FacadeTest", "count": 3},
-  {"file": "dev/vfyjxf/cumulus/kernel/engine/ScenarioTest.java", "package": "engine", "className": "ScenarioTest", "count": 14},
+  {"file": "dev/vfyjxf/cumulus/kernel/engine/ScenarioTest.java", "package": "engine", "className": "ScenarioTest", "count": 15},
   {"file": "dev/vfyjxf/cumulus/kernel/finding/CodesTest.java", "package": "finding", "className": "CodesTest", "count": 3},
   {"file": "dev/vfyjxf/cumulus/kernel/finding/FindingBundleTest.java", "package": "finding", "className": "FindingBundleTest", "count": 13},
   {"file": "dev/vfyjxf/cumulus/kernel/finding/FindingRendererTest.java", "package": "finding", "className": "FindingRendererTest", "count": 5},
@@ -27,11 +27,11 @@ export const TEST_GROUPS = [
   {"name": "context", "count": 3},
   {"name": "core", "count": 8},
   {"name": "document", "count": 4},
-  {"name": "engine", "count": 17},
+  {"name": "engine", "count": 18},
   {"name": "finding", "count": 34},
   {"name": "space", "count": 14},
   {"name": "structure", "count": 4},
   {"name": "world", "count": 5},
 ];
 
-export const TEST_COUNT = 94;
+export const TEST_COUNT = 95;
