@@ -44,17 +44,23 @@ Then the module files, in dependency order:
 
 - Design revision: **v1.0**, 2026-10-26.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
-  was specified only in that round. Current status: the M1 capture slice (`LevelCapture`,
-  `LevelSnapshot`, `LevelLease`, one capture GameTest) is implemented; commands, persistence and the
-  full adapter remain pending.
+  was specified only in that round. Current status: M1 is the host + command + capture-check slice —
+  `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
+  lifecycle, in-memory `BuiltinDocuments` (`structurecumulus:air_cell`) and
+  `/cumulus check <id> <origin>` (identity siting for anchorless blueprints), proven by two GameTests
+  (capture-only; capture → compile → check). Claims/persistence, JSON/datapack, the rest of the
+  command surface, entities, nested views, traits, orientation mapping and windows remain pending.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
-  the adapter. The adapter is the only place allowed to name Minecraft.
+  the adapter. At M1 the adapter also owns the server state, the in-memory document source and
+  `/cumulus check`. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 97
-  JUnit 5 tests pass; `tools/spec-check.py` is clean; `./gradlew check` is green and the adapter's
-  `runGameTestServer` capture GameTest passes. The adapter is implemented to M1 only; commands,
-  persistence and the full adapter remain pending.
+  kernel JUnit 5 tests and 1 adapter unit test pass; `tools/spec-check.py` is clean;
+  `./gradlew check` is green; `runGameTestServer` passes 2/2 (capture-only; capture → compile →
+  check). The adapter is implemented to M1 only; claims/persistence, JSON/datapack, the remaining
+  commands, entities, nested views, traits, orientation mapping and windows remain pending. The two
+  GameTests are counted separately from the 97 kernel tests.
 
 ## The one rule
 

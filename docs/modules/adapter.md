@@ -1,18 +1,23 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 host + check)
 
-> The only code allowed to name Minecraft. M1 implements capture, a root snapshot, the lease,
-> block/block-entity descriptors and one capture GameTest; the rest of this file is still the
-> specification. The kernel is complete without it: a host that implements the four ports can run
-> every scenario.
+> The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
+> path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
+> `ServerState` lifecycle, in-memory `BuiltinDocuments` (`structurecumulus:air_cell`) and
+> `/cumulus check <id> <origin>` (identity siting for anchorless blueprints), proven by two GameTests
+> (capture-only; capture → compile → check). The rest of this file is still the specification. The
+> kernel is complete without it: a host that implements the four ports can run every scenario.
 
 ## 1. Position
 
 - Source set `main`; package `dev.vfyjxf.cumulus.mc`; the mod entry is
   `dev.vfyjxf.cumulus.StructureCumulus`.
 - Minecraft 1.21.1 / NeoForge 21.1.x; one baseline, no loader abstraction and no version branches.
-- At M1 the adapter implements `WorldCapture`, `WorldView`, `SnapshotLease` and block/block-entity
-  descriptor mapping; `ClaimLedger`, `ContextStore`, `DocumentReader`, `DocumentWriter`,
-  entity/trait resolution and the command surface remain pending.
+- At M1 the adapter implements `WorldCapture`, `WorldView`, `SnapshotLease`, block/block-entity
+  descriptor mapping, the `ServerState` lifecycle (`ServerAboutToStartEvent`, `ServerStoppingEvent`,
+  `LevelEvent.Unload`), an in-memory `DocumentSource`, and `/cumulus check <id> <origin>` as its only
+  registered command. `ClaimLedger`, `ContextStore`, `DocumentReader`, `DocumentWriter`, entity/trait
+  resolution, nested views, orientation mapping, windows and the rest of the command surface
+  (`compile`, `settle`, `explain`, `claims`) remain pending.
 - No kernel type names a Minecraft type; the adapter may name every kernel type.
 
 ## 2. Types

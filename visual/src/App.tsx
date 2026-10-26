@@ -209,7 +209,7 @@ export default function App() {
             <div className="footer-rule rule" />
             <div className="footer-small">
               <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
-              <span>{zh ? 'Adapter M1 采集；完整 adapter 待完成' : 'Adapter M1 capture; full adapter pending'}</span>
+              <span>{zh ? 'Adapter M1：capture + host + check；其余待完成' : 'Adapter M1: capture + host + check; rest pending'}</span>
               <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>

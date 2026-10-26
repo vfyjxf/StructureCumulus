@@ -3,9 +3,12 @@
 An interactive, adversarial review of the kernel design. Not a feature tour: each chapter is a claim
 the kernel must survive — a frame mapping, a write, a conflict, a missing value, a finding.
 
-The design of record is [`../docs/README.md`](../docs/README.md). The adapter's M1 capture slice
-(`LevelCapture`, `LevelSnapshot`, `LevelLease`) and its GameTest are implemented; commands,
-persistence and the full adapter are pending. The UI opens in **中文**; the **EN** button in the top bar switches to the
+The design of record is [`../docs/README.md`](../docs/README.md). The adapter is at M1: the host,
+`/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`, `LevelSnapshot`,
+`LevelLease`, block/block-entity descriptors, `ServerState`, in-memory `BuiltinDocuments`), proven by
+two GameTests (capture-only; capture → compile → check). Claims/persistence, JSON/datapack, the rest
+of the command surface, entities, nested views, traits, orientation mapping and windows are pending.
+The UI opens in **中文**; the **EN** button in the top bar switches to the
 English reading layer. Technical identifiers, code, JSON, Java and finding codes stay in their
 original form in both languages.
 
@@ -24,7 +27,8 @@ network request.
 
 ## What is inside
 
-97 tests, 55 codes, 23 decisions, 11 ranked kernel packages. One complete document and a Java builder excerpt target the same IR.
+97 kernel tests, 55 codes, 23 decisions, 11 ranked kernel packages, plus M1's two adapter GameTests.
+One complete document and a Java builder excerpt target the same IR.
 
 | Chapter | What you can do |
 | --- | --- |
@@ -58,5 +62,5 @@ history; this app documents v1.0 and is the one to run.
 
 ## Caveat
 
-The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check` and the adapter’s
-capture GameTest are green.
+The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check` and the adapter’s two M1
+GameTests (`runGameTestServer` 2/2) are green.

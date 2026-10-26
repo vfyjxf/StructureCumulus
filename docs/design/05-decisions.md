@@ -21,12 +21,16 @@ section. The acceptance gate is the regenerated kernel.
 Core kernel + document compiler + thin remedy SPI. The v1 round scoped the NeoForge adapter to
 `modules/adapter.md` and left it unimplemented at the time; no scheduler, no dirty index, no overlay
 renderer, no schematic importer, no client code. This kept the first regeneration small enough to
-prove, while the ports make the adapter a later, independent exercise. Current status: the M1 capture
-slice (`LevelCapture`, `LevelSnapshot`, `LevelLease`, one capture GameTest) is implemented;
-claims/context persistence, document I/O, commands and the rest of the adapter remain pending.
+prove, while the ports make the adapter a later, independent exercise. Current status: the M1 host +
+command + capture-check slice is implemented — `LevelCapture`, `LevelSnapshot`, `LevelLease`,
+block/block-entity descriptors, the `ServerState` lifecycle, in-memory `BuiltinDocuments`
+(`structurecumulus:air_cell`) and `/cumulus check <id> <origin>` (identity siting for anchorless
+blueprints), with two GameTests (capture-only; capture → compile → check). Claims/context
+persistence, document I/O, the rest of the command surface, entities, nested views, traits,
+orientation mapping and windows remain pending.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-full adapter remains the missing piece for a game.
+adapter beyond M1 remains the missing piece for a game.
 
 ### D-03 — English only
 

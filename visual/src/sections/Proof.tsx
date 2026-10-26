@@ -85,13 +85,13 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、97 个测试、55 个 code、23 条决策。五道 gate 通过；determinism 在沙箱里没有运行。adapter 的 M1 采集已就位，其余刻意缺席；kernel 不是。</> : <>Six gates, 97 tests, 55 codes and 23 decisions. Five gates are green; determinism was not run in this sandbox. The adapter's M1 capture slice exists; the rest is deliberately absent, not the kernel.</>}
+        note={zh ? <>六道 gate、97 个 kernel 测试、55 个 code、23 条决策。五道 gate 通过；determinism 在沙箱里没有运行。adapter 处于 M1 —— host、<code>/cumulus check</code> 和两个 GameTest（capture-only；capture → compile → check）；其余刻意缺席，kernel 不是。</> : <>Six gates, 97 kernel tests, 55 codes and 23 decisions. Five gates are green; determinism was not run in this sandbox. The adapter is at M1 — host, <code>/cumulus check</code> and two GameTests (capture-only; capture → compile → check); the rest is deliberately absent, not the kernel.</>}
       />
 
       <Reveal>
         <div className="proof-top">
           <div className="proof-gates">
-            <div className="eyebrow">{zh ? '当前 gate 报告 / 2026.10.26' : 'Current gate report / 2026.10.26'}</div>
+            <div className="eyebrow">{zh ? '当前 gate 报告 / 2026.10.27' : 'Current gate report / 2026.10.27'}</div>
             <div className="gate-grid" style={{ marginTop: 12 }}>
               {GATES.map((gate) => {
                 const copy = zh ? ZH_GATES[gate.label] : gate;
@@ -127,9 +127,9 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green; the transcript below is the direct javac/JUnit harness.</div>
+            <div className="warn">check: ./gradlew check is green; the transcript below is the direct javac/JUnit harness. M1 GameTests: runGameTestServer 2/2.</div>
             <div style={{ height: 14 }} />
-            <div className="cmd">{zh ? '下一个攻击点：adapter 剩余部分（commands、persistence、GameTests），不是 kernel。' : 'Next attack: the rest of the adapter (commands, persistence, GameTests), not the kernel.'}</div>
+            <div className="cmd">{zh ? '下一个攻击点：M2–M4（nested frames、entities、traits、orientation、windows、claims/context persistence、JSON/datapack、剩余 commands），不是 kernel。' : 'Next attack: M2–M4 (nested frames, entities, traits, orientation, windows, claims/context persistence, JSON/datapack, the remaining commands), not the kernel.'}</div>
           </div>
         </div>
       </Reveal>

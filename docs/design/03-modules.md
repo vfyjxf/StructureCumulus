@@ -63,8 +63,10 @@ Notes:
 - `engine` is the only package that knows the whole pipeline. `spi` is the only package that knows
   `StructureKernel`.
 - `mc` is a separate Gradle source set (`main`), not a kernel package. In v1 it was specified in
-  `modules/adapter.md` only; the M1 capture slice (capture, root snapshot, lease, one GameTest) is now
-  implemented, while commands, persistence and the full adapter remain pending. The main source set
+  `modules/adapter.md` only; the M1 slice (host + `/cumulus check` + capture-check: capture, root
+  snapshot, lease, block/block-entity descriptors, `ServerState`, in-memory documents, two GameTests)
+  is now implemented, while claims/persistence, JSON/datapack, the rest of the command surface,
+  entities, nested views, traits, orientation mapping and windows remain pending. The main source set
   also compiles the mod entry.
 
 ## 2. Ownership

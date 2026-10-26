@@ -108,7 +108,7 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
 
       <div className="hero-foot">
         <span>{zh ? 'Review 于 2026.10.26 · kernel commit 0d1218e' : 'Reviewed 2026.10.26 · kernel commit 0d1218e'}</span>
-        <span>{zh ? '英文设计是唯一权威 · adapter M1 采集；其余待完成' : 'English source only · adapter M1 capture; rest pending'}</span>
+        <span>{zh ? '英文设计是唯一权威 · adapter M1：capture + host + check；其余待完成' : 'English source only · adapter M1: capture + host + check; rest pending'}</span>
       </div>
     </header>
   );
