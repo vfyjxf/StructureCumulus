@@ -87,6 +87,7 @@ public interface ExpectationContext<T> extends FocusContext {     // what a test
 | `FocusContext` | `extends AggregateContext`（后者回答 `read(key)`、`occupants(box)` 与 `context()`），并增加 `bay(): BayView`、`view()`、`siting()`、`cells()`、`stage()`、`locus()`；因此一个检查只能通过 `context()` 读取 `ContextKey`，别无其他途径 |
 | `ExpectationContext<T>` | `extends FocusContext`，并增加 `subject(): T`、`subjects()`、`withSubject(value, subjects): ExpectationContext<V>`——为舱位测试中的单个单元格重新指定主体类型的唯一途径——、静态的 `of(base, subject, subjects)`、`budget()`、`session()`、`occupantAt(p)`——null ⇔ 该单元格所在区段不可读 |
 | `ProbeSession` | `occupant(LatticePoint)`、`claimsAt(LatticePoint): List<Claim>`（仅限冻结账本；会话预留保持私有）、`<T> @Nullable T binding(BindingKey<T>)`、`remaining(): Budget`、`stage(): Stage` |
+| `DoorView` | `record (OccupantRef first, OccupantRef second, BayView bay)`：`door` 焦点绑定的两半，`first` 是下半（`06` §3.2），以及它们所在的舱位 |
 | `Expectations` | `allOf`、`anyOf`、`not`、`sequence`、`atLeast(k)`、`atMost(k)`、`exactly(k)`、`block`、`air`、`eachCell(element)`、`trait`、`anyOccupant`、`nothing`、`custom(meta, body)`——每个都返回其子项主体类型的 `Expectation<T>`；`eachCell` 是唯一改变该类型的组合器（`Expectation<OccupantSnapshot>` → `Expectation<BayView>`） |
 | `ExpectationFactory` / `FactoryContext` | `id()`、`create(DataView, FactoryContext): @Nullable Expectation<?>`；`factory(id)`、`source()`、`range()`、`report(Finding)` |
 

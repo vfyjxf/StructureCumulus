@@ -55,6 +55,7 @@ Behaviour is §4's; a constructor throws only for a malformed value (`04` §5).
 | `Orientation` | `record (int ordinal) implements Comparable<Orientation>`; `IDENTITY`, `static of(Turn,Tilt,Flip)`, `compose`, `then` (this element first), `inverse`, `Heading apply(Heading)`, `@Nullable apply(LatticePoint)`, `@Nullable apply(Cuboid)`, `@Nullable apply(CuboidSet)`, `Turn turn()`, `Tilt tilt()`, `isMirror()`, `id()`, `static List<Orientation> all()` |
 | `Placement` | `record (Orientation, LatticePoint offset)`; `IDENTITY`, `compose`, `inverse`, `@Nullable apply(...)` |
 | `Siting` | `record (LatticePoint origin, Placement)`; `static of(origin, Orientation)`, `of(origin, Placement)`, `withOrigin`, `withPlacement`, `static @Nullable anchoring(anchorTarget, anchorLocal, Placement)`, `@Nullable toWorld(...)`, `@Nullable toLocal(...)` |
+| `SectionKey` | `record (World world, int x, int y, int z) implements Comparable<SectionKey>`; `static of(World, LatticePoint cell, int cellSize)`, `sectionOf(LatticePoint, int cellSize)`; compares by world, then `x`, `y`, `z`. The 16³ index of one world; not a cache key |
 | `Locus` | `record (LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @Nullable SourceSpan)`; `static definition(SourceSpan)`, `local(CuboidSet)`, `local(CuboidSet, SourceSpan)`, `world(CuboidSet)`, `key(InstanceId, NamespacedId)`, `withSource(SourceSpan)` |
 | `LocusMap` | `record (Siting)`; `static of(Siting)`, `@Nullable toWorld(Locus)`, `@Nullable toLocal(Locus)`, `toDefinition(Locus)` |
 

@@ -80,6 +80,12 @@ public interface ContextStore {
     Outcome<Void> publish(ContextDraft draft);      // Missing(SC-CTX-0108) when base is stale
 }
 
+public interface CatalogsDraft {                     // the catalog's key family while it is being built
+    <T> ContextKey<T> registerKey(ContextKey<T> key);
+    <T> ContextKey<T> putKey(ContextKey<T> key);     // a second declaration of one id is SC-CTX-0102
+    static CatalogsDraft create();
+}
+
 public enum AugmentFold { SUM, MAX, MIN, MULTIPLY, SET }
 public record AugmentKey(NamespacedId id, AugmentFold fold) { static AugmentKey of(NamespacedId, AugmentFold); }
 public record Augment(AugmentKey key, double amount) {

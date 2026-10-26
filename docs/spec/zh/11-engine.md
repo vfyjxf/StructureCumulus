@@ -77,6 +77,41 @@ public sealed interface MatchResult extends AutoCloseable
     record Deferred(Stage stage, RetryToken token, List<Finding> findings) implements MatchResult {}
 }
 // MatchSession: idempotent run(), spend(), remaining(), readSet(), probe(); writes are internal.
+
+// Supporting values: the slot's ceilings, the coalescing token, the per-instance state.
+public record Budget(int cells, int sections) {              // the slot's ceiling
+    public static final Budget ZERO;
+    public static Budget of(int cells, int sections);
+    public static Budget unbounded();
+    public boolean admits(Spend spend);
+}
+public record Spend(int cells, int sections) {               // what an attempt consumed
+    public static final Spend ZERO;
+}
+public final class InstanceBudget {                          // slot-owned counters; a request holds the reference
+    public static InstanceBudget of(Budget limit);  public static InstanceBudget unbounded();
+    public Budget limit();  public Spend spend();
+}
+public final class PinBudget {                               // retained bytes, never cache bytes
+    public static PinBudget of(long limit);  public static PinBudget unbounded();
+    public long limit();  public long retained();  public long remaining();
+    public boolean tryCharge(long bytes);                    // all or nothing
+}
+public record Ticket(long serial) implements Comparable<Ticket> { public Ticket next(); }
+public record RetryToken(Ticket ticket, Stage stage) {
+    public static RetryToken of(Ticket ticket, Stage stage);
+    public RetryToken next();
+}
+public final class InstanceRecord {                          // one per placed instance
+    public static InstanceRecord of(InstanceId id);
+    public InstanceId id();  public long generation();
+    public MatchResult.@Nullable Formed previous();
+    public long nextGeneration();
+    public void remember(MatchResult.Formed formed);
+    public MatchResult.@Nullable Formed reemit(FindingBundle findings);
+}
+public enum CacheMode { OFF, PARTIALS, OUTCOMES }             // what a host may keep across attempts
+public enum DropCause { SNAPSHOT_CHANGED, CAPTURE_INVALID }
 ```
 
 安放位在请求存在之前就已解析：请求里没有 `Place`，`run()` 内部也没有朝向搜索（`22` §4.4）。
