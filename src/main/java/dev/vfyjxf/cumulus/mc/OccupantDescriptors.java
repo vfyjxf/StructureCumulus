@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-/** M1 block/block-entity descriptor mapping; entities and traits follow in M2. */
+/** Block, block-entity and entity descriptor mapping. */
 @NullMarked
 public final class OccupantDescriptors {
 
@@ -46,6 +46,18 @@ public final class OccupantDescriptors {
         );
         OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.blockEntity, cell);
         return new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), List.of());
+    }
+
+    public static OccupantSnapshot entity(
+        SnapshotId snapshot,
+        int frame,
+        LatticePoint anchor,
+        NamespacedId type,
+        Cuboid footprint
+    ) {
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity, Map.of(), List.of());
+        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.entity, anchor);
+        return new OccupantSnapshot(ref, descriptor, footprint, List.of());
     }
 
     public static OccupantSnapshot air(SnapshotId snapshot, int frame, LatticePoint cell) {
