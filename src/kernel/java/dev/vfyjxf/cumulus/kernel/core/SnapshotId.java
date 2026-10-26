@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.core;
 
 import java.util.Objects;
+
 /** The identity of one capture. */
 public record SnapshotId(World world, long revision) implements Comparable<SnapshotId> {
 

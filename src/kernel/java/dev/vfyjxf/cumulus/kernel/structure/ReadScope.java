@@ -12,11 +12,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+
 /** What a check declares it reads: cells, keys and entity windows. */
 public record ReadScope(CuboidSet cells, Set<ContextKey<?>> keys, List<EntityWindow> windows) {
 
-    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator
-            .comparing((ContextKey<?> key) -> key.id())
+    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator.comparing((ContextKey<?> key) -> key.id())
             .thenComparing(key -> key.type().getName());
 
     public ReadScope {

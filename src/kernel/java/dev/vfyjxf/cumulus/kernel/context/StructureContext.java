@@ -14,13 +14,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-/** The typed values of one instance at one revision. */
-public record StructureContext(InstanceId instance, long revision,
-                               Map<ContextKey<?>, Object> values,
-                               FindingBundle findings, Spend spend) implements ContextView {
 
-    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator
-            .comparing((ContextKey<?> key) -> key.id())
+/** The typed values of one instance at one revision. */
+public record StructureContext(
+    InstanceId instance,
+    long revision,
+    Map<ContextKey<?>, Object> values,
+    FindingBundle findings,
+    Spend spend
+) implements ContextView {
+
+    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator.comparing((ContextKey<?> key) -> key.id())
             .thenComparing(key -> key.type().getName());
 
     public StructureContext {
@@ -36,8 +40,7 @@ public record StructureContext(InstanceId instance, long revision,
             ContextKey<?> key = Objects.requireNonNull(entry.getKey(), "key");
             Object value = Objects.requireNonNull(entry.getValue(), "value");
             if (!key.type().isInstance(value)) {
-                throw new IllegalArgumentException(
-                        "value for " + key.id() + " is not a " + key.type().getName());
+                throw new IllegalArgumentException("value for " + key.id() + " is not a " + key.type().getName());
             }
             sorted.put(key, value);
         }

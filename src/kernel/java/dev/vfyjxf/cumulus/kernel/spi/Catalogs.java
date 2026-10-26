@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
 import dev.vfyjxf.cumulus.kernel.structure.ComputationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.ExpectationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.FocusFactory;
+
 /** The six frozen extension families of one kernel. */
 public interface Catalogs {
 

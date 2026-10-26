@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.core;
 
 import java.util.Objects;
+
 /** A half-open character range in one document. */
 public record SourceSpan(NamespacedId document, int start, int end) {
 

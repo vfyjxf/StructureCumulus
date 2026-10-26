@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Locale;
+
 /** The one anchor read: one cell, one property, one mapping. */
 public final class Anchors {
 
@@ -41,24 +42,21 @@ public final class Anchors {
         }
         String value = occupant.descriptor().property(spec.property());
         if (value == null) {
-            return failure(origin, Codes.ANCHOR_INVALID,
-                    "the anchor has no property " + spec.property());
+            return failure(origin, Codes.ANCHOR_INVALID, "the anchor has no property " + spec.property());
         }
-        @Nullable Heading heading = heading(value);
+        @Nullable
+        Heading heading = heading(value);
         if (heading == null) {
-            return failure(origin, Codes.ANCHOR_INVALID,
-                    "the property is not a heading: " + value);
+            return failure(origin, Codes.ANCHOR_INVALID, "the property is not a heading: " + value);
         }
         Orientation orientation = policy.select(heading);
         if (orientation == null) {
             return failure(origin, Codes.ANCHOR_INVALID, "no allowed orientation faces " + heading);
         }
-        return new SitingResult(Outcome.found(Siting.of(origin, orientation)),
-                FindingBundle.empty());
+        return new SitingResult(Outcome.found(Siting.of(origin, orientation)), FindingBundle.empty());
     }
 
-    private static SitingResult failure(LatticePoint origin, CodeEntry code,
-                                        String message) {
+    private static SitingResult failure(LatticePoint origin, CodeEntry code, String message) {
         Locus locus = Locus.world(CuboidSet.of(Cuboid.of(origin)));
         Finding finding = Finding.builder(code).phase(Phase.COMPILE).message(message)
                 .label(Label.primary(locus, message)).build();
@@ -73,6 +71,5 @@ public final class Anchors {
         }
     }
 
-    private Anchors() {
-    }
+    private Anchors() {}
 }

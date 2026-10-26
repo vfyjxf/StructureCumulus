@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.world;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 
 import java.util.Objects;
+
 /** One section's answer. */
 public sealed interface SectionSlot {
     record Air(long revision) implements SectionSlot {

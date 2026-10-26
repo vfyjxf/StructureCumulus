@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.space;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** An orientation plus an integer offset. */
 public record Placement(Orientation orientation, LatticePoint offset) {
 
@@ -58,8 +59,7 @@ public record Placement(Orientation orientation, LatticePoint offset) {
     }
 
     private static @Nullable LatticePoint negate(LatticePoint point) {
-        if (point.x() == LatticePoint.MIN_XZ || point.y() == LatticePoint.MIN_Y
-                || point.z() == LatticePoint.MIN_XZ) {
+        if (point.x() == LatticePoint.MIN_XZ || point.y() == LatticePoint.MIN_Y || point.z() == LatticePoint.MIN_XZ) {
             return null;
         }
         return LatticePoint.of(-point.x(), -point.y(), -point.z());

@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
 /** The ledger's answer to a settle or release. */
 public sealed interface ClaimVerdict {
     record Settled(long revision, List<ClaimRow> rows) implements ClaimVerdict {

@@ -8,6 +8,7 @@ import dev.vfyjxf.cumulus.kernel.space.Siting;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** The five answers of one attempt. */
 public sealed interface MatchResult {
 
@@ -15,9 +16,15 @@ public sealed interface MatchResult {
 
     FindingBundle findings();
 
-    record Admitted(Phase phase, InstanceId instance, Siting siting, MatchOutcome outcome,
-                    long ledgerRevision, boolean ledgerAvailable,
-                    FindingBundle findings) implements MatchResult {
+    record Admitted(
+        Phase phase,
+        InstanceId instance,
+        Siting siting,
+        MatchOutcome outcome,
+        long ledgerRevision,
+        boolean ledgerAvailable,
+        FindingBundle findings
+    ) implements MatchResult {
         public Admitted {
             Objects.requireNonNull(phase, "phase");
             Objects.requireNonNull(instance, "instance");
@@ -30,9 +37,16 @@ public sealed interface MatchResult {
         }
     }
 
-    record Formed(Phase phase, InstanceId instance, Siting siting, MatchOutcome outcome,
-                  ClaimSet claims, long contextRevision, long ledgerRevision,
-                  FindingBundle findings) implements MatchResult {
+    record Formed(
+        Phase phase,
+        InstanceId instance,
+        Siting siting,
+        MatchOutcome outcome,
+        ClaimSet claims,
+        long contextRevision,
+        long ledgerRevision,
+        FindingBundle findings
+    ) implements MatchResult {
         public Formed {
             Objects.requireNonNull(phase, "phase");
             Objects.requireNonNull(instance, "instance");
@@ -53,8 +67,9 @@ public sealed interface MatchResult {
         }
     }
 
-    record Undecided(Phase phase, UndecidedReason reason, FindingBundle findings,
-                     @Nullable MatchOutcome partial) implements MatchResult {
+    record Undecided(Phase phase, UndecidedReason reason, FindingBundle findings, @Nullable MatchOutcome partial)
+            implements
+                MatchResult {
         public Undecided {
             Objects.requireNonNull(phase, "phase");
             Objects.requireNonNull(reason, "reason");

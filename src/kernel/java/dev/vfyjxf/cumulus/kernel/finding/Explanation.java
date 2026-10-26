@@ -6,9 +6,9 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 
 import java.util.ArrayList;
 import java.util.List;
+
 /** One code's long form. */
-public record Explanation(FindingCode code, String summary, String body,
-                          List<NamespacedId> seeAlso) {
+public record Explanation(FindingCode code, String summary, String body, List<NamespacedId> seeAlso) {
 
     public Explanation {
         Checks.checkNotNull(code, "code");

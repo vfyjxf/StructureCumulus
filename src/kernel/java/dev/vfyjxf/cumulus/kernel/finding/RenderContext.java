@@ -7,13 +7,21 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+
 /** What a human rendering may read. */
-public record RenderContext(List<SourceText> sources, @Nullable NamespacedId document,
-                            int width, ColorMode color, Locale locale) {
+public record RenderContext(
+    List<SourceText> sources,
+    @Nullable NamespacedId document,
+    int width,
+    ColorMode color,
+    Locale locale
+) {
 
     private static final int DEFAULT_WIDTH = 100;
 
-    public enum ColorMode { PLAIN, ANSI }
+    public enum ColorMode {
+        PLAIN, ANSI
+    }
 
     public RenderContext {
         List<SourceText> ordered = new ArrayList<>(sources);
@@ -29,8 +37,7 @@ public record RenderContext(List<SourceText> sources, @Nullable NamespacedId doc
 
     public static RenderContext of(SourceText source) {
         Checks.checkNotNull(source, "source");
-        return new RenderContext(List.of(source), source.id(), DEFAULT_WIDTH,
-                ColorMode.PLAIN, Locale.ROOT);
+        return new RenderContext(List.of(source), source.id(), DEFAULT_WIDTH, ColorMode.PLAIN, Locale.ROOT);
     }
 
     public @Nullable SourceText sourceFor(NamespacedId id) {

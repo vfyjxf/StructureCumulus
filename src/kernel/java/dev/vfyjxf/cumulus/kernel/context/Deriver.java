@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Value;
 
 import java.util.Set;
+
 /** A context-only producer of one value. It never reads a world. */
 public interface Deriver<T> {
 

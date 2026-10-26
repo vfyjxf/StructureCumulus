@@ -6,9 +6,11 @@ import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 
 import java.util.Objects;
+
 /** One cell of one world held by one bay of one owner at one siting. */
-public record ClaimRow(LatticeKey cell, Sharing sharing, OwnerId owner, Siting siting,
-                       NamespacedId bay) implements Comparable<ClaimRow> {
+public record ClaimRow(LatticeKey cell, Sharing sharing, OwnerId owner, Siting siting, NamespacedId bay)
+        implements
+            Comparable<ClaimRow> {
 
     public ClaimRow {
         Objects.requireNonNull(cell, "cell");

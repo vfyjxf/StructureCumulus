@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.space;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** A half-open axis-aligned box: {@code [min, max)}. */
 public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<Cuboid> {
 
@@ -28,8 +29,7 @@ public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<C
         if (maxX > LatticePoint.MAX_XZ || maxY > LatticePoint.MAX_Y || maxZ > LatticePoint.MAX_XZ) {
             throw new IllegalArgumentException("box leaves the lattice");
         }
-        return new Cuboid(LatticePoint.of(x, y, z),
-                LatticePoint.of((int) maxX, (int) maxY, (int) maxZ));
+        return new Cuboid(LatticePoint.of(x, y, z), LatticePoint.of((int) maxX, (int) maxY, (int) maxZ));
     }
 
     public static Cuboid of(LatticePoint min, LatticePoint max) {
@@ -50,27 +50,36 @@ public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<C
 
     public boolean contains(LatticePoint cell) {
         return !isEmpty()
-                && cell.x() >= min.x() && cell.x() < max.x()
-                && cell.y() >= min.y() && cell.y() < max.y()
-                && cell.z() >= min.z() && cell.z() < max.z();
+                && cell.x() >= min.x()
+                && cell.x() < max.x()
+                && cell.y() >= min.y()
+                && cell.y() < max.y()
+                && cell.z() >= min.z()
+                && cell.z() < max.z();
     }
 
     public boolean contains(Cuboid other) {
         if (other.isEmpty()) {
             return true;
         }
-        return other.min.x() >= min.x() && other.max.x() <= max.x()
-                && other.min.y() >= min.y() && other.max.y() <= max.y()
-                && other.min.z() >= min.z() && other.max.z() <= max.z();
+        return other.min.x() >= min.x()
+                && other.max.x() <= max.x()
+                && other.min.y() >= min.y()
+                && other.max.y() <= max.y()
+                && other.min.z() >= min.z()
+                && other.max.z() <= max.z();
     }
 
     public boolean intersects(Cuboid other) {
         if (isEmpty() || other.isEmpty()) {
             return false;
         }
-        return min.x() < other.max.x() && other.min.x() < max.x()
-                && min.y() < other.max.y() && other.min.y() < max.y()
-                && min.z() < other.max.z() && other.min.z() < max.z();
+        return min.x() < other.max.x()
+                && other.min.x() < max.x()
+                && min.y() < other.max.y()
+                && other.min.y() < max.y()
+                && min.z() < other.max.z()
+                && other.min.z() < max.z();
     }
 
     public @Nullable Cuboid intersect(Cuboid other) {
@@ -87,9 +96,14 @@ public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<C
     }
 
     public Cuboid bounding(Cuboid other) {
-        return of(Math.min(min.x(), other.min.x()), Math.min(min.y(), other.min.y()),
-                Math.min(min.z(), other.min.z()), Math.max(max.x(), other.max.x()),
-                Math.max(max.y(), other.max.y()), Math.max(max.z(), other.max.z()));
+        return of(
+            Math.min(min.x(), other.min.x()),
+            Math.min(min.y(), other.min.y()),
+            Math.min(min.z(), other.min.z()),
+            Math.max(max.x(), other.max.x()),
+            Math.max(max.y(), other.max.y()),
+            Math.max(max.z(), other.max.z())
+        );
     }
 
     public @Nullable Cuboid translate(int dx, int dy, int dz) {
@@ -106,7 +120,7 @@ public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<C
         long sy = (long) max.y() - min.y();
         long sz = (long) max.z() - min.z();
         long result = 1;
-        for (long extent : new long[] {sx, sy, sz}) {
+        for (long extent : new long[]{sx, sy, sz}) {
             if (extent == 0) {
                 return 0;
             }

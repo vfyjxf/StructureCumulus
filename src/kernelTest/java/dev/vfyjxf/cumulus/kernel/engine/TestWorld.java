@@ -1,4 +1,5 @@
 package dev.vfyjxf.cumulus.kernel.engine;
+
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimMatrix;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
@@ -44,6 +45,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+
 final class TestWorld {
 
     static final World WORLD = World.of(NamespacedId.of("test", "overworld"));
@@ -52,18 +54,20 @@ final class TestWorld {
     static final NamespacedId CAMPFIRE = NamespacedId.of("minecraft", "campfire");
     static final NamespacedId DOOR = NamespacedId.of("minecraft", "oak_door");
 
-    private TestWorld() {
-    }
+    private TestWorld() {}
 
     static OccupantSnapshot block(NamespacedId type, LatticePoint cell) {
         return block(type, cell, Map.of(), List.of());
     }
 
-    static OccupantSnapshot block(NamespacedId type, LatticePoint cell,
-                                  Map<String, String> properties, List<Trait<?>> traits) {
+    static OccupantSnapshot block(
+        NamespacedId type,
+        LatticePoint cell,
+        Map<String, String> properties,
+        List<Trait<?>> traits
+    ) {
         OccupantRef ref = new OccupantRef(SNAPSHOT, 0, type, OccupantKind.BLOCK, cell);
-        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.BLOCK,
-                properties, List.of());
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.BLOCK, properties, List.of());
         return new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), traits);
     }
 
@@ -141,13 +145,10 @@ final class TestWorld {
         @Override
         public SectionSlot slot(SectionKey key) {
             if (refusedSections.contains(key)) {
-                return new SectionSlot.Refused(ReadStatus.NOT_CAPTURED,
-                        FindingCode.of(FindingCode.Family.OCC, 3));
+                return new SectionSlot.Refused(ReadStatus.NOT_CAPTURED, FindingCode.of(FindingCode.Family.OCC, 3));
             }
             if (!key.world().equals(WORLD) || key.frame() != 0) {
-                return new SectionSlot.Refused(ReadStatus.OUT_OF_BOUNDS,
-                        FindingCode.of(
-                                FindingCode.Family.OCC, 3));
+                return new SectionSlot.Refused(ReadStatus.OUT_OF_BOUNDS, FindingCode.of(FindingCode.Family.OCC, 3));
             }
             Map<LatticePoint, OccupantSnapshot> slice = new LinkedHashMap<>();
             for (Map.Entry<LatticePoint, OccupantSnapshot> entry : occupants.entrySet()) {
@@ -257,20 +258,24 @@ final class TestWorld {
             for (ClaimRow row : request.rows()) {
                 for (ClaimRow incumbent : rows) {
                     if (ClaimMatrix.conflicts(row, incumbent)) {
-                        return new ClaimVerdict.Conflict(List.of(incumbent), FindingBundle.of(
-                                List.of(Finding.builder(
-                                                Codes.CLAIM_CONFLICT)
-                                        .phase(Phase.SETTLE)
-                                        .message("test conflict")
-                                        .label(Label.primary(Locus.world(Cuboid.of(
-                                                        incumbent.cell().point()).asSet()),
-                                                "held"))
-                                        .build())));
+                        return new ClaimVerdict.Conflict(
+                            List.of(incumbent),
+                            FindingBundle.of(
+                                List.of(
+                                    Finding.builder(Codes.CLAIM_CONFLICT).phase(Phase.SETTLE).message("test conflict")
+                                            .label(
+                                                Label.primary(
+                                                    Locus.world(Cuboid.of(incumbent.cell().point()).asSet()),
+                                                    "held"
+                                                )
+                                            ).build()
+                                )
+                            )
+                        );
                     }
                 }
             }
-            rows.removeIf(row -> row.owner().equals(request.owner())
-                    && row.siting().equals(request.siting()));
+            rows.removeIf(row -> row.owner().equals(request.owner()) && row.siting().equals(request.siting()));
             rows.addAll(request.rows());
             rows.sort(ClaimRow::compareTo);
             revision++;
@@ -279,8 +284,7 @@ final class TestWorld {
 
         @Override
         public ClaimVerdict release(OwnerId owner, Siting siting) {
-            boolean removed = rows.removeIf(row -> row.owner().equals(owner)
-                    && row.siting().equals(siting));
+            boolean removed = rows.removeIf(row -> row.owner().equals(owner) && row.siting().equals(siting));
             if (removed) {
                 revision++;
             }

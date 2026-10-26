@@ -7,10 +7,12 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** id to document, for cross-document definitions. */
 public interface DocumentSource {
 
-    @Nullable Document find(NamespacedId id);
+    @Nullable
+    Document find(NamespacedId id);
 
     static DocumentSource of(Map<NamespacedId, Document> documents) {
         Objects.requireNonNull(documents, "documents");

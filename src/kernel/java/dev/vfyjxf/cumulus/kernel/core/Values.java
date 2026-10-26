@@ -4,6 +4,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
 /** Helpers for the neutral data tree. */
 public final class Values {
 
@@ -26,7 +27,8 @@ public final class Values {
                     yield false;
                 }
                 for (Map.Entry<String, Value> entry : a.members().entrySet()) {
-                    if (!contentEquals(entry.getValue(), b.members().get(entry.getKey()))) {
+                    Value other = b.members().get(entry.getKey());
+                    if (other == null || !contentEquals(entry.getValue(), other)) {
                         yield false;
                     }
                 }
@@ -78,6 +80,5 @@ public final class Values {
         return Integer.compare(left.length() - li, right.length() - ri);
     }
 
-    private Values() {
-    }
+    private Values() {}
 }

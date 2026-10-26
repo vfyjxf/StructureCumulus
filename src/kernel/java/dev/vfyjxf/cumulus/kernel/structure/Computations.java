@@ -11,6 +11,7 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 
 import java.util.Objects;
 import java.util.Set;
+
 /** The three shipped section computations. */
 public final class Computations {
 
@@ -26,17 +27,17 @@ public final class Computations {
         return new Builtin(output, region, Mode.AIR);
     }
 
-    private enum Mode { COUNT, VOLUME, AIR }
+    private enum Mode {
+        COUNT, VOLUME, AIR
+    }
 
-    private record Builtin(ContextKey<Long> output, CuboidSet region, Mode mode)
-            implements SectionComputation<Long> {
+    private record Builtin(ContextKey<Long> output, CuboidSet region, Mode mode) implements SectionComputation<Long> {
 
         private Builtin {
             Objects.requireNonNull(output, "output");
             Objects.requireNonNull(region, "region");
             Objects.requireNonNull(mode, "mode");
-            if (output.retention() != Retention.INSTANCE
-                    && output.retention() != Retention.MATCH) {
+            if (output.retention() != Retention.INSTANCE && output.retention() != Retention.MATCH) {
                 throw new IllegalArgumentException("unsupported retention");
             }
         }
@@ -88,6 +89,5 @@ public final class Computations {
         }
     }
 
-    private Computations() {
-    }
+    private Computations() {}
 }

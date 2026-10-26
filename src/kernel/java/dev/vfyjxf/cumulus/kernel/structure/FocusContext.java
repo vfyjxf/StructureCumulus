@@ -15,6 +15,7 @@ import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+
 /** What a focus sees during one check. */
 public interface FocusContext {
 
@@ -38,7 +39,8 @@ public interface FocusContext {
 
     CancelToken cancel();
 
-    @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    @Nullable
+    OccupantSnapshot occupantAt(LatticePoint cell);
 
     List<ClaimRow> claimsAt(LatticePoint cell);
 }

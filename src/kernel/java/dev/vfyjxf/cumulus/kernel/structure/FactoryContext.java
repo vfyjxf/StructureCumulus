@@ -9,10 +9,14 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
 /** What a document factory may see while building a unit. */
-public record FactoryContext(NamespacedId document, @Nullable SourceSpan source,
-                             Function<NamespacedId, @Nullable ContextKey<?>> keys,
-                             Consumer<Finding> report) {
+public record FactoryContext(
+    NamespacedId document,
+    @Nullable SourceSpan source,
+    Function<NamespacedId, @Nullable ContextKey<?>> keys,
+    Consumer<Finding> report
+) {
 
     public FactoryContext {
         Objects.requireNonNull(document, "document");

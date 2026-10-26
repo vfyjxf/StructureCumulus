@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 
 import java.util.List;
 import java.util.Objects;
+
 /** The remedies and the findings produced while solving. */
 public record SolveResult(List<Remedy> remedies, FindingBundle findings) {
 

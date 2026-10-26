@@ -6,9 +6,9 @@ import dev.vfyjxf.cumulus.kernel.space.Siting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
 /** The unit of the ledger's compare-and-set. */
-public record SettleRequest(OwnerId owner, Siting siting, List<ClaimRow> rows,
-                            long expectedRevision) {
+public record SettleRequest(OwnerId owner, Siting siting, List<ClaimRow> rows, long expectedRevision) {
 
     public SettleRequest {
         Objects.requireNonNull(owner, "owner");

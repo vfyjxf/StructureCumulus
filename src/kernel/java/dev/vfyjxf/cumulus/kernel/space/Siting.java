@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.space;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** Where a blueprint stands: an origin plus a placement. */
 public record Siting(LatticePoint origin, Placement placement) {
 

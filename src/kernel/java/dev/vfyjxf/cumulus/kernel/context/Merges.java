@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.Merge;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 
 import java.util.function.BinaryOperator;
+
 /** The shipped merge combinators. */
 public final class Merges {
 
@@ -35,6 +36,5 @@ public final class Merges {
         return operator::apply;
     }
 
-    private Merges() {
-    }
+    private Merges() {}
 }

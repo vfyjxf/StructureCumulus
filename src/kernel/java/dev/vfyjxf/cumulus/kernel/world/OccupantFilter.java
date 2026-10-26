@@ -5,10 +5,13 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.function.Predicate;
+
 /** Optional type/kind/trait predicates for a box query. */
-public record OccupantFilter(@Nullable Predicate<NamespacedId> type,
-                             @Nullable Predicate<OccupantKind> kind,
-                             @Nullable Predicate<NamespacedId> trait) {
+public record OccupantFilter(
+    @Nullable Predicate<NamespacedId> type,
+    @Nullable Predicate<OccupantKind> kind,
+    @Nullable Predicate<NamespacedId> trait
+) {
 
     public static OccupantFilter any() {
         return new OccupantFilter(null, null, null);

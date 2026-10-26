@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.finding;
 import dev.vfyjxf.cumulus.kernel.core.Checks;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import org.jspecify.annotations.Nullable;
+
 /** One document text plus offset-to-line and column conversion. */
 public record SourceText(NamespacedId id, String text) {
 
@@ -59,8 +60,7 @@ public record SourceText(NamespacedId id, String text) {
                 }
                 if (current == '\r') {
                     newline = index;
-                    breakLength = index + 1 < text.length() && text.charAt(index + 1) == '\n'
-                            ? 2 : 1;
+                    breakLength = index + 1 < text.length() && text.charAt(index + 1) == '\n' ? 2 : 1;
                     break;
                 }
             }
@@ -78,5 +78,5 @@ public record SourceText(NamespacedId id, String text) {
         }
     }
 
-    private record Line(int start, int end, int number) { }
+    private record Line(int start, int end, int number) {}
 }

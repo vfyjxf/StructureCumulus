@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 /** A stable finding identity: {@code SC-<FAMILY>-<NNNN>}. */
 public record FindingCode(Family family, int number) implements Comparable<FindingCode> {
 

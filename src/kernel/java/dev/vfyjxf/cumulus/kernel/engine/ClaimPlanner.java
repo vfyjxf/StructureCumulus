@@ -19,17 +19,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
 /** The only row factory: pure, with no view and no ledger. */
 public final class ClaimPlanner {
 
-    public static Derived derive(Blueprint blueprint, Siting siting, OwnerId owner,
-                                 List<BayBinding> bindings) {
+    public static Derived derive(Blueprint blueprint, Siting siting, OwnerId owner, List<BayBinding> bindings) {
         Objects.requireNonNull(blueprint, "blueprint");
         Objects.requireNonNull(siting, "siting");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(bindings, "bindings");
-        Map<NamespacedId, List<OccupantSnapshot>> subjectsByBay =
-                new LinkedHashMap<>();
+        Map<NamespacedId, List<OccupantSnapshot>> subjectsByBay = new LinkedHashMap<>();
         for (BayBinding binding : bindings) {
             subjectsByBay.put(binding.bay().id(), binding.subjects());
         }
@@ -56,8 +55,7 @@ public final class ClaimPlanner {
                     CuboidSet union = CuboidSet.empty();
                     for (OccupantSnapshot subject : subjects) {
                         if (subject.ref().frame() != 0) {
-                            throw new IllegalArgumentException(
-                                    "SC-CLM-0004: a nested subject cannot back a claim");
+                            throw new IllegalArgumentException("SC-CLM-0004: a nested subject cannot back a claim");
                         }
                         union = union.union(subject.footprint().asSet());
                     }
@@ -66,16 +64,14 @@ public final class ClaimPlanner {
                 case Footprint.None ignored -> CuboidSet.empty();
             };
             if (owned.isEmpty() && bay.sharing() == Sharing.EXCLUSIVE) {
-                throw new IllegalArgumentException("SC-CLM-0005: exclusive bay " + bay.id()
-                        + " owns no cell");
+                throw new IllegalArgumentException("SC-CLM-0005: exclusive bay " + bay.id() + " owns no cell");
             }
             for (Cuboid box : owned.boxes()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
                             LatticePoint point = LatticePoint.of(x, y, z);
-                            rows.add(new ClaimRow(LatticeKey.of(point), bay.sharing(), owner,
-                                    siting, bay.id()));
+                            rows.add(new ClaimRow(LatticeKey.of(point), bay.sharing(), owner, siting, bay.id()));
                         }
                     }
                 }
@@ -96,6 +92,5 @@ public final class ClaimPlanner {
         }
     }
 
-    private ClaimPlanner() {
-    }
+    private ClaimPlanner() {}
 }

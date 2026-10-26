@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
 /** Fluent construction; every rule is checked once in {@link #build()}. */
 public final class BlueprintBuilder {
 
@@ -125,10 +126,11 @@ public final class BlueprintBuilder {
     }
 
     public Blueprint build() {
-        if (bounds == null) {
-            fail("SC-BPT-0001", "a blueprint needs bounds");
+        Cuboid declaredBounds = bounds;
+        if (declaredBounds == null) {
+            throw new IllegalArgumentException("SC-BPT-0001: a blueprint needs bounds");
         }
-        if (bounds.isEmpty()) {
+        if (declaredBounds.isEmpty()) {
             fail("SC-BPT-0001", "bounds must not be empty");
         }
         if (checks.isEmpty()) {
@@ -150,13 +152,12 @@ public final class BlueprintBuilder {
             }
         }
 
-        CuboidSet boundsSet = bounds.asSet();
+        CuboidSet boundsSet = declaredBounds.asSet();
         for (Bay bay : bays.values()) {
             if (!boundsSet.containsAll(bay.cells())) {
                 fail("SC-BPT-0003", "bay " + bay.id() + " leaves the blueprint bounds");
             }
-            if (bay.footprint() instanceof Footprint.Declared declared
-                    && !boundsSet.containsAll(declared.cells())) {
+            if (bay.footprint() instanceof Footprint.Declared declared && !boundsSet.containsAll(declared.cells())) {
                 fail("SC-BPT-0010", "declared footprint of " + bay.id() + " leaves bounds");
             }
         }
@@ -207,10 +208,8 @@ public final class BlueprintBuilder {
                 Bay left = bayList.get(i);
                 Bay right = bayList.get(j);
                 if (left.cells().intersects(right.cells())
-                        && (left.sharing() == Sharing.EXCLUSIVE
-                        || right.sharing() == Sharing.EXCLUSIVE)) {
-                    fail("SC-BPT-0002", "bays " + left.id() + " and " + right.id()
-                            + " overlap with an exclusive side");
+                        && (left.sharing() == Sharing.EXCLUSIVE || right.sharing() == Sharing.EXCLUSIVE)) {
+                    fail("SC-BPT-0002", "bays " + left.id() + " and " + right.id() + " overlap with an exclusive side");
                 }
             }
         }
@@ -240,10 +239,11 @@ public final class BlueprintBuilder {
                 fail("SC-BPT-0006", "an orientation policy needs an anchor");
             }
         } else {
-            if (orientation == null) {
-                fail("SC-BPT-0006", "anchors need an orientation policy");
+            OrientationPolicy policy = orientation;
+            if (policy == null) {
+                throw new IllegalArgumentException("SC-BPT-0006: anchors need an orientation policy");
             }
-            if (anchor(orientation.primaryRole()) == null) {
+            if (anchor(policy.primaryRole()) == null) {
                 fail("SC-BPT-0006", "the policy's primary role has no anchor");
             }
         }
@@ -268,8 +268,7 @@ public final class BlueprintBuilder {
         for (Computation<?> computation : computations) {
             for (ContextKey<?> input : computation.inputs()) {
                 if (!byOutput.containsKey(input.id())) {
-                    fail("SC-BPT-0007", "computation " + computation.id()
-                            + " reads unknown key " + input.id());
+                    fail("SC-BPT-0007", "computation " + computation.id() + " reads unknown key " + input.id());
                 }
             }
             if (computation.region().isEmpty()) {
@@ -277,12 +276,14 @@ public final class BlueprintBuilder {
             }
             if (computation instanceof SectionComputation<?>) {
                 if (computation.output().merge() == null) {
-                    fail("SC-BPT-0007", "section computation " + computation.id()
-                            + " needs a contributed output key");
+                    fail("SC-BPT-0007", "section computation " + computation.id() + " needs a contributed output key");
                 }
                 if (!computation.inputs().isEmpty()) {
-                    fail("SC-BPT-0007", "section computation " + computation.id()
-                            + " reads context, but a section sees only its snapshot");
+                    fail(
+                        "SC-BPT-0007",
+                        "section computation " + computation.id()
+                                + " reads context, but a section sees only its snapshot"
+                    );
                 }
             }
         }
@@ -293,8 +294,10 @@ public final class BlueprintBuilder {
         for (Check<?> check : checks) {
             for (ContextKey<?> required : check.expectation().meta().requires()) {
                 if (!produced.contains(required)) {
-                    fail("SC-CHK-0002", "check " + check.id() + " requires "
-                            + required.id() + ", which no computation produces");
+                    fail(
+                        "SC-CHK-0002",
+                        "check " + check.id() + " requires " + required.id() + ", which no computation produces"
+                    );
                 }
             }
         }
@@ -309,8 +312,7 @@ public final class BlueprintBuilder {
                 fail("SC-BPT-0008", "two derivations produce " + derivation.output());
             }
             if (outputs.contains(derivation.output())) {
-                fail("SC-BPT-0008", "a derivation and a computation produce "
-                        + derivation.output());
+                fail("SC-BPT-0008", "a derivation and a computation produce " + derivation.output());
             }
         }
 
@@ -327,13 +329,27 @@ public final class BlueprintBuilder {
         }
         List<AggregateComputation<?>> orderedAggregates = orderAggregates(aggregateList, byOutput);
         List<Check<?>> checkList = List.copyOf(checks);
-        return new Blueprint(id, bounds, bayList, checkList, List.copyOf(computations),
-                List.copyOf(seams), List.copyOf(anchors), orientation, List.copyOf(derivations),
-                arguments, source, new Plan(sections, orderedAggregates, checkList), bayCells);
+        return new Blueprint(
+            id,
+            declaredBounds,
+            bayList,
+            checkList,
+            List.copyOf(computations),
+            List.copyOf(seams),
+            List.copyOf(anchors),
+            orientation,
+            List.copyOf(derivations),
+            arguments,
+            source,
+            new Plan(sections, orderedAggregates, checkList),
+            bayCells
+        );
     }
 
     private List<AggregateComputation<?>> orderAggregates(
-            List<AggregateComputation<?>> aggregates, Map<NamespacedId, Computation<?>> byOutput) {
+        List<AggregateComputation<?>> aggregates,
+        Map<NamespacedId, Computation<?>> byOutput
+    ) {
         Map<NamespacedId, Integer> indegree = new LinkedHashMap<>();
         Map<NamespacedId, List<AggregateComputation<?>>> dependents = new HashMap<>();
         for (AggregateComputation<?> aggregate : aggregates) {
@@ -342,8 +358,7 @@ public final class BlueprintBuilder {
                 Computation<?> producer = byOutput.get(input.id());
                 if (producer instanceof AggregateComputation<?> upstream) {
                     dependencies++;
-                    dependents.computeIfAbsent(upstream.id(), ignored -> new ArrayList<>())
-                            .add(aggregate);
+                    dependents.computeIfAbsent(upstream.id(), ignored -> new ArrayList<>()).add(aggregate);
                 }
             }
             indegree.put(aggregate.id(), dependencies);
@@ -352,13 +367,15 @@ public final class BlueprintBuilder {
         while (ordered.size() < aggregates.size()) {
             AggregateComputation<?> next = null;
             for (AggregateComputation<?> aggregate : aggregates) {
-                if (!ordered.contains(aggregate) && indegree.get(aggregate.id()) == 0) {
+                Integer degree = indegree.get(aggregate.id());
+                if (!ordered.contains(aggregate) && degree != null && degree == 0) {
                     next = aggregate;
                     break;
                 }
             }
             if (next == null) {
                 fail("SC-BPT-0007", "the computation graph has a cycle");
+                throw new AssertionError("unreachable");
             }
             ordered.add(next);
             for (AggregateComputation<?> dependent : dependents.getOrDefault(next.id(), List.of())) {

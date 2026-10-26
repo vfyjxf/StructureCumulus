@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.core;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /**
  * The typed identity of one context value.
  *
@@ -12,16 +13,20 @@ import java.util.Objects;
  * @param merge      non-null for a section-contributed key
  * @param whenAbsent the value used when every section was readable and nothing was contributed
  */
-public record ContextKey<T>(NamespacedId id, Class<T> type, Retention retention,
-                            @Nullable Merge<T> merge, @Nullable T whenAbsent) {
+public record ContextKey<T>(
+    NamespacedId id,
+    Class<T> type,
+    Retention retention,
+    @Nullable Merge<T> merge,
+    @Nullable T whenAbsent
+) {
 
     public ContextKey {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(retention, "retention");
         if (whenAbsent != null && !type.isInstance(whenAbsent)) {
-            throw new IllegalArgumentException(
-                    "whenAbsent is not a " + type.getName() + ": " + whenAbsent);
+            throw new IllegalArgumentException("whenAbsent is not a " + type.getName() + ": " + whenAbsent);
         }
     }
 

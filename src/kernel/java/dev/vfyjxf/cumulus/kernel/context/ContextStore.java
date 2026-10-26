@@ -12,21 +12,24 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+
 /** The per-instance value store. One writer per instance. */
 public interface ContextStore {
 
     StructureContext context(InstanceId instance);
 
-    StructureContext publish(InstanceId instance, Map<ContextKey<?>, Object> values,
-                             FindingBundle findings, Spend spend);
+    StructureContext publish(
+        InstanceId instance,
+        Map<ContextKey<?>, Object> values,
+        FindingBundle findings,
+        Spend spend
+    );
 
     static ContextStore inMemory() {
         return new ContextStore() {
             private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator
-                    .comparing((ContextKey<?> key) -> key.id())
-                    .thenComparing(key -> key.type().getName());
-            private final ConcurrentHashMap<InstanceId, StructureContext> contexts =
-                    new ConcurrentHashMap<>();
+                    .comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName());
+            private final ConcurrentHashMap<InstanceId, StructureContext> contexts = new ConcurrentHashMap<>();
 
             @Override
             public StructureContext context(InstanceId instance) {
@@ -35,9 +38,12 @@ public interface ContextStore {
             }
 
             @Override
-            public StructureContext publish(InstanceId instance,
-                                            Map<ContextKey<?>, Object> values,
-                                            FindingBundle findings, Spend spend) {
+            public StructureContext publish(
+                InstanceId instance,
+                Map<ContextKey<?>, Object> values,
+                FindingBundle findings,
+                Spend spend
+            ) {
                 Objects.requireNonNull(instance, "instance");
                 Objects.requireNonNull(values, "values");
                 Objects.requireNonNull(findings, "findings");
@@ -47,18 +53,22 @@ public interface ContextStore {
                     Objects.requireNonNull(entry.getValue(), "value");
                     if (entry.getKey().retention() != Retention.INSTANCE) {
                         throw new IllegalArgumentException(
-                                "only INSTANCE values are published: " + entry.getKey().id());
+                            "only INSTANCE values are published: " + entry.getKey().id()
+                        );
                     }
                 }
                 return contexts.compute(instance, (ignored, current) -> {
-                    StructureContext base = current == null
-                            ? StructureContext.empty(instance) : current;
+                    StructureContext base = current == null ? StructureContext.empty(instance) : current;
                     TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(KEY_ORDER);
                     merged.putAll(base.values());
                     merged.putAll(values);
-                    return new StructureContext(instance, base.revision() + 1,
-                            Collections.unmodifiableMap(merged), findings,
-                            base.spend().plus(spend));
+                    return new StructureContext(
+                        instance,
+                        base.revision() + 1,
+                        Collections.unmodifiableMap(merged),
+                        findings,
+                        base.spend().plus(spend)
+                    );
                 });
             }
         };

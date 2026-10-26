@@ -16,19 +16,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 /** The only aggregator of findings. */
 public final class FindingBundle {
 
-    private static final FindingBundle EMPTY = new FindingBundle(List.of(), 0, 0,
-            FindingOptions.defaults());
+    private static final FindingBundle EMPTY = new FindingBundle(List.of(), 0, 0, FindingOptions.defaults());
 
     private final List<Finding> findings;
     private final int elided;
     private final int filtered;
     private final FindingOptions options;
 
-    private FindingBundle(List<Finding> findings, int elided, int filtered,
-                          FindingOptions options) {
+    private FindingBundle(List<Finding> findings, int elided, int filtered, FindingOptions options) {
         this.findings = List.copyOf(findings);
         this.elided = elided;
         this.filtered = filtered;
@@ -114,9 +113,13 @@ public final class FindingBundle {
         return new BundleBuilder(Checks.checkNotNull(options, "options"));
     }
 
-    private static FindingBundle assemble(List<Finding> input, FindingOptions options,
-                                          int priorElided, int priorFiltered,
-                                          @Nullable Phase fallbackPhase) {
+    private static FindingBundle assemble(
+        List<Finding> input,
+        FindingOptions options,
+        int priorElided,
+        int priorFiltered,
+        @Nullable Phase fallbackPhase
+    ) {
         List<Finding> retained = new ArrayList<>();
         Set<DedupKey> seen = new HashSet<>();
         Phase latest = fallbackPhase;
@@ -129,8 +132,13 @@ public final class FindingBundle {
                 filtered++;
                 continue;
             }
-            DedupKey key = new DedupKey(finding.severity(), finding.phase(), finding.code(),
-                    finding.labels(), finding.notes());
+            DedupKey key = new DedupKey(
+                finding.severity(),
+                finding.phase(),
+                finding.code(),
+                finding.labels(),
+                finding.notes()
+            );
             if (!seen.add(key)) {
                 continue;
             }
@@ -161,8 +169,17 @@ public final class FindingBundle {
             if (options.includeNotes() || finding.notes().isEmpty()) {
                 cleaned.add(finding);
             } else {
-                cleaned.add(new Finding(finding.code(), finding.severity(), finding.message(),
-                        finding.labels(), List.of(), finding.suggestion(), finding.phase()));
+                cleaned.add(
+                    new Finding(
+                        finding.code(),
+                        finding.severity(),
+                        finding.message(),
+                        finding.labels(),
+                        List.of(),
+                        finding.suggestion(),
+                        finding.phase()
+                    )
+                );
             }
         }
         if (elided + filtered > 0) {
@@ -279,8 +296,7 @@ public final class FindingBundle {
         FindingBundle build();
     }
 
-    private record DedupKey(Severity severity, Phase phase, FindingCode code,
-                            List<Label> labels, List<Note> notes) { }
+    private record DedupKey(Severity severity, Phase phase, FindingCode code, List<Label> labels, List<Note> notes) {}
 
     private static final class BundleBuilder implements Builder {
         private final FindingOptions options;

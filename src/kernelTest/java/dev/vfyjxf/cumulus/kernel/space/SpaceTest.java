@@ -1,11 +1,4 @@
 package dev.vfyjxf.cumulus.kernel.space;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -14,17 +7,28 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 class SpaceTest {
 
     @Test
     void latticePackingRoundTrips() {
-        for (LatticePoint point : List.of(LatticePoint.ORIGIN, LatticePoint.of(-1, -1, -1),
-                LatticePoint.of(LatticePoint.MAX_XZ, LatticePoint.MAX_Y, LatticePoint.MAX_XZ),
-                LatticePoint.of(LatticePoint.MIN_XZ, LatticePoint.MIN_Y, LatticePoint.MIN_XZ))) {
+        for (LatticePoint point : List.of(
+            LatticePoint.ORIGIN,
+            LatticePoint.of(-1, -1, -1),
+            LatticePoint.of(LatticePoint.MAX_XZ, LatticePoint.MAX_Y, LatticePoint.MAX_XZ),
+            LatticePoint.of(LatticePoint.MIN_XZ, LatticePoint.MIN_Y, LatticePoint.MIN_XZ)
+        )) {
             assertEquals(point, point.key().point());
         }
-        assertThrows(IllegalArgumentException.class,
-                () -> LatticePoint.of(LatticePoint.MAX_XZ + 1, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> LatticePoint.of(LatticePoint.MAX_XZ + 1, 0, 0));
     }
 
     @Test
@@ -55,8 +59,7 @@ class SpaceTest {
 
     @Test
     void cuboidSetSubtractShell() {
-        CuboidSet shell = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3))
-                .subtract(Cuboid.of(1, 1, 1, 2, 2, 2));
+        CuboidSet shell = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(Cuboid.of(1, 1, 1, 2, 2, 2));
         assertEquals(26, shell.volume());
         assertFalse(shell.contains(LatticePoint.of(1, 1, 1)));
         assertTrue(shell.contains(LatticePoint.of(0, 1, 1)));
@@ -105,8 +108,7 @@ class SpaceTest {
 
     @Test
     void placementLawsAndOffLattice() {
-        Placement p = new Placement(Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE),
-                LatticePoint.of(10, 64, -5));
+        Placement p = new Placement(Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE), LatticePoint.of(10, 64, -5));
         Placement inverse = p.inverse();
         assertNotNull(inverse);
         assertEquals(Placement.IDENTITY, inverse.compose(p));
@@ -117,8 +119,7 @@ class SpaceTest {
 
     @Test
     void sitingRoundTrips() {
-        Siting siting = Siting.of(LatticePoint.of(10, 64, -5),
-                Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE));
+        Siting siting = Siting.of(LatticePoint.of(10, 64, -5), Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE));
         LatticePoint local = LatticePoint.of(3, 0, 0);
         LatticePoint world = siting.toWorld(local);
         assertNotNull(world);
@@ -126,7 +127,7 @@ class SpaceTest {
         CuboidSet set = CuboidSet.of(Cuboid.of(3, 0, 0, 5, 1, 1));
         CuboidSet worldSet = siting.toWorld(set);
         assertNotNull(worldSet);
-        assertTrue(siting.toLocal(worldSet).contentEquals(set));
+        assertTrue(java.util.Objects.requireNonNull(siting.toLocal(worldSet), "local").contentEquals(set));
     }
 
     @Test
@@ -144,31 +145,34 @@ class SpaceTest {
         Locus local = Locus.local(CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)));
         assertEquals(LocusFrame.LOCAL, local.frame());
         assertThrows(IllegalArgumentException.class, () -> Locus.local(CuboidSet.empty()));
-        Locus key = Locus.key(new InstanceId(
-                World.of(NamespacedId.of("w")), 1), NamespacedId.of("k"));
+        Locus key = Locus.key(new InstanceId(World.of(NamespacedId.of("w")), 1), NamespacedId.of("k"));
         assertEquals(LocusFrame.KEY, key.frame());
-        assertThrows(IllegalArgumentException.class, () -> new Locus(
-                LocusFrame.DEFINITION, CuboidSet.empty(), null, null));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Locus(LocusFrame.DEFINITION, CuboidSet.empty(), null, null)
+        );
     }
 
     @Test
     void locusMapMapsLocalAndWorld() {
-        Siting siting = Siting.of(LatticePoint.of(10, 64, -5),
-                Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE));
+        Siting siting = Siting.of(LatticePoint.of(10, 64, -5), Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE));
         Locus local = Locus.local(CuboidSet.of(Cuboid.of(3, 0, 0, 5, 1, 1)));
         Locus world = LocusMap.of(siting).toWorld(local);
         assertNotNull(world);
         assertEquals(LocusFrame.WORLD, world.frame());
-        assertTrue(LocusMap.of(siting).toLocal(world).cells().contentEquals(local.cells()));
-        assertNull(LocusMap.of(siting).toWorld(Locus.key(
-                new InstanceId(
-                        World.of(NamespacedId.of("w")), 1), NamespacedId.of("k"))));
+        assertTrue(
+            java.util.Objects.requireNonNull(LocusMap.of(siting).toLocal(world), "local").cells()
+                    .contentEquals(local.cells())
+        );
+        assertNull(
+            LocusMap.of(siting)
+                    .toWorld(Locus.key(new InstanceId(World.of(NamespacedId.of("w")), 1), NamespacedId.of("k")))
+        );
     }
 
     @Test
     void cuboidSetEqualityIsByCellsNotByDecomposition() {
-        CuboidSet split = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1),
-                Cuboid.of(1, 0, 0, 2, 1, 1));
+        CuboidSet split = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1), Cuboid.of(1, 0, 0, 2, 1, 1));
         CuboidSet whole = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
         assertEquals(whole, split);
         assertEquals(whole.hashCode(), split.hashCode());

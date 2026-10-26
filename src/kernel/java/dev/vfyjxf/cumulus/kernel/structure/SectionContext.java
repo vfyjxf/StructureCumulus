@@ -13,6 +13,7 @@ import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+
 /** What one section run of a computation sees. It has no aggregate read. */
 public interface SectionContext {
 
@@ -24,7 +25,8 @@ public interface SectionContext {
 
     Siting siting();
 
-    @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    @Nullable
+    OccupantSnapshot occupantAt(LatticePoint cell);
 
     List<OccupantSnapshot> occupants();
 

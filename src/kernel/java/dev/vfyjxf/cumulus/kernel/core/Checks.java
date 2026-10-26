@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.core;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** The only argument assertion helper. */
 public final class Checks {
 
@@ -16,6 +17,5 @@ public final class Checks {
         return Objects.requireNonNull(value, message);
     }
 
-    private Checks() {
-    }
+    private Checks() {}
 }

@@ -7,10 +7,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+
 /** What a focus bound, or why it could not. */
 public sealed interface FocusResult<T> {
-    record Taken<T>(T value, List<OccupantSnapshot> subjects, FindingBundle notes)
-            implements FocusResult<T> {
+    record Taken<T>(T value, List<OccupantSnapshot> subjects, FindingBundle notes) implements FocusResult<T> {
         public Taken {
             Objects.requireNonNull(value, "value");
             Objects.requireNonNull(subjects, "subjects");
@@ -22,8 +22,7 @@ public sealed interface FocusResult<T> {
         }
 
         @Override
-        public <R> R fold(BiFunction<T, List<OccupantSnapshot>, R> onTaken,
-                          Function<FindingBundle, R> onUnavailable) {
+        public <R> R fold(BiFunction<T, List<OccupantSnapshot>, R> onTaken, Function<FindingBundle, R> onUnavailable) {
             return onTaken.apply(value, subjects);
         }
     }
@@ -37,12 +36,10 @@ public sealed interface FocusResult<T> {
         }
 
         @Override
-        public <R> R fold(BiFunction<T, List<OccupantSnapshot>, R> onTaken,
-                          Function<FindingBundle, R> onUnavailable) {
+        public <R> R fold(BiFunction<T, List<OccupantSnapshot>, R> onTaken, Function<FindingBundle, R> onUnavailable) {
             return onUnavailable.apply(findings);
         }
     }
 
-    <R> R fold(BiFunction<T, List<OccupantSnapshot>, R> onTaken,
-               Function<FindingBundle, R> onUnavailable);
+    <R> R fold(BiFunction<T, List<OccupantSnapshot>, R> onTaken, Function<FindingBundle, R> onUnavailable);
 }

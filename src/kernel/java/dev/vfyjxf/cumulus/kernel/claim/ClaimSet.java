@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.claim;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
 /** The rows of one settlement and the revision written. */
 public record ClaimSet(List<ClaimRow> rows, long revision) {
 

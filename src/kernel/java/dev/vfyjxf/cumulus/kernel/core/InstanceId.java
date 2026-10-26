@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.core;
 
 import java.util.Objects;
+
 /** The identity of one placed structure. */
 public record InstanceId(World world, long serial) implements Comparable<InstanceId> {
 

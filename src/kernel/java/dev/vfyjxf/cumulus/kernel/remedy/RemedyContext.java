@@ -8,10 +8,17 @@ import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** What a provider may see while proposing remedies. */
-public record RemedyContext(Blueprint blueprint, Siting siting, @Nullable ClaimView claims,
-                            long ledgerRevision, @Nullable MatchOutcome outcome,
-                            @Nullable StructureContext context, int maxResults) {
+public record RemedyContext(
+    Blueprint blueprint,
+    Siting siting,
+    @Nullable ClaimView claims,
+    long ledgerRevision,
+    @Nullable MatchOutcome outcome,
+    @Nullable StructureContext context,
+    int maxResults
+) {
 
     public RemedyContext {
         Objects.requireNonNull(blueprint, "blueprint");

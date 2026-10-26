@@ -10,6 +10,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
 /** The immutable compiled template. */
 public final class Blueprint {
 
@@ -27,10 +28,21 @@ public final class Blueprint {
     private final Plan plan;
     private final CuboidSet bayCells;
 
-    Blueprint(NamespacedId id, Cuboid bounds, List<Bay> bays, List<Check<?>> checks,
-              List<Computation<?>> computations, List<Seam> seams, List<AnchorSpec> anchors,
-              @Nullable OrientationPolicy orientation, List<DerivationSpec> derivations,
-              Value arguments, @Nullable SourceSpan source, Plan plan, CuboidSet bayCells) {
+    Blueprint(
+        NamespacedId id,
+        Cuboid bounds,
+        List<Bay> bays,
+        List<Check<?>> checks,
+        List<Computation<?>> computations,
+        List<Seam> seams,
+        List<AnchorSpec> anchors,
+        @Nullable OrientationPolicy orientation,
+        List<DerivationSpec> derivations,
+        Value arguments,
+        @Nullable SourceSpan source,
+        Plan plan,
+        CuboidSet bayCells
+    ) {
         this.id = id;
         this.bounds = bounds;
         this.bays = List.copyOf(bays);
@@ -160,14 +172,14 @@ public final class Blueprint {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, bounds, bays, checks, computations, seams, anchors, orientation,
-                derivations, arguments);
+        return Objects
+                .hash(id, bounds, bays, checks, computations, seams, anchors, orientation, derivations, arguments);
     }
 
     @Override
     public String toString() {
-        return "Blueprint[" + id + ", bays=" + bays.size() + ", checks=" + checks.size()
-                + ", computations=" + computations.size() + "]";
+        return "Blueprint[" + id + ", bays=" + bays.size() + ", checks=" + checks.size() + ", computations="
+                + computations.size() + "]";
     }
 
     static CuboidSet unionOfCells(List<Bay> bays) {

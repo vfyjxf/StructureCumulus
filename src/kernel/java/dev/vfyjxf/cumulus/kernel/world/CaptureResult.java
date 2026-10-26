@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 
 import java.util.Objects;
+
 /** The three answers of a capture. */
 public sealed interface CaptureResult {
     record Captured(WorldView view, SnapshotLease lease) implements CaptureResult {

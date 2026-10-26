@@ -10,9 +10,14 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** The four host ports a kernel holds. */
-public record Host(DocumentSource documents, @Nullable ClaimLedger ledger,
-                   ContextStore contexts, Map<NamespacedId, Class<?>> types) {
+public record Host(
+    DocumentSource documents,
+    @Nullable ClaimLedger ledger,
+    ContextStore contexts,
+    Map<NamespacedId, Class<?>> types
+) {
 
     public Host {
         Objects.requireNonNull(documents, "documents");

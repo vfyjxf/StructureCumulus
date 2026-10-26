@@ -10,9 +10,9 @@ public enum Flip {
 
     int[][] matrix() {
         return switch (this) {
-            case NONE -> new int[][] {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-            case LEFT_RIGHT -> new int[][] {{1, 0, 0}, {0, 1, 0}, {0, 0, -1}};
-            case FRONT_BACK -> new int[][] {{-1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+            case NONE -> new int[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+            case LEFT_RIGHT -> new int[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, -1}};
+            case FRONT_BACK -> new int[][]{{-1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
         };
     }
 }

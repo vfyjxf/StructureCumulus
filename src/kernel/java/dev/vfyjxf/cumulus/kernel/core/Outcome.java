@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.core;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
 /** A lookup that either found a value or did not. */
 public sealed interface Outcome<T> permits Outcome.Found, Outcome.Missing {
 

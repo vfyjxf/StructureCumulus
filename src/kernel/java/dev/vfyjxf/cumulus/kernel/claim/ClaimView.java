@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
 /** One read answer of the ledger. */
 public record ClaimView(List<ClaimRow> rows, long revision, boolean available) {
 

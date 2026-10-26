@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.space;
 
 import org.jspecify.annotations.Nullable;
+
 /** Converts a locus between the local and world frames of one siting. */
 public record LocusMap(Siting siting) {
 

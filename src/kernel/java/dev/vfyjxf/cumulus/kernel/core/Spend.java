@@ -15,7 +15,8 @@ public record Spend(int cells, int sections) {
         long nextCells = (long) cells + other.cells;
         long nextSections = (long) sections + other.sections;
         return new Spend(
-                nextCells > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) nextCells,
-                nextSections > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) nextSections);
+            nextCells > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) nextCells,
+            nextSections > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) nextSections
+        );
     }
 }

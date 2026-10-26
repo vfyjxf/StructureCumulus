@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Value;
 
 import java.util.Objects;
+
 /** A reference to one deriver and its output key. */
 public record DerivationSpec(NamespacedId deriver, Value arguments, NamespacedId output, int order) {
 

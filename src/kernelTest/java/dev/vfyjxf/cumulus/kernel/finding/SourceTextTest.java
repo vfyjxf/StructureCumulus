@@ -1,11 +1,12 @@
 package dev.vfyjxf.cumulus.kernel.finding;
 
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import org.junit.jupiter.api.Test;
 class SourceTextTest {
 
     private static final NamespacedId DOC = NamespacedId.of("test", "doc");

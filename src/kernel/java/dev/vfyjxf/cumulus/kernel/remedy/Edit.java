@@ -8,10 +8,10 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** One host-applicable edit. */
 public sealed interface Edit {
-    record Place(CuboidSet cells, NamespacedId type, Map<String, String> properties)
-            implements Edit {
+    record Place(CuboidSet cells, NamespacedId type, Map<String, String> properties) implements Edit {
         public Place {
             Objects.requireNonNull(cells, "cells");
             Objects.requireNonNull(type, "type");
@@ -26,8 +26,7 @@ public sealed interface Edit {
         }
     }
 
-    record Replace(CuboidSet cells, NamespacedId type, Map<String, String> properties)
-            implements Edit {
+    record Replace(CuboidSet cells, NamespacedId type, Map<String, String> properties) implements Edit {
         public Replace {
             Objects.requireNonNull(cells, "cells");
             Objects.requireNonNull(type, "type");

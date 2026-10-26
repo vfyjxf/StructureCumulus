@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
 /** A frozen, namespaced, insertion-ordered family. */
 public final class Catalog<T> {
 
@@ -78,8 +79,9 @@ public final class Catalog<T> {
             Objects.requireNonNull(value, "value");
             T existing = values.putIfAbsent(id, value);
             if (existing != null && !existing.equals(value)) {
-                throw new IllegalArgumentException("SC-SPI-0003: catalog " + family
-                        + " already holds a different value for " + id);
+                throw new IllegalArgumentException(
+                    "SC-SPI-0003: catalog " + family + " already holds a different value for " + id
+                );
             }
             return this;
         }

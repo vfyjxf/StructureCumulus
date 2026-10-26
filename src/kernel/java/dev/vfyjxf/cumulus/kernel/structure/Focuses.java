@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 /** The shipped focus kinds. */
 public final class Focuses {
 
@@ -109,16 +110,14 @@ public final class Focuses {
             for (LatticePoint cell : cellsOf(ctx.cells())) {
                 OccupantSnapshot occupant = ctx.occupantAt(cell);
                 if (occupant == null) {
-                    return new FocusResult.Unavailable<>(
-                            missing(ctx, "SC-OCC-0001: unreadable cell " + cell));
+                    return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: unreadable cell " + cell));
                 }
                 occupants.add(occupant);
                 if (!occupant.isAir()) {
                     subjects.add(occupant);
                 }
             }
-            return new FocusResult.Taken<>(List.copyOf(occupants), List.copyOf(subjects),
-                    FindingBundle.empty());
+            return new FocusResult.Taken<>(List.copyOf(occupants), List.copyOf(subjects), FindingBundle.empty());
         }
 
         @Override
@@ -134,14 +133,15 @@ public final class Focuses {
         }
     }
 
-    private record EntityFocus(NamespacedId type)
-            implements Focus<OccupantSnapshot> {
+    private record EntityFocus(NamespacedId type) implements Focus<OccupantSnapshot> {
 
         @Override
         public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
-            CuboidSet worldCells =
-                    ctx.siting().toWorld(ctx.cells());
-            Cuboid bounds = worldCells == null ? null : worldCells.bounds();
+            CuboidSet worldCells = ctx.siting().toWorld(ctx.cells());
+            if (worldCells == null) {
+                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: empty bay"));
+            }
+            Cuboid bounds = worldCells.bounds();
             if (bounds == null) {
                 return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: empty bay"));
             }
@@ -155,12 +155,12 @@ public final class Focuses {
             List<OccupantSnapshot> entities = new ArrayList<>(found.values());
             entities.sort(Comparator.comparing(OccupantSnapshot::ref));
             if (entities.isEmpty()) {
-                return new FocusResult.Unavailable<>(missing(ctx,
-                        "SC-OCC-0001: no " + type + " in the bay"));
+                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: no " + type + " in the bay"));
             }
             if (entities.size() > 1) {
-                return new FocusResult.Unavailable<>(missing(ctx,
-                        "SC-OCC-0001: more than one " + type + " in the bay"));
+                return new FocusResult.Unavailable<>(
+                    missing(ctx, "SC-OCC-0001: more than one " + type + " in the bay")
+                );
             }
             OccupantSnapshot entity = entities.get(0);
             FindingBundle warning = footprintWarning(ctx, entity);
@@ -187,8 +187,7 @@ public final class Focuses {
                 return ReadScope.none();
             }
             EntityWindow window = EntityWindow.of(bounds, type);
-            return window == null ? ReadScope.none()
-                    : ReadScope.none().withWindows(List.of(window));
+            return window == null ? ReadScope.none() : ReadScope.none().withWindows(List.of(window));
         }
     }
 
@@ -198,8 +197,7 @@ public final class Focuses {
         public FocusResult<WorldView> take(FocusContext ctx) {
             OccupantSnapshot occupant = ctx.occupantAt(cell);
             if (occupant == null) {
-                return new FocusResult.Unavailable<>(missing(ctx,
-                        "SC-OCC-0001: no nested structure at " + cell));
+                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: no nested structure at " + cell));
             }
             LatticePoint world = ctx.siting().toWorld(cell);
             WorldView child = world == null ? null : ctx.view().nested(world);
@@ -207,11 +205,9 @@ public final class Focuses {
                 Locus locus = world == null
                         ? Locus.local(CuboidSet.of(Cuboid.of(cell)))
                         : Locus.world(CuboidSet.of(Cuboid.of(world)));
-                Finding finding = Finding.builder(Codes.NESTED_CUT)
-                        .phase(ctx.phase())
+                Finding finding = Finding.builder(Codes.NESTED_CUT).phase(ctx.phase())
                         .message("the nested view at " + cell + " was cut by depth")
-                        .label(Label.primary(locus, "nested view cut"))
-                        .build();
+                        .label(Label.primary(locus, "nested view cut")).build();
                 return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
             }
             return new FocusResult.Taken<>(child, List.of(occupant), FindingBundle.empty());
@@ -236,8 +232,9 @@ public final class Focuses {
             LatticePoint upper = origin.offset(0, 1, 0);
             OccupantSnapshot second = upper == null ? null : ctx.occupantAt(upper);
             if (first == null || second == null || first.isAir() || second.isAir()) {
-                return new FocusResult.Unavailable<>(missing(ctx,
-                        "SC-OCC-0001: a door needs two readable non-air halves"));
+                return new FocusResult.Unavailable<>(
+                    missing(ctx, "SC-OCC-0001: a door needs two readable non-air halves")
+                );
             }
             DoorView door = new DoorView(first, second, ctx.bay());
             return new FocusResult.Taken<>(door, List.of(first, second), FindingBundle.empty());
@@ -263,12 +260,9 @@ public final class Focuses {
                 return new FocusResult.Taken<>(found.value(), List.of(), FindingBundle.empty());
             }
             Locus locus = Locus.key(ctx.instance(), key.id());
-            Finding finding = Finding.builder(FindingCode.of(FindingCode.Family.CTX, 7),
-                            Severity.ERROR)
-                    .phase(ctx.phase())
-                    .message("context key " + key.id() + " is absent")
-                    .label(Label.primary(locus, "no value for " + key.id()))
-                    .build();
+            Finding finding = Finding.builder(FindingCode.of(FindingCode.Family.CTX, 7), Severity.ERROR)
+                    .phase(ctx.phase()).message("context key " + key.id() + " is absent")
+                    .label(Label.primary(locus, "no value for " + key.id())).build();
             return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
         }
 
@@ -303,12 +297,14 @@ public final class Focuses {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {
                         if (ctx.view().statusOf(LatticePoint.of(x, y, z)) != ReadStatus.READABLE) {
-                            Finding warning = Finding.builder(Codes.FOOTPRINT_CLIPPED)
-                                    .phase(ctx.phase())
+                            Finding warning = Finding.builder(Codes.FOOTPRINT_CLIPPED).phase(ctx.phase())
                                     .message("the subject footprint leaves the snapshot")
-                                    .label(Label.primary(Locus.world(occupant.footprint().asSet()),
-                                            "only the readable part was compared"))
-                                    .build();
+                                    .label(
+                                        Label.primary(
+                                            Locus.world(occupant.footprint().asSet()),
+                                            "only the readable part was compared"
+                                        )
+                                    ).build();
                             return FindingBundle.of(List.of(warning));
                         }
                     }
@@ -332,6 +328,5 @@ public final class Focuses {
         return points;
     }
 
-    private Focuses() {
-    }
+    private Focuses() {}
 }

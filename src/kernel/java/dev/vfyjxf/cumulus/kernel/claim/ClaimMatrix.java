@@ -13,6 +13,5 @@ public final class ClaimMatrix {
         return a.sharing().blocks() || b.sharing().blocks();
     }
 
-    private ClaimMatrix() {
-    }
+    private ClaimMatrix() {}
 }

@@ -12,12 +12,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
-/** What one attempt produced. */
-public record MatchOutcome(WorldView view, Map<ContextKey<?>, Object> values,
-                           List<BayBinding> bindings, ReadScope reads, Spend spend) {
 
-    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator
-            .comparing((ContextKey<?> key) -> key.id())
+/** What one attempt produced. */
+public record MatchOutcome(
+    WorldView view,
+    Map<ContextKey<?>, Object> values,
+    List<BayBinding> bindings,
+    ReadScope reads,
+    Spend spend
+) {
+
+    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator.comparing((ContextKey<?> key) -> key.id())
             .thenComparing(key -> key.type().getName());
 
     public MatchOutcome {
@@ -31,8 +36,7 @@ public record MatchOutcome(WorldView view, Map<ContextKey<?>, Object> values,
             ContextKey<?> key = Objects.requireNonNull(entry.getKey(), "key");
             Object value = Objects.requireNonNull(entry.getValue(), "value");
             if (!key.type().isInstance(value)) {
-                throw new IllegalArgumentException(
-                        "value for " + key.id() + " is not a " + key.type().getName());
+                throw new IllegalArgumentException("value for " + key.id() + " is not a " + key.type().getName());
             }
             sorted.put(key, value);
         }

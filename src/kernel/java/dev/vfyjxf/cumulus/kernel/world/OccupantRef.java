@@ -5,9 +5,11 @@ import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 
 import java.util.Objects;
+
 /** A snapshot-scoped handle minted in one frame. */
-public record OccupantRef(SnapshotId snapshot, int frame, NamespacedId type, OccupantKind kind,
-                          LatticePoint anchor) implements Comparable<OccupantRef> {
+public record OccupantRef(SnapshotId snapshot, int frame, NamespacedId type, OccupantKind kind, LatticePoint anchor)
+        implements
+            Comparable<OccupantRef> {
 
     public OccupantRef {
         Objects.requireNonNull(snapshot, "snapshot");

@@ -6,10 +6,10 @@ import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
 /** The four-state answer of one expectation. */
 public sealed interface Reply {
-    record Match() implements Reply {
-    }
+    record Match() implements Reply {}
 
     record Mismatch(FindingBundle findings) implements Reply {
         public Mismatch {
@@ -29,8 +29,7 @@ public sealed interface Reply {
         }
     }
 
-    record Abstain() implements Reply {
-    }
+    record Abstain() implements Reply {}
 
     static Reply match() {
         return new Match();

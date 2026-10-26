@@ -12,10 +12,17 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+
 /** One report value. */
-public record Finding(FindingCode code, Severity severity, String message,
-                      List<Label> labels, List<Note> notes,
-                      @Nullable Suggestion suggestion, Phase phase) {
+public record Finding(
+    FindingCode code,
+    Severity severity,
+    String message,
+    List<Label> labels,
+    List<Note> notes,
+    @Nullable Suggestion suggestion,
+    Phase phase
+) {
 
     public Finding {
         Checks.checkNotNull(code, "code");
@@ -38,8 +45,7 @@ public record Finding(FindingCode code, Severity severity, String message,
     }
 
     public static Builder builder(FindingCode code, Severity severity) {
-        return new Builder(Checks.checkNotNull(code, "code"),
-                Checks.checkNotNull(severity, "severity"));
+        return new Builder(Checks.checkNotNull(code, "code"), Checks.checkNotNull(severity, "severity"));
     }
 
     public static Builder builder(CodeEntry entry) {
@@ -155,8 +161,7 @@ public record Finding(FindingCode code, Severity severity, String message,
             return this;
         }
 
-        public Builder suggest(String message, Applicability applicability,
-                               @Nullable NamespacedId remedy) {
+        public Builder suggest(String message, Applicability applicability, @Nullable NamespacedId remedy) {
             suggestion = new Suggestion(message, applicability, remedy);
             return this;
         }
@@ -175,9 +180,11 @@ public record Finding(FindingCode code, Severity severity, String message,
             }
             String resolved = message;
             if (resolved == null) {
-                Checks.checkArgument(primary != null,
-                        "a finding without a primary label must set a message");
-                resolved = primary.message();
+                Label fallback = primary;
+                if (fallback == null) {
+                    throw new IllegalArgumentException("a finding without a primary label must set a message");
+                }
+                resolved = fallback.message();
             }
             return new Finding(code, severity, resolved, labels, notes, suggestion, stamped);
         }

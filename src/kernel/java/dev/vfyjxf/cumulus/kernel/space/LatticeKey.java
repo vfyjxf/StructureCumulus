@@ -7,9 +7,7 @@ public record LatticeKey(long packed) implements Comparable<LatticeKey> {
         int x = point.x();
         int y = point.y();
         int z = point.z();
-        long packed = ((long) (x & 0x3ff_ffff) << 38)
-                | ((long) (z & 0x3ff_ffff) << 12)
-                | (y & 0xfffL);
+        long packed = ((long) (x & 0x3ff_ffff) << 38) | ((long) (z & 0x3ff_ffff) << 12) | (y & 0xfffL);
         return new LatticeKey(packed);
     }
 

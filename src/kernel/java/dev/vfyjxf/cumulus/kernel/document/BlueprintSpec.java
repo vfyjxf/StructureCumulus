@@ -14,14 +14,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** The data form of one blueprint. */
-public record BlueprintSpec(NamespacedId id, Cuboid bounds, Value arguments,
-                            List<BaySpec> bays, List<SeamSpec> seams, List<CheckSpec> checks,
-                            List<ComputationSpec> computations, List<KeySpec> keys,
-                            List<DerivationSpec> derivations, List<AnchorSpec> anchors,
-                            @Nullable OrientationPolicy orientation,
-                            List<PlacementSpec> placements, Map<String, Value> extensions,
-                            @Nullable SourceSpan source) {
+public record BlueprintSpec(
+    NamespacedId id,
+    Cuboid bounds,
+    Value arguments,
+    List<BaySpec> bays,
+    List<SeamSpec> seams,
+    List<CheckSpec> checks,
+    List<ComputationSpec> computations,
+    List<KeySpec> keys,
+    List<DerivationSpec> derivations,
+    List<AnchorSpec> anchors,
+    @Nullable OrientationPolicy orientation,
+    List<PlacementSpec> placements,
+    Map<String, Value> extensions,
+    @Nullable SourceSpan source
+) {
 
     public BlueprintSpec {
         Objects.requireNonNull(id, "id");

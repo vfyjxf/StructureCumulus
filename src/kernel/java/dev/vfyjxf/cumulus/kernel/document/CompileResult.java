@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** The result of one compile. */
 public record CompileResult(FindingBundle findings, @Nullable Blueprint blueprint) {
 

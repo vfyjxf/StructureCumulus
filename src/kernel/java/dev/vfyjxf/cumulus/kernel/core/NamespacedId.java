@@ -4,6 +4,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.regex.Pattern;
+
 /** The only naming type in the kernel: {@code namespace:path}. */
 public record NamespacedId(String namespace, String path) implements Comparable<NamespacedId> {
 
@@ -18,8 +19,7 @@ public record NamespacedId(String namespace, String path) implements Comparable<
         if (!NAMESPACE.matcher(namespace).matches()) {
             throw new IllegalArgumentException("invalid namespace: " + namespace);
         }
-        if (!PATH.matcher(path).matches()
-                || path.startsWith("/") || path.endsWith("/") || path.contains("//")) {
+        if (!PATH.matcher(path).matches() || path.startsWith("/") || path.endsWith("/") || path.contains("//")) {
             throw new IllegalArgumentException("invalid path: " + path);
         }
     }
@@ -52,8 +52,7 @@ public record NamespacedId(String namespace, String path) implements Comparable<
     }
 
     private static boolean isValidPath(String path) {
-        return PATH.matcher(path).matches()
-                && !path.startsWith("/") && !path.endsWith("/") && !path.contains("//");
+        return PATH.matcher(path).matches() && !path.startsWith("/") && !path.endsWith("/") && !path.contains("//");
     }
 
     public String text() {

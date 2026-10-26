@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.world;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 
 import java.util.Objects;
+
 /** An open occupant family with four reserved constants. */
 public record OccupantKind(NamespacedId id) implements Comparable<OccupantKind> {
 

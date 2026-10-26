@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** The box one entity type may move in, inflated by {@link #MAX_ENTITY_SPAN}. */
 public record EntityWindow(Cuboid cells, NamespacedId type) {
 

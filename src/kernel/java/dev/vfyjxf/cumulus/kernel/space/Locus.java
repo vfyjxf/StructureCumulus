@@ -6,9 +6,9 @@ import dev.vfyjxf.cumulus.kernel.core.SourceSpan;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** Where a finding points. */
-public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key,
-                    @Nullable SourceSpan source) {
+public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @Nullable SourceSpan source) {
 
     public Locus {
         Objects.requireNonNull(frame, "frame");
@@ -73,7 +73,9 @@ public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key,
 
     @Override
     public String toString() {
-        return frame + (key != null ? "(" + key + ")" : "") + (source != null ? "@" + source : "")
+        return frame
+                + (key != null ? "(" + key + ")" : "")
+                + (source != null ? "@" + source : "")
                 + (cells.isEmpty() ? "" : cells.toString());
     }
 }

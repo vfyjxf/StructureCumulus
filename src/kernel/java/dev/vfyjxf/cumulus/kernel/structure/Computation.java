@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 
 import java.util.Set;
+
 /** A declared producer of one context key. */
 public interface Computation<T> {
 

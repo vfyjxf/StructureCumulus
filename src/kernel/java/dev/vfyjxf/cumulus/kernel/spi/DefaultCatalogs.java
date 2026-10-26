@@ -10,6 +10,7 @@ import dev.vfyjxf.cumulus.kernel.structure.ExpectationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.FocusFactory;
 
 import java.util.Objects;
+
 final class DefaultCatalogs implements Catalogs {
 
     private final Catalog<ExpectationFactory> expectations;
@@ -19,9 +20,14 @@ final class DefaultCatalogs implements Catalogs {
     private final Catalog<CodeEntry> codes;
     private final Catalog<RemedyProvider> remedies;
 
-    DefaultCatalogs(Catalog<ExpectationFactory> expectations, Catalog<FocusFactory> focuses,
-                    Catalog<ComputationFactory> computations, Catalog<Deriver<?>> derivers,
-                    Catalog<CodeEntry> codes, Catalog<RemedyProvider> remedies) {
+    DefaultCatalogs(
+        Catalog<ExpectationFactory> expectations,
+        Catalog<FocusFactory> focuses,
+        Catalog<ComputationFactory> computations,
+        Catalog<Deriver<?>> derivers,
+        Catalog<CodeEntry> codes,
+        Catalog<RemedyProvider> remedies
+    ) {
         this.expectations = Objects.requireNonNull(expectations, "expectations");
         this.focuses = Objects.requireNonNull(focuses, "focuses");
         this.computations = Objects.requireNonNull(computations, "computations");
@@ -61,9 +67,14 @@ final class DefaultCatalogs implements Catalogs {
     }
 
     static Catalogs builtin() {
-        return new DefaultCatalogs(BuiltinExpectations.catalog(), BuiltinFocuses.catalog(),
-                BuiltinComputations.catalog(), Catalog.empty(family("derivers")),
-                BuiltinCodes.catalog(), Catalog.empty(family("remedies")));
+        return new DefaultCatalogs(
+            BuiltinExpectations.catalog(),
+            BuiltinFocuses.catalog(),
+            BuiltinComputations.catalog(),
+            Catalog.empty(family("derivers")),
+            BuiltinCodes.catalog(),
+            Catalog.empty(family("remedies"))
+        );
     }
 
     private static NamespacedId family(String name) {
@@ -117,8 +128,7 @@ final class DefaultCatalogs implements Catalogs {
 
         @Override
         public Catalogs build() {
-            return new DefaultCatalogs(expectations, focuses, computations, derivers, codes,
-                    remedies);
+            return new DefaultCatalogs(expectations, focuses, computations, derivers, codes, remedies);
         }
 
         private static <T> Catalog<T> merge(Catalog<T> base, Catalog<T> extra) {

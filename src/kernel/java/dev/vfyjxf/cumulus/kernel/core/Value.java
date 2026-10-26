@@ -8,19 +8,23 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
-/** A format-neutral data tree. Spans are provenance; {@link Values#contentEquals} ignores them. */
-public sealed interface Value permits Value.ObjectValue, Value.ArrayValue, Value.StringValue,
-        Value.NumberValue, Value.BooleanValue, Value.NullValue {
 
-    @Nullable SourceSpan span();
+/** A format-neutral data tree. Spans are provenance; {@link Values#contentEquals} ignores them. */
+public sealed interface Value permits Value.ObjectValue, Value.ArrayValue, Value.StringValue, Value.NumberValue,
+        Value.BooleanValue, Value.NullValue {
+
+    @Nullable
+    SourceSpan span();
 
     record ObjectValue(Map<String, Value> members, @Nullable SourceSpan span) implements Value {
         public ObjectValue {
             Objects.requireNonNull(members, "members");
             TreeMap<String, Value> sorted = new TreeMap<>(Values.codePointOrder());
             for (Map.Entry<String, Value> entry : members.entrySet()) {
-                sorted.put(Objects.requireNonNull(entry.getKey(), "key"),
-                        Objects.requireNonNull(entry.getValue(), "value"));
+                sorted.put(
+                    Objects.requireNonNull(entry.getKey(), "key"),
+                    Objects.requireNonNull(entry.getValue(), "value")
+                );
             }
             members = Collections.unmodifiableMap(sorted);
         }

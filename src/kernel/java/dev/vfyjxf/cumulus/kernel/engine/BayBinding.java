@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 
 import java.util.List;
 import java.util.Objects;
+
 /** A bay and the subjects its checks bound. */
 public record BayBinding(Bay bay, List<OccupantSnapshot> subjects) {
 

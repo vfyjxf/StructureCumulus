@@ -21,6 +21,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
 /** The shipped leaf expectations and combinators. */
 @SuppressWarnings("varargs")
 public final class Expectations {
@@ -87,8 +88,11 @@ public final class Expectations {
         return new EachCell(element);
     }
 
-    public static <T> Expectation<T> custom(Class<T> subject, ExpectationMeta meta,
-                                            Function<ExpectationContext<T>, Reply> body) {
+    public static <T> Expectation<T> custom(
+        Class<T> subject,
+        ExpectationMeta meta,
+        Function<ExpectationContext<T>, Reply> body
+    ) {
         return new Custom<>(subject, meta, body);
     }
 
@@ -107,11 +111,8 @@ public final class Expectations {
 
     private static Finding problem(FocusContext ctx, OccupantSnapshot occupant, String message) {
         Locus locus = locusOf(ctx, occupant);
-        return Finding.builder(code(1), Severity.ERROR)
-                .phase(ctx.phase())
-                .message(message)
-                .label(Label.primary(locus, message))
-                .build();
+        return Finding.builder(code(1), Severity.ERROR).phase(ctx.phase()).message(message)
+                .label(Label.primary(locus, message)).build();
     }
 
     private static Reply mismatch(Finding finding) {
@@ -126,8 +127,7 @@ public final class Expectations {
             if (subject.descriptor().type().equals(type)) {
                 return Reply.match();
             }
-            return mismatch(problem(ctx, subject,
-                    "expected " + type + ", found " + subject.descriptor().type()));
+            return mismatch(problem(ctx, subject, "expected " + type + ", found " + subject.descriptor().type()));
         }
 
         @Override
@@ -148,8 +148,7 @@ public final class Expectations {
             if (ctx.subject().isAir()) {
                 return Reply.match();
             }
-            return mismatch(problem(ctx, ctx.subject(),
-                    "expected air, found " + ctx.subject().descriptor().type()));
+            return mismatch(problem(ctx, ctx.subject(), "expected air, found " + ctx.subject().descriptor().type()));
         }
 
         @Override
@@ -171,8 +170,13 @@ public final class Expectations {
             if (Objects.equals(value, found)) {
                 return Reply.match();
             }
-            return mismatch(problem(ctx, ctx.subject(),
-                    "expected " + key + "=" + value + ", found " + (found == null ? "nothing" : found)));
+            return mismatch(
+                problem(
+                    ctx,
+                    ctx.subject(),
+                    "expected " + key + "=" + value + ", found " + (found == null ? "nothing" : found)
+                )
+            );
         }
 
         @Override
@@ -207,8 +211,7 @@ public final class Expectations {
         }
     }
 
-    private record TraitValue<T>(TraitKey<T> key, Predicate<T> test)
-            implements Expectation<OccupantSnapshot> {
+    private record TraitValue<T>(TraitKey<T> key, Predicate<T> test) implements Expectation<OccupantSnapshot> {
 
         @Override
         public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
@@ -250,7 +253,9 @@ public final class Expectations {
 
     private record Junction<T>(Mode mode, List<Expectation<T>> children) implements Expectation<T> {
 
-        private enum Mode { ALL, ANY, SEQUENCE }
+        private enum Mode {
+            ALL, ANY, SEQUENCE
+        }
 
         private Junction {
             Objects.requireNonNull(mode, "mode");
@@ -321,10 +326,8 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             int specificity = switch (mode) {
-                case ALL, SEQUENCE -> children.stream()
-                        .mapToInt(child -> child.meta().specificity()).max().orElse(0);
-                case ANY -> children.stream()
-                        .mapToInt(child -> child.meta().specificity()).min().orElse(0);
+                case ALL, SEQUENCE -> children.stream().mapToInt(child -> child.meta().specificity()).max().orElse(0);
+                case ANY -> children.stream().mapToInt(child -> child.meta().specificity()).min().orElse(0);
             };
             Set<ContextKey<?>> requires = new LinkedHashSet<>();
             for (Expectation<T> child : children) {
@@ -358,11 +361,9 @@ public final class Expectations {
         public Reply test(ExpectationContext<T> ctx) {
             return switch (child.test(ctx)) {
                 case Reply.Match ignored -> {
-                    Finding finding = Finding.builder(code(2), Severity.ERROR)
-                            .phase(ctx.phase())
+                    Finding finding = Finding.builder(code(2), Severity.ERROR).phase(ctx.phase())
                             .message("a negated test matched")
-                            .label(Label.primary(ctx.locus(), "the negated test matched"))
-                            .build();
+                            .label(Label.primary(ctx.locus(), "the negated test matched")).build();
                     yield mismatch(finding);
                 }
                 case Reply.Mismatch ignored -> Reply.match();
@@ -387,10 +388,11 @@ public final class Expectations {
         }
     }
 
-    private record Threshold<T>(Mode mode, int count, List<Expectation<T>> children)
-            implements Expectation<T> {
+    private record Threshold<T>(Mode mode, int count, List<Expectation<T>> children) implements Expectation<T> {
 
-        private enum Mode { AT_LEAST, AT_MOST, EXACTLY }
+        private enum Mode {
+            AT_LEAST, AT_MOST, EXACTLY
+        }
 
         private Threshold {
             Objects.requireNonNull(mode, "mode");
@@ -431,15 +433,14 @@ public final class Expectations {
             boolean fail = switch (mode) {
                 case AT_LEAST -> matches + unreadable + abstained < count;
                 case AT_MOST -> matches > count;
-                case EXACTLY -> matches > count
-                        || matches + unreadable + abstained < count;
+                case EXACTLY -> matches > count || matches + unreadable + abstained < count;
             };
             if (fail) {
-                findings.add(Finding.builder(code(3), Severity.ERROR)
-                        .phase(ctx.phase())
-                        .message("threshold " + mode + "(" + count + ") cannot be met")
-                        .label(Label.primary(ctx.locus(), "the threshold failed"))
-                        .build());
+                findings.add(
+                    Finding.builder(code(3), Severity.ERROR).phase(ctx.phase())
+                            .message("threshold " + mode + "(" + count + ") cannot be met")
+                            .label(Label.primary(ctx.locus(), "the threshold failed")).build()
+                );
                 return Reply.mismatch(FindingBundle.of(findings));
             }
             boolean canStill = switch (mode) {
@@ -485,8 +486,7 @@ public final class Expectations {
         }
     }
 
-    private record EachCell(Expectation<OccupantSnapshot> element)
-            implements Expectation<BayView> {
+    private record EachCell(Expectation<OccupantSnapshot> element) implements Expectation<BayView> {
 
         private EachCell {
             Objects.requireNonNull(element, "element");
@@ -502,26 +502,22 @@ public final class Expectations {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
-                            LatticePoint cell =
-                                    LatticePoint.of(x, y, z);
+                            LatticePoint cell = LatticePoint.of(x, y, z);
                             OccupantSnapshot occupant = ctx.occupantAt(cell);
                             if (occupant == null) {
                                 unreadable = true;
-                                findings.add(Finding.builder(
-                                                FindingCode.of(FindingCode.Family.OCC, 1),
-                                                Severity.ERROR)
-                                        .phase(ctx.phase())
-                                        .message("unreadable cell " + cell)
-                                        .label(Label.primary(ctx.locus(), "unreadable cell " + cell))
-                                        .build());
+                                findings.add(
+                                    Finding.builder(FindingCode.of(FindingCode.Family.OCC, 1), Severity.ERROR)
+                                            .phase(ctx.phase()).message("unreadable cell " + cell)
+                                            .label(Label.primary(ctx.locus(), "unreadable cell " + cell)).build()
+                                );
                                 continue;
                             }
-                            ExpectationContext<OccupantSnapshot> sub = ctx.withSubject(occupant,
-                                    occupant.isAir() ? List.of() : List.of(occupant));
+                            ExpectationContext<OccupantSnapshot> sub = ctx
+                                    .withSubject(occupant, occupant.isAir() ? List.of() : List.of(occupant));
                             Reply reply = element.test(sub);
                             switch (reply) {
-                                case Reply.Match ignored -> {
-                                }
+                                case Reply.Match ignored -> {}
                                 case Reply.Mismatch mismatch -> {
                                     mismatched = true;
                                     findings.addAll(mismatch.findings().findings());
@@ -555,8 +551,12 @@ public final class Expectations {
 
         @Override
         public ExpectationMeta meta() {
-            return new ExpectationMeta(id("each_cell"), element.meta().specificity(),
-                    element.meta().requires(), code(1));
+            return new ExpectationMeta(
+                id("each_cell"),
+                element.meta().specificity(),
+                element.meta().requires(),
+                code(1)
+            );
         }
 
         @Override
@@ -565,9 +565,9 @@ public final class Expectations {
         }
     }
 
-    private record Custom<T>(Class<T> subject, ExpectationMeta meta,
-                             Function<ExpectationContext<T>, Reply> body)
-            implements Expectation<T> {
+    private record Custom<T>(Class<T> subject, ExpectationMeta meta, Function<ExpectationContext<T>, Reply> body)
+            implements
+                Expectation<T> {
 
         private Custom {
             Objects.requireNonNull(subject, "subject");
@@ -591,6 +591,5 @@ public final class Expectations {
         }
     }
 
-    private Expectations() {
-    }
+    private Expectations() {}
 }

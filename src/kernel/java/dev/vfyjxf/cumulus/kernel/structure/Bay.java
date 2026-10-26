@@ -8,9 +8,16 @@ import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** A rectangular region tested atomically, with its coverage, ownership and sharing. */
-public record Bay(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
-                  Sharing sharing, @Nullable String description) {
+public record Bay(
+    NamespacedId id,
+    CuboidSet cells,
+    Coverage coverage,
+    Footprint footprint,
+    Sharing sharing,
+    @Nullable String description
+) {
 
     public Bay {
         Objects.requireNonNull(id, "id");
@@ -23,18 +30,22 @@ public record Bay(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint
         }
     }
 
-    public static Bay of(NamespacedId id, Cuboid cells, Coverage coverage, Footprint footprint,
-                         Sharing sharing) {
+    public static Bay of(NamespacedId id, Cuboid cells, Coverage coverage, Footprint footprint, Sharing sharing) {
         return new Bay(id, CuboidSet.of(cells), coverage, footprint, sharing, null);
     }
 
-    public static Bay of(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
-                         Sharing sharing) {
+    public static Bay of(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint, Sharing sharing) {
         return new Bay(id, cells, coverage, footprint, sharing, null);
     }
 
-    public static Bay of(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
-                         Sharing sharing, String description) {
+    public static Bay of(
+        NamespacedId id,
+        CuboidSet cells,
+        Coverage coverage,
+        Footprint footprint,
+        Sharing sharing,
+        String description
+    ) {
         return new Bay(id, cells, coverage, footprint, sharing, description);
     }
 }

@@ -9,10 +9,12 @@ import dev.vfyjxf.cumulus.kernel.structure.Focus;
 import dev.vfyjxf.cumulus.kernel.structure.FocusFactory;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import org.jspecify.annotations.Nullable;
+
 final class BuiltinFocuses {
 
     private interface Body {
-        @Nullable Focus<?> create(Value args, FactoryContext ctx);
+        @Nullable
+        Focus<?> create(Value args, FactoryContext ctx);
     }
 
     private record Factory(NamespacedId id, Body body) implements FocusFactory {
@@ -21,8 +23,7 @@ final class BuiltinFocuses {
             try {
                 return body.create(args, context);
             } catch (RuntimeException failure) {
-                BuiltinSupport.report(context, Codes.FACTORY_BAD,
-                        "factory " + id + " failed: " + failure.getMessage());
+                BuiltinSupport.report(context, Codes.FACTORY_BAD, "factory " + id + " failed: " + failure.getMessage());
                 return null;
             }
         }
@@ -55,8 +56,7 @@ final class BuiltinFocuses {
             }
             var resolved = ctx.keys().apply(key);
             if (resolved == null) {
-                BuiltinSupport.report(ctx, Codes.KEY_UNDECLARED,
-                        "context focus names undeclared key " + key);
+                BuiltinSupport.report(ctx, Codes.KEY_UNDECLARED, "context focus names undeclared key " + key);
                 return null;
             }
             return Focuses.context(resolved);
@@ -72,6 +72,5 @@ final class BuiltinFocuses {
         return NamespacedId.of("structurecumulus", path);
     }
 
-    private BuiltinFocuses() {
-    }
+    private BuiltinFocuses() {}
 }

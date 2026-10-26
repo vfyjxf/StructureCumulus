@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.core;
 
 import java.util.Objects;
+
 /** One level, named by its id. */
 public record World(NamespacedId id) implements Comparable<World> {
 

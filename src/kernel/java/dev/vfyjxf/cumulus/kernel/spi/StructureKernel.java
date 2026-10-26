@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+
 /** The facade: five pipeline operations, three helpers and three lookups. */
 public final class StructureKernel {
 
@@ -71,9 +72,13 @@ public final class StructureKernel {
     }
 
     public CompileResult compile(Document document) {
-        CompilerContext context = new CompilerContext(catalogs.focuses(),
-                catalogs.expectations(), catalogs.computations(), host.types(),
-                host.documents());
+        CompilerContext context = new CompilerContext(
+            catalogs.focuses(),
+            catalogs.expectations(),
+            catalogs.computations(),
+            host.types(),
+            host.documents()
+        );
         return DocumentCompiler.compile(document, context);
     }
 
@@ -89,8 +94,7 @@ public final class StructureKernel {
         return MatchEngine.settle(request, admitted, host.ledger(), host.contexts());
     }
 
-    public StructureContext derive(MatchResult.Formed formed,
-                                   List<DerivationSpec> derivations) {
+    public StructureContext derive(MatchResult.Formed formed, List<DerivationSpec> derivations) {
         return MatchEngine.derive(formed, derivations, catalogs.derivers(), host.contexts());
     }
 
@@ -106,15 +110,25 @@ public final class StructureKernel {
                 try {
                     for (Remedy remedy : provider.solve(finding, context)) {
                         if (remedy == null) {
-                            problems.add(solveProblem(Codes.REMEDY_MALFORMED, finding,
-                                    "provider " + id + " returned a null remedy"));
+                            problems.add(
+                                solveProblem(
+                                    Codes.REMEDY_MALFORMED,
+                                    finding,
+                                    "provider " + id + " returned a null remedy"
+                                )
+                            );
                         } else {
                             unique.add(remedy);
                         }
                     }
                 } catch (RuntimeException failure) {
-                    problems.add(solveProblem(Codes.REMEDY_FAILED, finding,
-                            "provider " + id + " failed: " + failure.getMessage()));
+                    problems.add(
+                        solveProblem(
+                            Codes.REMEDY_FAILED,
+                            finding,
+                            "provider " + id + " failed: " + failure.getMessage()
+                        )
+                    );
                 }
             }
         }
@@ -136,8 +150,12 @@ public final class StructureKernel {
         if (explanation != null) {
             return explanation;
         }
-        return new Explanation(code, "no explanation is registered for " + code.text(),
-                "The code belongs to " + code.family().subject() + ".", List.of());
+        return new Explanation(
+            code,
+            "no explanation is registered for " + code.text(),
+            "The code belongs to " + code.family().subject() + ".",
+            List.of()
+        );
     }
 
     private static int applicability(Remedy remedy) {

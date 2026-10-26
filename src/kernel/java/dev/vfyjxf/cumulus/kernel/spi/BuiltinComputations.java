@@ -11,19 +11,28 @@ import dev.vfyjxf.cumulus.kernel.structure.ComputationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.Computations;
 import dev.vfyjxf.cumulus.kernel.structure.FactoryContext;
 import org.jspecify.annotations.Nullable;
+
 final class BuiltinComputations {
 
     private record Factory(NamespacedId id, Mode mode) implements ComputationFactory {
-        private enum Mode { COUNT, VOLUME, AIR }
+        private enum Mode {
+            COUNT, VOLUME, AIR
+        }
 
         @Override
         @SuppressWarnings("unchecked")
-        public @Nullable Computation<?> create(Value args, ContextKey<?> output, CuboidSet region,
-                                              FactoryContext context) {
+        public @Nullable Computation<?> create(
+            Value args,
+            ContextKey<?> output,
+            CuboidSet region,
+            FactoryContext context
+        ) {
             if (!output.type().equals(Long.class)) {
-                BuiltinSupport.report(context, Codes.KEY_TYPE,
-                        "computation " + id + " needs a long output, got "
-                                + output.type().getName());
+                BuiltinSupport.report(
+                    context,
+                    Codes.KEY_TYPE,
+                    "computation " + id + " needs a long output, got " + output.type().getName()
+                );
                 return null;
             }
             ContextKey<Long> key = (ContextKey<Long>) output;
@@ -51,6 +60,5 @@ final class BuiltinComputations {
         return NamespacedId.of("structurecumulus", path);
     }
 
-    private BuiltinComputations() {
-    }
+    private BuiltinComputations() {}
 }

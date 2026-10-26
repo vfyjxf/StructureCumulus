@@ -12,11 +12,11 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Locale;
+
 /** Pure projections of a bundle. */
 public final class FindingRenderer {
 
-    private FindingRenderer() {
-    }
+    private FindingRenderer() {}
 
     public static String human(FindingBundle bundle, RenderContext context) {
         Checks.checkNotNull(bundle, "bundle");
@@ -33,8 +33,8 @@ public final class FindingRenderer {
             if (!findings.isEmpty()) {
                 out.append('\n');
             }
-            out.append("= ").append(bundle.elided()).append(" elided, ")
-                    .append(bundle.filtered()).append(" filtered\n");
+            out.append("= ").append(bundle.elided()).append(" elided, ").append(bundle.filtered())
+                    .append(" filtered\n");
         }
         return out.toString();
     }
@@ -50,8 +50,8 @@ public final class FindingRenderer {
             }
             appendJsonFinding(out, findings.get(index));
         }
-        out.append("],\"elided\":").append(bundle.elided())
-                .append(",\"filtered\":").append(bundle.filtered()).append('}');
+        out.append("],\"elided\":").append(bundle.elided()).append(",\"filtered\":").append(bundle.filtered())
+                .append('}');
         return out.toString();
     }
 
@@ -62,8 +62,7 @@ public final class FindingRenderer {
         } else {
             out.append(severity);
         }
-        out.append('[').append(finding.code().text()).append("]: ")
-                .append(finding.message()).append('\n');
+        out.append('[').append(finding.code().text()).append("]: ").append(finding.message()).append('\n');
 
         int primaryIndex = -1;
         for (int index = 0; index < finding.labels().size(); index++) {
@@ -80,9 +79,8 @@ public final class FindingRenderer {
                 continue;
             }
             Label label = finding.labels().get(index);
-            out.append("  = ").append(label.locus().frame().name().toLowerCase(Locale.ROOT))
-                    .append(' ').append(locusText(label.locus())).append(": ")
-                    .append(label.message()).append('\n');
+            out.append("  = ").append(label.locus().frame().name().toLowerCase(Locale.ROOT)).append(' ')
+                    .append(locusText(label.locus())).append(": ").append(label.message()).append('\n');
         }
         for (Note note : finding.notes()) {
             out.append("  = note: ").append(note.message());
@@ -110,24 +108,26 @@ public final class FindingRenderer {
             }
             SourceText source = context.sourceFor(span.document());
             if (source != null && source.lineAt(span.start()) != null) {
-                out.append(" --> ").append(span.document().text()).append(':')
-                        .append(source.lineNumber(span.start())).append(':')
-                        .append(source.column(span.start())).append('\n');
+                out.append(" --> ").append(span.document().text()).append(':').append(source.lineNumber(span.start()))
+                        .append(':').append(source.column(span.start())).append('\n');
                 appendSourceFrame(out, source, span, label.message(), context.width());
             } else {
-                out.append(" --> ").append(span.document().text()).append(':')
-                        .append(span.start()).append("..").append(span.end())
-                        .append(": ").append(label.message()).append('\n');
+                out.append(" --> ").append(span.document().text()).append(':').append(span.start()).append("..")
+                        .append(span.end()).append(": ").append(label.message()).append('\n');
             }
             return;
         }
-        out.append(" --> ").append(locus.frame().name().toLowerCase(Locale.ROOT))
-                .append(' ').append(locusText(locus)).append(": ")
-                .append(label.message()).append('\n');
+        out.append(" --> ").append(locus.frame().name().toLowerCase(Locale.ROOT)).append(' ').append(locusText(locus))
+                .append(": ").append(label.message()).append('\n');
     }
 
-    private static void appendSourceFrame(StringBuilder out, SourceText source, SourceSpan span,
-                                          String message, int width) {
+    private static void appendSourceFrame(
+        StringBuilder out,
+        SourceText source,
+        SourceSpan span,
+        String message,
+        int width
+    ) {
         String line = source.lineAt(span.start());
         if (line == null) {
             return;
@@ -144,8 +144,7 @@ public final class FindingRenderer {
         String gutter = " ".repeat(Integer.toString(lineNumber).length());
         out.append(' ').append(gutter).append(" |\n");
         out.append(lineNumber).append(" | ").append(line).append('\n');
-        out.append(' ').append(gutter).append(" | ").append(" ".repeat(caretStart))
-                .append("^".repeat(carets));
+        out.append(' ').append(gutter).append(" | ").append(" ".repeat(caretStart)).append("^".repeat(carets));
         if (!message.isBlank()) {
             out.append(' ').append(message);
         }
@@ -173,8 +172,7 @@ public final class FindingRenderer {
         if (key == null) {
             return "?";
         }
-        return key.key().text() + " @ " + key.instance().world().id().text()
-                + "#" + key.instance().serial();
+        return key.key().text() + " @ " + key.instance().world().id().text() + "#" + key.instance().serial();
     }
 
     private static String boxesText(CuboidSet cells) {
@@ -187,9 +185,8 @@ public final class FindingRenderer {
                 out.append(", ");
             }
             Cuboid box = cells.boxes().get(index);
-            out.append('[').append(pointText(box.min().x(), box.min().y(), box.min().z()))
-                    .append("..").append(pointText(box.max().x(), box.max().y(), box.max().z()))
-                    .append(')');
+            out.append('[').append(pointText(box.min().x(), box.min().y(), box.min().z())).append("..")
+                    .append(pointText(box.max().x(), box.max().y(), box.max().z())).append(')');
         }
         return out.toString();
     }
@@ -291,9 +288,9 @@ public final class FindingRenderer {
                 out.append(',');
             }
             Cuboid box = cells.boxes().get(index);
-            out.append('[').append(box.min().x()).append(',').append(box.min().y()).append(',')
-                    .append(box.min().z()).append(',').append(box.max().x()).append(',')
-                    .append(box.max().y()).append(',').append(box.max().z()).append(']');
+            out.append('[').append(box.min().x()).append(',').append(box.min().y()).append(',').append(box.min().z())
+                    .append(',').append(box.max().x()).append(',').append(box.max().y()).append(',')
+                    .append(box.max().z()).append(']');
         }
         out.append(']');
     }
@@ -305,8 +302,7 @@ public final class FindingRenderer {
         }
         out.append("{\"document\":");
         quote(out, span.document().text());
-        out.append(",\"start\":").append(span.start())
-                .append(",\"end\":").append(span.end()).append('}');
+        out.append(",\"start\":").append(span.start()).append(",\"end\":").append(span.end()).append('}');
     }
 
     private static void appendJsonKey(StringBuilder out, @Nullable KeyLocus key) {

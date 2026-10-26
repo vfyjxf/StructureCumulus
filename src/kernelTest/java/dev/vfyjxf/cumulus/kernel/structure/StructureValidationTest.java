@@ -1,7 +1,5 @@
 package dev.vfyjxf.cumulus.kernel.structure;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -17,6 +15,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 class StructureValidationTest {
 
     private static NamespacedId id(String path) {
@@ -55,43 +56,43 @@ class StructureValidationTest {
                 return cells;
             }
         };
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(),
-                Sharing.EXCLUSIVE);
-        Check<?> check = Check.of(id("cells"), bay, Focuses.bay(),
-                Expectations.eachCell(Expectations.anyOccupant()));
-        assertThrows(IllegalArgumentException.class,
-                () -> Blueprint.builder(id("bad")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                        .check(check).computation(first).computation(second).build());
+        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Check<?> check = Check.of(id("cells"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Blueprint.builder(id("bad")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check).computation(first)
+                    .computation(second).build()
+        );
     }
 
     @Test
     void duplicateOutputAndEmptyRegionAreBuildErrors() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.INSTANCE, (l, r) -> l);
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(),
-                Sharing.EXCLUSIVE);
-        Check<?> check = Check.of(id("cells"), bay, Focuses.bay(),
-                Expectations.eachCell(Expectations.anyOccupant()));
-        assertThrows(IllegalArgumentException.class,
-                () -> Blueprint.builder(id("dup")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                        .check(check)
-                        .computation(Computations.volume(a, cells))
-                        .computation(Computations.volume(a, cells)).build());
-        assertThrows(IllegalArgumentException.class,
-                () -> Blueprint.builder(id("empty")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                        .check(check)
-                        .computation(Computations.volume(a, CuboidSet.empty())).build());
+        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Check<?> check = Check.of(id("cells"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Blueprint.builder(id("dup")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
+                    .computation(Computations.volume(a, cells)).computation(Computations.volume(a, cells)).build()
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Blueprint.builder(id("empty")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
+                    .computation(Computations.volume(a, CuboidSet.empty())).build()
+        );
     }
 
     @Test
     void whenAbsentMustMatchTheKeyType() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new ContextKey(id("bad"), Long.class, Retention.INSTANCE, null, "x"));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new ContextKey(id("bad"), Long.class, Retention.INSTANCE, null, "x")
+        );
     }
 
     @Test
     void aConflictExplainsItself() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new ClaimVerdict.Conflict(List.of(), FindingBundle.empty()));
+        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of(), FindingBundle.empty()));
     }
 }

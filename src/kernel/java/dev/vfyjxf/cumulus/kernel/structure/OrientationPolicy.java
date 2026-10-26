@@ -12,9 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeSet;
+
 /** The allowed orientations and the one role that supplies a heading. */
-public record OrientationPolicy(NamespacedId primaryRole, List<Orientation> allowed,
-                                boolean uprightOnly) {
+public record OrientationPolicy(NamespacedId primaryRole, List<Orientation> allowed, boolean uprightOnly) {
 
     public OrientationPolicy {
         Objects.requireNonNull(primaryRole, "primaryRole");

@@ -4,9 +4,15 @@ import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 
 import java.util.Objects;
+
 /** What a resolver may see. */
-public record ResolveContext(SnapshotId snapshot, int frame, LatticePoint anchor,
-                             int remainingDepth, SnapshotPolicy policy) {
+public record ResolveContext(
+    SnapshotId snapshot,
+    int frame,
+    LatticePoint anchor,
+    int remainingDepth,
+    SnapshotPolicy policy
+) {
 
     public ResolveContext {
         Objects.requireNonNull(snapshot, "snapshot");

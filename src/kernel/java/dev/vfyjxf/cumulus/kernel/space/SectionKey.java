@@ -3,9 +3,9 @@ package dev.vfyjxf.cumulus.kernel.space;
 import dev.vfyjxf.cumulus.kernel.core.World;
 
 import java.util.Objects;
+
 /** The section index of one view frame. */
-public record SectionKey(World world, int frame, int x, int y, int z)
-        implements Comparable<SectionKey> {
+public record SectionKey(World world, int frame, int x, int y, int z) implements Comparable<SectionKey> {
 
     public SectionKey {
         Objects.requireNonNull(world, "world");
@@ -18,10 +18,13 @@ public record SectionKey(World world, int frame, int x, int y, int z)
         if (cellSize < 1) {
             throw new IllegalArgumentException("cellSize >= 1");
         }
-        return new SectionKey(world, frame,
-                Math.floorDiv(cell.x(), cellSize),
-                Math.floorDiv(cell.y(), cellSize),
-                Math.floorDiv(cell.z(), cellSize));
+        return new SectionKey(
+            world,
+            frame,
+            Math.floorDiv(cell.x(), cellSize),
+            Math.floorDiv(cell.y(), cellSize),
+            Math.floorDiv(cell.z(), cellSize)
+        );
     }
 
     public SectionKey sectionOf(LatticePoint cell, int cellSize) {

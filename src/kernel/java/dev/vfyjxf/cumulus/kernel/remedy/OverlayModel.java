@@ -8,9 +8,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** Pure overlay data. Rendering is the host's. */
-public record OverlayModel(Cuboid bounds, Map<LatticeKey, CellMark> cells,
-                           List<Marker> markers) {
+public record OverlayModel(Cuboid bounds, Map<LatticeKey, CellMark> cells, List<Marker> markers) {
 
     public OverlayModel {
         Objects.requireNonNull(bounds, "bounds");

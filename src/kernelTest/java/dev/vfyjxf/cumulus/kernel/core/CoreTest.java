@@ -1,15 +1,16 @@
 package dev.vfyjxf.cumulus.kernel.core;
 
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
 class CoreTest {
 
     @Test
@@ -28,40 +29,49 @@ class CoreTest {
 
     @Test
     void namespacedIdOrderIsNamespaceThenPath() {
-        List<NamespacedId> ids = List.of(NamespacedId.parse("b:a"), NamespacedId.parse("a:z"),
-                NamespacedId.parse("a:a"), NamespacedId.parse("a:aa"));
+        List<NamespacedId> ids = List.of(
+            NamespacedId.parse("b:a"),
+            NamespacedId.parse("a:z"),
+            NamespacedId.parse("a:a"),
+            NamespacedId.parse("a:aa")
+        );
         List<NamespacedId> sorted = ids.stream().sorted().toList();
-        assertEquals(List.of(NamespacedId.parse("a:a"), NamespacedId.parse("a:aa"),
-                NamespacedId.parse("a:z"), NamespacedId.parse("b:a")), sorted);
+        assertEquals(
+            List.of(
+                NamespacedId.parse("a:a"),
+                NamespacedId.parse("a:aa"),
+                NamespacedId.parse("a:z"),
+                NamespacedId.parse("b:a")
+            ),
+            sorted
+        );
     }
 
     @Test
     void catalogFreezesAndRefusesDifferentDuplicate() {
-        Catalog<String> catalog = Catalog.<String>builder(NamespacedId.of("test"))
-                .put(NamespacedId.of("a"), "a")
-                .put(NamespacedId.of("b"), "b")
-                .build();
+        Catalog<String> catalog = Catalog.<String>builder(NamespacedId.of("test")).put(NamespacedId.of("a"), "a")
+                .put(NamespacedId.of("b"), "b").build();
         assertEquals(List.of(NamespacedId.of("a"), NamespacedId.of("b")), catalog.ids());
         assertEquals("a", catalog.require(NamespacedId.of("a")));
         assertNull(catalog.get(NamespacedId.of("c")));
-        assertThrows(IllegalArgumentException.class,
-                () -> Catalog.<String>builder(NamespacedId.of("test"))
-                        .put(NamespacedId.of("a"), "a").put(NamespacedId.of("a"), "b"));
-        assertThrows(UnsupportedOperationException.class,
-                () -> catalog.asMap().put(NamespacedId.of("c"), "c"));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Catalog.<String>builder(NamespacedId.of("test")).put(NamespacedId.of("a"), "a")
+                    .put(NamespacedId.of("a"), "b")
+        );
+        assertThrows(UnsupportedOperationException.class, () -> catalog.asMap().put(NamespacedId.of("c"), "c"));
     }
 
     @Test
     void valueEqualityIgnoresSpan() {
         SourceSpan span = new SourceSpan(NamespacedId.of("doc"), 1, 3);
         Value a = Value.object(Map.of("b", Value.number(2), "a", Value.string("x")));
-        Value b = Value.withSpan(Value.object(Map.of("a", Value.string("x"),
-                "b", Value.number(2))), span);
+        Value b = Value.withSpan(Value.object(Map.of("a", Value.string("x"), "b", Value.number(2))), span);
         assertEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());
         assertTrue(Values.contentEquals(a, b));
         assertEquals(List.of("a", "b"), List.copyOf(a.members().keySet()));
-        assertEquals(2, a.get("b").asNumber(0));
+        assertEquals(2, java.util.Objects.requireNonNull(a.get("b"), "b").asNumber(0));
     }
 
     @Test
@@ -82,10 +92,8 @@ class CoreTest {
         assertNull(FindingCode.parse("SC-EXP-1"));
         assertNull(FindingCode.parse("SC-NOPE-0001"));
         assertNull(FindingCode.parse("SC-EXP-0000"));
-        assertThrows(IllegalArgumentException.class,
-                () -> FindingCode.of(FindingCode.Family.EXP, 10000));
-        assertTrue(FindingCode.of(FindingCode.Family.EXP, 1)
-                .compareTo(FindingCode.of(FindingCode.Family.EXP, 2)) < 0);
+        assertThrows(IllegalArgumentException.class, () -> FindingCode.of(FindingCode.Family.EXP, 10000));
+        assertTrue(FindingCode.of(FindingCode.Family.EXP, 1).compareTo(FindingCode.of(FindingCode.Family.EXP, 2)) < 0);
     }
 
     @Test
@@ -104,8 +112,8 @@ class CoreTest {
         ContextKey<Long> b = ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.INSTANCE);
         assertEquals(a, b);
         assertFalse(a.contributed());
-        ContextKey<Long> c = ContextKeys.of(NamespacedId.of("k"), Long.class,
-                Retention.INSTANCE, (left, right) -> left + right, 0L);
+        ContextKey<Long> c = ContextKeys
+                .of(NamespacedId.of("k"), Long.class, Retention.INSTANCE, (left, right) -> left + right, 0L);
         assertTrue(c.contributed());
         assertEquals(0L, c.whenAbsent());
     }

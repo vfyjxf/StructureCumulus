@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** A declared connectable edge. It is never tested and never claimed. */
 public record Seam(SeamId id, Cuboid cells, SeamKind kind, Map<String, String> properties) {
 
@@ -20,7 +21,6 @@ public record Seam(SeamId id, Cuboid cells, SeamKind kind, Map<String, String> p
     }
 
     public boolean compatibleWith(Seam other) {
-        return kind == other.kind
-                && Objects.equals(properties.get(CUSTOM_KIND), other.properties.get(CUSTOM_KIND));
+        return kind == other.kind && Objects.equals(properties.get(CUSTOM_KIND), other.properties.get(CUSTOM_KIND));
     }
 }

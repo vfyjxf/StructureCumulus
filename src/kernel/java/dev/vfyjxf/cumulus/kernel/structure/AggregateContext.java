@@ -10,6 +10,7 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 
 import java.util.List;
+
 /** What one aggregate run of a computation sees. It cannot contribute a section value. */
 public interface AggregateContext {
 

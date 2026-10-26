@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.kernel.finding;
 
 import dev.vfyjxf.cumulus.kernel.core.Checks;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
+
 /** One located message. */
 public record Label(Locus locus, String message, LabelRole role) {
 

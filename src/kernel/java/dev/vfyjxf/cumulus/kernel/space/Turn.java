@@ -15,10 +15,10 @@ public enum Turn {
 
     int[][] matrix() {
         return switch (this) {
-            case NONE -> new int[][] {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-            case CLOCKWISE -> new int[][] {{0, 0, -1}, {0, 1, 0}, {1, 0, 0}};
-            case HALF -> new int[][] {{-1, 0, 0}, {0, 1, 0}, {0, 0, -1}};
-            case COUNTERCLOCKWISE -> new int[][] {{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}};
+            case NONE -> new int[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+            case CLOCKWISE -> new int[][]{{0, 0, -1}, {0, 1, 0}, {1, 0, 0}};
+            case HALF -> new int[][]{{-1, 0, 0}, {0, 1, 0}, {0, 0, -1}};
+            case COUNTERCLOCKWISE -> new int[][]{{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}};
         };
     }
 }

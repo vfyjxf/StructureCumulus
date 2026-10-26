@@ -17,12 +17,12 @@ public enum Tilt {
 
     int[][] matrix() {
         return switch (this) {
-            case LEVEL -> new int[][] {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-            case PITCH_UP -> new int[][] {{1, 0, 0}, {0, 0, -1}, {0, 1, 0}};
-            case PITCH_DOWN -> new int[][] {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}};
-            case ROLL_LEFT -> new int[][] {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}};
-            case ROLL_RIGHT -> new int[][] {{0, 1, 0}, {-1, 0, 0}, {0, 0, 1}};
-            case INVERTED -> new int[][] {{1, 0, 0}, {0, -1, 0}, {0, 0, -1}};
+            case LEVEL -> new int[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+            case PITCH_UP -> new int[][]{{1, 0, 0}, {0, 0, -1}, {0, 1, 0}};
+            case PITCH_DOWN -> new int[][]{{1, 0, 0}, {0, 0, 1}, {0, -1, 0}};
+            case ROLL_LEFT -> new int[][]{{0, -1, 0}, {1, 0, 0}, {0, 0, 1}};
+            case ROLL_RIGHT -> new int[][]{{0, 1, 0}, {-1, 0, 0}, {0, 0, 1}};
+            case INVERTED -> new int[][]{{1, 0, 0}, {0, -1, 0}, {0, 0, -1}};
         };
     }
 }

@@ -1,10 +1,4 @@
 package dev.vfyjxf.cumulus.kernel.engine;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
@@ -50,6 +44,14 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 class FacadeTest {
 
     private static NamespacedId id(String path) {
@@ -59,22 +61,25 @@ class FacadeTest {
     @Test
     void facadeChecksSettlesAndExplains() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(),
-                Sharing.EXCLUSIVE);
-        Blueprint blueprint = Blueprint.builder(id("one"))
-                .bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN),
-                        Expectations.air())).build();
+        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Blueprint blueprint = Blueprint.builder(id("one")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.air())).build();
         TestWorld.View view = new TestWorld.View().air(LatticePoint.ORIGIN);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
-        StructureKernel kernel = StructureKernel.create(Catalogs.builtin(),
-                new Host(DocumentSource.empty(), ledger, ContextStore.inMemory(), Map.of()));
-        MatchRequest request = MatchRequest.of(blueprint, Siting.of(LatticePoint.ORIGIN,
-                        Orientation.IDENTITY), new TestWorld.Lease(view),
-                new InstanceId(TestWorld.WORLD, 1),
-                OwnerId.of(id("owner")), Budget.unbounded(), new ClaimView(List.of(), 0, true));
-        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class,
-                kernel.check(request));
+        StructureKernel kernel = StructureKernel.create(
+            Catalogs.builtin(),
+            new Host(DocumentSource.empty(), ledger, ContextStore.inMemory(), Map.of())
+        );
+        MatchRequest request = MatchRequest.of(
+            blueprint,
+            Siting.of(LatticePoint.ORIGIN, Orientation.IDENTITY),
+            new TestWorld.Lease(view),
+            new InstanceId(TestWorld.WORLD, 1),
+            OwnerId.of(id("owner")),
+            Budget.unbounded(),
+            new ClaimView(List.of(), 0, true)
+        );
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, kernel.check(request));
         assertInstanceOf(MatchResult.Formed.class, kernel.settle(request, admitted));
         assertEquals(1, ledger.revision());
 
@@ -97,27 +102,47 @@ class FacadeTest {
 
             @Override
             public List<Remedy> solve(Finding finding, RemedyContext context) {
-                Remedy repair = new Remedy.Repair(new EditPlan(List.of(), "fix"),
-                        Applicability.MACHINE_APPLICABLE, "fix");
-                Remedy preview = new Remedy.Preview(new OverlayModel(
-                        Cuboid.of(0, 0, 0, 1, 1, 1), Map.of(), List.of()), "preview");
+                Remedy repair = new Remedy.Repair(
+                    new EditPlan(List.of(), "fix"),
+                    Applicability.MACHINE_APPLICABLE,
+                    "fix"
+                );
+                Remedy preview = new Remedy.Preview(
+                    new OverlayModel(Cuboid.of(0, 0, 0, 1, 1, 1), Map.of(), List.of()),
+                    "preview"
+                );
                 return List.of(preview, repair, repair);
             }
         };
-        Catalog<RemedyProvider> remedies = Catalog.<RemedyProvider>builder(id("remedies"))
-                .put(provider.id(), provider).build();
-        StructureKernel kernel = StructureKernel.create(
-                Catalogs.builder().remedies(remedies).build());
-        Finding finding = Finding.builder(Codes.UNREADABLE_CELL).phase(Phase.CHECK)
-                .message("missing").label(Label.primary(Locus.local(
-                        CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1))), "missing")).build();
-        Blueprint blueprint = Blueprint.builder(id("empty"))
-                .bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), Bay.of(id("bay"), CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
-                                Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE),
-                        Focuses.occupant(LatticePoint.ORIGIN), Expectations.air())).build();
-        RemedyContext context = new RemedyContext(blueprint, Siting.of(LatticePoint.ORIGIN,
-                Orientation.IDENTITY), null, 0, null, null, 2);
+        Catalog<RemedyProvider> remedies = Catalog.<RemedyProvider>builder(id("remedies")).put(provider.id(), provider)
+                .build();
+        StructureKernel kernel = StructureKernel.create(Catalogs.builder().remedies(remedies).build());
+        Finding finding = Finding.builder(Codes.UNREADABLE_CELL).phase(Phase.CHECK).message("missing")
+                .label(Label.primary(Locus.local(CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1))), "missing")).build();
+        Blueprint blueprint = Blueprint.builder(id("empty")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(
+                    Check.of(
+                        id("air"),
+                        Bay.of(
+                            id("bay"),
+                            CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+                            Coverage.EVERY_CELL,
+                            Footprint.box(),
+                            Sharing.EXCLUSIVE
+                        ),
+                        Focuses.occupant(LatticePoint.ORIGIN),
+                        Expectations.air()
+                    )
+                ).build();
+        RemedyContext context = new RemedyContext(
+            blueprint,
+            Siting.of(LatticePoint.ORIGIN, Orientation.IDENTITY),
+            null,
+            0,
+            null,
+            null,
+            2
+        );
         SolveResult result = kernel.solve(FindingBundle.of(List.of(finding)), context);
         assertEquals(2, result.remedies().size());
         assertInstanceOf(Remedy.Repair.class, result.remedies().get(0));
@@ -127,16 +152,12 @@ class FacadeTest {
     @Test
     void sitingReportsWhyItCannotPlace() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(),
-                Sharing.EXCLUSIVE);
-        Blueprint blueprint = Blueprint.builder(id("unplaced"))
-                .bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN),
-                        Expectations.air())).build();
+        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Blueprint blueprint = Blueprint.builder(id("unplaced")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.air())).build();
         TestWorld.View view = new TestWorld.View().air(LatticePoint.ORIGIN);
         StructureKernel kernel = StructureKernel.create(Catalogs.builtin());
-        SitingResult result =
-                kernel.siting(blueprint, LatticePoint.ORIGIN, view);
+        SitingResult result = kernel.siting(blueprint, LatticePoint.ORIGIN, view);
         assertFalse(result.succeeded());
         assertNotNull(result.findings().primary());
         assertEquals(Codes.ANCHOR_INVALID.code(), result.findings().primary().code());

@@ -11,10 +11,18 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** The determinism tuple of one attempt. */
-public record MatchRequest(Blueprint blueprint, Siting siting, SnapshotLease lease,
-                           InstanceId instance, OwnerId owner, Budget budget,
-                           @Nullable ClaimView claims, CancelToken cancel) {
+public record MatchRequest(
+    Blueprint blueprint,
+    Siting siting,
+    SnapshotLease lease,
+    InstanceId instance,
+    OwnerId owner,
+    Budget budget,
+    @Nullable ClaimView claims,
+    CancelToken cancel
+) {
 
     public MatchRequest {
         Objects.requireNonNull(blueprint, "blueprint");
@@ -26,10 +34,15 @@ public record MatchRequest(Blueprint blueprint, Siting siting, SnapshotLease lea
         Objects.requireNonNull(cancel, "cancel");
     }
 
-    public static MatchRequest of(Blueprint blueprint, Siting siting, SnapshotLease lease,
-                                  InstanceId instance, OwnerId owner, Budget budget,
-                                  @Nullable ClaimView claims) {
-        return new MatchRequest(blueprint, siting, lease, instance, owner, budget, claims,
-                CancelToken.never());
+    public static MatchRequest of(
+        Blueprint blueprint,
+        Siting siting,
+        SnapshotLease lease,
+        InstanceId instance,
+        OwnerId owner,
+        Budget budget,
+        @Nullable ClaimView claims
+    ) {
+        return new MatchRequest(blueprint, siting, lease, instance, owner, budget, claims, CancelToken.never());
     }
 }

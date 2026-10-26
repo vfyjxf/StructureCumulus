@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 /** One of the 48 signed axis permutations. */
 public record Orientation(int ordinal) implements Comparable<Orientation> {
 
@@ -27,9 +28,9 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
                 for (int parity = 0; parity < 2; parity++) {
                     int ordinal = (turn * 6 + tilt) * 2 + parity;
                     int[][] matrix = multiply(
-                            Turn.values()[turn].matrix(),
-                            multiply(Tilt.values()[tilt].matrix(),
-                                    parity == 0 ? identity : frontBack));
+                        Turn.values()[turn].matrix(),
+                        multiply(Tilt.values()[tilt].matrix(), parity == 0 ? identity : frontBack)
+                    );
                     MATRICES[ordinal] = matrix;
                     TURNS[ordinal] = Turn.values()[turn];
                     TILTS[ordinal] = Tilt.values()[tilt];
@@ -118,8 +119,7 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
                 hi[axis] = 1 - min[source];
             }
         }
-        if (!LatticePoint.inLattice(lo[0], lo[1], lo[2])
-                || !LatticePoint.inLattice(hi[0], hi[1], hi[2])) {
+        if (!LatticePoint.inLattice(lo[0], lo[1], lo[2]) || !LatticePoint.inLattice(hi[0], hi[1], hi[2])) {
             return null;
         }
         return Cuboid.of(lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
@@ -205,7 +205,6 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
 
     @Override
     public String toString() {
-        return "Orientation[" + ordinal + ":" + turn() + "/" + tilt()
-                + (isMirror() ? "/mirror" : "") + "]";
+        return "Orientation[" + ordinal + ":" + turn() + "/" + tilt() + (isMirror() ? "/mirror" : "") + "]";
     }
 }

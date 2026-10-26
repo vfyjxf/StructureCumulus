@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.remedy;
 import dev.vfyjxf.cumulus.kernel.finding.Applicability;
 
 import java.util.Objects;
+
 /** A repair or a preview. */
 public sealed interface Remedy {
     record Repair(EditPlan plan, Applicability applicability, String rationale) implements Remedy {

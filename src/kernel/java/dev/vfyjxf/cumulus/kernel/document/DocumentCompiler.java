@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
 /** The only lowering function: data in, blueprint or findings out. */
 public final class DocumentCompiler {
 
@@ -63,9 +64,13 @@ public final class DocumentCompiler {
             return compileChecked(document, context);
         } catch (IllegalArgumentException rejected) {
             List<Finding> findings = new ArrayList<>();
-            error(findings, Codes.DOCUMENT_FIELD,
-                    "the document cannot be lowered: " + rejected.getMessage(),
-                    document.root().source(), documentLocus(document));
+            error(
+                findings,
+                Codes.DOCUMENT_FIELD,
+                "the document cannot be lowered: " + rejected.getMessage(),
+                document.root().source(),
+                documentLocus(document)
+            );
             return new CompileResult(FindingBundle.of(findings), null);
         }
     }
@@ -73,9 +78,13 @@ public final class DocumentCompiler {
     private static CompileResult compileChecked(Document document, CompilerContext context) {
         List<Finding> findings = new ArrayList<>();
         if (document.schemaVersion() != Document.CURRENT_VERSION) {
-            error(findings, Codes.SCHEMA_VERSION,
-                    "unsupported schema version " + document.schemaVersion(), null,
-                    documentLocus(document));
+            error(
+                findings,
+                Codes.SCHEMA_VERSION,
+                "unsupported schema version " + document.schemaVersion(),
+                null,
+                documentLocus(document)
+            );
             return new CompileResult(FindingBundle.of(findings), null);
         }
         Flat flat = new Flat(document.root());
@@ -89,22 +98,22 @@ public final class DocumentCompiler {
         Map<NamespacedId, Bay> bays = buildBays(flat.bays, flat.bounds, findings);
         List<Seam> seams = buildSeams(flat.seams, findings);
         List<Check<?>> checks = buildChecks(flat.checks, bays, keys, document, context, findings);
-        List<Computation<?>> computations = buildComputations(flat.computations, bays, keys,
-                document, context, findings);
+        List<Computation<?>> computations = buildComputations(
+            flat.computations,
+            bays,
+            keys,
+            document,
+            context,
+            findings
+        );
         List<DerivationSpec> derivations = buildDerivations(flat.derivations, keys, findings, documentLocus(document));
         if (hasErrors(findings)) {
             return new CompileResult(FindingBundle.of(findings), null);
         }
 
-        BlueprintBuilder builder =
-                Blueprint.builder(document.root().id())
-                        .bounds(flat.bounds)
-                        .checks(checks)
-                        .computations(computations)
-                        .seams(seams)
-                        .anchors(flat.anchors)
-                        .derivations(derivations)
-                        .arguments(document.root().arguments());
+        BlueprintBuilder builder = Blueprint.builder(document.root().id()).bounds(flat.bounds).checks(checks)
+                .computations(computations).seams(seams).anchors(flat.anchors).derivations(derivations)
+                .arguments(document.root().arguments());
         if (flat.orientation != null) {
             builder.orientation(flat.orientation);
         }
@@ -116,9 +125,13 @@ public final class DocumentCompiler {
             return new CompileResult(FindingBundle.of(findings), blueprint);
         } catch (IllegalArgumentException rejected) {
             CodeEntry entry = codeFromMessage(rejected.getMessage());
-            error(findings, entry,
-                    "the compiled blueprint is invalid: " + rejected.getMessage(),
-                    document.root().source(), documentLocus(document));
+            error(
+                findings,
+                entry,
+                "the compiled blueprint is invalid: " + rejected.getMessage(),
+                document.root().source(),
+                documentLocus(document)
+            );
             return new CompileResult(FindingBundle.of(findings), null);
         }
     }
@@ -131,8 +144,7 @@ public final class DocumentCompiler {
         private final List<ComputationSpec> computations = new ArrayList<>();
         private final List<KeySpec> keys = new ArrayList<>();
         private final List<DerivationSpec> derivations = new ArrayList<>();
-        private final List<AnchorSpec> anchors =
-                new ArrayList<>();
+        private final List<AnchorSpec> anchors = new ArrayList<>();
         private @Nullable OrientationPolicy orientation;
 
         private Flat(BlueprintSpec root) {
@@ -142,22 +154,35 @@ public final class DocumentCompiler {
         }
     }
 
-    private static void flatten(BlueprintSpec spec, Document owner, CompilerContext context,
-                                String prefix, LatticePoint offset, Flat flat, List<Finding> findings,
-                                Set<String> active) {
+    private static void flatten(
+        BlueprintSpec spec,
+        Document owner,
+        CompilerContext context,
+        String prefix,
+        LatticePoint offset,
+        Flat flat,
+        List<Finding> findings,
+        Set<String> active
+    ) {
         String key = owner.root().id() + "/" + spec.id();
         if (!active.add(key)) {
-            error(findings, Codes.DEFINITION_CYCLE,
-                    "definition cycle at " + spec.id(), spec.source(), null);
+            error(findings, Codes.DEFINITION_CYCLE, "definition cycle at " + spec.id(), spec.source(), null);
             return;
         }
         if (!prefix.isEmpty()) {
-            if (!spec.checks().isEmpty() || !spec.computations().isEmpty()
-                    || !spec.keys().isEmpty() || !spec.derivations().isEmpty()
-                    || !spec.anchors().isEmpty() || spec.orientation() != null) {
-                error(findings, Codes.DOCUMENT_FIELD,
-                        "a definition may contribute only bays, seams and placements",
-                        spec.source(), null);
+            if (!spec.checks().isEmpty()
+                    || !spec.computations().isEmpty()
+                    || !spec.keys().isEmpty()
+                    || !spec.derivations().isEmpty()
+                    || !spec.anchors().isEmpty()
+                    || spec.orientation() != null) {
+                error(
+                    findings,
+                    Codes.DOCUMENT_FIELD,
+                    "a definition may contribute only bays, seams and placements",
+                    spec.source(),
+                    null
+                );
                 active.remove(key);
                 return;
             }
@@ -170,47 +195,77 @@ public final class DocumentCompiler {
         for (BaySpec bay : spec.bays()) {
             CuboidSet translated = translate(bay.cells(), offset);
             if (translated == null) {
-                error(findings, Codes.PLACEMENT_OUTSIDE,
-                        "bay " + bay.id() + " leaves the lattice", bay.source(), null);
+                error(findings, Codes.PLACEMENT_OUTSIDE, "bay " + bay.id() + " leaves the lattice", bay.source(), null);
                 continue;
             }
             Footprint footprint = translate(bay.footprint(), offset);
             if (footprint == null) {
-                error(findings, Codes.PLACEMENT_OUTSIDE,
-                        "the footprint of " + bay.id() + " leaves the lattice", bay.source(), null);
+                error(
+                    findings,
+                    Codes.PLACEMENT_OUTSIDE,
+                    "the footprint of " + bay.id() + " leaves the lattice",
+                    bay.source(),
+                    null
+                );
                 continue;
             }
-            flat.bays.add(new BaySpec(qualify(prefix, bay.id()), translated, bay.coverage(),
-                    footprint, bay.sharing(), bay.description(), bay.source()));
+            flat.bays.add(
+                new BaySpec(
+                    qualify(prefix, bay.id()),
+                    translated,
+                    bay.coverage(),
+                    footprint,
+                    bay.sharing(),
+                    bay.description(),
+                    bay.source()
+                )
+            );
         }
         for (SeamSpec seam : spec.seams()) {
             Cuboid translated = seam.cells().translate(offset.x(), offset.y(), offset.z());
             if (translated == null) {
-                error(findings, Codes.PLACEMENT_OUTSIDE,
-                        "seam " + seam.id() + " leaves the lattice", seam.source(), null);
+                error(
+                    findings,
+                    Codes.PLACEMENT_OUTSIDE,
+                    "seam " + seam.id() + " leaves the lattice",
+                    seam.source(),
+                    null
+                );
                 continue;
             }
-            flat.seams.add(new SeamSpec(new SeamId(qualify(prefix, seam.id().id())), translated,
-                    seam.kind(), seam.properties(), seam.source()));
+            flat.seams.add(
+                new SeamSpec(
+                    new SeamId(qualify(prefix, seam.id().id())),
+                    translated,
+                    seam.kind(),
+                    seam.properties(),
+                    seam.source()
+                )
+            );
         }
         for (PlacementSpec placement : spec.placements()) {
             BlueprintSpec definition = owner.definitions().get(placement.definition());
-            Document nextOwner = owner;
+            Document nextOwner;
             if (definition == null) {
                 Document external = context.documents().find(placement.definition());
-                definition = external == null ? null : external.root();
+                if (external == null) {
+                    error(
+                        findings,
+                        Codes.DEFINITION_MISSING,
+                        "no definition " + placement.definition(),
+                        placement.source(),
+                        null
+                    );
+                    continue;
+                }
+                definition = external.root();
                 nextOwner = external;
+            } else {
+                nextOwner = owner;
             }
-            if (definition == null) {
-                error(findings, Codes.DEFINITION_MISSING,
-                        "no definition " + placement.definition(), placement.source(), null);
-                continue;
-            }
-            LatticePoint next = offset.offset(placement.offset().x(), placement.offset().y(),
-                    placement.offset().z());
+            LatticePoint next = offset.offset(placement.offset().x(), placement.offset().y(), placement.offset().z());
             if (next == null) {
-                error(findings, Codes.PLACEMENT_OUTSIDE,
-                        "placement leaves the lattice", placement.source(), null);
+                error(findings, Codes.PLACEMENT_OUTSIDE, "placement leaves the lattice", placement.source(), null);
                 continue;
             }
             String nextPrefix = prefix.isEmpty()
@@ -221,9 +276,11 @@ public final class DocumentCompiler {
         active.remove(key);
     }
 
-    private static Map<NamespacedId, ContextKey<?>> buildKeys(List<KeySpec> specs,
-                                                              CompilerContext context,
-                                                              List<Finding> findings) {
+    private static Map<NamespacedId, ContextKey<?>> buildKeys(
+        List<KeySpec> specs,
+        CompilerContext context,
+        List<Finding> findings
+    ) {
         Map<NamespacedId, ContextKey<?>> keys = new LinkedHashMap<>();
         for (KeySpec spec : specs) {
             Class<?> type = type(spec.type(), context, spec, findings);
@@ -234,30 +291,36 @@ public final class DocumentCompiler {
             if (spec.merge() != null && merge == null) {
                 continue;
             }
-            Object absent = spec.whenAbsent() == null ? null
-                    : decode(spec.whenAbsent(), type, spec, findings);
+            Object absent = spec.whenAbsent() == null ? null : decode(spec.whenAbsent(), type, spec, findings);
             if (spec.whenAbsent() != null && absent == null) {
                 continue;
             }
             ContextKey<?> key = rawKey(spec, type, merge, absent);
             ContextKey<?> previous = keys.putIfAbsent(key.id(), key);
             if (previous != null && !previous.equals(key)) {
-                error(findings, Codes.DOCUMENT_DUPLICATE,
-                        "key " + key.id() + " is declared twice with different content",
-                        spec.source(), null);
+                error(
+                    findings,
+                    Codes.DOCUMENT_DUPLICATE,
+                    "key " + key.id() + " is declared twice with different content",
+                    spec.source(),
+                    null
+                );
             }
         }
         return keys;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static ContextKey<?> rawKey(KeySpec spec, Class<?> type, @Nullable Merge<?> merge,
-                                        @Nullable Object absent) {
+    private static ContextKey<?> rawKey(
+        KeySpec spec,
+        Class<?> type,
+        @Nullable Merge<?> merge,
+        @Nullable Object absent
+    ) {
         return ContextKeys.of(spec.id(), (Class) type, spec.retention(), (Merge) merge, absent);
     }
 
-    private static @Nullable Class<?> type(String name, CompilerContext context, KeySpec spec,
-                                           List<Finding> findings) {
+    private static @Nullable Class<?> type(String name, CompilerContext context, KeySpec spec, List<Finding> findings) {
         Class<?> builtin = switch (name) {
             case "long" -> Long.class;
             case "int" -> Integer.class;
@@ -279,8 +342,12 @@ public final class DocumentCompiler {
         return custom;
     }
 
-    private static @Nullable Merge<?> merge(@Nullable NamespacedId merge, Class<?> type,
-                                            KeySpec spec, List<Finding> findings) {
+    private static @Nullable Merge<?> merge(
+        @Nullable NamespacedId merge,
+        Class<?> type,
+        KeySpec spec,
+        List<Finding> findings
+    ) {
         if (merge == null) {
             return null;
         }
@@ -295,15 +362,19 @@ public final class DocumentCompiler {
             default -> null;
         };
         if (candidate == null) {
-            error(findings, Codes.KEY_TYPE,
-                    "merge " + merge + " does not fit type " + type.getName(), spec.source(), null);
+            error(
+                findings,
+                Codes.KEY_TYPE,
+                "merge " + merge + " does not fit type " + type.getName(),
+                spec.source(),
+                null
+            );
             return null;
         }
         return (Merge<?>) candidate;
     }
 
-    private static @Nullable Object decode(Value value, Class<?> type, KeySpec spec,
-                                           List<Finding> findings) {
+    private static @Nullable Object decode(Value value, Class<?> type, KeySpec spec, List<Finding> findings) {
         if (type.equals(Long.class)) {
             long number = value.asNumber(Long.MIN_VALUE);
             if (number != Long.MIN_VALUE) {
@@ -319,42 +390,57 @@ public final class DocumentCompiler {
                 return value.asBoolean(false);
             }
         } else if (type.equals(String.class)) {
-            String text = value.asString(null);
-            if (text != null) {
-                return text;
+            if (value instanceof Value.StringValue stringValue) {
+                return stringValue.value();
             }
         } else if (type.equals(NamespacedId.class)) {
-            NamespacedId id = NamespacedId.parse(value.asString(null));
+            NamespacedId id = value instanceof Value.StringValue stringValue
+                    ? NamespacedId.parse(stringValue.value())
+                    : null;
             if (id != null) {
                 return id;
             }
         }
-        error(findings, Codes.KEY_TYPE,
-                "whenAbsent does not fit key " + spec.id(), spec.source(), null);
+        error(findings, Codes.KEY_TYPE, "whenAbsent does not fit key " + spec.id(), spec.source(), null);
         return null;
     }
 
-    private static Map<NamespacedId, Bay> buildBays(List<BaySpec> specs, Cuboid bounds,
-                                                    List<Finding> findings) {
+    private static Map<NamespacedId, Bay> buildBays(List<BaySpec> specs, Cuboid bounds, List<Finding> findings) {
         Map<NamespacedId, Bay> bays = new LinkedHashMap<>();
         CuboidSet boundsSet = bounds.asSet();
         for (BaySpec spec : specs) {
             if (!boundsSet.containsAll(spec.cells())) {
-                error(findings, Codes.PLACEMENT_OUTSIDE,
-                        "bay " + spec.id() + " leaves the blueprint bounds", spec.source(),
-                        Locus.local(spec.cells()));
+                error(
+                    findings,
+                    Codes.PLACEMENT_OUTSIDE,
+                    "bay " + spec.id() + " leaves the blueprint bounds",
+                    spec.source(),
+                    Locus.local(spec.cells())
+                );
                 continue;
             }
             try {
-                Bay bay = new Bay(spec.id(), spec.cells(), spec.coverage(), spec.footprint(),
-                        spec.sharing(), spec.description());
+                Bay bay = new Bay(
+                    spec.id(),
+                    spec.cells(),
+                    spec.coverage(),
+                    spec.footprint(),
+                    spec.sharing(),
+                    spec.description()
+                );
                 Bay previous = bays.putIfAbsent(bay.id(), bay);
                 if (previous != null && !previous.equals(bay)) {
-                    error(findings, Codes.DOCUMENT_DUPLICATE,
-                            "two different bays share id " + bay.id(), spec.source(), null);
+                    error(
+                        findings,
+                        Codes.DOCUMENT_DUPLICATE,
+                        "two different bays share id " + bay.id(),
+                        spec.source(),
+                        null
+                    );
                 }
             } catch (IllegalArgumentException rejected) {
-                error(findings, Codes.DOCUMENT_FIELD, rejected.getMessage(), spec.source(), null);
+                String message = rejected.getMessage();
+                error(findings, Codes.DOCUMENT_FIELD, message == null ? "invalid bay" : message, spec.source(), null);
             }
         }
         return bays;
@@ -365,8 +451,7 @@ public final class DocumentCompiler {
         Set<SeamId> ids = new HashSet<>();
         for (SeamSpec spec : specs) {
             if (!ids.add(spec.id())) {
-                error(findings, Codes.DOCUMENT_DUPLICATE,
-                        "duplicate seam id " + spec.id(), spec.source(), null);
+                error(findings, Codes.DOCUMENT_DUPLICATE, "duplicate seam id " + spec.id(), spec.source(), null);
                 continue;
             }
             seams.add(new Seam(spec.id(), spec.cells(), spec.kind(), spec.properties()));
@@ -374,89 +459,113 @@ public final class DocumentCompiler {
         return seams;
     }
 
-    private static List<Check<?>> buildChecks(List<CheckSpec> specs, Map<NamespacedId, Bay> bays,
-                                              Map<NamespacedId, ContextKey<?>> keys,
-                                              Document document, CompilerContext context,
-                                              List<Finding> findings) {
+    private static List<Check<?>> buildChecks(
+        List<CheckSpec> specs,
+        Map<NamespacedId, Bay> bays,
+        Map<NamespacedId, ContextKey<?>> keys,
+        Document document,
+        CompilerContext context,
+        List<Finding> findings
+    ) {
         List<Check<?>> checks = new ArrayList<>();
         Set<NamespacedId> ids = new HashSet<>();
         for (CheckSpec spec : specs) {
             if (!ids.add(spec.id())) {
-                error(findings, Codes.DOCUMENT_DUPLICATE,
-                        "duplicate check id " + spec.id(), spec.source(), null);
+                error(findings, Codes.DOCUMENT_DUPLICATE, "duplicate check id " + spec.id(), spec.source(), null);
                 continue;
             }
             Bay bay = bays.get(spec.bay());
             if (bay == null) {
-                error(findings, Codes.BAY_UNRESOLVED,
-                        "check " + spec.id() + " names no merged bay " + spec.bay(),
-                        spec.source(), null);
+                error(
+                    findings,
+                    Codes.BAY_UNRESOLVED,
+                    "check " + spec.id() + " names no merged bay " + spec.bay(),
+                    spec.source(),
+                    null
+                );
                 continue;
             }
-            FactoryContext factory = new FactoryContext(document.root().id(), spec.source(),
-                    keys::get, findings::add);
+            FactoryContext factory = new FactoryContext(document.root().id(), spec.source(), keys::get, findings::add);
             Focus<?> focus = focus(context, spec.focusKind(), spec.focusArgs(), factory, findings);
             if (focus == null) {
                 continue;
             }
-            Expectation<?> expectation = expectation(context, spec.expectationKind(),
-                    spec.expectationArgs(), factory, findings);
+            Expectation<?> expectation = expectation(
+                context,
+                spec.expectationKind(),
+                spec.expectationArgs(),
+                factory,
+                findings
+            );
             if (expectation == null) {
                 continue;
             }
             try {
                 checks.add(check(spec, bay, focus, expectation));
             } catch (IllegalArgumentException rejected) {
-                error(findings, Codes.DOCUMENT_FIELD,
-                        "check " + spec.id() + ": " + rejected.getMessage(), spec.source(), null);
+                error(
+                    findings,
+                    Codes.DOCUMENT_FIELD,
+                    "check " + spec.id() + ": " + rejected.getMessage(),
+                    spec.source(),
+                    null
+                );
             }
         }
         return checks;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Check<?> check(CheckSpec spec, Bay bay, Focus<?> focus,
-                                  Expectation<?> expectation) {
-        return Check.of(spec.id(), bay, (Focus) focus, (Expectation) expectation,
-                spec.description());
+    private static Check<?> check(CheckSpec spec, Bay bay, Focus<?> focus, Expectation<?> expectation) {
+        return Check.of(spec.id(), bay, (Focus) focus, (Expectation) expectation, spec.description());
     }
 
-    private static @Nullable Focus<?> focus(CompilerContext context, NamespacedId kind, Value args,
-                                            FactoryContext factory, List<Finding> findings) {
+    private static @Nullable Focus<?> focus(
+        CompilerContext context,
+        NamespacedId kind,
+        Value args,
+        FactoryContext factory,
+        List<Finding> findings
+    ) {
         if (kind.path().equals("missing_kind")) {
             error(findings, Codes.FACTORY_UNKNOWN, "a focus has no kind", factory.source(), null);
             return null;
         }
         FocusFactory registered = lookup(context.focuses(), kind);
         if (registered == null) {
-            error(findings, Codes.DOCUMENT_FACTORY,
-                    "no focus factory " + kind, factory.source(), null);
+            error(findings, Codes.DOCUMENT_FACTORY, "no focus factory " + kind, factory.source(), null);
             return null;
         }
         Focus<?> focus;
         try {
             focus = registered.create(args, factory);
         } catch (RuntimeException failure) {
-            error(findings, Codes.FACTORY_BAD,
-                    "focus factory " + kind + " failed: " + failure.getMessage(),
-                    factory.source(), null);
+            error(
+                findings,
+                Codes.FACTORY_BAD,
+                "focus factory " + kind + " failed: " + failure.getMessage(),
+                factory.source(),
+                null
+            );
             return null;
         }
         if (focus == null) {
-            error(findings, Codes.FACTORY_BAD, "focus factory " + kind + " returned null",
-                    factory.source(), null);
+            error(findings, Codes.FACTORY_BAD, "focus factory " + kind + " returned null", factory.source(), null);
         }
         return focus;
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static @Nullable Expectation<?> expectation(CompilerContext context, NamespacedId kind,
-                                                        Value args, FactoryContext factory,
-                                                        List<Finding> findings) {
+    private static @Nullable Expectation<?> expectation(
+        CompilerContext context,
+        NamespacedId kind,
+        Value args,
+        FactoryContext factory,
+        List<Finding> findings
+    ) {
         String name = kind.path();
         if (name.equals("missing_kind")) {
-            error(findings, Codes.FACTORY_UNKNOWN, "an expectation has no kind", factory.source(),
-                    null);
+            error(findings, Codes.FACTORY_UNKNOWN, "an expectation has no kind", factory.source(), null);
             return null;
         }
         List<Expectation<?>> children = new ArrayList<>();
@@ -464,8 +573,7 @@ public final class DocumentCompiler {
             case "all_of", "any_of", "sequence" -> {
                 children = children(args, context, factory, findings);
                 if (children.isEmpty()) {
-                    error(findings, Codes.DOCUMENT_FIELD,
-                            name + " needs at least one child", factory.source(), null);
+                    error(findings, Codes.DOCUMENT_FIELD, name + " needs at least one child", factory.source(), null);
                     return null;
                 }
                 if (!subjectsAgree(children, factory, findings)) {
@@ -481,30 +589,30 @@ public final class DocumentCompiler {
             case "not" -> {
                 Value child = args.get("child");
                 if (child == null) {
-                    error(findings, Codes.DOCUMENT_FIELD, "not needs a child", factory.source(),
-                            null);
+                    error(findings, Codes.DOCUMENT_FIELD, "not needs a child", factory.source(), null);
                     return null;
                 }
-                Expectation<?> compiled = expectation(context, kindOf(child), child, factory,
-                        findings);
+                Expectation<?> compiled = expectation(context, kindOf(child), child, factory, findings);
                 return compiled == null ? null : Expectations.not((Expectation) compiled);
             }
             case "each_cell" -> {
                 Value element = args.get("element");
                 if (element == null) {
-                    error(findings, Codes.DOCUMENT_FIELD, "each_cell needs an element",
-                            factory.source(), null);
+                    error(findings, Codes.DOCUMENT_FIELD, "each_cell needs an element", factory.source(), null);
                     return null;
                 }
-                Expectation<?> compiled = expectation(context, kindOf(element), element, factory,
-                        findings);
+                Expectation<?> compiled = expectation(context, kindOf(element), element, factory, findings);
                 if (compiled == null) {
                     return null;
                 }
                 if (!compiled.subject().equals(OccupantSnapshot.class)) {
-                    error(findings, Codes.DOCUMENT_FIELD,
-                            "each_cell needs an OccupantSnapshot expectation", factory.source(),
-                            null);
+                    error(
+                        findings,
+                        Codes.DOCUMENT_FIELD,
+                        "each_cell needs an OccupantSnapshot expectation",
+                        factory.source(),
+                        null
+                    );
                     return null;
                 }
                 return Expectations.eachCell((Expectation<OccupantSnapshot>) compiled);
@@ -513,14 +621,12 @@ public final class DocumentCompiler {
                 Value count = args.get("count");
                 long n = count == null ? -1 : count.asNumber(-1);
                 if (n < 0 || n > Integer.MAX_VALUE) {
-                    error(findings, Codes.DOCUMENT_FIELD, name + " needs a count",
-                            factory.source(), null);
+                    error(findings, Codes.DOCUMENT_FIELD, name + " needs a count", factory.source(), null);
                     return null;
                 }
                 children = children(args, context, factory, findings);
                 if (children.isEmpty()) {
-                    error(findings, Codes.DOCUMENT_FIELD, name + " needs children",
-                            factory.source(), null);
+                    error(findings, Codes.DOCUMENT_FIELD, name + " needs children", factory.source(), null);
                     return null;
                 }
                 if (!subjectsAgree(children, factory, findings)) {
@@ -536,44 +642,63 @@ public final class DocumentCompiler {
             default -> {
                 ExpectationFactory registered = lookup(context.expectations(), kind);
                 if (registered == null) {
-                    error(findings, Codes.DOCUMENT_FACTORY,
-                            "no expectation factory " + kind, factory.source(), null);
+                    error(findings, Codes.DOCUMENT_FACTORY, "no expectation factory " + kind, factory.source(), null);
                     return null;
                 }
                 try {
                     Expectation<?> compiled = registered.create(args, factory);
                     if (compiled == null) {
-                        error(findings, Codes.FACTORY_BAD,
-                                "expectation factory " + kind + " returned null",
-                                factory.source(), null);
+                        error(
+                            findings,
+                            Codes.FACTORY_BAD,
+                            "expectation factory " + kind + " returned null",
+                            factory.source(),
+                            null
+                        );
                     }
                     return compiled;
                 } catch (RuntimeException failure) {
-                    error(findings, Codes.FACTORY_BAD,
-                            "expectation factory " + kind + " failed: " + failure.getMessage(),
-                            factory.source(), null);
+                    error(
+                        findings,
+                        Codes.FACTORY_BAD,
+                        "expectation factory " + kind + " failed: " + failure.getMessage(),
+                        factory.source(),
+                        null
+                    );
                     return null;
                 }
             }
         }
     }
 
-    private static boolean subjectsAgree(List<Expectation<?>> children, FactoryContext factory,
-                                         List<Finding> findings) {
+    private static boolean subjectsAgree(
+        List<Expectation<?>> children,
+        FactoryContext factory,
+        List<Finding> findings
+    ) {
         Class<?> subject = children.get(0).subject();
         for (Expectation<?> child : children) {
             if (!child.subject().equals(subject)) {
-                error(findings, Codes.DOCUMENT_FIELD,
-                        "children of one combinator disagree on subject: " + subject.getName()
-                                + " vs " + child.subject().getName(), factory.source(), null);
+                error(
+                    findings,
+                    Codes.DOCUMENT_FIELD,
+                    "children of one combinator disagree on subject: " + subject.getName() + " vs "
+                            + child.subject().getName(),
+                    factory.source(),
+                    null
+                );
                 return false;
             }
         }
         return true;
     }
 
-    private static List<Expectation<?>> children(Value args, CompilerContext context,
-                                                 FactoryContext factory, List<Finding> findings) {
+    private static List<Expectation<?>> children(
+        Value args,
+        CompilerContext context,
+        FactoryContext factory,
+        List<Finding> findings
+    ) {
         Value array = args.get("children");
         if (array == null || !array.isArray()) {
             return List.of();
@@ -589,7 +714,8 @@ public final class DocumentCompiler {
     }
 
     private static NamespacedId kindOf(Value value) {
-        String kind = value.get("kind") == null ? null : value.get("kind").asString(null);
+        Value kindValue = value.get("kind");
+        String kind = kindValue instanceof Value.StringValue stringValue ? stringValue.value() : null;
         if (kind == null) {
             return NamespacedId.of("missing_kind");
         }
@@ -597,100 +723,136 @@ public final class DocumentCompiler {
         return parsed == null ? NamespacedId.of("missing_kind") : parsed;
     }
 
-    private static List<Computation<?>> buildComputations(List<ComputationSpec> specs,
-                                                          Map<NamespacedId, Bay> bays,
-                                                          Map<NamespacedId, ContextKey<?>> keys,
-                                                          Document document,
-                                                          CompilerContext context,
-                                                          List<Finding> findings) {
+    private static List<Computation<?>> buildComputations(
+        List<ComputationSpec> specs,
+        Map<NamespacedId, Bay> bays,
+        Map<NamespacedId, ContextKey<?>> keys,
+        Document document,
+        CompilerContext context,
+        List<Finding> findings
+    ) {
         List<Computation<?>> computations = new ArrayList<>();
         Set<NamespacedId> ids = new HashSet<>();
         for (ComputationSpec spec : specs) {
             if (!ids.add(spec.id())) {
-                error(findings, Codes.DOCUMENT_DUPLICATE,
-                        "duplicate computation id " + spec.id(), spec.source(), null);
+                error(findings, Codes.DOCUMENT_DUPLICATE, "duplicate computation id " + spec.id(), spec.source(), null);
                 continue;
             }
             ContextKey<?> output = keys.get(spec.output());
             if (output == null) {
-                error(findings, Codes.KEY_UNDECLARED,
-                        "computation " + spec.id() + " names undeclared key " + spec.output(),
-                        spec.source(), null);
+                error(
+                    findings,
+                    Codes.KEY_UNDECLARED,
+                    "computation " + spec.id() + " names undeclared key " + spec.output(),
+                    spec.source(),
+                    null
+                );
                 continue;
             }
             if (spec.bay() != null && spec.region() != null) {
-                error(findings, Codes.DOCUMENT_FIELD,
-                        "computation " + spec.id() + " declares both a bay and a region",
-                        spec.source(), null);
+                error(
+                    findings,
+                    Codes.DOCUMENT_FIELD,
+                    "computation " + spec.id() + " declares both a bay and a region",
+                    spec.source(),
+                    null
+                );
                 continue;
             }
             CuboidSet region;
             if (spec.bay() != null) {
                 Bay bay = bays.get(spec.bay());
                 if (bay == null) {
-                    error(findings, Codes.BAY_UNRESOLVED,
-                            "computation " + spec.id() + " names no merged bay " + spec.bay(),
-                            spec.source(), null);
+                    error(
+                        findings,
+                        Codes.BAY_UNRESOLVED,
+                        "computation " + spec.id() + " names no merged bay " + spec.bay(),
+                        spec.source(),
+                        null
+                    );
                     continue;
                 }
                 region = bay.cells();
             } else if (spec.region() != null) {
                 region = spec.region();
             } else {
-                error(findings, Codes.DOCUMENT_FIELD,
-                        "computation " + spec.id() + " needs a bay or a region", spec.source(),
-                        null);
+                error(
+                    findings,
+                    Codes.DOCUMENT_FIELD,
+                    "computation " + spec.id() + " needs a bay or a region",
+                    spec.source(),
+                    null
+                );
                 continue;
             }
             for (NamespacedId input : spec.inputs()) {
                 if (!keys.containsKey(input)) {
-                    error(findings, Codes.KEY_UNDECLARED,
-                            "computation " + spec.id() + " reads undeclared key " + input,
-                            spec.source(), null);
+                    error(
+                        findings,
+                        Codes.KEY_UNDECLARED,
+                        "computation " + spec.id() + " reads undeclared key " + input,
+                        spec.source(),
+                        null
+                    );
                 }
             }
             ComputationFactory factory = lookup(context.computations(), spec.kind());
             if (factory == null) {
-                error(findings, Codes.DOCUMENT_FACTORY,
-                        "no computation factory " + spec.kind(), spec.source(), null);
+                error(findings, Codes.DOCUMENT_FACTORY, "no computation factory " + spec.kind(), spec.source(), null);
                 continue;
             }
-            FactoryContext fctx = new FactoryContext(document.root().id(), spec.source(), keys::get,
-                    findings::add);
+            FactoryContext fctx = new FactoryContext(document.root().id(), spec.source(), keys::get, findings::add);
             Computation<?> created;
             try {
                 created = factory.create(spec.args(), output, region, fctx);
             } catch (RuntimeException failure) {
-                error(findings, Codes.FACTORY_BAD,
-                        "computation factory " + spec.kind() + " failed: " + failure.getMessage(),
-                        spec.source(), null);
+                error(
+                    findings,
+                    Codes.FACTORY_BAD,
+                    "computation factory " + spec.kind() + " failed: " + failure.getMessage(),
+                    spec.source(),
+                    null
+                );
                 continue;
             }
             if (created == null) {
-                error(findings, Codes.FACTORY_BAD,
-                        "computation factory " + spec.kind() + " returned null", spec.source(),
-                        null);
+                error(
+                    findings,
+                    Codes.FACTORY_BAD,
+                    "computation factory " + spec.kind() + " returned null",
+                    spec.source(),
+                    null
+                );
                 continue;
             }
             if (!created.output().equals(output)) {
-                error(findings, Codes.FACTORY_BAD,
-                        "computation factory " + spec.kind() + " produced "
-                                + created.output().id() + ", not " + output.id(),
-                        spec.source(), null);
+                error(
+                    findings,
+                    Codes.FACTORY_BAD,
+                    "computation factory " + spec.kind() + " produced " + created.output().id() + ", not "
+                            + output.id(),
+                    spec.source(),
+                    null
+                );
                 continue;
             }
             Set<ContextKey<?>> resolvedInputs = inputKeys(spec.inputs(), keys);
-            computations.add(created.id().equals(spec.id())
-                    && created.inputs().equals(resolvedInputs)
-                    ? created
-                    : wrap(created, spec.id(), output, resolvedInputs));
+            computations.add(
+                created.id().equals(spec.id()) && created.inputs().equals(resolvedInputs)
+                        ? created
+                        : wrap(created, spec.id(), output, resolvedInputs)
+            );
         }
         return computations;
     }
 
     @SuppressWarnings("unchecked")
-    private static Computation<?> wrap(Computation<?> computation, NamespacedId id,
-                                       ContextKey<?> output, Set<ContextKey<?>> inputs) {
+    private static Computation<?> wrap(
+        Computation<?> computation,
+        NamespacedId id,
+        ContextKey<?> output,
+        Set<ContextKey<?>> inputs
+    ) {
         ContextKey<Object> typed = (ContextKey<Object>) output;
         if (computation instanceof SectionComputation<?> section) {
             return new WrappedSection(section, id, typed, inputs);
@@ -701,9 +863,12 @@ public final class DocumentCompiler {
         throw new IllegalArgumentException("unknown computation kind");
     }
 
-    private record WrappedSection(SectionComputation<?> delegate, NamespacedId id,
-                                  ContextKey<Object> output, Set<ContextKey<?>> inputs)
-            implements SectionComputation<Object> {
+    private record WrappedSection(
+        SectionComputation<?> delegate,
+        NamespacedId id,
+        ContextKey<Object> output,
+        Set<ContextKey<?>> inputs
+    ) implements SectionComputation<Object> {
         private WrappedSection {
             Objects.requireNonNull(delegate, "delegate");
             Objects.requireNonNull(id, "id");
@@ -724,9 +889,12 @@ public final class DocumentCompiler {
         }
     }
 
-    private record WrappedAggregate(AggregateComputation<?> delegate, NamespacedId id,
-                                    ContextKey<Object> output, Set<ContextKey<?>> inputs)
-            implements AggregateComputation<Object> {
+    private record WrappedAggregate(
+        AggregateComputation<?> delegate,
+        NamespacedId id,
+        ContextKey<Object> output,
+        Set<ContextKey<?>> inputs
+    ) implements AggregateComputation<Object> {
         private WrappedAggregate {
             Objects.requireNonNull(delegate, "delegate");
             Objects.requireNonNull(id, "id");
@@ -747,8 +915,7 @@ public final class DocumentCompiler {
         }
     }
 
-    private static Set<ContextKey<?>> inputKeys(Set<NamespacedId> ids,
-                                                Map<NamespacedId, ContextKey<?>> keys) {
+    private static Set<ContextKey<?>> inputKeys(Set<NamespacedId> ids, Map<NamespacedId, ContextKey<?>> keys) {
         Set<ContextKey<?>> resolved = new HashSet<>();
         for (NamespacedId id : ids) {
             ContextKey<?> key = keys.get(id);
@@ -759,28 +926,32 @@ public final class DocumentCompiler {
         return Set.copyOf(resolved);
     }
 
-    private static List<DerivationSpec> buildDerivations(List<DerivationSpec> specs,
-                                                         Map<NamespacedId, ContextKey<?>> keys,
-                                                         List<Finding> findings,
-                                                         @Nullable Locus fallback) {
+    private static List<DerivationSpec> buildDerivations(
+        List<DerivationSpec> specs,
+        Map<NamespacedId, ContextKey<?>> keys,
+        List<Finding> findings,
+        @Nullable Locus fallback
+    ) {
         List<DerivationSpec> derivations = new ArrayList<>();
         Set<Integer> orders = new HashSet<>();
         Set<NamespacedId> outputs = new HashSet<>();
         for (DerivationSpec spec : specs) {
             if (!keys.containsKey(spec.output())) {
-                error(findings, Codes.KEY_UNDECLARED,
-                        "derivation " + spec.deriver() + " names undeclared key " + spec.output(),
-                        null, fallback);
+                error(
+                    findings,
+                    Codes.KEY_UNDECLARED,
+                    "derivation " + spec.deriver() + " names undeclared key " + spec.output(),
+                    null,
+                    fallback
+                );
                 continue;
             }
             if (!orders.add(spec.order())) {
-                error(findings, Codes.DERIVE_DUPLICATE,
-                        "duplicate derivation order " + spec.order(), null, fallback);
+                error(findings, Codes.DERIVE_DUPLICATE, "duplicate derivation order " + spec.order(), null, fallback);
                 continue;
             }
             if (!outputs.add(spec.output())) {
-                error(findings, Codes.DERIVE_DUPLICATE,
-                        "two derivations produce " + spec.output(), null, fallback);
+                error(findings, Codes.DERIVE_DUPLICATE, "two derivations produce " + spec.output(), null, fallback);
                 continue;
             }
             derivations.add(spec);
@@ -844,8 +1015,13 @@ public final class DocumentCompiler {
         return NamespacedId.of(id.namespace(), prefix + id.path());
     }
 
-    private static void error(List<Finding> findings, CodeEntry entry, String message,
-                              @Nullable SourceSpan source, @Nullable Locus locus) {
+    private static void error(
+        List<Finding> findings,
+        CodeEntry entry,
+        String message,
+        @Nullable SourceSpan source,
+        @Nullable Locus locus
+    ) {
         Finding.Builder builder = Finding.builder(entry).phase(Phase.COMPILE).message(message);
         if (source != null) {
             builder.label(Label.primary(Locus.definition(source), message));
@@ -864,6 +1040,5 @@ public final class DocumentCompiler {
         return false;
     }
 
-    private DocumentCompiler() {
-    }
+    private DocumentCompiler() {}
 }

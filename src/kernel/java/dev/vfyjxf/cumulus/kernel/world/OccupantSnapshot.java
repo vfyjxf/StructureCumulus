@@ -11,14 +11,18 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
 /** The immutable read model of one occupant. */
-public record OccupantSnapshot(OccupantRef ref, OccupantDescriptor descriptor, Cuboid footprint,
-                               List<Trait<?>> traits) {
+public record OccupantSnapshot(
+    OccupantRef ref,
+    OccupantDescriptor descriptor,
+    Cuboid footprint,
+    List<Trait<?>> traits
+) {
 
     public static final NamespacedId AIR = NamespacedId.of("air");
 
-    private static final Comparator<Trait<?>> TRAIT_ORDER =
-            Comparator.comparing(trait -> trait.key().id());
+    private static final Comparator<Trait<?>> TRAIT_ORDER = Comparator.comparing(trait -> trait.key().id());
 
     public OccupantSnapshot {
         Objects.requireNonNull(ref, "ref");
@@ -44,8 +48,12 @@ public record OccupantSnapshot(OccupantRef ref, OccupantDescriptor descriptor, C
 
     public static OccupantSnapshot air(SnapshotId snapshot, int frame, LatticePoint cell) {
         OccupantRef ref = new OccupantRef(snapshot, frame, AIR, OccupantKind.BLOCK, cell);
-        return new OccupantSnapshot(ref, new OccupantDescriptor(AIR, OccupantKind.BLOCK,
-                Map.of(), List.of()), Cuboid.of(cell), List.of());
+        return new OccupantSnapshot(
+            ref,
+            new OccupantDescriptor(AIR, OccupantKind.BLOCK, Map.of(), List.of()),
+            Cuboid.of(cell),
+            List.of()
+        );
     }
 
     public boolean isAir() {

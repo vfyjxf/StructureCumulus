@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.TreeSet;
+
 /** A canonical, disjoint, sorted set of boxes. */
 public final class CuboidSet {
 
@@ -57,11 +58,10 @@ public final class CuboidSet {
             for (int zi = 0; zi < zs.size() - 1; zi++) {
                 int z0 = zs.get(zi);
                 int z1 = zs.get(zi + 1);
-                record Interval(int lo, int hi) { }
+                record Interval(int lo, int hi) {}
                 List<Interval> intervals = new ArrayList<>();
                 for (Cuboid box : nonEmpty) {
-                    if (box.min().x() <= x0 && x1 <= box.max().x()
-                            && box.min().z() <= z0 && z1 <= box.max().z()) {
+                    if (box.min().x() <= x0 && x1 <= box.max().x() && box.min().z() <= z0 && z1 <= box.max().z()) {
                         intervals.add(new Interval(box.min().y(), box.max().y()));
                     }
                 }
@@ -212,12 +212,10 @@ public final class CuboidSet {
         }
         List<Cuboid> pieces = new ArrayList<>(6);
         if (a.min().x() < b.min().x()) {
-            pieces.add(Cuboid.of(a.min().x(), a.min().y(), a.min().z(),
-                    b.min().x(), a.max().y(), a.max().z()));
+            pieces.add(Cuboid.of(a.min().x(), a.min().y(), a.min().z(), b.min().x(), a.max().y(), a.max().z()));
         }
         if (b.max().x() < a.max().x()) {
-            pieces.add(Cuboid.of(b.max().x(), a.min().y(), a.min().z(),
-                    a.max().x(), a.max().y(), a.max().z()));
+            pieces.add(Cuboid.of(b.max().x(), a.min().y(), a.min().z(), a.max().x(), a.max().y(), a.max().z()));
         }
         int x0 = Math.max(a.min().x(), b.min().x());
         int x1 = Math.min(a.max().x(), b.max().x());

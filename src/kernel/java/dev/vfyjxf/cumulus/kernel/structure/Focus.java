@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.kernel.structure;
 
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+
 /** How a check binds its subject. */
 public interface Focus<T> {
 

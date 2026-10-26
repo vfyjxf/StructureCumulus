@@ -1,9 +1,9 @@
 package dev.vfyjxf.cumulus.kernel.finding;
 
 import dev.vfyjxf.cumulus.kernel.core.Checks;
+
 /** Caps and floors; errors are never capped. */
-public record FindingOptions(int maxTotal, int maxPerCode, boolean includeInfo,
-                             boolean includeNotes) {
+public record FindingOptions(int maxTotal, int maxPerCode, boolean includeInfo, boolean includeNotes) {
 
     public FindingOptions {
         Checks.checkArgument(maxTotal >= 0, "maxTotal >= 0");
@@ -17,10 +17,11 @@ public record FindingOptions(int maxTotal, int maxPerCode, boolean includeInfo,
     public FindingOptions narrowedBy(FindingOptions other) {
         Checks.checkNotNull(other, "other");
         return new FindingOptions(
-                Math.min(maxTotal, other.maxTotal),
-                Math.min(maxPerCode, other.maxPerCode),
-                includeInfo && other.includeInfo,
-                includeNotes && other.includeNotes);
+            Math.min(maxTotal, other.maxTotal),
+            Math.min(maxPerCode, other.maxPerCode),
+            includeInfo && other.includeInfo,
+            includeNotes && other.includeNotes
+        );
     }
 
     public FindingOptions withMaxTotal(int maxTotal) {

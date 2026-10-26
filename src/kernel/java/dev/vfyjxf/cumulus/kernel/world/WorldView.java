@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+
 /** The immutable, recursive, section-based read face. */
 public interface WorldView {
 
@@ -18,7 +19,8 @@ public interface WorldView {
 
     LatticePoint origin();
 
-    @Nullable WorldView parent();
+    @Nullable
+    WorldView parent();
 
     int cellSize();
 
@@ -26,13 +28,16 @@ public interface WorldView {
 
     SectionSlot slot(SectionKey key);
 
-    @Nullable OccupantSnapshot occupant(LatticePoint cell);
+    @Nullable
+    OccupantSnapshot occupant(LatticePoint cell);
 
-    @Nullable OccupantSnapshot occupant(OccupantRef ref);
+    @Nullable
+    OccupantSnapshot occupant(OccupantRef ref);
 
     List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
 
-    @Nullable WorldView nested(LatticePoint cell);
+    @Nullable
+    WorldView nested(LatticePoint cell);
 
     long contentDigest(SectionKey key);
 

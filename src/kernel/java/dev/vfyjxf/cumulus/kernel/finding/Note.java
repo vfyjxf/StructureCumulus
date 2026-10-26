@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.finding;
 import dev.vfyjxf.cumulus.kernel.core.Checks;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import org.jspecify.annotations.Nullable;
+
 /** A fact with no cell of its own. */
 public record Note(String message, @Nullable Locus locus) {
 

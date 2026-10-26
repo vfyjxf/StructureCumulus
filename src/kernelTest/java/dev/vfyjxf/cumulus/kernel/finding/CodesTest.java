@@ -1,10 +1,5 @@
 package dev.vfyjxf.cumulus.kernel.finding;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import org.junit.jupiter.api.Test;
 
@@ -12,6 +7,12 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 class CodesTest {
 
     private static final String PRODUCERS = """
@@ -108,7 +109,10 @@ class CodesTest {
             assertFalse(explanation.body().isBlank());
             assertFalse(explanation.seeAlso().isEmpty());
             assertTrue(explanation.summary().endsWith("."));
-            assertEquals(entry.code().text(), FindingCode.parse(entry.code().text()).text());
+            assertEquals(
+                entry.code().text(),
+                java.util.Objects.requireNonNull(FindingCode.parse(entry.code().text()), "parsed").text()
+            );
         }
     }
 

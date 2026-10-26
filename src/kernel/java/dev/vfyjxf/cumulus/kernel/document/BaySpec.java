@@ -9,10 +9,17 @@ import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** The data form of a bay. */
-public record BaySpec(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
-                      Sharing sharing, @Nullable String description,
-                      @Nullable SourceSpan source) {
+public record BaySpec(
+    NamespacedId id,
+    CuboidSet cells,
+    Coverage coverage,
+    Footprint footprint,
+    Sharing sharing,
+    @Nullable String description,
+    @Nullable SourceSpan source
+) {
 
     public BaySpec {
         Objects.requireNonNull(id, "id");

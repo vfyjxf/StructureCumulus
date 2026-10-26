@@ -10,9 +10,15 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** The data form of a seam. */
-public record SeamSpec(SeamId id, Cuboid cells, SeamKind kind, Map<String, String> properties,
-                       @Nullable SourceSpan source) {
+public record SeamSpec(
+    SeamId id,
+    Cuboid cells,
+    SeamKind kind,
+    Map<String, String> properties,
+    @Nullable SourceSpan source
+) {
 
     public SeamSpec {
         Objects.requireNonNull(id, "id");

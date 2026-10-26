@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.core;
 
 import java.util.Objects;
+
 /** Who holds a claim: a player or a team. */
 public record OwnerId(NamespacedId id) {
 

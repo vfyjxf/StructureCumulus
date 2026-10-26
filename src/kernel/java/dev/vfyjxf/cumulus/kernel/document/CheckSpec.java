@@ -6,10 +6,18 @@ import dev.vfyjxf.cumulus.kernel.core.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+
 /** The data form of a check. */
-public record CheckSpec(NamespacedId id, NamespacedId bay, NamespacedId focusKind, Value focusArgs,
-                        NamespacedId expectationKind, Value expectationArgs,
-                        @Nullable String description, @Nullable SourceSpan source) {
+public record CheckSpec(
+    NamespacedId id,
+    NamespacedId bay,
+    NamespacedId focusKind,
+    Value focusArgs,
+    NamespacedId expectationKind,
+    Value expectationArgs,
+    @Nullable String description,
+    @Nullable SourceSpan source
+) {
 
     public CheckSpec {
         Objects.requireNonNull(id, "id");

@@ -10,12 +10,15 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+
 /** The catalogs, type registry and document source a compiler needs. */
-public record CompilerContext(Catalog<FocusFactory> focuses,
-                              Catalog<ExpectationFactory> expectations,
-                              Catalog<ComputationFactory> computations,
-                              Map<NamespacedId, Class<?>> types,
-                              DocumentSource documents) {
+public record CompilerContext(
+    Catalog<FocusFactory> focuses,
+    Catalog<ExpectationFactory> expectations,
+    Catalog<ComputationFactory> computations,
+    Map<NamespacedId, Class<?>> types,
+    DocumentSource documents
+) {
 
     public CompilerContext {
         Objects.requireNonNull(focuses, "focuses");

@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 
 import java.util.Objects;
+
 /** One anchor read: a siting or the findings that prevented it. */
 public record SitingResult(Outcome<Siting> outcome, FindingBundle findings) {
 
