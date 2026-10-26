@@ -243,7 +243,7 @@ public final class MatchEngine {
             derived = ClaimPlanner.derive(request.blueprint(), request.siting(), request.owner(),
                     outcome.bindings());
         } catch (IllegalArgumentException rejected) {
-            session.findings.add(code(Codes.BINDING_INVALID, phase, rejected.getMessage(),
+            session.findings.add(plannerFailure(phase, rejected,
                     Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
         }
@@ -287,7 +287,7 @@ public final class MatchEngine {
             derived = ClaimPlanner.derive(request.blueprint(), request.siting(), request.owner(),
                     admitted.outcome().bindings());
         } catch (IllegalArgumentException rejected) {
-            findings.add(code(Codes.BINDING_INVALID, phase, rejected.getMessage(),
+            findings.add(plannerFailure(phase, rejected,
                     Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(findings));
         }
@@ -548,6 +548,16 @@ public final class MatchEngine {
     private static MatchResult undecided(Phase phase, UndecidedReason reason, Session session) {
         return new MatchResult.Undecided(phase, reason,
                 FindingBundle.of(session.findings), session.outcome());
+    }
+
+    private static Finding plannerFailure(Phase phase, IllegalArgumentException rejected,
+                                          Locus locus) {
+        String message = rejected.getMessage() == null ? "claim planning failed"
+                : rejected.getMessage();
+        CodeEntry entry = message.contains("SC-SPC-0001") ? Codes.LOCUS_UNMAPPED
+                : message.contains("SC-CLM-0005") ? Codes.BOUND_EMPTY
+                : Codes.BINDING_INVALID;
+        return code(entry, phase, message, locus);
     }
 
     private static Finding code(CodeEntry entry, Phase phase,

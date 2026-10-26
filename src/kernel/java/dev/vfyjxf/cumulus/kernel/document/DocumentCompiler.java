@@ -62,6 +62,18 @@ public final class DocumentCompiler {
     public static CompileResult compile(Document document, CompilerContext context) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(context, "context");
+        try {
+            return compileChecked(document, context);
+        } catch (IllegalArgumentException rejected) {
+            List<Finding> findings = new ArrayList<>();
+            error(findings, Codes.DOCUMENT_FIELD,
+                    "the document cannot be lowered: " + rejected.getMessage(),
+                    document.root().source(), null);
+            return new CompileResult(FindingBundle.of(findings), null);
+        }
+    }
+
+    private static CompileResult compileChecked(Document document, CompilerContext context) {
         List<Finding> findings = new ArrayList<>();
         if (document.schemaVersion() != Document.CURRENT_VERSION) {
             error(findings, Codes.SCHEMA_VERSION,
@@ -637,31 +649,42 @@ public final class DocumentCompiler {
                         null);
                 continue;
             }
+            if (!created.output().equals(output)) {
+                error(findings, Codes.FACTORY_BAD,
+                        "computation factory " + spec.kind() + " produced "
+                                + created.output().id() + ", not " + output.id(),
+                        spec.source(), null);
+                continue;
+            }
             Set<ContextKey<?>> resolvedInputs = inputKeys(spec.inputs(), keys);
             computations.add(created.id().equals(spec.id())
                     && created.inputs().equals(resolvedInputs)
                     ? created
-                    : wrap(created, spec.id(), resolvedInputs));
+                    : wrap(created, spec.id(), output, resolvedInputs));
         }
         return computations;
     }
 
+    @SuppressWarnings("unchecked")
     private static Computation<?> wrap(Computation<?> computation, NamespacedId id,
-                                       Set<ContextKey<?>> inputs) {
+                                       ContextKey<?> output, Set<ContextKey<?>> inputs) {
+        ContextKey<Object> typed = (ContextKey<Object>) output;
         if (computation instanceof SectionComputation<?> section) {
-            return new WrappedSection(section, id, inputs);
+            return new WrappedSection(section, id, typed, inputs);
         }
         if (computation instanceof AggregateComputation<?> aggregate) {
-            return new WrappedAggregate(aggregate, id, inputs);
+            return new WrappedAggregate(aggregate, id, typed, inputs);
         }
         throw new IllegalArgumentException("unknown computation kind");
     }
 
     private record WrappedSection(SectionComputation<?> delegate, NamespacedId id,
-                                  Set<ContextKey<?>> inputs) implements SectionComputation<Object> {
+                                  ContextKey<Object> output, Set<ContextKey<?>> inputs)
+            implements SectionComputation<Object> {
         private WrappedSection {
             Objects.requireNonNull(delegate, "delegate");
             Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(output, "output");
             inputs = Set.copyOf(inputs);
         }
 
@@ -673,34 +696,18 @@ public final class DocumentCompiler {
         }
 
         @Override
-        public NamespacedId id() {
-            return id;
-        }
-
-        @Override
-        public ContextKey<Object> output() {
-            @SuppressWarnings("unchecked")
-            ContextKey<Object> output = (ContextKey<Object>) delegate.output();
-            return output;
-        }
-
-        @Override
-        public Set<ContextKey<?>> inputs() {
-            return inputs;
-        }
-
-        @Override
         public CuboidSet region() {
             return delegate.region();
         }
     }
 
     private record WrappedAggregate(AggregateComputation<?> delegate, NamespacedId id,
-                                    Set<ContextKey<?>> inputs)
+                                    ContextKey<Object> output, Set<ContextKey<?>> inputs)
             implements AggregateComputation<Object> {
         private WrappedAggregate {
             Objects.requireNonNull(delegate, "delegate");
             Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(output, "output");
             inputs = Set.copyOf(inputs);
         }
 
@@ -709,23 +716,6 @@ public final class DocumentCompiler {
             @SuppressWarnings("unchecked")
             Outcome<Object> result = (Outcome<Object>) delegate.compute(ctx);
             return result;
-        }
-
-        @Override
-        public NamespacedId id() {
-            return id;
-        }
-
-        @Override
-        public ContextKey<Object> output() {
-            @SuppressWarnings("unchecked")
-            ContextKey<Object> output = (ContextKey<Object>) delegate.output();
-            return output;
-        }
-
-        @Override
-        public Set<ContextKey<?>> inputs() {
-            return inputs;
         }
 
         @Override
