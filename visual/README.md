@@ -4,7 +4,9 @@ An interactive, adversarial review of the kernel design. Not a feature tour: eac
 the kernel must survive — a frame mapping, a write, a conflict, a missing value, a finding.
 
 The design of record is [`../docs/README.md`](../docs/README.md). The adapter is specified, not
-implemented in this round.
+implemented in this round. The UI opens in **中文**; the **EN** button in the top bar switches to the
+English reading layer. Technical identifiers, code, JSON, Java and finding codes stay in their
+original form in both languages.
 
 ## Run
 
@@ -34,7 +36,7 @@ network request.
 | **06 / Codes** | Search/filter all 55 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail. |
 | **07 / Proof** | Read the gate report, the falsifiers, the 23 decisions, the regeneration protocol and the document index. |
 
-Press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> for the index. The **NIGHT** switch flips the same
+Press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> for the index. Use **EN / 中文** in the top bar to switch languages. The **NIGHT** switch flips the same
 information to a dark instrument palette. The layout is responsive down to 390 px.
 
 ## Data is generated, not hand-maintained

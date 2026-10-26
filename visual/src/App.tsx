@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NAV, type ModuleId, type SectionId } from './data/site';
+import { ZH_NAV } from './data/site.zh';
+import { useLanguage } from './i18n/Language';
 import { Hero } from './components/Hero';
 import { CommandPalette } from './components/CommandPalette';
 import { Thesis } from './sections/Thesis';
@@ -16,6 +18,7 @@ type Theme = 'paper' | 'night';
 const isSection = (value: string | null): value is SectionId => NAV.some((entry) => entry.id === value);
 
 export default function App() {
+  const { zh, setLang } = useLanguage();
   const [active, setActive] = useState<SectionId>('thesis');
   const [theme, setTheme] = useState<Theme>('paper');
   const [palette, setPalette] = useState(false);
@@ -107,20 +110,22 @@ export default function App() {
   const activeIndex = NAV.findIndex((entry) => entry.id === active);
   const progress = ((activeIndex + 1) / NAV.length) * 100;
   const activeEntry = NAV[activeIndex] ?? NAV[0];
+  const navLabel = (id: SectionId) => zh ? ZH_NAV[id].label : NAV.find((entry) => entry.id === id)!.label;
+  const navSub = (id: SectionId) => zh ? ZH_NAV[id].sub : NAV.find((entry) => entry.id === id)!.sub;
 
   return (
     <div className="app">
-      <a className="skip" href="#thesis">Skip to the review</a>
+      <a className="skip" href="#thesis">{zh ? '跳到 review' : 'Skip to the review'}</a>
 
-      <aside className="rail" aria-label="Review index">
+      <aside className="rail" aria-label={zh ? 'Review 目录' : 'Review index'}>
         <div className="brand">
           <span className="brand-mark" aria-hidden="true" />
           <div>SC<span>//</span><br />REVIEW</div>
         </div>
         <div className="rail-meta">
           StructureCumulus<br />
-          design of record / v1.0<br />
-          26 oct 2026
+          {zh ? '设计之书 / v1.0' : 'design of record / v1.0'}<br />
+          {zh ? '2026 年 10 月 26 日' : '26 oct 2026'}
         </div>
         <nav className="rail-nav">
           {NAV.map((entry) => (
@@ -133,8 +138,8 @@ export default function App() {
             >
               <span className="rail-no">{entry.no}</span>
               <span>
-                <span className="rail-label">{entry.label}</span>
-                <span className="rail-sub">{entry.sub}</span>
+                <span className="rail-label">{zh ? ZH_NAV[entry.id].label : entry.label}</span>
+                <span className="rail-sub">{zh ? ZH_NAV[entry.id].sub : entry.sub}</span>
               </span>
             </button>
           ))}
@@ -146,10 +151,10 @@ export default function App() {
           </div>
           <div className="rail-bar"><span style={{ width: `${progress}%` }} /></div>
           <div className="rail-gates">
-            <div className="rail-gate">tests<strong>95/95</strong></div>
-            <div className="rail-gate">codes<strong>55</strong></div>
-            <div className="rail-gate">purity<strong>0</strong></div>
-            <div className="rail-gate">rulings<strong>23</strong></div>
+            <div className="rail-gate">{zh ? '测试' : 'tests'}<strong>95/95</strong></div>
+            <div className="rail-gate">{zh ? '代码' : 'codes'}<strong>55</strong></div>
+            <div className="rail-gate">{zh ? '纯度' : 'purity'}<strong>0</strong></div>
+            <div className="rail-gate">{zh ? '裁决' : 'rulings'}<strong>23</strong></div>
           </div>
         </div>
       </aside>
@@ -159,16 +164,19 @@ export default function App() {
           <div className="topbar-id">
             <span className="topbar-dot" aria-hidden="true" />
             <strong>SC//REVIEW</strong>
-            <span className="hide-sm">/ {activeEntry.no} {activeEntry.label}</span>
-            <span className="hide-sm" style={{ color: 'var(--faint)' }}>— {activeEntry.sub}</span>
-            <span className="topbar-active-mobile">{activeEntry.no} / {activeEntry.label}</span>
+            <span className="hide-sm">/ {activeEntry.no} {navLabel(activeEntry.id)}</span>
+            <span className="hide-sm" style={{ color: 'var(--faint)' }}>— {navSub(activeEntry.id)}</span>
+            <span className="topbar-active-mobile">{activeEntry.no} / {navLabel(activeEntry.id)}</span>
           </div>
           <div className="topbar-actions">
             <button type="button" className="icon-btn" onClick={() => setPalette(true)}>
-              index <kbd>⌘K</kbd>
+              {zh ? '索引' : 'index'} <kbd>⌘K</kbd>
+            </button>
+            <button type="button" className="icon-btn" onClick={() => setLang(zh ? 'en' : 'zh')} aria-label={zh ? 'Switch to English' : '切换到中文'}>
+              {zh ? 'EN' : '中文'}
             </button>
             <button type="button" className="icon-btn" onClick={() => setTheme(theme === 'paper' ? 'night' : 'paper')}>
-              {theme === 'paper' ? 'night' : 'paper'} <span aria-hidden="true">{theme === 'paper' ? '◐' : '◑'}</span>
+              {theme === 'paper' ? (zh ? '夜间' : 'night') : (zh ? '日间' : 'paper')} <span aria-hidden="true">{theme === 'paper' ? '◐' : '◑'}</span>
             </button>
           </div>
         </header>
@@ -188,21 +196,21 @@ export default function App() {
             <div className="footer-rule rule-strong" />
             <div className="footer-grid">
               <h3>
-                The code is generated.<br />
-                The <em>design</em> is the source.
+                {zh ? '代码是生成的。' : 'The code is generated.'}<br />
+                {zh ? <>真正的地基是 <em>设计</em>。</> : <>The <em>design</em> is the source.</>}
               </h3>
               <div className="footer-meta">
-                StructureCumulus / design review 1.0<br />
-                8 design files · 11 kernel modules + adapter spec<br />
-                kernel 11 packages · 55 codes · 95 tests<br />
+                StructureCumulus / {zh ? '设计 review 1.0' : 'design review 1.0'}<br />
+                {zh ? '8 份设计文件 · 11 个 kernel 模块 + adapter 规范' : '8 design files · 11 kernel modules + adapter spec'}<br />
+                {zh ? 'kernel 11 个 package · 55 个 code · 95 个测试' : 'kernel 11 packages · 55 codes · 95 tests'}<br />
                 kernel commit 0d1218e
               </div>
             </div>
             <div className="footer-rule rule" />
             <div className="footer-small">
-              <span>English only · no mirrored spec</span>
-              <span>Adapter specified, not implemented</span>
-              <span>If they disagree, the design wins.</span>
+              <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
+              <span>{zh ? 'Adapter 只有规范，没有实现' : 'Adapter specified, not implemented'}</span>
+              <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>
         </main>

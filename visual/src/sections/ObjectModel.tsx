@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Reveal, SectionHead, Segmented } from '../components/ui';
+import { useLanguage } from '../i18n/Language';
 
 const CHAIN = [
   {
@@ -59,18 +60,48 @@ LatticePoint origin();
   },
 ];
 
+const ZH_CHAIN: Record<string, { role: string; detail: string; side: string }> = {
+  world: {
+    role: '一个不可变读取面',
+    detail: 'world 不是可变 level。它是一个冻结的递归 view：snapshot id、frame、section 网格，以及一个只回答“它还 current 吗？”的 lease。',
+    side: '嵌套 view 是同一个类型，只是 frame 不同。section key 只回答自己的 frame。',
+  },
+  bay: {
+    role: '带 coverage 和 footprint 的 cells',
+    detail: 'bay 是一个 CuboidSet。shell 不是六个合成 bay；door 是两个 cell；L 形房间是三个 box。coverage 说明 check 必须决定什么；footprint 说明 bay 拥有什么。',
+    side: 'EVERY_CELL · ONE_SUBJECT · ANY_SUBJECT。三个词替代了整套 requirement 语言。',
+  },
+  check: {
+    role: '一个 focus × 一个 expectation',
+    detail: 'focus 取一个 subject，expectation 检验它，check 是两者唯一相遇的地方。没有 predicate registry、没有 requirement 对象、没有第二条 dispatch 路径。',
+    side: 'Match、Mismatch、Unreadable、Abstain 永不合并。Mismatch 是反驳；Unreadable 是无知。',
+  },
+  blueprint: {
+    role: '完整声明',
+    detail: 'builder 一次校验 coverage、overlap、footprint、plan、anchor 和 derivation。结果是不可变的，并携带缓存 Plan：先 sections，再拓扑 aggregate 顺序，最后 checks。',
+    side: 'blueprint 是 document 编译的目标值。坏 document 返回 findings；它从不构造半成品 blueprint。',
+  },
+  outcome: {
+    role: 'values、bindings、spend',
+    detail: 'check 返回一个 outcome：折叠后的 values、每个 bay 一个 binding、read scope 和 spend。result arm 再加 revision 或 verdict；它从不藏第二个可变状态。',
+    side: 'Admitted 携带 bindings 和它读到的 revision。Formed 携带写入的 rows 和 context revision。',
+  },
+};
+
 export function ObjectModel() {
+  const { zh } = useLanguage();
   const [active, setActive] = useState('check');
   const [retention, setRetention] = useState<'INSTANCE' | 'MATCH'>('INSTANCE');
   const selected = CHAIN.find((item) => item.id === active) ?? CHAIN[2];
+  const copy = zh ? ZH_CHAIN[selected.id] : { role: selected.role, detail: selected.detail, side: selected.side };
 
   return (
     <section className="section" id="object" data-section>
       <SectionHead
         no="02"
-        kicker="The object model"
-        title={<>One meeting point. <em>No second dispatch.</em></>}
-        note={<>A check is not a rule engine. It is a focus that takes a subject and an expectation that answers. Everything else is a value around that meeting.</>}
+        kicker={zh ? '对象模型' : 'The object model'}
+        title={zh ? <>一个汇合点。<em>没有第二套 dispatch。</em></> : <>One meeting point. <em>No second dispatch.</em></>}
+        note={zh ? <>check 不是规则引擎。它是一个取 subject 的 focus 和一个负责回答的 expectation。其余一切都只是围绕这次汇合的值。</> : <>A check is not a rule engine. It is a focus that takes a subject and an expectation that answers. Everything else is a value around that meeting.</>}
       />
 
       <Reveal>
@@ -87,23 +118,23 @@ export function ObjectModel() {
                 >
                   <span className="idx">0{index + 1}</span>
                   <span className="t">{item.title}</span>
-                  <span className="r">{item.role}</span>
+                  <span className="r">{zh ? ZH_CHAIN[item.id].role : item.role}</span>
                 </button>
               ))}
             </div>
             <div className="object-detail">
               <div>
                 <h4>{selected.title}</h4>
-                <p>{selected.detail}</p>
+                <p>{copy.detail}</p>
                 <pre className="code-block sig" style={{ marginTop: 16, fontSize: 10 }}>
                   <code>{selected.signature}</code>
                 </pre>
               </div>
               <div>
-                <div className="eyebrow">The invariant</div>
-                <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12, lineHeight: 1.6 }}>{selected.side}</p>
+                <div className="eyebrow">{zh ? '不变量' : 'The invariant'}</div>
+                <p style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12, lineHeight: 1.6 }}>{copy.side}</p>
                 <div style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid var(--line)' }}>
-                  <div className="mono muted">the only meeting</div>
+                  <div className="mono muted">{zh ? '唯一的汇合' : 'the only meeting'}</div>
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span className="tag">Focus</span>
                     <span className="mono muted">×</span>
@@ -117,11 +148,12 @@ export function ObjectModel() {
           </div>
 
           <aside className="object-side">
-            <div className="eyebrow">The one key</div>
+            <div className="eyebrow">{zh ? '唯一的 key' : 'The one key'}</div>
             <div className="big">ContextKey&lt;T&gt;</div>
             <p>
-              Identity is the tuple. A key with the same id but a different Java type is a different key;
-              there is no lookup by string.
+              {zh
+                ? '身份就是整个元组。同一个 id、不同 Java 类型的 key 就是两个 key；没有按字符串查找。'
+                : 'Identity is the tuple. A key with the same id but a different Java type is a different key; there is no lookup by string.'}
             </p>
             <div className="key-diagram">
               <div className="key-row"><span className="k">id</span><span className="v">mymod:air_cells</span></div>
@@ -135,19 +167,18 @@ export function ObjectModel() {
                 value={retention}
                 options={[{ value: 'INSTANCE', label: 'instance' }, { value: 'MATCH', label: 'match' }]}
                 onChange={setRetention}
-                label="Context retention"
+                label={zh ? 'context retention' : 'Context retention'}
               />
             </div>
             <div className="key-state" data-instance={retention === 'INSTANCE'}>
               {retention === 'INSTANCE'
-                ? 'published once by settle or derive'
-                : 'attempt-local; never published'}
+                ? (zh ? '由 settle 或 derive 发布一次' : 'published once by settle or derive')
+                : (zh ? 'attempt 局部；从不发布' : 'attempt-local; never published')}
             </div>
             <div className="aside-rule" />
-            <div className="eyebrow">A note on absence</div>
+            <div className="eyebrow">{zh ? '关于缺席' : 'A note on absence'}</div>
             <p style={{ marginTop: 8 }}>
-              <code>Outcome</code>, <code>FocusResult</code>, <code>Reply</code> and <code>MatchResult</code>
-              {' '}are four different questions. The design keeps four types instead of one nullable value.
+              {zh ? <>四个不同的提问：<code>Outcome</code>、<code>FocusResult</code>、<code>Reply</code>、<code>MatchResult</code>。设计保留四种类型，而不是一个可空值。</> : <><code>Outcome</code>, <code>FocusResult</code>, <code>Reply</code> and <code>MatchResult</code>{' '}are four different questions. The design keeps four types instead of one nullable value.</>}
             </p>
           </aside>
         </div>

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MODULES, NAV, type ModuleId, type SectionId } from '../data/site';
+import { ZH_MODULES, ZH_NAV } from '../data/site.zh';
+import { useLanguage } from '../i18n/Language';
 
 type Item =
   | { kind: 'section'; id: SectionId; label: string; no: string; hint: string }
@@ -16,6 +18,7 @@ export function CommandPalette({
   onSection: (id: SectionId) => void;
   onModule: (id: ModuleId) => void;
 }) {
+  const { zh } = useLanguage();
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,22 +28,22 @@ export function CommandPalette({
     const sections: Item[] = NAV.map((entry) => ({
       kind: 'section',
       id: entry.id,
-      label: entry.label,
+      label: zh ? ZH_NAV[entry.id].label : entry.label,
       no: entry.no,
-      hint: entry.sub,
+      hint: zh ? ZH_NAV[entry.id].sub : entry.sub,
     }));
     const modules: Item[] = MODULES.map((entry) => ({
       kind: 'module',
       id: entry.id,
       label: `kernel.${entry.id}`,
       no: `R${entry.rank}`,
-      hint: entry.owns,
+      hint: zh ? ZH_MODULES[entry.id].owns : entry.owns,
     }));
     const all = [...sections, ...modules];
     const q = query.trim().toLowerCase();
     if (!q) return all;
     return all.filter((item) => `${item.label} ${item.hint} ${item.no}`.toLowerCase().includes(q));
-  }, [query]);
+  }, [query, zh]);
 
   useEffect(() => {
     if (!open) return;
@@ -102,23 +105,23 @@ export function CommandPalette({
 
   return (
     <div className="palette-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <div ref={dialogRef} className="palette" role="dialog" aria-modal="true" aria-label="Review index">
+      <div ref={dialogRef} className="palette" role="dialog" aria-modal="true" aria-label={zh ? 'Review 索引' : 'Review index'}>
         <input
           ref={inputRef}
           className="palette-input"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Jump to a chapter or package…"
-          aria-label="Search review index"
+          placeholder={zh ? '跳到章节或 package…' : 'Jump to a chapter or package…'}
+          aria-label={zh ? '搜索 review 索引' : 'Search review index'}
         />
         <div className="palette-list">
           {items.length === 0 ? (
-            <div className="palette-group">No matches</div>
+            <div className="palette-group">{zh ? '没有匹配' : 'No matches'}</div>
           ) : (
             items.map((item, itemIndex) => (
               <div key={`${item.kind}-${item.id}`}>
                 {itemIndex === 0 || item.kind !== items[itemIndex - 1]?.kind ? (
-                  <div className="palette-group">{item.kind === 'section' ? 'Chapters' : 'Kernel packages'}</div>
+                  <div className="palette-group">{item.kind === 'section' ? (zh ? '章节' : 'Chapters') : (zh ? '内核 package' : 'Kernel packages')}</div>
                 ) : null}
                 <button
                   type="button"
@@ -139,8 +142,8 @@ export function CommandPalette({
           )}
         </div>
         <div className="palette-foot">
-          <span><span className="palette-kbd">↑↓</span> navigate · <span className="palette-kbd">↵</span> open</span>
-          <span><span className="palette-kbd">esc</span> close</span>
+          <span><span className="palette-kbd">↑↓</span> {zh ? '选择' : 'navigate'} · <span className="palette-kbd">↵</span> {zh ? '打开' : 'open'}</span>
+          <span><span className="palette-kbd">esc</span> {zh ? '关闭' : 'close'}</span>
         </div>
       </div>
     </div>

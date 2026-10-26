@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { MODULES, MODULE_BY_ID, type ModuleId } from '../data/site';
+import { ZH_MODULES } from '../data/site.zh';
+import { useLanguage } from '../i18n/Language';
 
 const NODE_H = 34;
 const STEP = 34;
@@ -265,15 +267,16 @@ function stackLayout(w: number): Geo {
 }
 
 function EdgeLedger({ flow = false }: { flow?: boolean }) {
+  const { zh } = useLanguage();
   return (
     <div className={flow ? 'lg-ledger lg-ledger-flow' : 'lg-ledger'}>
       <p className="lg-ledger-title">
-        Edge ledger <span>03-modules.md §1</span>
+        {zh ? '边账本' : 'Edge ledger'} <span>03-modules.md §1</span>
       </p>
       <p className="lg-ledger-count">
-        <b>{EDGES.length}</b> imports of <b>{COMPARABLE.length}</b> comparable pairs
+        <b>{EDGES.length}</b> {zh ? '条 import / ' : 'imports of '}<b>{COMPARABLE.length}</b> {zh ? '对可比 package' : 'comparable pairs'}
       </p>
-      <p className="lg-ledger-sub">absent — no import runs this way</p>
+      <p className="lg-ledger-sub">{zh ? '缺失 — 没有 import 走这个方向' : 'absent — no import runs this way'}</p>
       <ul className="lg-absent">
         {ABSENT.map(([from, to]) => (
           <li key={`${from}-${to}`}>
@@ -284,7 +287,7 @@ function EdgeLedger({ flow = false }: { flow?: boolean }) {
           </li>
         ))}
       </ul>
-      <p className="lg-ledger-note">0 cycles · edge table checked</p>
+      <p className="lg-ledger-note">{zh ? '0 循环 · 边表已检查' : '0 cycles · edge table checked'}</p>
     </div>
   );
 }
@@ -314,7 +317,9 @@ function Chip({ id, dir, onSelect }: { id: ModuleId; dir: 'dep' | 'rev'; onSelec
 }
 
 function Inspector({ id, onSelect }: { id: ModuleId; onSelect: (id: ModuleId) => void }) {
+  const { zh } = useLanguage();
   const m = MODULE_BY_ID[id];
+  const copy = zh ? ZH_MODULES[id] : { owns: m.owns, law: m.law };
   const imports = [...m.imports].sort((a, b) => K[a] - K[b]);
   const importers = IMPORTED_BY[id];
   return (
@@ -326,7 +331,7 @@ function Inspector({ id, onSelect }: { id: ModuleId; onSelect: (id: ModuleId) =>
           <span> / 09</span>
         </p>
         <p className="lg-rank-fig">
-          {imports.length} imports · {importers.length} importers
+          {imports.length} {zh ? '条 import' : 'imports'} · {importers.length} {zh ? '个 importer' : 'importers'}
         </p>
       </div>
       <div className="lg-insp-main">
@@ -334,23 +339,23 @@ function Inspector({ id, onSelect }: { id: ModuleId; onSelect: (id: ModuleId) =>
           <span>kernel.</span>
           {m.id}
         </h3>
-        <p className="lg-law">“{m.law}”</p>
+        <p className="lg-law">“{copy.law}”</p>
         <p className="lg-owns">
-          <span className="lg-label">Owns</span>
-          {m.owns}
+          <span className="lg-label">{zh ? '拥有' : 'Owns'}</span>
+          {copy.owns}
         </p>
         <p className="lg-doc">
-          <span className="lg-label">Normative file</span>
+          <span className="lg-label">{zh ? '规范文件' : 'Normative file'}</span>
           {m.doc}
         </p>
       </div>
       <div className="lg-insp-edges" data-dir="dep">
         <p className="lg-label">
-          Imports <b>{imports.length}</b>
+          {zh ? 'import 自' : 'Imports'} <b>{imports.length}</b>
         </p>
         <div className="lg-chips">
           {imports.length === 0 ? (
-            <p className="lg-none">nothing — the base</p>
+            <p className="lg-none">{zh ? '什么都没有 — 基座' : 'nothing — the base'}</p>
           ) : (
             imports.map((x) => <Chip key={x} id={x} dir="dep" onSelect={onSelect} />)
           )}
@@ -358,11 +363,11 @@ function Inspector({ id, onSelect }: { id: ModuleId; onSelect: (id: ModuleId) =>
       </div>
       <div className="lg-insp-edges" data-dir="rev">
         <p className="lg-label">
-          Imported by <b>{importers.length}</b>
+          {zh ? '被 import' : 'Imported by'} <b>{importers.length}</b>
         </p>
         <div className="lg-chips">
           {importers.length === 0 ? (
-            <p className="lg-none">nothing — the root</p>
+            <p className="lg-none">{zh ? '什么都没有 — 根' : 'nothing — the root'}</p>
           ) : (
             importers.map((x) => <Chip key={x} id={x} dir="rev" onSelect={onSelect} />)
           )}
@@ -425,7 +430,9 @@ export function LatticeGraph({ focus }: { focus?: ModuleId | null }) {
     nodeRefs.current.get(nextId)?.focus();
   };
 
+  const { zh } = useLanguage();
   const selectedModule = MODULE_BY_ID[selected];
+  const selectedCopy = zh ? ZH_MODULES[selected] : { owns: selectedModule.owns, law: selectedModule.law };
 
   return (
     <div className="lg-shell" ref={shellRef}>
@@ -433,21 +440,21 @@ export function LatticeGraph({ focus }: { focus?: ModuleId | null }) {
         <div className="lg-head">
           <p className="lg-meta">
             <span>
-              <b>{N}</b> packages
+              <b>{N}</b> {zh ? '个 package' : 'packages'}
             </span>
             <span className="lg-sep" />
             <span>
-              <b>{EDGES.length}</b> edges
+              <b>{EDGES.length}</b> {zh ? '条边' : 'edges'}
             </span>
             <span className="lg-sep" />
-            <span className="lg-ok">0 cycles / edge table checked</span>
+            <span className="lg-ok">{zh ? '0 循环 / 边表已检查' : '0 cycles / edge table checked'}</span>
           </p>
-          <div className="lg-seg" role="group" aria-label="Edge display">
+          <div className="lg-seg" role="group" aria-label={zh ? '边的显示' : 'Edge display'}>
             <button type="button" aria-pressed={traceOnly} data-active={traceOnly} onClick={() => setTraceOnly(true)}>
-              trace
+              {zh ? '追踪' : 'trace'}
             </button>
             <button type="button" aria-pressed={!traceOnly} data-active={!traceOnly} onClick={() => setTraceOnly(false)}>
-              all edges
+              {zh ? '全部边' : 'all edges'}
             </button>
           </div>
         </div>
@@ -618,13 +625,13 @@ export function LatticeGraph({ focus }: { focus?: ModuleId | null }) {
               {geo.mode === 'plate' ? (
                 <div className="lg-dir" aria-hidden="true">
                   <span>
-                    <b>imports only</b>
+                    <b>{zh ? '只有 import' : 'imports only'}</b>
                   </span>
-                  <span>rank 00 → 09</span>
+                  <span>{zh ? 'rank 00 → 09' : 'rank 00 → 09'}</span>
                 </div>
               ) : (
                 <div className="lg-dir lg-dir-stack" aria-hidden="true">
-                  <span>imports ↑</span>
+                  <span>{zh ? 'import ↑' : 'imports ↑'}</span>
                 </div>
               )}
 
@@ -643,7 +650,7 @@ export function LatticeGraph({ focus }: { focus?: ModuleId | null }) {
 
               {geo.nodes.map((node) => {
                 const module = MODULE_BY_ID[node.id];
-                const owns = module.owns.split(' · ');
+                const owns = (zh ? ZH_MODULES[module.id].owns : module.owns).split(' · ');
                 const extra = owns.length - 1;
                 const active = node.id === selected;
                 const hover = node.id === hovered && !active;
@@ -673,7 +680,7 @@ export function LatticeGraph({ focus }: { focus?: ModuleId | null }) {
                     onClick={() => select(node.id)}
                     onKeyDown={(event) => onNodeKeyDown(event, node.id)}
                     aria-pressed={active}
-                    aria-label={`${node.id}, rank ${node.rank}, ${DEP_COUNT[node.id]} imports, ${IMPORTED_BY[node.id].length} importers`}
+                    aria-label={zh ? `${node.id}，rank ${node.rank}，${DEP_COUNT[node.id]} 条 import，${IMPORTED_BY[node.id].length} 个 importer` : `${node.id}, rank ${node.rank}, ${DEP_COUNT[node.id]} imports, ${IMPORTED_BY[node.id].length} importers`}
                   >
                     <span className="lg-node-name" style={{ fontSize: node.nameFs }}>
                       {node.id}
@@ -693,24 +700,24 @@ export function LatticeGraph({ focus }: { focus?: ModuleId | null }) {
 
         <div className="lg-foot">
           <p>
-            Fig. 01 — the edge table, drawn
+            {zh ? '图 01 — 画出来的边表' : 'Fig. 01 — the edge table, drawn'}
             <span className="lg-foot-sep">/</span>
             <span className="lg-trace-read">
-              trace <b>{activeModule.id}</b> <span className="lg-foot-dim">{activeDeps} imports · {activeRev} importers</span>
+              {zh ? '追踪' : 'trace'} <b>{activeModule.id}</b> <span className="lg-foot-dim">{activeDeps} {zh ? '条 import' : 'imports'} · {activeRev} {zh ? '个 importer' : 'importers'}</span>
             </span>
           </p>
           <ul className="lg-legend">
             <li data-k="dep">
               <Mark kind="dep" />
-              <span>imports</span>
+              <span>{zh ? 'import' : 'imports'}</span>
             </li>
             <li data-k="rev">
               <Mark kind="rev" />
-              <span>imported by</span>
+              <span>{zh ? '被 import' : 'imported by'}</span>
             </li>
             <li data-k="ghost">
               <Mark kind="ghost" />
-              <span>other edge</span>
+              <span>{zh ? '其他边' : 'other edge'}</span>
             </li>
           </ul>
         </div>
@@ -721,8 +728,8 @@ export function LatticeGraph({ focus }: { focus?: ModuleId | null }) {
       </div>
 
       <p className="lg-sr" aria-live="polite">
-        {selectedModule.id}, rank {selectedModule.rank}, {DEP_COUNT[selected]} imports,{' '}
-        {IMPORTED_BY[selected].length} importers
+        {selectedModule.id}, rank {selectedModule.rank}, {DEP_COUNT[selected]} {zh ? '条 import' : 'imports'},{' '}
+        {IMPORTED_BY[selected].length} {zh ? '个 importer' : 'importers'}
       </p>
     </div>
   );

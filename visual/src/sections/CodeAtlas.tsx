@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { CODE_COUNT, codes } from '../data/codes';
 import { Reveal, SectionHead } from '../components/ui';
 import { BundleLab } from '../components/BundleLab';
+import { CODE_ZH } from '../data/codes.zh';
+import { useLanguage } from '../i18n/Language';
 
 const FAMILY_ORDER = ['SPC', 'OCC', 'EXP', 'CLM', 'BPT', 'CHK', 'DOC', 'CTX', 'ENG', 'DIA', 'RMD', 'SPI'];
 
@@ -12,6 +14,7 @@ function severityClass(severity: string) {
 }
 
 export function CodeAtlas() {
+  const { zh } = useLanguage();
   const [query, setQuery] = useState('');
   const [family, setFamily] = useState('all');
   const [selected, setSelected] = useState('SC-CLM-0001');
@@ -26,9 +29,10 @@ export function CodeAtlas() {
     return ordered.filter((entry) => {
       if (family !== 'all' && entry.family !== family) return false;
       if (!q) return true;
-      return `${entry.code} ${entry.summary} ${entry.body} ${entry.producer}`.toLowerCase().includes(q);
+      const zhText = CODE_ZH[entry.code];
+      return `${entry.code} ${entry.summary} ${entry.body} ${entry.producer} ${zhText?.summary ?? ''} ${zhText?.body ?? ''}`.toLowerCase().includes(q);
     });
-  }, [query, family, ordered]);
+  }, [query, family, ordered, zh]);
 
   const selectedCode = filtered.find((entry) => entry.code === selected) ?? filtered[0] ?? null;
 
@@ -47,9 +51,9 @@ export function CodeAtlas() {
     <section className="section" id="codes" data-section>
       <SectionHead
         no="06"
-        kicker="Findings / the report layer"
-        title={<>A finding is a <em>value</em>, not an event.</>}
-        note={<>One code table, one severity, one producer. The bundle sorts, dedupes and caps; the engine never prints and the renderer never decides.</>}
+        kicker={zh ? 'finding / 报告层' : 'Findings / the report layer'}
+        title={zh ? <>finding 是一个<em>值</em>，不是事件。</> : <>A finding is a <em>value</em>, not an event.</>}
+        note={zh ? <>一张 code 表，一个 severity，一个 producer。bundle 负责排序、去重和截断；engine 从不打印，renderer 从不做决定。</> : <>One code table, one severity, one producer. The bundle sorts, dedupes and caps; the engine never prints and the renderer never decides.</>}
       />
 
       <Reveal>
@@ -81,19 +85,19 @@ export function CodeAtlas() {
                   className="input"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="search code, message, producer…"
-                  aria-label="Search finding codes"
+                  placeholder={zh ? '搜索 code、消息、producer…' : 'search code, message, producer…'}
+                  aria-label={zh ? '搜索 finding code' : 'Search finding codes'}
                 />
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, paddingTop: 9, flexWrap: 'wrap' }}>
               <div className="ledger-legend">
-                <span><i style={{ background: 'var(--accent)' }} />error</span>
-                <span><i style={{ background: 'var(--ochre)' }} />warning</span>
-                <span><i style={{ background: 'var(--blue)' }} />info</span>
+                <span><i style={{ background: 'var(--accent)' }} />{zh ? '错误' : 'error'}</span>
+                <span><i style={{ background: 'var(--ochre)' }} />{zh ? '警告' : 'warning'}</span>
+                <span><i style={{ background: 'var(--blue)' }} />{zh ? '信息' : 'info'}</span>
               </div>
-              <span className="mono muted">{filtered.length} / {CODE_COUNT} codes · 12 kernel families + MC</span>
+              <span className="mono muted">{filtered.length} / {CODE_COUNT} {zh ? '个 code · 12 个 kernel family + MC' : 'codes · 12 kernel families + MC'}</span>
             </div>
 
             <div className="atlas-list">
@@ -109,22 +113,22 @@ export function CodeAtlas() {
                     <i className="sev" data-sev={entry.severity} />
                     {entry.code}
                   </span>
-                  <span className="sum">{entry.summary}</span>
+                  <span className="sum">{zh ? CODE_ZH[entry.code]?.summary ?? entry.summary : entry.summary}</span>
                 </button>
               ))}
             </div>
-            {filtered.length === 0 ? <div className="code-empty">No code matches this filter.</div> : null}
+            {filtered.length === 0 ? <div className="code-empty">{zh ? '没有 code 匹配这个筛选。' : 'No code matches this filter.'}</div> : null}
 
             <div className="figure-label">
-              <span>Fig. 06 — the code atlas</span>
-              <span>SC-&lt;family&gt;-&lt;NNNN&gt; · one producer per row</span>
+              <span>{zh ? '图 06 — code 图谱' : 'Fig. 06 — the code atlas'}</span>
+              <span>SC-&lt;family&gt;-&lt;NNNN&gt; · {zh ? '每行一个 producer' : 'one producer per row'}</span>
             </div>
           </div>
 
           <aside className="code-side">
             {selectedCode ? (
               <>
-            <div className="eyebrow">Selected code</div>
+            <div className="eyebrow">{zh ? '选中的 code' : 'Selected code'}</div>
             <div className="big-code" style={{ marginTop: 8 }}>{selectedCode.code}</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
               <span className={`tag ${severityClass(selectedCode.severity)}`}>{selectedCode.severity}</span>
@@ -134,30 +138,27 @@ export function CodeAtlas() {
               <span>SC</span><span>{selectedCode.family}</span><span>{String(selectedCode.number).padStart(4, '0')}</span>
             </div>
             <div className="code-detail">
-              <h4>{selectedCode.summary}</h4>
-              <p>{selectedCode.body}</p>
+              <h4>{zh ? CODE_ZH[selectedCode.code]?.summary ?? selectedCode.summary : selectedCode.summary}</h4>
+              <p>{zh ? CODE_ZH[selectedCode.code]?.body ?? selectedCode.body : selectedCode.body}</p>
               <div className="producer">
-                <strong>Producer</strong>{" "}
+                <strong>{zh ? '产生者' : 'Producer'}</strong>{" "}
                 {selectedCode.producer || 'documented host boundary'}
               </div>
               <div className="producer">
-                <strong>Stable identity</strong>{" "}
-                {selectedCode.code} · never reused, never renumbered
+                <strong>{zh ? '稳定身份' : 'Stable identity'}</strong>{" "}
+                {selectedCode.code} · {zh ? '永不复用，永不重编号' : 'never reused, never renumbered'}
               </div>
             </div>
             <div className="aside-rule" />
             <div className="mono muted" style={{ lineHeight: 1.7, fontSize: 8 }}>
-              THE BUNDLE<br />
-              ERROR never capped · warnings may elide<br />
-              one SC-DIA-0001 truncation tail<br />
-              human and JSON projections share one value
+              {zh ? <>BUNDLE<br />ERROR 从不截断 · warning 可能省略<br />一条 SC-DIA-0001 截断尾巴<br />human 与 JSON 投影共享同一个值</> : <>THE BUNDLE<br />ERROR never capped · warnings may elide<br />one SC-DIA-0001 truncation tail<br />human and JSON projections share one value</>}
             </div>
             <div style={{ marginTop: 18 }}>
-              <div className="tag tag-green"><span className="dot" /> 55 registered · one table</div>
+              <div className="tag tag-green"><span className="dot" /> {zh ? '55 个已注册 · 一张表' : '55 registered · one table'}</div>
             </div>
               </>
             ) : (
-              <div className="code-empty" style={{ marginTop: 0 }}>No code matches this filter.</div>
+              <div className="code-empty" style={{ marginTop: 0 }}>{zh ? '没有 code 匹配这个筛选。' : 'No code matches this filter.'}</div>
             )}
           </aside>
         </div>

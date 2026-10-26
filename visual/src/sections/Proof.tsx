@@ -2,16 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { decisions, DECISION_COUNT } from '../data/decisions';
 import { TEST_GROUPS, TEST_COUNT, testClasses } from '../data/tests';
 import { DOCS, GATES } from '../data/site';
+import { DECISION_ZH } from '../data/decisions.zh';
+import { ZH_DOCS, ZH_GATES, ZH_GROUPS } from '../data/site.zh';
+import { useLanguage } from '../i18n/Language';
 import { Reveal, SectionHead } from '../components/ui';
 
 const REGEN = [
-  { n: '01', t: 'Archive', d: 'tar the old tree; never migrate it' },
-  { n: '02', t: 'Delete', d: 'kernel, tests, util and docs/spec' },
-  { n: '03', t: 'Write', d: 'requirements → constitution → model' },
-  { n: '04', t: 'Split', d: 'eleven ranked kernel modules + adapter spec' },
-  { n: '05', t: 'Generate', d: 'skeleton, then implementation' },
-  { n: '06', t: 'Prove', d: 'javac, JUnit, purity, spec-check' },
-  { n: '07', t: 'Review', d: 'attack the design, not the prose' },
+  { n: '01', t: 'Archive', tZh: '归档', d: 'tar the old tree; never migrate it', dZh: '把旧树 tar 起来；绝不迁移' },
+  { n: '02', t: 'Delete', tZh: '删除', d: 'kernel, tests, util and docs/spec', dZh: 'kernel、tests、util 和 docs/spec' },
+  { n: '03', t: 'Write', tZh: '书写', d: 'requirements → constitution → model', dZh: 'requirements → constitution → model' },
+  { n: '04', t: 'Split', tZh: '拆分', d: 'eleven ranked kernel modules + adapter spec', dZh: '十一个 rank 化的 kernel 模块 + adapter 规范' },
+  { n: '05', t: 'Generate', tZh: '生成', d: 'skeleton, then implementation', dZh: '先骨架，再实现' },
+  { n: '06', t: 'Prove', tZh: '证明', d: 'javac, JUnit, purity, spec-check', dZh: 'javac、JUnit、purity、spec-check' },
+  { n: '07', t: 'Review', tZh: 'Review', d: 'attack the design, not the prose', dZh: '攻击设计，不是散文' },
 ];
 
 const FALSIFIERS = [
@@ -23,6 +26,15 @@ const FALSIFIERS = [
   { claim: 'A missing section contribution is CTX-0001, not CTX-0006', gate: 'aMissingSectionContributionIsAComputationFailure', detail: 'unreadable fold stays a different code' },
 ];
 
+const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
+  sectionComputationMapsThroughSiting: { claim: 'section computation 通过 siting 读 world', detail: '非零 origin + 被拒绝的 local section' },
+  aNoOpReleaseKeepsRevisionZero: { claim: 'no-op release 可以保持 revision 0', detail: '新 ledger，空 release' },
+  campfireChecksSettlesAndDerives: { claim: 'derive 不会重复收取 settle 的 spend', detail: '两次调用都等于 settle spend' },
+  aClippedEntityFootprintIsUnreadable: { claim: '被裁剪的 entity 是 unreadable，不是 clipped match', detail: '没有写入任何 row' },
+  documentBuildErrorsKeepTheirSpecificCode: { claim: 'document 构建错误保留具体 code', detail: 'exclusive bays 重叠 → SC-BPT-0002' },
+  aMissingSectionContributionIsAComputationFailure: { claim: '缺失 section contribution 是 CTX-0001，不是 CTX-0006', detail: 'unreadable fold 仍是另一个 code' },
+};
+
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
@@ -33,6 +45,7 @@ $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
   none`;
 
 export function Proof() {
+  const { zh } = useLanguage();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState('D-22');
   const [copied, setCopied] = useState<string | null>(null);
@@ -40,8 +53,11 @@ export function Proof() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return decisions;
-    return decisions.filter((decision) => `${decision.id} ${decision.title} ${decision.summary}`.toLowerCase().includes(q));
-  }, [query]);
+    return decisions.filter((decision) => {
+      const zhText = DECISION_ZH[decision.id];
+      return `${decision.id} ${decision.title} ${decision.summary} ${zhText?.title ?? ''} ${zhText?.summary ?? ''}`.toLowerCase().includes(q);
+    });
+  }, [query, zh]);
 
   const active = filtered.find((decision) => decision.id === selected) ?? filtered[0] ?? null;
 
@@ -67,26 +83,29 @@ export function Proof() {
     <section className="section" id="proof" data-section>
       <SectionHead
         no="07"
-        kicker="Proof / the review closes"
-        title={<>A design is only real if it can <em>run.</em></>}
-        note={<>Six gates, 95 tests, 55 codes and 23 decisions. Five gates are green; determinism was not run in this sandbox. The adapter is deliberately absent from this round; the kernel is not.</>}
+        kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
+        title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
+        note={zh ? <>六道 gate、95 个测试、55 个 code、23 条决策。五道 gate 通过；determinism 在沙箱里没有运行。adapter 在这一轮刻意缺席；kernel 不是。</> : <>Six gates, 95 tests, 55 codes and 23 decisions. Five gates are green; determinism was not run in this sandbox. The adapter is deliberately absent from this round; the kernel is not.</>}
       />
 
       <Reveal>
         <div className="proof-top">
           <div className="proof-gates">
-            <div className="eyebrow">Current gate report / 2026.10.26</div>
+            <div className="eyebrow">{zh ? '当前 gate 报告 / 2026.10.26' : 'Current gate report / 2026.10.26'}</div>
             <div className="gate-grid" style={{ marginTop: 12 }}>
-              {GATES.map((gate) => (
-                <div className="gate" key={gate.label}>
-                  <span className="v">{gate.value}</span>
-                  <span className="l">{gate.label}</span>
-                  <span className="n">{gate.note}</span>
-                </div>
-              ))}
+              {GATES.map((gate) => {
+                const copy = zh ? ZH_GATES[gate.label] : gate;
+                return (
+                  <div className="gate" key={gate.label}>
+                    <span className="v">{gate.value}</span>
+                    <span className="l">{copy.label}</span>
+                    <span className="n">{copy.note}</span>
+                  </div>
+                );
+              })}
             </div>
             <div className="test-bars">
-              <div className="eyebrow" style={{ marginBottom: 4 }}>Tests by package</div>
+              <div className="eyebrow" style={{ marginBottom: 4 }}>{zh ? '按 package 的测试' : 'Tests by package'}</div>
               {TEST_GROUPS.map((group) => (
                 <div className="test-bar" key={group.name}>
                   <span>{group.name}</span>
@@ -95,7 +114,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} tests / {testClassCount} classes · 15 JUnit containers
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 15 JUnit containers
               </div>
             </div>
           </div>
@@ -110,7 +129,7 @@ export function Proof() {
             <div style={{ height: 8 }} />
             <div className="warn">warn: Gradle/Spotless were not run; compile is the direct javac harness, not the shipping build.</div>
             <div style={{ height: 14 }} />
-            <div className="cmd">Next attack: adapter implementation, not the kernel.</div>
+            <div className="cmd">{zh ? '下一个攻击点：adapter 实现，不是 kernel。' : 'Next attack: adapter implementation, not the kernel.'}</div>
           </div>
         </div>
       </Reveal>
@@ -119,18 +138,18 @@ export function Proof() {
         <div className="falsifiers">
           <div className="falsifiers-head">
             <div>
-              <div className="eyebrow">Falsifiers / six ways this review could be wrong</div>
-              <div className="mono muted" style={{ marginTop: 4 }}>Each claim has a test that would fail loudly if the design regressed.</div>
+              <div className="eyebrow">{zh ? 'Falsifier / 这个 review 可能错的六种方式' : 'Falsifiers / six ways this review could be wrong'}</div>
+              <div className="mono muted" style={{ marginTop: 4 }}>{zh ? '每个主张都有一个测试；设计退化时它会大声失败。' : 'Each claim has a test that would fail loudly if the design regressed.'}</div>
             </div>
-            <span className="stamp">all green</span>
+            <span className="stamp">{zh ? '全部通过' : 'all green'}</span>
           </div>
           <div className="falsifier-grid">
             {FALSIFIERS.map((item) => (
               <div className="falsifier" key={item.gate}>
-                <div className="falsifier-claim">{item.claim}</div>
+                <div className="falsifier-claim">{zh ? FALSIFIER_ZH[item.gate].claim : item.claim}</div>
                 <div className="falsifier-gate">{item.gate}</div>
-                <div className="falsifier-detail">{item.detail}</div>
-                <span className="tag tag-green">pass</span>
+                <div className="falsifier-detail">{zh ? FALSIFIER_ZH[item.gate].detail : item.detail}</div>
+                <span className="tag tag-green">{zh ? '通过' : 'pass'}</span>
               </div>
             ))}
           </div>
@@ -142,11 +161,11 @@ export function Proof() {
           <div className="decision-main">
             <div className="decision-toolbar">
               <div>
-                <div className="eyebrow">Decision ledger / {DECISION_COUNT} rulings</div>
-                <div className="mono muted" style={{ marginTop: 4 }}>Every ruling replaced a previous design; none is a preference.</div>
+                <div className="eyebrow">{zh ? '决策账本' : 'Decision ledger'} / {DECISION_COUNT} rulings</div>
+                <div className="mono muted" style={{ marginTop: 4 }}>{zh ? '每条 ruling 都替换了旧设计；没有一条只是偏好。' : 'Every ruling replaced a previous design; none is a preference.'}</div>
               </div>
               <div style={{ width: 'min(100%, 260px)' }}>
-                <input className="input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="search decisions…" aria-label="Search decisions" />
+                <input className="input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={zh ? '搜索决策…' : 'search decisions…'} aria-label={zh ? '搜索决策' : 'Search decisions'} />
               </div>
             </div>
 
@@ -160,24 +179,24 @@ export function Proof() {
                   onClick={() => setSelected(decision.id)}
                 >
                   <span className="id">{decision.id}</span>
-                  <span className="title">{decision.title}</span>
-                  <span className="summary">{decision.summary}</span>
+                  <span className="title">{zh ? DECISION_ZH[decision.id]?.title ?? decision.title : decision.title}</span>
+                  <span className="summary">{zh ? DECISION_ZH[decision.id]?.summary ?? decision.summary : decision.summary}</span>
                 </button>
               ))}
             </div>
-            {filtered.length === 0 ? <div className="code-empty">No decision matches this filter.</div> : null}
+            {filtered.length === 0 ? <div className="code-empty">{zh ? '没有决策匹配这个筛选。' : 'No decision matches this filter.'}</div> : null}
           </div>
 
           <aside className="decision-side">
             {active ? (
               <div className="decision-detail" key={active.id}>
                 <div className="id">{active.id} / ruling</div>
-                <h4>{active.title}</h4>
-                <p>{active.summary}</p>
+                <h4>{zh ? DECISION_ZH[active.id]?.title ?? active.title : active.title}</h4>
+                <p>{zh ? DECISION_ZH[active.id]?.summary ?? active.summary : active.summary}</p>
                 <div className="producer"><strong>Source</strong>{" "}docs/design/05-decisions.md</div>
               </div>
             ) : (
-              <div className="code-empty">No ruling selected.</div>
+              <div className="code-empty">{zh ? '没有选中 ruling。' : 'No ruling selected.'}</div>
             )}
           </aside>
         </div>
@@ -185,13 +204,13 @@ export function Proof() {
 
       <Reveal delay={120}>
         <div style={{ marginTop: 34 }}>
-          <div className="eyebrow">Regeneration protocol / one direction</div>
+          <div className="eyebrow">{zh ? '重生协议 / 一个方向' : 'Regeneration protocol / one direction'}</div>
           <div className="regen">
             {REGEN.map((step) => (
               <div className="regen-step" key={step.n}>
                 <span className="n">{step.n}</span>
-                <span className="t">{step.t}</span>
-                <span className="d">{step.d}</span>
+                <span className="t">{zh ? step.tZh : step.t}</span>
+                <span className="d">{zh ? step.dZh : step.d}</span>
               </div>
             ))}
           </div>
@@ -199,15 +218,15 @@ export function Proof() {
 
         <div style={{ marginTop: 30 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <div className="eyebrow">Read the source / 21 documents</div>
-            <div className="mono muted">click to copy a path · English is the only authority</div>
+            <div className="eyebrow">{zh ? '读源文件 / 21 份文档' : 'Read the source / 21 documents'}</div>
+            <div className="mono muted">{zh ? '点击复制路径 · 英文是唯一权威' : 'click to copy a path · English is the only authority'}</div>
           </div>
           <div className="doc-index">
             {DOCS.map((doc) => (
               <button key={doc.file} type="button" className="doc-item" onClick={() => copy(doc.file)}>
-                <span className="g">{doc.group}</span>
-                <span className="t">{doc.title}</span>
-                <span className="f">{copied === doc.file ? 'copied to clipboard' : doc.file}</span>
+                <span className="g">{zh ? ZH_GROUPS[doc.group] ?? doc.group : doc.group}</span>
+                <span className="t">{zh ? ZH_DOCS[doc.file] ?? doc.title : doc.title}</span>
+                <span className="f">{copied === doc.file ? (zh ? '已复制到剪贴板' : 'copied to clipboard') : doc.file}</span>
               </button>
             ))}
           </div>

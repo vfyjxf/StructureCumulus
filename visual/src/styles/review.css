@@ -1156,3 +1156,48 @@ code, kbd, pre { font-family: var(--mono); }
 
 .object-detail > *, .object-main > *, .fold-main > *, .code-main > *, .ledger-main > * { min-width: 0; }
 .fold-main, .fold-side, .ledger-main, .ledger-side, .proof-gates, .terminal, .workbench-side { min-width: 0; }
+
+/* Chinese reading layer: technical identifiers stay Latin, prose gets a CJK serif and air. */
+[data-lang="zh"] {
+  --serif: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  --sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+[data-lang="zh"] .hero-title {
+  font-size: clamp(62px, 8vw, 104px);
+  line-height: 1.04;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+[data-lang="zh"] .hero-title em,
+[data-lang="zh"] .section-title em,
+[data-lang="zh"] .thesis-main h3 em,
+[data-lang="zh"] .decision-detail h4 em { font-style: normal; }
+[data-lang="zh"] .section-title {
+  font-size: clamp(42px, 4.6vw, 64px);
+  line-height: 1.08;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+[data-lang="zh"] .hero-lede { line-height: 1.75; }
+[data-lang="zh"] .section-note { line-height: 1.65; }
+[data-lang="zh"] .thesis-main h3 {
+  font-size: clamp(30px, 3.2vw, 46px);
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+[data-lang="zh"] .object-detail h4,
+[data-lang="zh"] .decision-detail h4,
+[data-lang="zh"] .fold-side-title { line-height: 1.25; }
+[data-lang="zh"] .hero-stat .l,
+[data-lang="zh"] .gate .n,
+[data-lang="zh"] .rail-gate,
+[data-lang="zh"] .figure-label { letter-spacing: 0; }
+[data-lang="zh"] .hero-stat .l { text-transform: none; }
+[data-lang="zh"] .kicker,
+[data-lang="zh"] .eyebrow { text-transform: none; letter-spacing: 0.06em; }
+[data-lang="zh"] .topbar-id,
+[data-lang="zh"] .ledger-legend,
+[data-lang="zh"] .figure-label,
+[data-lang="zh"] .lg-meta,
+[data-lang="zh"] .lg-dir,
+[data-lang="zh"] .rail-sub { text-transform: none; letter-spacing: 0.03em; }

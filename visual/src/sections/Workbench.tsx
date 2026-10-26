@@ -20,6 +20,8 @@ import {
   type TurnQuarter,
 } from '../data/campfire';
 import { CodeBlock, Reveal, SectionHead } from '../components/ui';
+import { ZH_BAYS, ZH_FURNACE, ZH_INVARIANTS, ZH_MOMENTS, ZH_QUARTERS, ZH_SITING } from '../data/campfire.zh';
+import { useLanguage } from '../i18n/Language';
 import { IsometricCampfire } from '../components/IsometricCampfire';
 import '../styles/workbench.css';
 
@@ -44,6 +46,7 @@ const worldPoint = (x: number, z: number) =>
   `${WORLD_MAP.pad + x * WORLD_MAP.cell},${WORLD_MAP.pad + z * WORLD_MAP.cell}`;
 
 export function Workbench() {
+  const { zh } = useLanguage();
   const [moment, setMoment] = useState<MomentId>('check');
   const [source, setSource] = useState<SourceId>('document');
   const [selectedBay, setSelectedBay] = useState<BayId | 'all'>('all');
@@ -58,6 +61,7 @@ export function Workbench() {
   const momentIndex = MOMENT_ORDER.indexOf(moment);
   const phaseIndex = PHASES.findIndex((entry) => entry.id === moment);
   const momentData = MOMENTS.find((entry) => entry.id === moment)!;
+  const momentZh = zh ? ZH_MOMENTS[moment] : null;
   const focusBay = hoverCell?.bay ?? hoverBay ?? (selectedBay === 'all' ? null : selectedBay);
   const focusMeta = focusBay ? BAYS.find((entry) => entry.id === focusBay)! : null;
   const selectedMeta = selectedBay === 'all' ? null : BAYS.find((entry) => entry.id === selectedBay)!;
@@ -140,15 +144,11 @@ export function Workbench() {
     <section className="section" id="workbench" data-section>
       <SectionHead
         no="03"
-        kicker="Worked example / campfire"
-        title={<>One attempt, <em>three phases</em>, then derive.</>}
-        note={
-          <>
-            The complete 3×3×3 campfire document sits beside a Java builder excerpt.
-            Walk COMPILE, CHECK and SETTLE; derive is one more pure fold on <strong>Formed</strong>,
-            not a fourth phase.
-          </>
-        }
+        kicker={zh ? '完整示例 / 营火' : 'Worked example / campfire'}
+        title={zh ? <>一次 attempt，<em>三个阶段</em>，然后 derive。</> : <>One attempt, <em>three phases</em>, then derive.</>}
+        note={zh
+          ? <>完整的 3×3×3 营火 document 放在 Java builder 摘录旁边。走 COMPILE、CHECK、SETTLE；derive 是作用在 <strong>Formed</strong> 上的又一次纯折叠，不是第四个阶段。</>
+          : <>The complete 3×3×3 campfire document sits beside a Java builder excerpt. Walk COMPILE, CHECK and SETTLE; derive is one more pure fold on <strong>Formed</strong>, not a fourth phase.</>}
       />
 
       <Reveal>
@@ -184,7 +184,7 @@ export function Workbench() {
               </div>
 
               <div className="wb-chamber-sub">
-                <span>3×3×3 · 27 cells · shell 25 / hollow 1 / fire 1</span>
+                <span>{zh ? '3×3×3 · 27 个 cell · shell 25 / hollow 1 / fire 1' : '3×3×3 · 27 cells · shell 25 / hollow 1 / fire 1'}</span>
                 <span>
                   {exploded ? 'three layers / separated' : cutaway ? 'near octant / x-ray' : 'shell closed'}
                 </span>
@@ -215,7 +215,7 @@ export function Workbench() {
                     onClick={() => selectBay('all')}
                   >
                     <span className="wb-bay-swatch wb-swatch-all" />
-                    <span className="wb-bay-name">all bays</span>
+                    <span className="wb-bay-name">{zh ? '全部 bays' : 'all bays'}</span>
                     <span className="wb-bay-count">27</span>
                   </button>
                   {BAYS.map((entry) => (
@@ -251,17 +251,17 @@ export function Workbench() {
                     </div>
                     <p>
                       {hoverCell
-                        ? `${hoverCell.bay} cell — click to select the bay`
+                        ? (zh ? `${hoverCell.bay} cell — 点击选中其 bay` : `${hoverCell.bay} cell — click to select the bay`)
                         : focusMeta
-                          ? `${focusMeta.note} · ${focusMeta.footprint} footprint`
+                          ? (zh ? `${ZH_BAYS[focusMeta.id].note} · ${focusMeta.footprint} footprint` : `${focusMeta.note} · ${focusMeta.footprint} footprint`)
                           : exploded
-                            ? 'three y layers · the fire cell is pulled from the hearth'
-                            : 'hover a cell · click to hold its bay · frame stays local'}
+                            ? (zh ? '三个 y 层 · fire cell 从炉膛里拉出' : 'three y layers · the fire cell is pulled from the hearth')
+                            : (zh ? '悬停 cell · 点击保留其 bay · frame 留在 local' : 'hover a cell · click to hold its bay · frame stays local')}
                     </p>
                   </div>
                   <div className="wb-chamber-count">
                     <span className="wb-n">{readCount}</span>
-                    <span className="wb-l">{readCount === 1 ? 'cell' : 'cells'}</span>
+                    <span className="wb-l">{zh ? '个 cell' : readCount === 1 ? 'cell' : 'cells'}</span>
                   </div>
                 </div>
               </div>
@@ -269,11 +269,11 @@ export function Workbench() {
 
             <div className="wb-attempt">
               <div className="wb-attempt-head">
-                <span className="wb-kicker">attempt / one request</span>
+                <span className="wb-kicker">{zh ? 'attempt / 一个 request' : 'attempt / one request'}</span>
                 <span className="wb-attempt-id">#04 · campfire</span>
               </div>
 
-              <div className="wb-phases" role="group" aria-label="Attempt phases">
+              <div className="wb-phases" role="group" aria-label={zh ? 'attempt 阶段' : 'Attempt phases'}>
                 {PHASES.map((entry, index) => (
                   <button
                     key={entry.id}
@@ -298,8 +298,8 @@ export function Workbench() {
                 onClick={() => pickMoment('derive')}
               >
                 <span className="wb-aftermath-mark" aria-hidden="true">↳</span>
-                <span className="wb-aftermath-label">derive</span>
-                <span className="wb-aftermath-note">after Formed · one more pure fold</span>
+                <span className="wb-aftermath-label">{zh ? 'derive（后续）' : 'derive'}</span>
+                <span className="wb-aftermath-note">{zh ? 'Formed 之后 · 再一次纯折叠' : 'after Formed · one more pure fold'}</span>
                 <span className="wb-aftermath-rev">context rev 2</span>
               </button>
 
@@ -307,33 +307,36 @@ export function Workbench() {
                 <div className="wb-moment-copy-top">
                   <span className="wb-kicker">
                     {momentData.kind === 'phase'
-                      ? `PHASE ${momentData.no} / ${momentData.label}`
-                      : 'AFTER FORMED / DERIVE'}
+                      ? (zh ? `阶段 ${momentData.no} / ${momentData.label}` : `PHASE ${momentData.no} / ${momentData.label}`)
+                      : (zh ? 'FORMED 之后 / DERIVE' : 'AFTER FORMED / DERIVE')}
                   </span>
                   <span className="wb-tag">{momentData.result}</span>
                 </div>
-                <h3>{momentData.title}</h3>
-                <p>{momentData.note}</p>
+                <h3>{momentZh?.title ?? momentData.title}</h3>
+                <p>{momentZh?.note ?? momentData.note}</p>
               </div>
 
               <div className="wb-readout">
-                {momentData.readout.map(([key, value]) => (
-                  <div key={key}>
-                    <span className="wb-k">{key}</span>
-                    <span
-                      className="wb-v"
-                      data-ok={value === 'match' || value === 'same' || value === 'Formed' || value === 'Admitted' || value === '10'}
-                    >
-                      {value}
-                    </span>
-                  </div>
-                ))}
+                {momentData.readout.map(([key, value]) => {
+                  const shown = momentZh?.readout[key] ?? value;
+                  return (
+                    <div key={key}>
+                      <span className="wb-k">{key}</span>
+                      <span
+                        className="wb-v"
+                        data-ok={value === 'match' || value === 'same' || value === 'Formed' || value === 'Admitted' || value === '10'}
+                      >
+                        {shown}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="wb-log">
                 <div className="wb-section-head">
-                  <span>attempt log</span>
-                  <span>three phases · one derive</span>
+                  <span>{zh ? 'attempt 日志' : 'attempt log'}</span>
+                  <span>{zh ? '三个阶段 · 一次 derive' : 'three phases · one derive'}</span>
                 </div>
                 {MOMENTS.map((entry, index) => {
                   const state = index < momentIndex ? 'done' : index === momentIndex ? 'live' : 'next';
@@ -363,7 +366,7 @@ export function Workbench() {
                           <span>{entry.context === '—' ? 'context —' : `context ${entry.context}`}</span>
                           <span>{entry.writes}</span>
                         </span>
-                        <span className="wb-log-note">{entry.log}</span>
+                        <span className="wb-log-note">{zh ? ZH_MOMENTS[entry.id].log : entry.log}</span>
                       </span>
                     </button>
                   );
@@ -372,8 +375,8 @@ export function Workbench() {
 
               <div className="wb-invariants">
                 <div className="wb-section-head">
-                  <span>invariants</span>
-                  <span>held across the attempt</span>
+                  <span>{zh ? '不变量' : 'invariants'}</span>
+                  <span>{zh ? '贯穿整个 attempt' : 'held across the attempt'}</span>
                 </div>
                 {INVARIANTS.map((entry) => {
                   const live = entry.moments.includes(moment);
@@ -382,10 +385,10 @@ export function Workbench() {
                       <span className="wb-inv-no">{entry.no}</span>
                       <div className="wb-inv-body">
                         <div className="wb-inv-title">
-                          {entry.title}
+                          {zh ? ZH_INVARIANTS[entry.id].title : entry.title}
                           <span className="wb-inv-code">{entry.code}</span>
                         </div>
-                        <p>{entry.detail}</p>
+                        <p>{zh ? ZH_INVARIANTS[entry.id].detail : entry.detail}</p>
                       </div>
                       <span className="wb-inv-mark" aria-hidden="true">✓</span>
                     </div>
@@ -395,7 +398,7 @@ export function Workbench() {
 
               <div className="wb-attempt-foot">
                 <button type="button" className="wb-run" onClick={() => setPlaying((value) => !value)}>
-                  {playing ? 'pause attempt' : 'run attempt'}
+                  {zh ? (playing ? '暂停 attempt' : '运行 attempt') : (playing ? 'pause attempt' : 'run attempt')}
                   <span aria-hidden="true">{playing ? 'Ⅱ' : '▶'}</span>
                 </button>
                 <div className="wb-progress">
@@ -411,7 +414,7 @@ export function Workbench() {
                   <span className="wb-progress-label">
                     {moment === 'derive'
                       ? `after settle · ${momentData.result}`
-                      : `phase ${phaseIndex + 1} / 3 · ${momentData.result}`}
+                      : (zh ? `阶段 ${phaseIndex + 1} / 3 · ${momentData.result}` : `phase ${phaseIndex + 1} / 3 · ${momentData.result}`)}
                   </span>
                 </div>
               </div>
@@ -420,23 +423,21 @@ export function Workbench() {
 
           <div className="wb-siting">
             <div className="wb-siting-copy">
-              <div className="wb-kicker">siting / frame · D-22</div>
-              <h3>The blueprint stays local.</h3>
+              <div className="wb-kicker">{zh ? 'siting / frame · D-22' : 'siting / frame · D-22'}</div>
+              <h3>{zh ? ZH_SITING.title : 'The blueprint stays local.'}</h3>
               <p>
-                Bays, checks and computations are local cells. Every focus, section and aggregate
-                argument is mapped once by the request&rsquo;s <code>Siting</code> before the read,
-                so the document never carries a world coordinate.
+                {zh ? <>Bays、checks 和 computations 都是 local cells。每个 focus、section、aggregate 参数都会在读取前由 request 的 <code>Siting</code> 映射一次，所以 document 从不携带 world 坐标。</> : <>Bays, checks and computations are local cells. Every focus, section and aggregate argument is mapped once by the request&rsquo;s <code>Siting</code> before the read, so the document never carries a world coordinate.</>}
               </p>
               <div className="wb-siting-tags">
-                <span>local fixed</span>
-                <span>world image</span>
-                <span>one mapping per read</span>
+                <span>{zh ? 'local 固定' : 'local fixed'}</span>
+                <span>{zh ? 'world 图' : 'world image'}</span>
+                <span>{zh ? '每次读取映射一次' : 'one mapping per read'}</span>
               </div>
             </div>
 
             <div className="wb-siting-map">
               <div className="wb-map-cell">
-                <svg viewBox="0 0 116 116" role="img" aria-label="Fixed local 3 by 3 footprint with the fire cell">
+                <svg viewBox="0 0 116 116" role="img" aria-label={zh ? '固定的 local 3×3 footprint 与 fire cell' : 'Fixed local 3 by 3 footprint with the fire cell'}>
                   {[0, 1, 2, 3].map((index) => (
                     <g key={index} className="wb-local-grid">
                       <line x1={LOCAL_MAP.pad + index * LOCAL_MAP.cell} y1={LOCAL_MAP.pad} x2={LOCAL_MAP.pad + index * LOCAL_MAP.cell} y2={LOCAL_MAP.pad + 3 * LOCAL_MAP.cell} />
@@ -451,11 +452,11 @@ export function Workbench() {
                   <text x="21" y="114" className="wb-map-cap">Z</text>
                   <circle cx={LOCAL_MAP.pad} cy={LOCAL_MAP.pad} r="2.6" className="wb-map-origin" />
                 </svg>
-                <span className="wb-map-caption">local · fixed</span>
+                <span className="wb-map-caption">{zh ? 'local · 固定' : 'local · fixed'}</span>
               </div>
 
               <div className="wb-map-cell">
-                <svg viewBox="0 0 150 150" role="img" aria-label={`World image of the campfire at origin ${origin.x},${origin.z}; fire at world ${image.x},${image.z}`}>
+                <svg viewBox="0 0 150 150" role="img" aria-label={zh ? `营火的 world 图：origin ${origin.x},${origin.z}；fire 在 world ${image.x},${image.z}` : `World image of the campfire at origin ${origin.x},${origin.z}; fire at world ${image.x},${image.z}`}>
                   {Array.from({ length: WORLD_MAP.span + 1 }, (_, index) => (
                     <g key={index} className="wb-world-grid">
                       <line x1={WORLD_MAP.pad + index * WORLD_MAP.cell} y1={WORLD_MAP.pad} x2={WORLD_MAP.pad + index * WORLD_MAP.cell} y2={WORLD_MAP.pad + WORLD_MAP.span * WORLD_MAP.cell} />
@@ -487,35 +488,35 @@ export function Workbench() {
                   <circle cx={WORLD_MAP.pad + origin.x * WORLD_MAP.cell} cy={WORLD_MAP.pad + origin.z * WORLD_MAP.cell} r="2.6" className="wb-map-origin" />
                   <circle cx={WORLD_MAP.pad + origin.x * WORLD_MAP.cell} cy={WORLD_MAP.pad + origin.z * WORLD_MAP.cell} r="0.9" className="wb-map-origin-core" />
                 </svg>
-                <span className="wb-map-caption">world · image</span>
+                <span className="wb-map-caption">{zh ? 'world · 图' : 'world · image'}</span>
               </div>
             </div>
 
             <div className="wb-siting-controls">
               <div className="wb-control-row">
-                <span className="wb-k">origin x</span>
+                <span className="wb-k">{zh ? 'origin X' : 'origin x'}</span>
                 <div className="wb-stepper">
-                  <button type="button" aria-label="decrease origin x" onClick={() => moveOrigin('x', -1)}>−</button>
+                  <button type="button" aria-label={zh ? '减小 origin X' : 'decrease origin x'} onClick={() => moveOrigin('x', -1)}>−</button>
                   <b>{origin.x}</b>
-                  <button type="button" aria-label="increase origin x" onClick={() => moveOrigin('x', 1)}>+</button>
+                  <button type="button" aria-label={zh ? '增大 origin X' : 'increase origin x'} onClick={() => moveOrigin('x', 1)}>+</button>
                 </div>
-                <span className="wb-k">origin z</span>
+                <span className="wb-k">{zh ? 'origin Z' : 'origin z'}</span>
                 <div className="wb-stepper">
-                  <button type="button" aria-label="decrease origin z" onClick={() => moveOrigin('z', -1)}>−</button>
+                  <button type="button" aria-label={zh ? '减小 origin Z' : 'decrease origin z'} onClick={() => moveOrigin('z', -1)}>−</button>
                   <b>{origin.z}</b>
-                  <button type="button" aria-label="increase origin z" onClick={() => moveOrigin('z', 1)}>+</button>
+                  <button type="button" aria-label={zh ? '增大 origin Z' : 'increase origin z'} onClick={() => moveOrigin('z', 1)}>+</button>
                 </div>
               </div>
 
               <div className="wb-control-row">
-                <span className="wb-k">quarter turn</span>
+                <span className="wb-k">{zh ? '90° 转向' : 'quarter turn'}</span>
                 <div className="wb-turn">
-                  <button type="button" aria-label="turn counterclockwise 90 degrees" onClick={() => rotate(-1)}>↺</button>
+                  <button type="button" aria-label={zh ? '逆时针转 90°' : 'turn counterclockwise 90 degrees'} onClick={() => rotate(-1)}>↺</button>
                   <b>{turnMeta.label}</b>
-                  <button type="button" aria-label="turn clockwise 90 degrees" onClick={() => rotate(1)}>↻</button>
+                  <button type="button" aria-label={zh ? '顺时针转 90°' : 'turn clockwise 90 degrees'} onClick={() => rotate(1)}>↻</button>
                 </div>
                 <span className="wb-turn-name">{turnMeta.turn}</span>
-                <button type="button" className="wb-reset" onClick={resetSiting}>reset</button>
+                <button type="button" className="wb-reset" onClick={resetSiting}>{zh ? '重置' : 'reset'}</button>
               </div>
 
               <div className="wb-world-line" aria-live="polite">
@@ -532,13 +533,13 @@ export function Workbench() {
                 <span>value</span>
               </div>
               <dl>
-                <div><dt>origin</dt><dd>({origin.x}, {origin.y}, {origin.z})</dd></div>
-                <div><dt>placement</dt><dd>{turnMeta.turn}</dd></div>
-                <div><dt>quarter turns</dt><dd>{quarter} / 4</dd></div>
-                <div><dt>world fire</dt><dd>({image.x}, {image.y}, {image.z})</dd></div>
-                <div><dt>mapping</dt><dd>origin + o(local)</dd></div>
+                <div><dt>{zh ? 'origin' : 'origin'}</dt><dd>({origin.x}, {origin.y}, {origin.z})</dd></div>
+                <div><dt>{zh ? 'placement' : 'placement'}</dt><dd>{turnMeta.turn}</dd></div>
+                <div><dt>{zh ? 'quarter turns' : 'quarter turns'}</dt><dd>{quarter} / 4</dd></div>
+                <div><dt>{zh ? 'world fire' : 'world fire'}</dt><dd>({image.x}, {image.y}, {image.z})</dd></div>
+                <div><dt>{zh ? 'mapping' : 'mapping'}</dt><dd>origin + o(local)</dd></div>
               </dl>
-              <p>Affine and checked once per read; only the image moves.</p>
+              <p>{zh ? '仿射、每次读取检查一次；只有 image 移动。' : 'Affine and checked once per read; only the image moves.'}</p>
             </aside>
           </div>
 
@@ -546,8 +547,8 @@ export function Workbench() {
             <div className="wb-source">
               <div className="wb-source-head">
                 <div className="wb-source-title">
-                  <span className="wb-kicker">the declaration</span>
-                  <span className="wb-source-sub">document complete · java excerpt</span>
+                  <span className="wb-kicker">{zh ? '声明' : 'the declaration'}</span>
+                  <span className="wb-source-sub">{zh ? 'document 完整 · java 摘录' : 'document complete · java excerpt'}</span>
                 </div>
                 <div className="wb-source-tabs">
                   <button type="button" data-on={source === 'document'} onClick={() => setSource('document')}>document</button>
@@ -560,20 +561,20 @@ export function Workbench() {
                 language={source === 'document' ? 'json' : 'java'}
               />
               <div className="wb-source-foot">
-                <span>3 bays · 3 checks · 1 computation</span>
-                <span>27 predicted rows · one blueprint</span>
+                <span>{zh ? '3 个 bay · 3 个 check · 1 个 computation' : '3 bays · 3 checks · 1 computation'}</span>
+                <span>{zh ? '预测 27 行 · 一个 blueprint' : '27 predicted rows · one blueprint'}</span>
               </div>
             </div>
 
             <aside className="wb-aside">
               <div className="wb-aside-claims">
               <div className="wb-section-head">
-                <span>claim prediction</span>
-                <span>predicted, not written</span>
+                <span>{zh ? 'claim 预测' : 'claim prediction'}</span>
+                <span>{zh ? '预测，不写入' : 'predicted, not written'}</span>
               </div>
               <div className="wb-claim-total">
                 <strong>{selectedMeta ? selectedMeta.count : CAMPFIRE.claims}</strong>
-                <span>{selectedMeta ? `${selectedMeta.label} rows predicted` : 'predicted rows · exclusive'}</span>
+                <span>{selectedMeta ? (zh ? `${selectedMeta.label} 预测行` : `${selectedMeta.label} rows predicted`) : (zh ? '预测行 · exclusive' : 'predicted rows · exclusive')}</span>
               </div>
               <div className="wb-claim-layers">
                 {[0, 1, 2].map((layer) => (
@@ -597,14 +598,14 @@ export function Workbench() {
                 <span><i data-bay="shell" />shell 25</span>
                 <span><i data-bay="hollow" />hollow 1</span>
                 <span><i data-bay="fire" />fire 1</span>
-                <span className="wb-legend-frame">x → · z ↓ per layer</span>
+                <span className="wb-legend-frame">{zh ? 'x → · z ↓ 每层' : 'x → · z ↓ per layer'}</span>
               </div>
               </div>
               <div className="wb-aside-checks">
               <div className="wb-hairline" />
               <div className="wb-section-head">
-                <span>checks</span>
-                <span>3 / 3 matched</span>
+                <span>{zh ? 'checks' : 'checks'}</span>
+                <span>{zh ? '3 / 3 匹配' : '3 / 3 matched'}</span>
               </div>
               <div className="wb-checks">
                 {CHECKS.map((check) => (
@@ -618,9 +619,9 @@ export function Workbench() {
               </div>
               <div className="wb-hairline" />
               <dl className="wb-aside-facts">
-                <div><dt>sharing</dt><dd>EXCLUSIVE · 3 bays</dd></div>
-                <div><dt>writes</dt><dd>0 until settle</dd></div>
-                <div><dt>publication</dt><dd>settle once · derive once</dd></div>
+                <div><dt>{zh ? 'sharing' : 'sharing'}</dt><dd>EXCLUSIVE · 3 bays</dd></div>
+                <div><dt>{zh ? 'writes' : 'writes'}</dt><dd>{zh ? 'settle 前为 0' : '0 until settle'}</dd></div>
+                <div><dt>{zh ? 'publication' : 'publication'}</dt><dd>{zh ? 'settle 一次 · derive 一次' : 'settle once · derive once'}</dd></div>
               </dl>
               </div>
             </aside>
@@ -630,8 +631,8 @@ export function Workbench() {
 
       <div className="wb-pipe">
         <div className="wb-pipe-lead">
-          <span className="wb-kicker">pipeline / one request</span>
-          <strong>one lease · one spend · one derive</strong>
+          <span className="wb-kicker">{zh ? 'pipeline / 一个 request' : 'pipeline / one request'}</span>
+          <strong>{zh ? '一个 lease · 一个 spend · 一次 derive' : 'one lease · one spend · one derive'}</strong>
         </div>
         {PHASES.map((entry, index) => {
           const state = index < momentIndex ? 'done' : index === momentIndex ? 'live' : 'next';
@@ -662,26 +663,26 @@ export function Workbench() {
           onClick={() => pickMoment('derive')}
         >
           <span className="wb-pipe-node" aria-hidden="true">↳</span>
-          <span className="wb-pipe-no">after Formed</span>
+          <span className="wb-pipe-no">{zh ? 'Formed 之后' : 'after Formed'}</span>
           <span className="wb-pipe-label">DERIVE</span>
           <span className="wb-pipe-out">Context</span>
-          <span className="wb-pipe-meta">one batch · context rev 2</span>
+          <span className="wb-pipe-meta">{zh ? '一个 batch · context rev 2' : 'one batch · context rev 2'}</span>
         </button>
       </div>
 
       <Reveal delay={80}>
         <div className="wb-furnace">
           <div className="wb-furnace-id">
-            <span className="wb-kicker">second specimen / {FURNACE.bounds}</span>
-            <h3>{FURNACE.title}</h3>
+            <span className="wb-kicker">{zh ? '第二个样本' : 'second specimen'} / {FURNACE.bounds}</span>
+            <h3>{zh ? ZH_FURNACE.title : FURNACE.title}</h3>
             <code>{FURNACE.id}</code>
-            <p>{FURNACE.note}</p>
+            <p>{zh ? ZH_FURNACE.note : FURNACE.note}</p>
           </div>
           <div className="wb-furnace-bars">
             <div className="wb-furnace-head">
-              <span>bay</span>
-              <span>cells</span>
-              <span>coverage / footprint</span>
+              <span>{zh ? 'bay' : 'bay'}</span>
+              <span>{zh ? 'cells' : 'cells'}</span>
+              <span>{zh ? 'coverage / footprint' : 'coverage / footprint'}</span>
             </div>
             {FURNACE.bays.map((entry) => (
               <div className="wb-furnace-bar" data-kind={entry.id} key={entry.id}>
@@ -698,14 +699,14 @@ export function Workbench() {
             ))}
             <div className="wb-furnace-sum">
               <span>192 + 100 + 2 = 294</span>
-              <span>exclusive · one row per owned cell</span>
+              <span>{zh ? 'exclusive · 每个 owned cell 一行' : 'exclusive · one row per owned cell'}</span>
             </div>
           </div>
           <div className="wb-furnace-total">
             <span className="wb-furnace-n">{FURNACE.claims}</span>
-            <span className="wb-furnace-l">claim rows</span>
+            <span className="wb-furnace-l">{zh ? 'claim 行' : 'claim rows'}</span>
             <span className="wb-furnace-note">= {FURNACE.bounds} volume</span>
-            <span className="wb-furnace-note">0 overlap</span>
+            <span className="wb-furnace-note">{zh ? '0 重叠' : '0 overlap'}</span>
           </div>
         </div>
       </Reveal>
