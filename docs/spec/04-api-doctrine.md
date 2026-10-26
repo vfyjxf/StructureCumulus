@@ -217,11 +217,11 @@ An addon author writes one expectation, registers a factory, and never touches t
 
 ```java
 public final class HatchExpectation implements Expectation {
-    public static final BindingKey<OccupantRef> HATCH = BindingKeys.of("hatch", OccupantRef.class);
+    public static final BindingKey<OccupantRef> HATCH = BindingKey.of("hatch", OccupantRef.class);
 
     @Override
     public ExpectationMeta meta() {
-        return new ExpectationMeta(NamespacedId.of("mymod", "hatch"), 4, Set.of(Traits.ITEM_INVENTORY));
+        return ExpectationMeta.of(NamespacedId.of("mymod", "hatch"), 4, FindingCode.of(Family.EXP, 1));
     }
 
     @Override
@@ -234,7 +234,7 @@ public final class HatchExpectation implements Expectation {
                     .build());
         }
         if (!occupant.has(Traits.ITEM_INVENTORY)) {
-            return Reply.mismatch(Finding.builder(FindingCode.of(Family.EXP, 2))
+            return Reply.mismatch(Finding.builder(FindingCode.of(Family.EXP, 1))
                     .stage(ctx.stage())
                     .label(ctx.locus(), "expected an inventory-bearing hatch")
                     .note("found " + occupant.descriptor().type())

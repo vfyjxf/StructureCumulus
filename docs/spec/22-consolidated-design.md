@@ -108,11 +108,12 @@ interface AnchorResolver {
 
 ```java
 interface WorldView {
+    SnapshotId snapshotId();
     SectionSlot slot(SectionKey key);
-    OccupantSnapshot occupant(LatticeKey cell);
+    @Nullable OccupantSnapshot occupant(LatticePoint cell);
     @Nullable OccupantSnapshot occupant(OccupantRef ref);
     List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
-    @Nullable NestedLevelSnapshot nested(LatticeKey cell);
+    @Nullable NestedLevelSnapshot nested(LatticePoint cell);
     long contentDigest(SectionKey key);
 }
 ```
@@ -221,10 +222,11 @@ record Check<T>(NamespacedId id, NamespacedId bay,
 
     public ReadScope reads(Cuboid bayCells) { return focus.reads(bayCells).withKeys(expectation.meta().requires()); }
 
-    public CheckResult run(CheckContext ctx) {
+    public CheckResult run(FocusContext ctx) {
         Outcome<T> taken = focus.take(ctx);
         if (taken instanceof Outcome.Found<T> found) {
-            return new CheckResult(expectation.test(ctx.with(found.value(), found.subjects())),
+            return new CheckResult(
+                    expectation.test(ExpectationContext.of(ctx, found.value(), found.subjects())),
                     found.subjects(), found.notes());
         }
         Outcome.Missing<T> missing = (Outcome.Missing<T>) taken;

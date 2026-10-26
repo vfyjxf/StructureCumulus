@@ -522,7 +522,7 @@ The total order — five keys, applied once:
 | 1 | severity rank | `ERROR 0 < WARNING 1 < INFO 2` |
 | 2 | stage | `Stage` declaration order `DESIGN, PROBE, FORM, SETTLE` |
 | 3 | code | `FindingCode.compareTo`: family ordinal, then number |
-| 4 | primary locus | `(frameRank, a, b, c)`; label-less findings rank last with `(4,0,0,0)`; for a `DEFINITION` primary `(0, span.start, span.end, 0)`, for `LOCAL`/`WORLD` `(1|2, y, z, x)` of the canonical first cell, for `KEY` `(3, 0, 0, 0)` |
+| 4 | primary locus | `(frameRank, a, b, c)`; label-less findings rank last with `(4,0,0,0)`; for a `DEFINITION` primary `(0, span.start, span.end, 0)`, for `LOCAL`/`WORLD` `(1\|2, y, z, x)` of the canonical first cell, for `KEY` `(3, 0, 0, 0)` |
 | 5 | insertion | the attempt's append index, unique within the bundle |
 
 Why severity first: a reader triages by how much the finding counts before anything else, and a

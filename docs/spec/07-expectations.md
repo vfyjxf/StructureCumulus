@@ -261,14 +261,13 @@ per-unit cost: the engine charges the declared read closure in `cells` and `sect
 
 ```java
 final class HatchExpectation implements Expectation<OccupantSnapshot> {   // three outcomes, one binding
-    static final NamespacedId ITEM_INVENTORY = NamespacedId.of("minecraft", "item_inventory");
     static final BindingKey<OccupantRef> HATCH = BindingKey.of(ID("hatch"), OccupantRef.class);
     public Class<OccupantSnapshot> subject() { return OccupantSnapshot.class; }
     public ExpectationMeta meta() { return ExpectationMeta.of(ID("hatch"), 80, SC_EXP_0001); }
 
     public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
         OccupantSnapshot o = ctx.subject();                              // never null: absence is Missing
-        if (!o.hasTrait(ITEM_INVENTORY)) return Reply.mismatch(Finding.builder(SC_EXP_0001)
+        if (!o.has(Traits.ITEM_INVENTORY)) return Reply.mismatch(Finding.builder(SC_EXP_0001)
                 .message("expected an inventory-bearing hatch")
                 .label(ctx.locus(), "expected an inventory-bearing hatch")
                 .note("found " + o.descriptor().type()).build());

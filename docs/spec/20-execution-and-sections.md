@@ -554,8 +554,8 @@ interface AttemptCache {                        // CacheKey is 11 §4.7
 - `06`: `WorldView` is the section model only — `slot(SectionKey)` answers a read, and the
   `chunkGrid()`/`chunk()`/`summary()` facades with `ChunkContent`/`OccupancySummary` are withdrawn;
   `NestedLevelSnapshot` naming.
-- `07`: `ProbeSession.claimsAt` reads the frozen claim view only; `ExpectationMeta.cost` work
-  units; custom expectation cancellation contract.
+- `07`: `ProbeSession.claimsAt` reads the frozen claim view only; custom expectation cancellation
+  contract.
 - `08`: claims serial after the match; no per-section reservation; one `ClaimMatrix` predicate.
 - `13`: `Finding.withId` for cached findings; `SC-MC-06xx` codes.
 - `18`: X1–X15 and gate tests.

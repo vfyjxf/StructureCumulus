@@ -210,8 +210,8 @@ A structure whose controller sits elsewhere puts its origin there; no controller
 A rejection is `Failed` only when it negates something the **blueprint declared**, and `Undecided`
 when it negates a condition of *knowing*; a heuristic ("fewer bricks than last time") is neither: the
 census is never compared with another observation. No frozen type carries a
-per-type demand (`ExpectationMeta.requires` is traits, not counts), so the census check today only
-observes.
+per-type demand (`ExpectationMeta.requires` is a `ContextKey` coverage demand, not a count), so the
+census check today only observes.
 
 `Fingerprint` covers the template — id, bounds, bay cuboids with their `Coverage`, `Footprint` and `Sharing`, anchor specs, orientation policy, demand, and each plan's unit ids — digesting canonical
 content, so it is stable across hosts. It is a cache key, not a gate: a hit still compares id and
