@@ -19,7 +19,7 @@ regeneration session without the wrapper cache must still run `javac` and the JU
 and record the commands.
 
 Current M1 evidence (2026-10-27): `./gradlew check` is green; `runGameTestServer` passes 2/2
-(capture-only; capture → compile → check); `kernelTest` is 97; the adapter `test` task is 1;
+(capture-only; capture → compile → check); `kernelTest` is 97; the adapter `test` task is 2;
 `tools/spec-check.py` is clean; the visual build is green. The two GameTests are separate from the 97
 kernel tests.
 

@@ -78,7 +78,7 @@ export const DOCS = [
   { group: 'Modules', file: 'docs/modules/space.md', title: 'space' },
   { group: 'Modules', file: 'docs/modules/remedy.md', title: 'remedy' },
   { group: 'Modules', file: 'docs/modules/spi.md', title: 'spi' },
-  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (M1 host + check)' },
+  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (M1: capture + host + check)' },
 ];
 
 export const HERO_STATS = [

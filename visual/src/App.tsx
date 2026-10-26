@@ -202,7 +202,7 @@ export default function App() {
               <div className="footer-meta">
                 StructureCumulus / {zh ? '设计 review 1.0' : 'design review 1.0'}<br />
                 {zh ? '8 份设计文件 · 11 个 kernel 模块 + adapter 规范' : '8 design files · 11 kernel modules + adapter spec'}<br />
-                {zh ? 'kernel 11 个 package · 55 个 code · 97 个测试' : 'kernel 11 packages · 55 codes · 97 tests'}<br />
+                {zh ? 'kernel 11 个 package · 55 个 code · 97 个 kernel 测试' : 'kernel 11 packages · 55 codes · 97 kernel tests'}<br />
                 kernel commit 0d1218e
               </div>
             </div>

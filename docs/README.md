@@ -56,7 +56,7 @@ Then the module files, in dependency order:
   the adapter. At M1 the adapter also owns the server state, the in-memory document source and
   `/cumulus check`. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 97
-  kernel JUnit 5 tests and 1 adapter unit test pass; `tools/spec-check.py` is clean;
+  kernel JUnit 5 tests and 2 adapter unit tests pass; `tools/spec-check.py` is clean;
   `./gradlew check` is green; `runGameTestServer` passes 2/2 (capture-only; capture → compile →
   check). The adapter is implemented to M1 only; claims/persistence, JSON/datapack, the remaining
   commands, entities, nested views, traits, orientation mapping and windows remain pending. The two

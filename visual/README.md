@@ -8,9 +8,9 @@ The design of record is [`../docs/README.md`](../docs/README.md). The adapter is
 `LevelLease`, block/block-entity descriptors, `ServerState`, in-memory `BuiltinDocuments`), proven by
 two GameTests (capture-only; capture → compile → check). Claims/persistence, JSON/datapack, the rest
 of the command surface, entities, nested views, traits, orientation mapping and windows are pending.
-The UI opens in **中文**; the **EN** button in the top bar switches to the
-English reading layer. Technical identifiers, code, JSON, Java and finding codes stay in their
-original form in both languages.
+The UI opens in **中文**; the **EN** button in the top bar switches to the English reading layer.
+Technical identifiers, code, JSON, Java and finding codes stay in their original form in both
+languages.
 
 ## Run
 

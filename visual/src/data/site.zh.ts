@@ -68,7 +68,7 @@ export const ZH_DOCS: Record<string, string> = {
   'docs/modules/space.md': 'space',
   'docs/modules/remedy.md': 'remedy',
   'docs/modules/spi.md': 'spi',
-  'docs/modules/adapter.md': 'adapter（M1 host + check）',
+  'docs/modules/adapter.md': 'adapter（M1：capture + host + check）',
 };
 
 export const ZH_GROUPS: Record<string, string> = {
