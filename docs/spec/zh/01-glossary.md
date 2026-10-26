@@ -38,6 +38,7 @@
 | 源区间（Source span） | `SourceSpan` | `(NamespacedId document, int start, int end)`：一个文档内的半开字符区间。位于 `base`，使 `space` 永不依赖 `finding`。 | — |
 | 数据视图（Data view） | `DataView` | 格式中立的读取接口：`kind()`、`get(String)`、`list()`、`keys()`（`SequencedSet`）、`asString/asInt/asBoolean(default)`、`@Nullable SourceSpan span()`。位于 `base`，使 `expectation` 永不依赖 `document`。 | `DataView` |
 | 数据种类（Data kind） | `DataKind` | `OBJECT`、`ARRAY`、`STRING`、`NUMBER`、`BOOLEAN`、`NULL`。 | — |
+| 诊断码（Finding code） | `FindingCode` | 稳定标识符 `SC-<FAMILY>-<NNNN>`，例如 `SC-SPC-0001`，`record (Family family, int number)`；绝不重用为不同含义。它属于 `base` 而非 `finding`：`occupant` 与 `space` 都携带它（`06` §3.3 的 `Refused`、`R38`），而两者都不得引用 U9。 | `DiagnosticCode` |
 
 ## C. U1 — 空间与朝向（`kernel.space`）
 
@@ -61,6 +62,7 @@
 | 定位域映射（Locus map） | `LocusMap` | 针对一个 `Siting`，在单元格框架之间转换 `Locus`；`toWorld`、`toLocal`、`toDefinition`；`KEY` 定位域不参与转换。 | `SpanMapper` |
 | 区块键（Chunk key） | `ChunkKey` | `ChunkGrid` 中的 `(int cx, cy, cz)` 下标，按 `(cy, cz, cx)` 排序。不是 Minecraft 类。 | — |
 | 区块网格（Chunk grid） | `ChunkGrid` | `(int cellSize, LatticePoint origin)`：世界框架下的立方区块网格；`chunkOf`、`boundsOf`、`chunkCount`、`chunksOf`。`cellSize` 是数据；适配器传 16。 | — |
+| 区段键（Section key） | `SectionKey` | `(World world, int x, int y, int z)`：一个世界的 16³ 区段下标，排序为世界、`x`、`z`、`y`；不是缓存键。 | — |
 
 ## D. U2 — 占用体与世界（`kernel.occupant`）
 
@@ -89,6 +91,7 @@
 | 占用体解析器（Occupant resolver） | `OccupantResolver<R>` | 宿主 SPI，把一个宿主原始占用体转换为 `OccupantSnapshot`；`kinds()` 声明它服务的族，`resolve` 可以拒绝。 | `WorldOccupants` |
 | 解析上下文（Resolve context） | `ResolveContext` | 解析器可见的内容：`snapshotId()`、`anchor()`、`remainingDepth()`、`policy()`。 | — |
 | 众所周知的特征（Well-known traits） | `Traits` | 内核保留的 `TraitKey` 常量（`ITEM_INVENTORY`、`ENERGY`、`FLUID`、`TIER`）；附加组件可以定义自己的。 | — |
+| 嵌套层级快照（Nested level snapshot） | `NestedLevelSnapshot` | 一个嵌套占用体冻结后的内部，在它自己的坐标系中读取：`static of(OccupantRef parent, int depth, Map<LatticePoint, OccupantSnapshot>)`、`parent()`、`depth()`、`contentDigest()`、`occupantAt(LatticePoint)`、`occupants(Cuboid, OccupantFilter)`。属于内核侧，适配器不拥有它。 | — |
 
 ## E. U3 — 期望（`kernel.expectation`）
 
@@ -213,7 +216,6 @@
 | 实例 id（Instance id） | `InstanceId` | `(World world, long serial)`：一个已摆放结构的身份。它以自身为键拥有 `StructureContext` 存储，因此两个实例发布同一个键永不冲突；它也是 `KEY` 定位域所命名的对象。 | — |
 | 计划 id（Plan id） | `PlanId` | 一个驻留的 `long`，在 `Blueprint` 构建时分配；数据包重建会得到新 id 与冷缓存。 | — |
 | 单元 id（Unit id） | `UnitId` | 计划中一个计划单元的身份：一个 `Check` id 或一个 `Computation` id（`11` §4.7）。 | — |
-| 区段键（Section key） | `SectionKey` | `(World world, int x, int y, int z)`：一个世界的 16³ 区段下标；不是缓存键。 | — |
 | 缓存键（Cache key） | `CacheKey` | `(PlanId plan, Siting siting, UnitId unit, long closureDigest)`：某个安放位上单个单元的尝试缓存身份（`11` §4.7）。 | — |
 | 缓存单元（Cached unit） | `CachedUnit` | 密封的 `CachedPartial(ContextKey<?> key, Object value)` \| `CachedOutcome(Reply reply, List<Finding> findings, List<OccupantRef> subjects)`：一个单元的贡献或它的产物，绝不是折叠后的值，也绝不是世界内容（`20` §6.3）。 | `SectionResult` |
 | 尝试缓存（Attempt cache） | `AttemptCache` | 覆盖 `CachedUnit` 的可选 LRU：`@Nullable get(CacheKey)`、`put(CacheKey, CachedUnit)`、`none(long cacheBytes)`；在 `cacheBytes` 之下逐出，绝不在 `retainedBytes` 之下逐出（`20` §6.3）。 | `SectionCache` |
@@ -237,7 +239,6 @@
 | 术语 | 类型（Type） | 定义 | 先前术语（Prior） |
 | --- | --- | --- | --- |
 | 严重级别（Severity） | `Severity` | `ERROR`、`WARNING`、`INFO`。 | `Severity` |
-| 诊断码（Finding code） | `FindingCode` | 稳定标识符 `SC-<FAMILY>-<NNNN>`，例如 `SC-SPC-0001`；绝不重用为不同含义。 | `DiagnosticCode` |
 | 诊断项（Finding） | `Finding` | `(FindingId id, FindingCode code, Severity severity, String message, List<Label> labels, List<Note> notes, @Nullable Suggestion suggestion, List<FindingId> related, Stage stage)`。 | `Diagnostic` |
 | 诊断项 id（Finding id） | `FindingId` | 在一个包内稳定；被 `related` 引用；`NONE` 表示“不可寻址”。 | — |
 | 标签（Label） | `Label` | `(Locus locus, String message, LabelRole role)`；源区间随 `Locus` 传递，绝不出现两次。 | `Label` |
@@ -324,7 +325,6 @@
 | 单元格载荷（Cell payload） | `CellPayload` | 受监视的 BE/实体单元格的 `(LatticeKey, OccupantDescriptor, List<Trait<?>>)`；`OccupantRef` 在读取时用最终 `SnapshotId` 惰性盖上。 | — |
 | 捕获请求 / 上限（Capture request / limits） | `CaptureRequest`, `CaptureLimits` | 边界、策略、网格、受跟踪的类型/单元格，以及上限（单元格、区段、字节、实体、载荷）。 | — |
 | 捕获结果（Capture result） | `CaptureResult` | 密封的 `Captured(WorldView)`、`TooLarge`、`Unavailable(status, code)`；绝不把部分快照当作完整。 | — |
-| 嵌套层级快照（Nested level snapshot） | `NestedLevelSnapshot` | 子 `NestedView`，与其父共享同一份冻结字节。 | — |
 | 捕获工具（Capture tool） | `CaptureTool` | `/cumulus capture` 宿主路径：选区 → compact JSON `DataView`。 | — |
 | 结构导入（Schematic import） | `SchematicImport` | 读取 `.schem`/`.nbt` 并输出 compact JSON；不支持的条目变成诊断项。 | — |
 

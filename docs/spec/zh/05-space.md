@@ -51,9 +51,9 @@
 | `Tilt` | `enum { LEVEL, PITCH_UP, PITCH_DOWN, ROLL_LEFT, ROLL_RIGHT, INVERTED }`; `Heading up()` |
 | `Flip` | `enum { NONE, LEFT_RIGHT, FRONT_BACK }`; `boolean isMirror()` |
 | `Orientation` | `record (int ordinal) implements Comparable<Orientation>`; `IDENTITY`, `static of(Turn,Tilt,Flip)`, `compose`, `then`（本元素在前）, `inverse`, `Heading apply(Heading)`, `@Nullable apply(LatticePoint)`, `@Nullable apply(Cuboid)`, `@Nullable apply(CuboidSet)`, `Turn turn()`, `Tilt tilt()`, `isMirror()`, `id()`, `static List<Orientation> all()` |
-| `Placement` | `record (Orientation, LatticePoint offset)`; `IDENTITY`, `compose`, `inverse`, `@Nullable apply(...)` |
+| `Placement` | `record (Orientation, LatticePoint offset)`; `IDENTITY`, `@Nullable compose(Placement)`, `@Nullable inverse()`, `@Nullable apply(...)`——偏移是格点，因此一次合成可能越出格阵并返回 `null` |
 | `Siting` | `record (LatticePoint origin, Placement)`; `static of(origin, Orientation)`, `of(origin, Placement)`, `withOrigin`, `withPlacement`, `static @Nullable anchoring(anchorTarget, anchorLocal, Placement)`, `@Nullable toWorld(...)`, `@Nullable toLocal(...)` |
-| `SectionKey` | `record (World world, int x, int y, int z) implements Comparable<SectionKey>`; `static of(World, LatticePoint cell, int cellSize)`, `sectionOf(LatticePoint, int cellSize)`；先比世界、再比 `x`、`y`、`z`。它是一世界内的 16³ 区段索引，不是缓存键 |
+| `SectionKey` | `record (World world, int x, int y, int z) implements Comparable<SectionKey>`; `static of(World, LatticePoint cell, int cellSize)`, `SectionKey sectionOf(LatticePoint, int cellSize)`（实例方法：复用本键的世界）；先比世界、再比 `x`、`z`、`y`。它是一世界内的 16³ 区段索引，不是缓存键 |
 | `Locus` | `record (LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @Nullable SourceSpan)`; `static definition(SourceSpan)`, `local(CuboidSet)`, `local(CuboidSet, SourceSpan)`, `world(CuboidSet)`, `key(InstanceId, NamespacedId)`, `withSource(SourceSpan)` |
 | `LocusMap` | `record (Siting)`; `static of(Siting)`, `@Nullable toWorld(Locus)`, `@Nullable toLocal(Locus)`, `toDefinition(Locus)` |
 
@@ -179,8 +179,8 @@ Siting.toLocal(w)  = o⁻¹(w − origin − t)
 
 | 定律 | 陈述 |
 | --- | --- |
-| 合成（Composition） | `P.compose(Q) = (o_P ∘ o_Q, o_P(t_Q) + t_P)` —— `Q` 先作用 |
-| 逆（Inverse） | `P.inverse() = (o⁻¹, −o⁻¹(t))`；`P.inverse().compose(P) == IDENTITY` |
+| 合成（Composition） | `P.compose(Q) = (o_P ∘ o_Q, o_P(t_Q) + t_P)` —— `Q` 先作用；和越出格阵时为 `null` |
+| 逆（Inverse） | `P.inverse() = (o⁻¹, −o⁻¹(t))`；当两者都非空时，`P.inverse().compose(P) == IDENTITY` |
 | 线性（Linearity） | `o(p.offset(d)) == o(p).offset(o(d))` |
 | 仿射等变（Affine equivariance） | `s.toWorld(p.offset(d)) == s.toWorld(p).offset(o(d))` |
 | 重新安放（Re-siting） | `s.withPlacement(P.compose(Q)).toWorld(q) == s.withPlacement(P).toWorld(Q.apply(q))` |

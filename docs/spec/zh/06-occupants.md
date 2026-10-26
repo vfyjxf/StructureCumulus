@@ -84,7 +84,9 @@ enum ReadStatus { READABLE, OUT_OF_BOUNDS, NOT_CAPTURED, DENIED, STALE; boolean 
   构造时拒绝 ref 与描述符不一致、空占地轮廓、没有子结构的 `NESTED`。
 - `air(...)`：kind 为 `BLOCK`（该 id 是哨兵），一格，无特征；适配器把每个空世界值映射
   到它。
-- `view.occupant(cell) != null ⇔ view.slot(SectionKey.of(dimension, cell, cellSize)).readable()`（§7.2）。
+- `view.occupant(cell) != null ⇔ 包含 `cell` 的那个区段可读——即对该格的键
+  `view.slot(key).readable()`（§7.2）。键由视图自己解析：实现用它捕获时带的世界与区段尺寸算出，
+  所以消费者不必自己构造。
 
 ### 3.3 嵌套视图、世界视图与策略
 
@@ -228,12 +230,12 @@ interface ResolveContext
 
 | 问题 | 回答 |
 | --- | --- |
-| 边界 | `bounds()` 是子框架中的子网格；`parent().footprint()` 是父框架中的范围；`Siting`/`LocusMap`（U1）把二者复合。 |
+| 边界 | 子视图捕获到的区段就是它的边界：区段之外的格子，`occupant` 回答 `null`，其槽为 `Refused(OUT_OF_BOUNDS)`；`parent().footprint()` 是父框架中的范围；`Siting`/`LocusMap`（U1）把二者复合。 |
 | 快照 | 整条链上 `snapshotId()` 与父相同：一次捕获，一个 id。 |
-| `readStatus` | 同样五种；`OUT_OF_BOUNDS` 相对于子 `bounds()`；`NOT_CAPTURED` 还涵盖深度截断与元素上限。 |
+| `slot` | 同样五种状态；`OUT_OF_BOUNDS` 相对于子视图捕获到的区段；`NOT_CAPTURED` 还涵盖深度截断与元素上限。 |
 | 递归 | `depth() = parent + 1`；捕获拒绝 `depth() > maxNestedDepth` 的子结构，留下 `nested() == null` 且内部为 `NOT_CAPTURED`。 |
 | 环 | 当 `(parent().descriptor().type(), parent().ref().anchor())` 沿 `ancestry()` 重复时视为成环；捕获拒绝（`nested() == null`、`NOT_CAPTURED`、`SC-OCC-0203`）。失败即关闭且为启发式 —— 框架不共享 —— 所以深度才是真正的保证。 |
-| 暴露面 | 仅通过 `occupant`/`occupants`/`readStatus`；没有“此结构的子结构”成员。 |
+| 暴露面 | 仅通过 `occupant`/`occupants`/`slot`；没有“此结构的子结构”成员。 |
 
 ### 4.6 捕获协议与宿主职责
 
@@ -434,7 +436,7 @@ U10、U11、A1。
 | Q4 | `footprint()` 是一个 `Cuboid`；L 形宿主组合无法表达。 | 推迟：拆分该组合。若出现真实用例，改为 `CuboidSet` 并重证 §7.3。 |
 | Q5 | 众所周知的特征容器（`Traits.ITEM_INVENTORY`，04 §8–§9）归谁？ | U3 或 U11；`structurecumulus:item_inventory` 在此保留。 |
 | Q6 | 03 §7 说常量是 lowerCamelCase，但其示例是 `Expectations.AIR`，术语表写的是 `BLOCK`。 | U2 遵循术语表；03 §7 应予更正。 |
-| Q7 | 逐格覆盖检查使大蓝图的 BOUNDS 检查产生 O(volume) 次状态调用。 | 不加成员；若 U7 实测为热点，提议把 `readStatus(Cuboid)` 作为 default 方法。 |
+| Q7 | 逐格覆盖检查使大蓝图的 BOUNDS 检查产生 O(volume) 次状态调用。 | 不加成员：盒查询是 `occupants(box, filter)`。若 U7 实测逐盒状态为热点，提议一个 `slot` 汇总成员，而不是逐格的 `readStatus`。 |
 
 ## 9. 证伪（Falsification）
 

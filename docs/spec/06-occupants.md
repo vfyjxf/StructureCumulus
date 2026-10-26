@@ -86,7 +86,9 @@ enum ReadStatus { READABLE, OUT_OF_BOUNDS, NOT_CAPTURED, DENIED, STALE; boolean 
   without a child.
 - `air(...)`: kind `BLOCK` (the id is the sentinel), one cell, no traits; the adapter maps every
   empty world value to it.
-- `view.occupant(cell) != null ⇔ view.slot(SectionKey.of(dimension, cell, cellSize)).readable()` (§7.2).
+- `view.occupant(cell) != null ⇔ the section that holds `cell` is readable — `view.slot(key).readable()`
+  for the key of that cell (§7.2). The key is the view's own: an implementation derives it from the
+  world and cell size it was captured with, so a consumer never has to build one.
 
 ### 3.3 Nested view, world view, policy
 
@@ -233,12 +235,12 @@ deep immutability.
 
 | Question | Answer |
 | --- | --- |
-| Bounds | `bounds()` is the child grid in the child frame; `parent().footprint()` is the parent-frame extent; `Siting`/`LocusMap` (U1) composes them. |
+| Bounds | The child's captured sections are its bounds: a cell outside them answers `null` from `occupant` and its slot is `Refused(OUT_OF_BOUNDS)`; `parent().footprint()` is the parent-frame extent; `Siting`/`LocusMap` (U1) composes them. |
 | Snapshot | `snapshotId()` equals the parent's for the whole chain: one capture, one id. |
-| `readStatus` | The same five; `OUT_OF_BOUNDS` is relative to the child `bounds()`; `NOT_CAPTURED` also covers the depth cut and the element cap. |
+| `slot` | The same five statuses; `OUT_OF_BOUNDS` is relative to the child's captured sections; `NOT_CAPTURED` also covers the depth cut and the element cap. |
 | Recursion | `depth() = parent + 1`; capture refuses a child at `depth() > maxNestedDepth`, leaving `nested() == null` and the interior `NOT_CAPTURED`. |
 | Cycles | Cyclic when `(parent().descriptor().type(), parent().ref().anchor())` repeats along `ancestry()`; capture refuses (`nested() == null`, `NOT_CAPTURED`, `SC-OCC-0203`). Fail-closed and heuristic — frames are not shared — so depth is the real guarantee. |
-| Exposure | Only via `occupant`/`occupants`/`readStatus`; there is no "children of this structure" member. |
+| Exposure | Only via `occupant`/`occupants`/`slot`; there is no "children of this structure" member. |
 
 ### 4.6 Capture protocol and host duties
 
@@ -449,7 +451,7 @@ U10, U11, A1.
 | Q4 | `footprint()` is one `Cuboid`; an L-shaped host group is inexpressible. | Deferred: split the group. If a real case appears, amend to `CuboidSet` and re-prove §7.3. |
 | Q5 | Who owns the well-known trait holder (`Traits.ITEM_INVENTORY`, 04 §8–§9)? | U3 or U11; `structurecumulus:item_inventory` is reserved here. |
 | Q6 | 03 §7 says constants are lowerCamelCase, but its example is `Expectations.AIR` and the glossary writes `BLOCK`. | U2 follows the glossary; 03 §7 should be corrected. |
-| Q7 | Per-cell coverage checking makes a large blueprint's BOUNDS check O(volume) status calls. | No member added; if U7 measures it hot, propose `readStatus(Cuboid)` as a default method. |
+| Q7 | Per-cell coverage checking makes a large blueprint's BOUNDS check O(volume) status calls. | No member added: the box query is `occupants(box, filter)`. If U7 measures a per-box status hot, propose a `slot`-summary member, not a per-cell `readStatus`. |
 
 ## 9. Falsification
 

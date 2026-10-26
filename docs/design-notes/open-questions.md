@@ -42,6 +42,7 @@ Q<n>: <选项字母> [+ 一句理由，可选]
 
 | 项 | 结论 | 依据 |
 | --- | --- | --- |
+| `Placement.compose`/`inverse` 的可空性 | 两者都是 `@Nullable`，`05` §4.6 的两条定律改为"非空时成立" | 偏移是格点，`MIN_XZ` 取反越界；已按代码改 `05` §3/§4.6 |
 | 分层搬迁 | `Finding*` 全体 → `kernel.finding`；`Locus`/`LocusFrame`/`KeyLocus` → `kernel.space`；`Outcome` 及两臂 → `kernel.finding`；`ReadScope` → `kernel.context`；`OccupantRef` 留 `occupant`、`SourceSpan` 留 `base` | 依赖图计算：`base` 向上的四条边只来自 `Finding.java:3-5`、`ReadScope.java:3-5`、`Outcome.java:3`、`Locus.java:3`；搬完 `base` 无出边 |
 | `PrescreenIndex`/`Census`/`AnchorCandidate`/`Fingerprint` | 删除（`11` §8 自称被取代，代码里 0 命中） | `G12` |
 | `anyOf()` 空数组 | 要求至少一个子项 | `RULE-D1` |
@@ -257,17 +258,6 @@ Q<n>: <选项字母> [+ 一句理由，可选]
 推荐 (a)。
 裁决:
 
-#### Q17 `Placement.inverse` 的可空与定律
-
-事实：`compose`/`inverse` 是 `@Nullable`〔已核〕；`05` §4.6 把 `P.inverse().compose(P) == IDENTITY` 当恒等式。`MIN_XZ` 的取反越界，所以"限制可逆"这条不可行。
-
-- (a) 把定律改成"当 `inverse()` 非空时成立"。
-- (b) `inverse` 返回 `Outcome`/`Optional`，强制调用方处理。
-- (c) 用更宽的坐标表示（如 `long`）让所有合法摆放都可逆。
-
-推荐 (a)。
-裁决:
-
 #### Q18 U10 修葺的归属
 
 事实：`14-remedies.md` 约 20 个类型、十条试运行规则、七种编辑，没有任何分片对照过代码；`22` §11.2/§11.3/§12/§13/§14/§15 同样无人读；`RMD` 码族与 `14` 自相矛盾。
@@ -345,6 +335,30 @@ Q<n>: <选项字母> [+ 一句理由，可选]
 - (c) 保留五个成员但把 `spend()`/`remaining()` 移到结果对象上。
 
 推荐 (a)：`17`/`18` 的示例按这套成员写。
+
+#### Q25 嵌套视图是不是一个完整 `WorldView`
+
+为什么必须现在定：`06` §2/§3.3/§4.5 三处都说"隔一层仍是同一个 `WorldView`、同一个快照、只是自己的坐标系"（`R-01` 的均匀性），而代码里没有 `NestedView` 这个接口，只有 `NestedLevelSnapshot`。
+
+事实〔已核〕：`predicate/NestedView.java` 是**另一个概念**（`record NestedView(NestedLevelSnapshot level, BayView bay)`，`nested` 焦点绑定的那一对），名字已被占用；`occupant/NestedLevelSnapshot` 只有 `parent()`、`depth()`、`contentDigest()`、`occupantAt(cell)`、`occupants(box, filter)`，是 `WorldView` 的真子集（没有 `slot`、`occupant(OccupantRef)`、`nested()`、`contentDigest(SectionKey)`、`snapshotId()`）。上一轮盲写探针照文档把它声明成 `extends NestedView`，编译不过——成员的缺不是"还没写"，是"子坐标系没有 16³ 区段可对齐"。
+
+- (a) 子视图就是完整 `WorldView`：`NestedLevelSnapshot` 补齐五个成员，`NestedView` 成为内核接口；子坐标系要虚构出区段对齐。
+- (b) 子视图是它自己的小面（代码的做法）：`parent`/`depth`/`contentDigest`/`occupantAt`/`occupants`；`06` §2/§4.5 改写成"同一次捕获、自己的坐标系、不承诺 `WorldView` 成员"；`predicate.NestedView` 保留名字。
+- (c) 同 (b)，但把 `predicate.NestedView` 改名（例如 `NestedPair`），空出 `NestedView` 给内核。
+
+推荐 (b)：子坐标系没有 16³ 区段，硬凑 `slot` 会得到一个永远 `Present` 的空壳；`R-01` 的措辞要从"同一个 `WorldView`"降到"同一份冻结字节、同一套缺席规则"。
+
+#### Q26 `WorldView` 要不要一个逐格读状态的入口
+
+为什么必须现在定：`06` §4.1 的五档状态与优先级、`13` 的 `SC-OCC-0101–0104` 都要求"说出这一格为什么不可读"，而接口只有 `slot(SectionKey)` 与 `occupant(cell)`；`occupant(cell) == null` 只说"不可读"，不说哪一档。
+
+事实〔已核〕：`WorldView` 没有 `readStatus(LatticePoint)`，也没有 `dimension()`/`cellSize()`，所以消费者无法从格子算出区段键；`06` §3.2 的双条件我今天改成"视图自己解析那个键"，但那只解决了实现侧，没解决**消费者侧**。代码里 `MatchSession`/`Focuses` 都是先拿到区段键再用 `slot`，没有逐格入口。
+
+- (a) 加 `ReadStatus readStatus(LatticePoint)`（底层仍是区段模型）：消费者能说出档位，`06` §4.1 的表与 `13` 的四个码都落地；接口多一个成员。
+- (b) 加 `SectionSlot slotOf(LatticePoint)`：同 (a) 但不引入第二套状态表达。
+- (c) 不加：消费者只报 `SC-OCC-0001`（"这一格不可读"），删掉 `06` §4.1 分档位下诊断的要求，`SC-OCC-0102/0103/0104` 只在捕获侧产生。
+
+推荐 (b)：一个成员、复用已有的 `SectionSlot`，`Air`/`Refused` 已经带着档位。
 
 ## 4. 不需要裁决、只需改文档的
 

@@ -53,9 +53,9 @@ Behaviour is §4's; a constructor throws only for a malformed value (`04` §5).
 | `Tilt` | `enum { LEVEL, PITCH_UP, PITCH_DOWN, ROLL_LEFT, ROLL_RIGHT, INVERTED }`; `Heading up()` |
 | `Flip` | `enum { NONE, LEFT_RIGHT, FRONT_BACK }`; `boolean isMirror()` |
 | `Orientation` | `record (int ordinal) implements Comparable<Orientation>`; `IDENTITY`, `static of(Turn,Tilt,Flip)`, `compose`, `then` (this element first), `inverse`, `Heading apply(Heading)`, `@Nullable apply(LatticePoint)`, `@Nullable apply(Cuboid)`, `@Nullable apply(CuboidSet)`, `Turn turn()`, `Tilt tilt()`, `isMirror()`, `id()`, `static List<Orientation> all()` |
-| `Placement` | `record (Orientation, LatticePoint offset)`; `IDENTITY`, `compose`, `inverse`, `@Nullable apply(...)` |
+| `Placement` | `record (Orientation, LatticePoint offset)`; `IDENTITY`, `@Nullable compose(Placement)`, `@Nullable inverse()`, `@Nullable apply(...)` — the offset is a lattice point, so a composition can leave the lattice and answers `null` |
 | `Siting` | `record (LatticePoint origin, Placement)`; `static of(origin, Orientation)`, `of(origin, Placement)`, `withOrigin`, `withPlacement`, `static @Nullable anchoring(anchorTarget, anchorLocal, Placement)`, `@Nullable toWorld(...)`, `@Nullable toLocal(...)` |
-| `SectionKey` | `record (World world, int x, int y, int z) implements Comparable<SectionKey>`; `static of(World, LatticePoint cell, int cellSize)`, `sectionOf(LatticePoint, int cellSize)`; compares by world, then `x`, `y`, `z`. The 16³ index of one world; not a cache key |
+| `SectionKey` | `record (World world, int x, int y, int z) implements Comparable<SectionKey>`; `static of(World, LatticePoint cell, int cellSize)`, `SectionKey sectionOf(LatticePoint, int cellSize)` (an instance method: it reuses this key's world); compares by world, then `x`, then `z`, then `y`. The 16³ index of one world; not a cache key |
 | `Locus` | `record (LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @Nullable SourceSpan)`; `static definition(SourceSpan)`, `local(CuboidSet)`, `local(CuboidSet, SourceSpan)`, `world(CuboidSet)`, `key(InstanceId, NamespacedId)`, `withSource(SourceSpan)` |
 | `LocusMap` | `record (Siting)`; `static of(Siting)`, `@Nullable toWorld(Locus)`, `@Nullable toLocal(Locus)`, `toDefinition(Locus)` |
 
@@ -187,8 +187,8 @@ Siting.toLocal(w)  = o⁻¹(w − origin − t)
 
 | Law | Statement |
 | --- | --- |
-| Composition | `P.compose(Q) = (o_P ∘ o_Q, o_P(t_Q) + t_P)` — `Q` first |
-| Inverse | `P.inverse() = (o⁻¹, −o⁻¹(t))`; `P.inverse().compose(P) == IDENTITY` |
+| Composition | `P.compose(Q) = (o_P ∘ o_Q, o_P(t_Q) + t_P)` — `Q` first; `null` when the sum leaves the lattice |
+| Inverse | `P.inverse() = (o⁻¹, −o⁻¹(t))`; when both are non-null, `P.inverse().compose(P) == IDENTITY` |
 | Linearity | `o(p.offset(d)) == o(p).offset(o(d))` |
 | Affine equivariance | `s.toWorld(p.offset(d)) == s.toWorld(p).offset(o(d))` |
 | Re-siting | `s.withPlacement(P.compose(Q)).toWorld(q) == s.withPlacement(P).toWorld(Q.apply(q))` |

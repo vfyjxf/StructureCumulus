@@ -39,6 +39,7 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Source span | `SourceSpan` | `(NamespacedId document, int start, int end)`: half-open character range in one document. Lives in `base` so `space` never depends on `finding`. | — |
 | Data view | `DataView` | Format-neutral read interface: `kind()`, `get(String)`, `list()`, `keys()` (`SequencedSet`), `asString/asInt/asBoolean(default)`, `@Nullable SourceSpan span()`. Lives in `base` so `expectation` never depends on `document`. | `DataView` |
 | Data kind | `DataKind` | `OBJECT`, `ARRAY`, `STRING`, `NUMBER`, `BOOLEAN`, `NULL`. | — |
+| Finding code | `FindingCode` | Stable identifier `SC-<FAMILY>-<NNNN>`, e.g. `SC-SPC-0001`, `record (Family family, int number)`; never reused for a different meaning. Lives in `base`, not `finding`: `occupant` and `space` carry it (`06` §3.3's `Refused`, `R38`), and neither may name U9. | `DiagnosticCode` |
 
 ## C. U1 — space and orientation (`kernel.space`)
 
@@ -62,6 +63,7 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Locus map | `LocusMap` | Converts a `Locus` between the cell frames for one `Siting`; `toWorld`, `toLocal`, `toDefinition`; a `KEY` locus is not converted. | `SpanMapper` |
 | Chunk key | `ChunkKey` | `(int cx, cy, cz)` index in a `ChunkGrid`, ordered `(cy, cz, cx)`. Not a Minecraft class. | — |
 | Chunk grid | `ChunkGrid` | `(int cellSize, LatticePoint origin)`: a world-framed grid of cube chunks; `chunkOf`, `boundsOf`, `chunkCount`, `chunksOf`. `cellSize` is data; the adapter passes 16. | — |
+| Section key | `SectionKey` | `(World world, int x, int y, int z)`: the 16³ section index of one world, ordered by world, then `x`, `z`, `y`; not a cache key. | — |
 
 ## D. U2 — occupants and world (`kernel.occupant`)
 
@@ -90,6 +92,7 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Occupant resolver | `OccupantResolver<R>` | Host SPI turning one raw host occupant into an `OccupantSnapshot`; `kinds()` declares the families it serves, `resolve` may decline. | `WorldOccupants` |
 | Resolve context | `ResolveContext` | What a resolver may see: `snapshotId()`, `anchor()`, `remainingDepth()`, `policy()`. | — |
 | Well-known traits | `Traits` | The kernel's reserved `TraitKey` constants (`ITEM_INVENTORY`, `ENERGY`, `FLUID`, `TIER`); addons may define their own. | — |
+| Nested level snapshot | `NestedLevelSnapshot` | The frozen interior of one nested occupant, read in its own frame: `static of(OccupantRef parent, int depth, Map<LatticePoint, OccupantSnapshot>)`, `parent()`, `depth()`, `contentDigest()`, `occupantAt(LatticePoint)`, `occupants(Cuboid, OccupantFilter)`. Kernel-side; the adapter does not own it. | — |
 
 ## E. U3 — expectations (`kernel.expectation`)
 
@@ -214,7 +217,6 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Instance id | `InstanceId` | `(World world, long serial)`: the identity of one placed structure. It keys its own `StructureContext` store, so two instances publishing one key never collide, and it is what a `KEY` locus names. | — |
 | Plan id | `PlanId` | One interned `long`, allocated at `Blueprint` build; a datapack rebuild gets a new id and a cold cache. | — |
 | Unit id | `UnitId` | The identity of one plan unit inside a plan: a `Check` id or a `Computation` id (`11` §4.7). | — |
-| Section key | `SectionKey` | `(World world, int x, int y, int z)`: the 16³ section index of one world; not a cache key. | — |
 | Cache key | `CacheKey` | `(PlanId plan, Siting siting, UnitId unit, long closureDigest)`: the attempt-cache identity of one unit at one placement (`11` §4.7). | — |
 | Cached unit | `CachedUnit` | Sealed `CachedPartial(ContextKey<?> key, Object value)` \| `CachedOutcome(Reply reply, List<Finding> findings, List<OccupantRef> subjects)`: one unit's contributions or its outcome, never a folded value and never world content (`20` §6.3). | `SectionResult` |
 | Attempt cache | `AttemptCache` | Optional LRU over `CachedUnit`: `@Nullable get(CacheKey)`, `put(CacheKey, CachedUnit)`, `none(long cacheBytes)`; evicts under `cacheBytes`, never under `retainedBytes` (`20` §6.3). | `SectionCache` |
@@ -238,7 +240,6 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Term | Type | Definition | Prior |
 | --- | --- | --- | --- |
 | Severity | `Severity` | `ERROR`, `WARNING`, `INFO`. | `Severity` |
-| Finding code | `FindingCode` | Stable identifier `SC-<FAMILY>-<NNNN>`, e.g. `SC-SPC-0001`; never reused for a different meaning. | `DiagnosticCode` |
 | Finding | `Finding` | `(FindingId id, FindingCode code, Severity severity, String message, List<Label> labels, List<Note> notes, @Nullable Suggestion suggestion, List<FindingId> related, Stage stage)`. | `Diagnostic` |
 | Finding id | `FindingId` | Stable within one bundle; used by `related`; `NONE` means "not addressable". | — |
 | Label | `Label` | `(Locus locus, String message, LabelRole role)`; the source span travels inside the `Locus`, never twice. | `Label` |
@@ -325,7 +326,6 @@ These are the words a reader is most likely to over-read. Each has one allowed r
 | Cell payload | `CellPayload` | `(LatticeKey, OccupantDescriptor, List<Trait<?>>)` for a watched BE/entity cell; the `OccupantRef` is stamped with the final `SnapshotId` lazily. | — |
 | Capture request / limits | `CaptureRequest`, `CaptureLimits` | Bounds, policy, grid, tracked types/cells, caps (cells, sections, bytes, entities, payloads). | — |
 | Capture result | `CaptureResult` | Sealed `Captured(WorldView)`, `TooLarge`, `Unavailable(status, code)`; never a partial snapshot treated as complete. | — |
-| Nested level snapshot | `NestedLevelSnapshot` | Child `NestedView` over the same frozen bytes as its parent. | — |
 | Capture tool | `CaptureTool` | `/cumulus capture` host path: selection → compact JSON `DataView`. | — |
 | Schematic import | `SchematicImport` | `.schem`/`.nbt` reader that emits compact JSON; unsupported entries become findings. | — |
 
