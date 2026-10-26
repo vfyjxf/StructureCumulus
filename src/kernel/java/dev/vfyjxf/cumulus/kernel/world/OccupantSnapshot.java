@@ -20,9 +20,9 @@ public record OccupantSnapshot(
     List<Trait<?>> traits
 ) {
 
-    public static final NamespacedId AIR = NamespacedId.of("air");
+    public static final NamespacedId air = NamespacedId.of("air");
 
-    private static final Comparator<Trait<?>> TRAIT_ORDER = Comparator.comparing(trait -> trait.key().id());
+    private static final Comparator<Trait<?>> traitOrder = Comparator.comparing(trait -> trait.key().id());
 
     public OccupantSnapshot {
         Objects.requireNonNull(ref, "ref");
@@ -36,7 +36,7 @@ public record OccupantSnapshot(
             throw new IllegalArgumentException("an occupant needs a footprint");
         }
         List<Trait<?>> sorted = new ArrayList<>(traits);
-        sorted.sort(TRAIT_ORDER);
+        sorted.sort(traitOrder);
         for (int i = 0; i < sorted.size(); i++) {
             Objects.requireNonNull(sorted.get(i), "trait");
             if (i > 0 && sorted.get(i - 1).key().id().equals(sorted.get(i).key().id())) {
@@ -47,17 +47,17 @@ public record OccupantSnapshot(
     }
 
     public static OccupantSnapshot air(SnapshotId snapshot, int frame, LatticePoint cell) {
-        OccupantRef ref = new OccupantRef(snapshot, frame, AIR, OccupantKind.BLOCK, cell);
+        OccupantRef ref = new OccupantRef(snapshot, frame, air, OccupantKind.block, cell);
         return new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(AIR, OccupantKind.BLOCK, Map.of(), List.of()),
+            new OccupantDescriptor(air, OccupantKind.block, Map.of(), List.of()),
             Cuboid.of(cell),
             List.of()
         );
     }
 
     public boolean isAir() {
-        return descriptor.type().equals(AIR);
+        return descriptor.type().equals(air);
     }
 
     public <T> @Nullable Trait<T> find(TraitKey<T> key) {

@@ -8,18 +8,18 @@ import java.util.regex.Pattern;
 /** The only naming type in the kernel: {@code namespace:path}. */
 public record NamespacedId(String namespace, String path) implements Comparable<NamespacedId> {
 
-    public static final String DEFAULT_NAMESPACE = "structurecumulus";
+    public static final String defaultNamespace = "structurecumulus";
 
-    private static final Pattern NAMESPACE = Pattern.compile("[a-z0-9_.-]{1,64}");
-    private static final Pattern PATH = Pattern.compile("[a-z0-9/._-]{1,256}");
+    private static final Pattern namespacePattern = Pattern.compile("[a-z0-9_.-]{1,64}");
+    private static final Pattern pathPattern = Pattern.compile("[a-z0-9/._-]{1,256}");
 
     public NamespacedId {
         Objects.requireNonNull(namespace, "namespace");
         Objects.requireNonNull(path, "path");
-        if (!NAMESPACE.matcher(namespace).matches()) {
+        if (!namespacePattern.matcher(namespace).matches()) {
             throw new IllegalArgumentException("invalid namespace: " + namespace);
         }
-        if (!PATH.matcher(path).matches() || path.startsWith("/") || path.endsWith("/") || path.contains("//")) {
+        if (!pathPattern.matcher(path).matches() || path.startsWith("/") || path.endsWith("/") || path.contains("//")) {
             throw new IllegalArgumentException("invalid path: " + path);
         }
     }
@@ -29,7 +29,7 @@ public record NamespacedId(String namespace, String path) implements Comparable<
     }
 
     public static NamespacedId of(String path) {
-        return new NamespacedId(DEFAULT_NAMESPACE, path);
+        return new NamespacedId(defaultNamespace, path);
     }
 
     public static @Nullable NamespacedId parse(@Nullable String text) {
@@ -38,21 +38,24 @@ public record NamespacedId(String namespace, String path) implements Comparable<
         }
         int colon = text.indexOf(':');
         if (colon < 0) {
-            return isValidPath(text) ? new NamespacedId(DEFAULT_NAMESPACE, text) : null;
+            return isValidPath(text) ? new NamespacedId(defaultNamespace, text) : null;
         }
         if (text.indexOf(':', colon + 1) >= 0) {
             return null;
         }
         String namespace = text.substring(0, colon);
         String path = text.substring(colon + 1);
-        if (!NAMESPACE.matcher(namespace).matches() || !isValidPath(path)) {
+        if (!namespacePattern.matcher(namespace).matches() || !isValidPath(path)) {
             return null;
         }
         return new NamespacedId(namespace, path);
     }
 
     private static boolean isValidPath(String path) {
-        return PATH.matcher(path).matches() && !path.startsWith("/") && !path.endsWith("/") && !path.contains("//");
+        return pathPattern.matcher(path).matches()
+                && !path.startsWith("/")
+                && !path.endsWith("/")
+                && !path.contains("//");
     }
 
     public String text() {

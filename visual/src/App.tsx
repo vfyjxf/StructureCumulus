@@ -151,7 +151,7 @@ export default function App() {
           </div>
           <div className="rail-bar"><span style={{ width: `${progress}%` }} /></div>
           <div className="rail-gates">
-            <div className="rail-gate">{zh ? '测试' : 'tests'}<strong>95/95</strong></div>
+            <div className="rail-gate">{zh ? '测试' : 'tests'}<strong>97/97</strong></div>
             <div className="rail-gate">{zh ? '代码' : 'codes'}<strong>55</strong></div>
             <div className="rail-gate">{zh ? '纯度' : 'purity'}<strong>0</strong></div>
             <div className="rail-gate">{zh ? '裁决' : 'rulings'}<strong>23</strong></div>
@@ -202,14 +202,14 @@ export default function App() {
               <div className="footer-meta">
                 StructureCumulus / {zh ? '设计 review 1.0' : 'design review 1.0'}<br />
                 {zh ? '8 份设计文件 · 11 个 kernel 模块 + adapter 规范' : '8 design files · 11 kernel modules + adapter spec'}<br />
-                {zh ? 'kernel 11 个 package · 55 个 code · 95 个测试' : 'kernel 11 packages · 55 codes · 95 tests'}<br />
+                {zh ? 'kernel 11 个 package · 55 个 code · 97 个测试' : 'kernel 11 packages · 55 codes · 97 tests'}<br />
                 kernel commit 0d1218e
               </div>
             </div>
             <div className="footer-rule rule" />
             <div className="footer-small">
               <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
-              <span>{zh ? 'Adapter 只有规范，没有实现' : 'Adapter specified, not implemented'}</span>
+              <span>{zh ? 'Adapter M1 采集；完整 adapter 待完成' : 'Adapter M1 capture; full adapter pending'}</span>
               <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>

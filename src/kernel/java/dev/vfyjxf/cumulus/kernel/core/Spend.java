@@ -3,7 +3,7 @@ package dev.vfyjxf.cumulus.kernel.core;
 /** What one attempt consumed. */
 public record Spend(int cells, int sections) {
 
-    public static final Spend ZERO = new Spend(0, 0);
+    public static final Spend zero = new Spend(0, 0);
 
     public Spend {
         if (cells < 0 || sections < 0) {

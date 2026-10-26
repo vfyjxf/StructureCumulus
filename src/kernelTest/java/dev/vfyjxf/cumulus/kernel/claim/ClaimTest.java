@@ -20,47 +20,47 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ClaimTest {
 
-    private static final Siting SITING = Siting.of(LatticePoint.ORIGIN, Orientation.IDENTITY);
-    private static final OwnerId A = OwnerId.of(NamespacedId.of("a"));
-    private static final OwnerId B = OwnerId.of(NamespacedId.of("b"));
+    private static final Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+    private static final OwnerId ownerA = OwnerId.of(NamespacedId.of("a"));
+    private static final OwnerId ownerB = OwnerId.of(NamespacedId.of("b"));
 
     private static ClaimRow row(OwnerId owner, Sharing sharing) {
-        return new ClaimRow(LatticeKey.of(LatticePoint.ORIGIN), sharing, owner, SITING, NamespacedId.of("bay"));
+        return new ClaimRow(LatticeKey.of(LatticePoint.origin), sharing, owner, siting, NamespacedId.of("bay"));
     }
 
     @Test
     void matrixIsSymmetricAndSelfExcluded() {
-        assertFalse(ClaimMatrix.conflicts(row(A, Sharing.SHARED), row(A, Sharing.SHARED)));
-        assertFalse(ClaimMatrix.conflicts(row(A, Sharing.SHARED), row(B, Sharing.SHARED)));
-        assertTrue(ClaimMatrix.conflicts(row(A, Sharing.EXCLUSIVE), row(B, Sharing.SHARED)));
-        assertTrue(ClaimMatrix.conflicts(row(A, Sharing.SHARED), row(B, Sharing.EXCLUSIVE)));
-        assertTrue(ClaimMatrix.conflicts(row(A, Sharing.EXCLUSIVE), row(B, Sharing.EXCLUSIVE)));
+        assertFalse(ClaimMatrix.conflicts(row(ownerA, Sharing.shared), row(ownerA, Sharing.shared)));
+        assertFalse(ClaimMatrix.conflicts(row(ownerA, Sharing.shared), row(ownerB, Sharing.shared)));
+        assertTrue(ClaimMatrix.conflicts(row(ownerA, Sharing.exclusive), row(ownerB, Sharing.shared)));
+        assertTrue(ClaimMatrix.conflicts(row(ownerA, Sharing.shared), row(ownerB, Sharing.exclusive)));
+        assertTrue(ClaimMatrix.conflicts(row(ownerA, Sharing.exclusive), row(ownerB, Sharing.exclusive)));
     }
 
     @Test
     void claimSetOrdersAndViewHidesUnavailableRows() {
-        ClaimSet set = new ClaimSet(List.of(row(B, Sharing.SHARED), row(A, Sharing.SHARED)), 3);
-        assertEquals(A, set.rows().get(0).owner());
+        ClaimSet set = new ClaimSet(List.of(row(ownerB, Sharing.shared), row(ownerA, Sharing.shared)), 3);
+        assertEquals(ownerA, set.rows().get(0).owner());
         assertEquals(3, set.revision());
         ClaimView unavailable = ClaimView.unavailable();
         assertFalse(unavailable.available());
         assertTrue(unavailable.rows().isEmpty());
         assertEquals(
             1,
-            new ClaimView(List.of(row(A, Sharing.SHARED)), 1, true).rowsIn(Cuboid.of(0, 0, 0, 1, 1, 1)).size()
+            new ClaimView(List.of(row(ownerA, Sharing.shared)), 1, true).rowsIn(Cuboid.of(0, 0, 0, 1, 1, 1)).size()
         );
     }
 
     @Test
     void settleRequestRefusesForeignRows() {
         ClaimRow foreign = new ClaimRow(
-            LatticeKey.of(LatticePoint.ORIGIN),
-            Sharing.SHARED,
-            B,
-            SITING,
+            LatticeKey.of(LatticePoint.origin),
+            Sharing.shared,
+            ownerB,
+            siting,
             NamespacedId.of("bay")
         );
-        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(A, SITING, List.of(foreign), 0));
+        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(ownerA, siting, List.of(foreign), 0));
     }
 
     @Test
@@ -102,7 +102,7 @@ class ClaimTest {
                 return new ClaimView(List.of(), 0, true);
             }
         };
-        ClaimVerdict released = ledger.release(B, SITING);
+        ClaimVerdict released = ledger.release(ownerB, siting);
         assertTrue(released instanceof ClaimVerdict.Settled);
         assertEquals(0, ((ClaimVerdict.Settled) released).revision());
         assertEquals(0, ledger.revision());

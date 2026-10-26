@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,14 +22,14 @@ class SpaceTest {
     @Test
     void latticePackingRoundTrips() {
         for (LatticePoint point : List.of(
-            LatticePoint.ORIGIN,
+            LatticePoint.origin,
             LatticePoint.of(-1, -1, -1),
-            LatticePoint.of(LatticePoint.MAX_XZ, LatticePoint.MAX_Y, LatticePoint.MAX_XZ),
-            LatticePoint.of(LatticePoint.MIN_XZ, LatticePoint.MIN_Y, LatticePoint.MIN_XZ)
+            LatticePoint.of(LatticePoint.maxXz, LatticePoint.maxY, LatticePoint.maxXz),
+            LatticePoint.of(LatticePoint.minXz, LatticePoint.minY, LatticePoint.minXz)
         )) {
             assertEquals(point, point.key().point());
         }
-        assertThrows(IllegalArgumentException.class, () -> LatticePoint.of(LatticePoint.MAX_XZ + 1, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> LatticePoint.of(LatticePoint.maxXz + 1, 0, 0));
     }
 
     @Test
@@ -72,16 +73,16 @@ class SpaceTest {
         List<Orientation> all = Orientation.all();
         assertEquals(48, all.size());
         assertEquals(48, new HashSet<>(all).size());
-        assertEquals(Orientation.IDENTITY, Orientation.of(Turn.NONE, Tilt.LEVEL, Flip.NONE));
+        assertEquals(Orientation.identity, Orientation.of(Turn.none, Tilt.level, Flip.none));
         for (Orientation orientation : all) {
-            assertEquals(Orientation.IDENTITY, orientation.inverse().compose(orientation));
-            assertEquals(orientation, orientation.compose(Orientation.IDENTITY));
+            assertEquals(Orientation.identity, orientation.inverse().compose(orientation));
+            assertEquals(orientation, orientation.compose(Orientation.identity));
         }
     }
 
     @Test
     void orientationMirrorKeepsVolumeAndMapsCorners() {
-        Orientation mirror = Orientation.of(Turn.NONE, Tilt.LEVEL, Flip.FRONT_BACK);
+        Orientation mirror = Orientation.of(Turn.none, Tilt.level, Flip.frontBack);
         Cuboid image = mirror.apply(Cuboid.of(-1, 0, -1, 1, 1, 1));
         assertNotNull(image);
         assertEquals(Cuboid.of(0, 0, -1, 2, 1, 1), image);
@@ -95,31 +96,31 @@ class SpaceTest {
 
     @Test
     void turnAndTiltCompose() {
-        Orientation yaw = Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE);
-        assertEquals(Heading.EAST, yaw.apply(Heading.NORTH));
-        Orientation cap = Orientation.of(Turn.NONE, Tilt.INVERTED, Flip.NONE);
-        assertEquals(Heading.DOWN, cap.apply(Heading.UP));
+        Orientation yaw = Orientation.of(Turn.clockwise, Tilt.level, Flip.none);
+        assertEquals(Heading.east, yaw.apply(Heading.north));
+        Orientation cap = Orientation.of(Turn.none, Tilt.inverted, Flip.none);
+        assertEquals(Heading.down, cap.apply(Heading.up));
         Orientation tipped = yaw.compose(cap);
-        assertEquals(Heading.WEST, tipped.apply(Heading.NORTH));
-        assertEquals(Heading.DOWN, tipped.apply(Heading.UP));
+        assertEquals(Heading.west, tipped.apply(Heading.north));
+        assertEquals(Heading.down, tipped.apply(Heading.up));
         assertFalse(tipped.isMirror());
-        assertTrue(Orientation.of(Turn.NONE, Tilt.LEVEL, Flip.LEFT_RIGHT).isMirror());
+        assertTrue(Orientation.of(Turn.none, Tilt.level, Flip.leftRight).isMirror());
     }
 
     @Test
     void placementLawsAndOffLattice() {
-        Placement p = new Placement(Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE), LatticePoint.of(10, 64, -5));
+        Placement p = new Placement(Orientation.of(Turn.clockwise, Tilt.level, Flip.none), LatticePoint.of(10, 64, -5));
         Placement inverse = p.inverse();
         assertNotNull(inverse);
-        assertEquals(Placement.IDENTITY, inverse.compose(p));
-        assertEquals(LatticePoint.of(10, 64, -5), p.apply(LatticePoint.ORIGIN));
-        Placement edge = new Placement(Orientation.IDENTITY, LatticePoint.of(LatticePoint.MIN_XZ, 0, 0));
+        assertEquals(Placement.identity, inverse.compose(p));
+        assertEquals(LatticePoint.of(10, 64, -5), p.apply(LatticePoint.origin));
+        Placement edge = new Placement(Orientation.identity, LatticePoint.of(LatticePoint.minXz, 0, 0));
         assertNull(edge.inverse());
     }
 
     @Test
     void sitingRoundTrips() {
-        Siting siting = Siting.of(LatticePoint.of(10, 64, -5), Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE));
+        Siting siting = Siting.of(LatticePoint.of(10, 64, -5), Orientation.of(Turn.clockwise, Tilt.level, Flip.none));
         LatticePoint local = LatticePoint.of(3, 0, 0);
         LatticePoint world = siting.toWorld(local);
         assertNotNull(world);
@@ -127,7 +128,7 @@ class SpaceTest {
         CuboidSet set = CuboidSet.of(Cuboid.of(3, 0, 0, 5, 1, 1));
         CuboidSet worldSet = siting.toWorld(set);
         assertNotNull(worldSet);
-        assertTrue(java.util.Objects.requireNonNull(siting.toLocal(worldSet), "local").contentEquals(set));
+        assertTrue(Objects.requireNonNull(siting.toLocal(worldSet), "local").contentEquals(set));
     }
 
     @Test
@@ -143,26 +144,25 @@ class SpaceTest {
     @Test
     void locusFramesValidate() {
         Locus local = Locus.local(CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)));
-        assertEquals(LocusFrame.LOCAL, local.frame());
+        assertEquals(LocusFrame.local, local.frame());
         assertThrows(IllegalArgumentException.class, () -> Locus.local(CuboidSet.empty()));
         Locus key = Locus.key(new InstanceId(World.of(NamespacedId.of("w")), 1), NamespacedId.of("k"));
-        assertEquals(LocusFrame.KEY, key.frame());
+        assertEquals(LocusFrame.key, key.frame());
         assertThrows(
             IllegalArgumentException.class,
-            () -> new Locus(LocusFrame.DEFINITION, CuboidSet.empty(), null, null)
+            () -> new Locus(LocusFrame.definition, CuboidSet.empty(), null, null)
         );
     }
 
     @Test
     void locusMapMapsLocalAndWorld() {
-        Siting siting = Siting.of(LatticePoint.of(10, 64, -5), Orientation.of(Turn.CLOCKWISE, Tilt.LEVEL, Flip.NONE));
+        Siting siting = Siting.of(LatticePoint.of(10, 64, -5), Orientation.of(Turn.clockwise, Tilt.level, Flip.none));
         Locus local = Locus.local(CuboidSet.of(Cuboid.of(3, 0, 0, 5, 1, 1)));
         Locus world = LocusMap.of(siting).toWorld(local);
         assertNotNull(world);
-        assertEquals(LocusFrame.WORLD, world.frame());
+        assertEquals(LocusFrame.world, world.frame());
         assertTrue(
-            java.util.Objects.requireNonNull(LocusMap.of(siting).toLocal(world), "local").cells()
-                    .contentEquals(local.cells())
+            Objects.requireNonNull(LocusMap.of(siting).toLocal(world), "local").cells().contentEquals(local.cells())
         );
         assertNull(
             LocusMap.of(siting)

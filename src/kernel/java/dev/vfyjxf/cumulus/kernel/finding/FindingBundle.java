@@ -20,7 +20,7 @@ import java.util.Set;
 /** The only aggregator of findings. */
 public final class FindingBundle {
 
-    private static final FindingBundle EMPTY = new FindingBundle(List.of(), 0, 0, FindingOptions.defaults());
+    private static final FindingBundle empty = new FindingBundle(List.of(), 0, 0, FindingOptions.defaults());
 
     private final List<Finding> findings;
     private final int elided;
@@ -35,7 +35,7 @@ public final class FindingBundle {
     }
 
     public static FindingBundle empty() {
-        return EMPTY;
+        return empty;
     }
 
     public static FindingBundle of(List<Finding> findings) {
@@ -102,7 +102,7 @@ public final class FindingBundle {
         FindingOptions merged = options.narrowedBy(narrower);
         List<Finding> base = new ArrayList<>(findings.size());
         for (Finding finding : findings) {
-            if (!finding.code().equals(Codes.BUNDLE_TRUNCATED.code())) {
+            if (!finding.code().equals(Codes.bundleTruncated.code())) {
                 base.add(finding);
             }
         }
@@ -128,7 +128,7 @@ public final class FindingBundle {
         for (Finding finding : input) {
             Checks.checkNotNull(finding, "finding");
             latest = later(latest, finding.phase());
-            if (!options.includeInfo() && finding.severity() == Severity.INFO) {
+            if (!options.includeInfo() && finding.severity() == Severity.info) {
                 filtered++;
                 continue;
             }
@@ -150,7 +150,7 @@ public final class FindingBundle {
         Map<FindingCode, Integer> perCode = new HashMap<>();
         int total = 0;
         for (Finding finding : retained) {
-            if (finding.severity() == Severity.ERROR) {
+            if (finding.severity() == Severity.error) {
                 capped.add(finding);
                 continue;
             }
@@ -183,14 +183,14 @@ public final class FindingBundle {
             }
         }
         if (elided + filtered > 0) {
-            cleaned.add(truncation(elided, filtered, latest == null ? Phase.SETTLE : latest));
+            cleaned.add(truncation(elided, filtered, latest == null ? Phase.settle : latest));
         }
         return new FindingBundle(cleaned, elided, filtered, options);
     }
 
     private static Finding truncation(int elided, int filtered, Phase phase) {
         String message = elided + " elided, " + filtered + " filtered findings were omitted.";
-        return Finding.builder(Codes.BUNDLE_TRUNCATED).phase(phase).message(message).build();
+        return Finding.builder(Codes.bundleTruncated).phase(phase).message(message).build();
     }
 
     private static Phase later(@Nullable Phase current, Phase candidate) {
@@ -246,9 +246,9 @@ public final class FindingBundle {
             return byFrame;
         }
         return switch (frame) {
-            case DEFINITION -> compareDefinitions(left, right);
-            case LOCAL, WORLD -> compareBoxes(left.cells(), right.cells());
-            case KEY -> compareKeys(left.key(), right.key());
+            case definition -> compareDefinitions(left, right);
+            case local, world -> compareBoxes(left.cells(), right.cells());
+            case key -> compareKeys(left.key(), right.key());
         };
     }
 

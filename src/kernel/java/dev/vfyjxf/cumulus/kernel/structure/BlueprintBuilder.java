@@ -177,12 +177,12 @@ public final class BlueprintBuilder {
                 decided = decided.union(staticCells);
             }
             switch (bay.coverage()) {
-                case EVERY_CELL -> {
+                case everyCell -> {
                     if (!decided.containsAll(bay.cells())) {
                         fail("SC-BPT-0005", "EVERY_CELL bay " + bay.id() + " has undecided cells");
                     }
                 }
-                case ONE_SUBJECT -> {
+                case oneSubject -> {
                     boolean binds = false;
                     for (Check<?> check : bayChecks) {
                         binds |= check.focus().bindsSubjects();
@@ -191,13 +191,13 @@ public final class BlueprintBuilder {
                         fail("SC-BPT-0005", "ONE_SUBJECT bay " + bay.id() + " binds no subject");
                     }
                 }
-                case ANY_SUBJECT -> {
+                case anySubject -> {
                     if (!decided.isEmpty()) {
                         fail("SC-BPT-0005", "ANY_SUBJECT bay " + bay.id() + " has per-cell checks");
                     }
                 }
             }
-            if (bay.sharing() == Sharing.EXCLUSIVE && bay.footprint() instanceof Footprint.None) {
+            if (bay.sharing() == Sharing.exclusive && bay.footprint() instanceof Footprint.None) {
                 fail("SC-BPT-0005", "EXCLUSIVE bay " + bay.id() + " owns nothing");
             }
         }
@@ -208,7 +208,7 @@ public final class BlueprintBuilder {
                 Bay left = bayList.get(i);
                 Bay right = bayList.get(j);
                 if (left.cells().intersects(right.cells())
-                        && (left.sharing() == Sharing.EXCLUSIVE || right.sharing() == Sharing.EXCLUSIVE)) {
+                        && (left.sharing() == Sharing.exclusive || right.sharing() == Sharing.exclusive)) {
                     fail("SC-BPT-0002", "bays " + left.id() + " and " + right.id() + " overlap with an exclusive side");
                 }
             }

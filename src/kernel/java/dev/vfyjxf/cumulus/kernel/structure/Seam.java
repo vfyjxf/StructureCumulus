@@ -10,7 +10,7 @@ import java.util.TreeMap;
 /** A declared connectable edge. It is never tested and never claimed. */
 public record Seam(SeamId id, Cuboid cells, SeamKind kind, Map<String, String> properties) {
 
-    public static final String CUSTOM_KIND = "kind";
+    public static final String customKind = "kind";
 
     public Seam {
         Objects.requireNonNull(id, "id");
@@ -21,6 +21,6 @@ public record Seam(SeamId id, Cuboid cells, SeamKind kind, Map<String, String> p
     }
 
     public boolean compatibleWith(Seam other) {
-        return kind == other.kind && Objects.equals(properties.get(CUSTOM_KIND), other.properties.get(CUSTOM_KIND));
+        return kind == other.kind && Objects.equals(properties.get(customKind), other.properties.get(customKind));
     }
 }

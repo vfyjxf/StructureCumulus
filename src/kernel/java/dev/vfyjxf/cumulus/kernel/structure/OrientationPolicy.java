@@ -29,7 +29,7 @@ public record OrientationPolicy(NamespacedId primaryRole, List<Orientation> allo
         allowed = List.copyOf(sorted);
         if (uprightOnly) {
             for (Orientation orientation : allowed) {
-                if (orientation.apply(Heading.UP) != Heading.UP) {
+                if (orientation.apply(Heading.up) != Heading.up) {
                     throw new IllegalArgumentException("uprightOnly promises every allowed maps UP to UP");
                 }
             }
@@ -42,7 +42,7 @@ public record OrientationPolicy(NamespacedId primaryRole, List<Orientation> allo
 
     public @Nullable Orientation select(Heading anchorHeading) {
         for (Orientation orientation : allowed) {
-            if (orientation.apply(Heading.NORTH) == anchorHeading) {
+            if (orientation.apply(Heading.north) == anchorHeading) {
                 return orientation;
             }
         }
@@ -68,7 +68,7 @@ public record OrientationPolicy(NamespacedId primaryRole, List<Orientation> allo
 
         public Builder allowTurns(Turn... turns) {
             for (Turn turn : turns) {
-                allowed.add(Orientation.of(turn, Tilt.LEVEL, Flip.NONE));
+                allowed.add(Orientation.of(turn, Tilt.level, Flip.none));
             }
             return this;
         }

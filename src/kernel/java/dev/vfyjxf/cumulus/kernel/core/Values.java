@@ -8,10 +8,10 @@ import java.util.Objects;
 /** Helpers for the neutral data tree. */
 public final class Values {
 
-    private static final Comparator<String> CODE_POINT = Values::compareCodePoints;
+    private static final Comparator<String> codePoint = Values::compareCodePoints;
 
     public static Comparator<String> codePointOrder() {
-        return CODE_POINT;
+        return codePoint;
     }
 
     public static boolean contentEquals(Value left, Value right) {

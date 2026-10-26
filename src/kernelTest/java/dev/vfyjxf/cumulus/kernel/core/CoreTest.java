@@ -2,8 +2,11 @@ package dev.vfyjxf.cumulus.kernel.core;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -71,7 +74,7 @@ class CoreTest {
         assertEquals(a.hashCode(), b.hashCode());
         assertTrue(Values.contentEquals(a, b));
         assertEquals(List.of("a", "b"), List.copyOf(a.members().keySet()));
-        assertEquals(2, java.util.Objects.requireNonNull(a.get("b"), "b").asNumber(0));
+        assertEquals(2, Objects.requireNonNull(a.get("b"), "b").asNumber(0));
     }
 
     @Test
@@ -86,20 +89,33 @@ class CoreTest {
 
     @Test
     void findingCodeParsesAndOrders() {
-        FindingCode code = FindingCode.of(FindingCode.Family.EXP, 1);
+        FindingCode code = FindingCode.of(FindingCode.Family.exp, 1);
         assertEquals("SC-EXP-0001", code.text());
         assertEquals(code, FindingCode.parse("SC-EXP-0001"));
         assertNull(FindingCode.parse("SC-EXP-1"));
         assertNull(FindingCode.parse("SC-NOPE-0001"));
         assertNull(FindingCode.parse("SC-EXP-0000"));
-        assertThrows(IllegalArgumentException.class, () -> FindingCode.of(FindingCode.Family.EXP, 10000));
-        assertTrue(FindingCode.of(FindingCode.Family.EXP, 1).compareTo(FindingCode.of(FindingCode.Family.EXP, 2)) < 0);
+        assertThrows(IllegalArgumentException.class, () -> FindingCode.of(FindingCode.Family.exp, 10000));
+        assertTrue(FindingCode.of(FindingCode.Family.exp, 1).compareTo(FindingCode.of(FindingCode.Family.exp, 2)) < 0);
+    }
+
+    @Test
+    void everyFamilyEmitsItsUppercaseWireTag() {
+        Set<String> tags = new HashSet<>();
+        for (FindingCode.Family family : FindingCode.Family.values()) {
+            String text = FindingCode.of(family, 7).text();
+            assertTrue(text.matches("SC-[A-Z]{2,6}-0007"), text);
+            assertFalse(text.contains(family.name()), text);
+            assertEquals(new FindingCode(family, 7), FindingCode.parse(text));
+            assertTrue(tags.add(text.substring(3, text.length() - 5)), "duplicate family tag: " + text);
+        }
+        assertEquals(FindingCode.Family.values().length, tags.size());
     }
 
     @Test
     void budgetAndSpend() {
         Budget budget = Budget.of(10, 2);
-        assertTrue(budget.admits(Spend.ZERO));
+        assertTrue(budget.admits(Spend.zero));
         assertTrue(budget.admits(new Spend(10, 2)));
         assertFalse(budget.admits(new Spend(11, 2)));
         assertEquals(new Spend(3, 1), new Spend(1, 1).plus(new Spend(2, 0)));
@@ -108,12 +124,12 @@ class CoreTest {
 
     @Test
     void contextKeyEqualityAndFactory() {
-        ContextKey<Long> a = ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.INSTANCE);
-        ContextKey<Long> b = ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.INSTANCE);
+        ContextKey<Long> a = ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.instance);
+        ContextKey<Long> b = ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.instance);
         assertEquals(a, b);
         assertFalse(a.contributed());
         ContextKey<Long> c = ContextKeys
-                .of(NamespacedId.of("k"), Long.class, Retention.INSTANCE, (left, right) -> left + right, 0L);
+                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right, 0L);
         assertTrue(c.contributed());
         assertEquals(0L, c.whenAbsent());
     }

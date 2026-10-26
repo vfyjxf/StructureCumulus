@@ -24,18 +24,18 @@ three lookups (`document`, `ledger`, `catalogs`).
 NamespacedId id = NamespacedId.of("mymod", "campfire");
 
 ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class,
-        Retention.INSTANCE, Merges.sum(), null);
+        Retention.instance, Merges.sum(), null);
 
 CuboidSet shellCells = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3))
         .subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)))
         .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2)));
 
-Bay shell = Bay.of(id("shell"), shellCells, Coverage.EVERY_CELL,
-        Footprint.box(), Sharing.EXCLUSIVE);
+Bay shell = Bay.of(id("shell"), shellCells, Coverage.everyCell,
+        Footprint.box(), Sharing.exclusive);
 Bay hollow = Bay.of(id("hollow"), CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)),
-        Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Coverage.everyCell, Footprint.box(), Sharing.exclusive);
 Bay fire = Bay.of(id("fire"), CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2)),
-        Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Coverage.everyCell, Footprint.box(), Sharing.exclusive);
 
 Blueprint campfire = Blueprint.builder(id)
         .bounds(Cuboid.of(0, 0, 0, 3, 3, 3))
@@ -60,14 +60,14 @@ builder knot, no `Requirement`, no stage, and no hidden default that changes a v
 - `Check.of(id, bay, focus, expectation)` carries the `Bay` value. The builder adds the bay to the
   blueprint; there is no separate `bay(...)` call and no "check without a bay" state.
 - A check whose focus binds a subject declares it through the focus; a check that only reads a
-  context key uses `Focuses.context(key)` and must live in an `ANY_SUBJECT` bay.
-- `Coverage` is enforced at `Blueprint.build()`: `EVERY_CELL` needs the checks' static cells to
-  cover the bay; `ANY_SUBJECT` forbids static cells; `ONE_SUBJECT` needs a binding focus and, at
+  context key uses `Focuses.context(key)` and must live in an `anySubject` bay.
+- `Coverage` is enforced at `Blueprint.build()`: `everyCell` needs the checks' static cells to
+  cover the bay; `anySubject` forbids static cells; `oneSubject` needs a binding focus and, at
   settle, a bound footprint equal to the bay.
-- `Footprint` is independent of `Coverage`: `EVERY_CELL + Bound` asserts eight and owns four (pipe
-  corner); `EVERY_CELL + Box` protects an empty volume (furnace cavity); `ONE_SUBJECT + Bound`
-  owns exactly the subject's cells (door); `None` owns nothing and is illegal with `EXCLUSIVE`.
-- Two bays of one blueprint may overlap only when both are `SHARED`; any other overlap is a build
+- `Footprint` is independent of `Coverage`: `everyCell + Bound` asserts eight and owns four (pipe
+  corner); `everyCell + Box` protects an empty volume (furnace cavity); `oneSubject + Bound`
+  owns exactly the subject's cells (door); `None` owns nothing and is illegal with `exclusive`.
+- Two bays of one blueprint may overlap only when both are `shared`; any other overlap is a build
   error. There is no pairwise `overlap` declaration.
 
 ## 3. The host surface
@@ -98,17 +98,17 @@ handle back. A result is a pure value; a lease is a resource the host scopes.
 
 ```java
 final class HatchExpectation implements Expectation<OccupantSnapshot> {
-    static final NamespacedId ID = id("hatch");
-    static final TraitKey<Inventory> INVENTORY = new TraitKey<>(id("inventory"), Inventory.class);
+    static final NamespacedId id = id("hatch");
+    static final TraitKey<Inventory> inventory = new TraitKey<>(id("inventory"), Inventory.class);
 
     @Override public Class<OccupantSnapshot> subject() { return OccupantSnapshot.class; }
     @Override public ExpectationMeta meta() {
-        return ExpectationMeta.of(ID, 80, Codes.EXPECTED.code());
+        return ExpectationMeta.of(id, 80, Codes.expected.code());
     }
     @Override public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
         OccupantSnapshot occupant = ctx.subject();
-        if (!occupant.has(INVENTORY)) {
-            return Reply.mismatch(Finding.builder(Codes.EXPECTED)
+        if (!occupant.has(inventory)) {
+            return Reply.mismatch(Finding.builder(Codes.expected)
                     .phase(ctx.phase())
                     .message("expected an inventory-bearing hatch")
                     .label(Label.primary(ctx.locus(), "expected an inventory"))
@@ -119,7 +119,7 @@ final class HatchExpectation implements Expectation<OccupantSnapshot> {
 }
 ```
 
-One interface, one catalog registration, no engine access. `ctx.phase()` is always `CHECK`.
+One interface, one catalog registration, no engine access. `ctx.phase()` is always `check`.
 
 ## 5. The document surface
 
@@ -176,14 +176,14 @@ Java DSL and the JSON compiler produce the same `Blueprint` (I-13).
 CuboidSet shell = CuboidSet.of(Cuboid.of(0, 0, 0, 7, 6, 7))
         .subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 6, 5, 6)))
         .subtract(CuboidSet.of(Cuboid.of(3, 1, 0, 4, 3, 1)));
-Bay wall = Bay.of(id("wall"), shell, Coverage.EVERY_CELL, Footprint.bound(), Sharing.EXCLUSIVE);
+Bay wall = Bay.of(id("wall"), shell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
 Bay cavity = Bay.of(id("cavity"), CuboidSet.of(Cuboid.of(1, 1, 1, 6, 5, 6)),
-        Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Coverage.everyCell, Footprint.box(), Sharing.exclusive);
 Bay mouth = Bay.of(id("mouth"), CuboidSet.of(Cuboid.of(3, 1, 0, 4, 3, 1)),
-        Coverage.ONE_SUBJECT, Footprint.bound(), Sharing.EXCLUSIVE);
+        Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
 
-ContextKey<Long> volume = ContextKeys.of(id("volume"), Long.class, Retention.INSTANCE, Merges.sum(), null);
-ContextKey<Long> capacity = ContextKeys.of(id("capacity"), Long.class, Retention.INSTANCE);
+ContextKey<Long> volume = ContextKeys.of(id("volume"), Long.class, Retention.instance, Merges.sum(), null);
+ContextKey<Long> capacity = ContextKeys.of(id("capacity"), Long.class, Retention.instance);
 
 Blueprint furnace = Blueprint.builder(id("huge_furnace"))
         .bounds(Cuboid.of(0, 0, 0, 7, 6, 7))
@@ -205,7 +205,7 @@ Blueprint furnace = Blueprint.builder(id("huge_furnace"))
 ```java
 Bay doorBay = Bay.of(id("door"),
         CuboidSet.of(Cuboid.of(3, 0, 0, 4, 1, 1), Cuboid.of(3, 1, 0, 4, 2, 1)),
-        Coverage.ONE_SUBJECT, Footprint.bound(), Sharing.EXCLUSIVE);
+        Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
 Blueprint door = Blueprint.builder(id("door"))
         .bounds(Cuboid.of(0, 0, 0, 8, 4, 8))
         .check(Check.of(id("oak_door"), doorBay, Focuses.door(LatticePoint.of(3, 0, 0)),
@@ -213,15 +213,15 @@ Blueprint door = Blueprint.builder(id("door"))
         .build();
 ```
 
-A door that binds one half is `Unavailable`, never a one-cell claim. `ONE_SUBJECT` refuses a bound
+A door that binds one half is `Unavailable`, never a one-cell claim. `oneSubject` refuses a bound
 footprint that is not the bay at settle.
 
 ### 6.3 Pipe corner (eight asserted, four owned)
 
 ```java
 CuboidSet cornerCells = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 2, 2));
-Bay corner = Bay.of(id("corner"), cornerCells, Coverage.EVERY_CELL,
-        Footprint.bound(), Sharing.EXCLUSIVE);
+Bay corner = Bay.of(id("corner"), cornerCells, Coverage.everyCell,
+        Footprint.bound(), Sharing.exclusive);
 List<Check<?>> checks = new ArrayList<>();
 for (LatticePoint p : List.of(point(0,0,0), point(1,0,0), point(0,0,1), point(1,0,1)))
     checks.add(Check.of(id("pipe_" + p.x() + p.z()), corner, Focuses.occupant(p),
@@ -241,8 +241,8 @@ example is one line. `Bound` owns the four pipe cells; the four air cells are as
 
 ### 6.4 Shared hatch (two owners, no conflict)
 
-Two blueprints, one hatch bay with `Footprint.bound()` and `Sharing.SHARED`. Owner A settles; owner
-B checks and settles; both rows coexist. An `EXCLUSIVE` owner C then checks: `Failed(SC-CLM-0001)`
+Two blueprints, one hatch bay with `Footprint.bound()` and `Sharing.shared`. Owner A settles; owner
+B checks and settles; both rows coexist. An `exclusive` owner C then checks: `Failed(SC-CLM-0001)`
 with the incumbent rows. `claim` owns the matrix; the kernel never invents a second predicate.
 
 ## 7. What the user never writes
@@ -277,4 +277,4 @@ public final class StructureKernel {
 
 Five pipeline operations, three helpers, three lookups. `settle` takes only the request and the
 admitted result; it finds its ledger in the kernel's `Host`. `create(catalogs)` is the no-host form
-for compile-only use; `check` with a lease works, `settle` reports `Undecided(LEDGER_UNAVAILABLE)`.
+for compile-only use; `check` with a lease works, `settle` reports `Undecided(ledgerUnavailable)`.

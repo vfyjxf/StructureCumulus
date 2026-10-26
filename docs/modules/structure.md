@@ -24,7 +24,7 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | Type | Kind | Contract |
 | --- | --- | --- |
 | `Bay` | record | id + `CuboidSet` cells + coverage + footprint + sharing |
-| `Coverage` | enum | `EVERY_CELL`, `ONE_SUBJECT`, `ANY_SUBJECT` |
+| `Coverage` | enum | `everyCell`, `oneSubject`, `anySubject` |
 | `Check<T>` | record | id + bay + focus + expectation + description |
 | `CheckResult` | record | reply + subjects + non-fatal notes |
 | `Focus<T>` | interface | binds a subject or explains why not |
@@ -71,7 +71,7 @@ public record Bay(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint
                          Sharing sharing, String description);
 }
 
-public enum Coverage { EVERY_CELL, ONE_SUBJECT, ANY_SUBJECT }
+public enum Coverage { everyCell, oneSubject, anySubject }
 
 public record Check<T>(NamespacedId id, Bay bay, Focus<T> focus, Expectation<T> expectation,
                        @Nullable String description) {
@@ -212,20 +212,20 @@ public record SeamId(NamespacedId id) implements Comparable<SeamId> {
     @Override public int compareTo(SeamId other);
 }
 
-public enum SeamKind { ITEM, FLUID, ENERGY, STRUCTURAL, CUSTOM }
+public enum SeamKind { item, fluid, energy, structural, custom }
 
 public record Seam(SeamId id, Cuboid cells, SeamKind kind,
                    java.util.Map<String, String> properties) {
-    public static final String CUSTOM_KIND = "kind";
+    public static final String customKind = "kind";
     public boolean compatibleWith(Seam other);
 }
 
 public record AnchorSpec(NamespacedId role, String property, String value) { }
 
 public final class AnchorRoles {
-    public static final NamespacedId PRIMARY = NamespacedId.of("primary");
-    public static final NamespacedId FRONT = NamespacedId.of("front");
-    public static final NamespacedId CENTER = NamespacedId.of("center");
+    public static final NamespacedId primary = NamespacedId.of("primary");
+    public static final NamespacedId front = NamespacedId.of("front");
+    public static final NamespacedId center = NamespacedId.of("center");
     private AnchorRoles() {}
 }
 
@@ -381,12 +381,12 @@ what the instance owns, `Sharing` says how claims meet. They are three independe
 
 | Coverage | Build obligation | Settle obligation |
 | --- | --- | --- |
-| `EVERY_CELL` | union of the bay's checks' `focus.staticCells(bay.cells())` contains `bay.cells()` | — |
-| `ONE_SUBJECT` | at least one check binds subjects; static cells stay inside the bay | union of bound subject footprints equals `bay.cells()` |
-| `ANY_SUBJECT` | every check's static cells is empty | — |
+| `everyCell` | union of the bay's checks' `focus.staticCells(bay.cells())` contains `bay.cells()` | — |
+| `oneSubject` | at least one check binds subjects; static cells stay inside the bay | union of bound subject footprints equals `bay.cells()` |
+| `anySubject` | every check's static cells is empty | — |
 
-`EXCLUSIVE` requires a footprint other than `None` (R1). `ONE_SUBJECT + Box` is legal (the bay owns
-its air); `ANY_SUBJECT + Bound` is legal (a pen owns the animal's cells). Only `None + EXCLUSIVE` is a
+`exclusive` requires a footprint other than `None` (R1). `oneSubject + Box` is legal (the bay owns
+its air); `anySubject + Bound` is legal (a pen owns the animal's cells). Only `None + exclusive` is a
 contradiction.
 
 ### 4.2 Check
@@ -442,7 +442,7 @@ reads `origin` and `origin + (0,1,0)` and requires both to be non-air; otherwise
 `Focuses.entity(type)` requires exactly one entity of that type in the bay; zero or many is
 `Unavailable` (`SC-OCC-0001` for zero, an ambiguity finding for many). `Focuses.nested(cell)` requires
 a nested occupant and returns its child view. `Focuses.context(key)` is `context().require(key)`;
-absent is `Unavailable` with `SC-CTX-0007` on a `KEY` locus.
+absent is `Unavailable` with `SC-CTX-0007` on a `key` locus.
 
 ### 4.5 Read scope
 
@@ -486,10 +486,10 @@ is `SC-BPT-0007`.
 | Rule | Code |
 | --- | --- |
 | id/bounds non-null, bounds non-empty, at least one check | `SC-BPT-0001` |
-| two bays intersect and at least one is `EXCLUSIVE` | `SC-BPT-0002` |
+| two bays intersect and at least one is `exclusive` | `SC-BPT-0002` |
 | a bay is empty or leaves `bounds` | `SC-BPT-0003` |
 | duplicate bay/check/seam id, or two different bays with one id | `SC-BPT-0004` |
-| coverage/footprint R1–R4, `None + EXCLUSIVE`, `Declared` outside bounds | `SC-BPT-0005` |
+| coverage/footprint R1–R4, `None + exclusive`, `Declared` outside bounds | `SC-BPT-0005` |
 | anchor roles duplicated, primary role absent, allowed empty/duplicate/not upright, anchors without a policy | `SC-BPT-0006` |
 | computation DAG cycle/missing input/duplicate output/empty region/section input | `SC-BPT-0007` |
 | derivation order negative/duplicate, output duplicate/also a computation output | `SC-BPT-0008` |
@@ -503,8 +503,8 @@ a `build()` throw after a clean compile is a kernel defect.
 
 The anchor cell is the definition origin, supplied by the caller. `OrientationPolicy.select` scans
 `allowed` in `Orientation.all()` order and returns the first `o` with
-`o.apply(Heading.NORTH) == anchorHeading`; `null` means no admissible pose. `allowed` is non-empty,
-duplicate-free and in canonical order; `uprightOnly` is a build-time promise (`o.apply(UP) == UP`),
+`o.apply(Heading.north) == anchorHeading`; `null` means no admissible pose. `allowed` is non-empty,
+duplicate-free and in canonical order; `uprightOnly` is a build-time promise (`o.apply(up) == up`),
 not a match-time filter. A blueprint with no anchor has a null orientation policy and takes a
 `Siting` directly; `Anchors.resolve` is only for anchored blueprints.
 
@@ -544,8 +544,8 @@ table in `finding.md` is authoritative.
 
 ## 7. Tests
 
-- Bay: `CuboidSet` shell, door pair, pipe box; empty cells rejected; `None + EXCLUSIVE` rejected.
-- Coverage: `EVERY_CELL` gap, `ANY_SUBJECT` with a static focus, `ONE_SUBJECT` with a context focus.
+- Bay: `CuboidSet` shell, door pair, pipe box; empty cells rejected; `None + exclusive` rejected.
+- Coverage: `everyCell` gap, `anySubject` with a static focus, `oneSubject` with a context focus.
 - Focus: air-aware occupant; door missing half; entity zero/many; nested; context absent.
 - Reply combinators: all four states; thresholds; `not`; `each_cell`; findings merged.
 - Build: every row of §4.8; duplicate ids; overlapping exclusive bays; shared overlap allowed;

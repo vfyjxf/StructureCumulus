@@ -27,7 +27,7 @@ public interface ContextStore {
 
     static ContextStore inMemory() {
         return new ContextStore() {
-            private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator
+            private static final Comparator<ContextKey<?>> keyOrder = Comparator
                     .comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName());
             private final ConcurrentHashMap<InstanceId, StructureContext> contexts = new ConcurrentHashMap<>();
 
@@ -51,7 +51,7 @@ public interface ContextStore {
                 for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
                     Objects.requireNonNull(entry.getKey(), "key");
                     Objects.requireNonNull(entry.getValue(), "value");
-                    if (entry.getKey().retention() != Retention.INSTANCE) {
+                    if (entry.getKey().retention() != Retention.instance) {
                         throw new IllegalArgumentException(
                             "only INSTANCE values are published: " + entry.getKey().id()
                         );
@@ -59,7 +59,7 @@ public interface ContextStore {
                 }
                 return contexts.compute(instance, (ignored, current) -> {
                     StructureContext base = current == null ? StructureContext.empty(instance) : current;
-                    TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(KEY_ORDER);
+                    TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(keyOrder);
                     merged.putAll(base.values());
                     merged.putAll(values);
                     return new StructureContext(

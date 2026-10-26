@@ -14,14 +14,14 @@ public record Label(Locus locus, String message, LabelRole role) {
     }
 
     public static Label primary(Locus locus, String message) {
-        return new Label(locus, message, LabelRole.PRIMARY);
+        return new Label(locus, message, LabelRole.primary);
     }
 
     public static Label secondary(Locus locus, String message) {
-        return new Label(locus, message, LabelRole.SECONDARY);
+        return new Label(locus, message, LabelRole.secondary);
     }
 
     public static Label context(Locus locus, String message) {
-        return new Label(locus, message, LabelRole.CONTEXT);
+        return new Label(locus, message, LabelRole.context);
     }
 }

@@ -8,6 +8,7 @@ import dev.vfyjxf.cumulus.kernel.space.Locus;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,40 +22,40 @@ class FindingBundleTest {
     }
 
     private static Finding expected(String message, int cell) {
-        return Finding.builder(Codes.EXPECTED.code(), Severity.WARNING).phase(Phase.CHECK).message(message)
+        return Finding.builder(Codes.expected.code(), Severity.warning).phase(Phase.check).message(message)
                 .label(local(cell), message).build();
     }
 
     private static Finding negation(String message, int cell) {
-        return Finding.builder(Codes.NEGATION_MATCHED.code(), Severity.WARNING).phase(Phase.CHECK).message(message)
+        return Finding.builder(Codes.negationMatched.code(), Severity.warning).phase(Phase.check).message(message)
                 .label(local(cell), message).build();
     }
 
     private static Finding error(String message, Phase phase) {
-        return Finding.builder(Codes.BUDGET_EXHAUSTED.code(), Severity.ERROR).phase(phase).message(message).build();
+        return Finding.builder(Codes.budgetExhausted.code(), Severity.error).phase(phase).message(message).build();
     }
 
     @Test
     void dedupKeepsTheFirstInsertion() {
-        Finding first = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).message("first")
+        Finding first = Finding.builder(Codes.expected).phase(Phase.check).message("first")
                 .label(local(0), "same label").build();
-        Finding duplicate = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).message("second")
+        Finding duplicate = Finding.builder(Codes.expected).phase(Phase.check).message("second")
                 .label(local(0), "same label").build();
         FindingBundle bundle = FindingBundle.of(List.of(first, duplicate));
         assertEquals(1, bundle.size());
-        assertEquals("first", java.util.Objects.requireNonNull(bundle.primary(), "primary").message());
+        assertEquals("first", Objects.requireNonNull(bundle.primary(), "primary").message());
         assertEquals(0, bundle.elided());
         assertEquals(0, bundle.filtered());
     }
 
     @Test
     void orderIsSeverityThenPhaseThenCodeThenPrimaryLocus() {
-        Finding warningCompile = Finding.builder(Codes.EXPECTED.code(), Severity.WARNING).phase(Phase.COMPILE)
+        Finding warningCompile = Finding.builder(Codes.expected.code(), Severity.warning).phase(Phase.compile)
                 .message("w-compile").label(local(0), "w-compile").build();
-        Finding warningCheck = Finding.builder(Codes.EXPECTED.code(), Severity.WARNING).phase(Phase.CHECK)
+        Finding warningCheck = Finding.builder(Codes.expected.code(), Severity.warning).phase(Phase.check)
                 .message("w-check").label(local(0), "w-check").build();
-        Finding errorSettle = error("e-settle", Phase.SETTLE);
-        Finding errorCompile = error("e-compile", Phase.COMPILE);
+        Finding errorSettle = error("e-settle", Phase.settle);
+        Finding errorCompile = error("e-compile", Phase.compile);
         Finding codeTwo = negation("n-check", 0);
         FindingBundle bundle = FindingBundle
                 .of(List.of(warningCheck, errorSettle, codeTwo, errorCompile, warningCompile));
@@ -69,42 +70,39 @@ class FindingBundleTest {
     void capsKeepErrorsAndAppendTheTruncationFinding() {
         FindingOptions options = new FindingOptions(1, 1, true, true);
         FindingBundle bundle = FindingBundle.builder(options).add(expected("a1", 0)).add(expected("a2", 1))
-                .add(negation("b1", 0)).add(error("e1", Phase.CHECK)).add(error("e2", Phase.SETTLE)).build();
+                .add(negation("b1", 0)).add(error("e1", Phase.check)).add(error("e2", Phase.settle)).build();
 
         assertEquals(4, bundle.size());
-        assertEquals(2, bundle.ofSeverity(Severity.ERROR).size());
+        assertEquals(2, bundle.ofSeverity(Severity.error).size());
         assertEquals(List.of("e1", "e2", "a1"), bundle.findings().stream().map(Finding::message).limit(3).toList());
         assertEquals(2, bundle.elided());
         assertEquals(0, bundle.filtered());
         Finding truncation = bundle.findings().get(bundle.size() - 1);
-        assertEquals(Codes.BUNDLE_TRUNCATED.code(), truncation.code());
-        assertEquals(Severity.WARNING, truncation.severity());
-        assertEquals(Phase.SETTLE, truncation.phase());
+        assertEquals(Codes.bundleTruncated.code(), truncation.code());
+        assertEquals(Severity.warning, truncation.severity());
+        assertEquals(Phase.settle, truncation.phase());
         assertTrue(truncation.message().contains("2 elided"));
     }
 
     @Test
     void infoFloorCountsFilteredAndStillReportsTruncation() {
-        Finding info = Finding.builder(Codes.NO_POSITIONS).phase(Phase.COMPILE).message("no spans").build();
+        Finding info = Finding.builder(Codes.noPositions).phase(Phase.compile).message("no spans").build();
         FindingBundle bundle = FindingBundle.builder(new FindingOptions(10, 10, false, true))
-                .add(error("error", Phase.CHECK)).add(info).build();
+                .add(error("error", Phase.check)).add(info).build();
         assertEquals(2, bundle.size());
         assertEquals(1, bundle.filtered());
         assertEquals(0, bundle.elided());
-        assertEquals(
-            Codes.BUDGET_EXHAUSTED.code(),
-            java.util.Objects.requireNonNull(bundle.primary(), "primary").code()
-        );
-        assertEquals(Codes.BUNDLE_TRUNCATED.code(), bundle.findings().get(bundle.size() - 1).code());
+        assertEquals(Codes.budgetExhausted.code(), Objects.requireNonNull(bundle.primary(), "primary").code());
+        assertEquals(Codes.bundleTruncated.code(), bundle.findings().get(bundle.size() - 1).code());
     }
 
     @Test
     void includeNotesStripsNotesWithoutCounting() {
-        Finding withNote = Finding.builder(Codes.EXPECTED.code(), Severity.WARNING).phase(Phase.CHECK).message("m")
+        Finding withNote = Finding.builder(Codes.expected.code(), Severity.warning).phase(Phase.check).message("m")
                 .note("a note").build();
         FindingBundle bundle = FindingBundle.builder(new FindingOptions(10, 10, true, false)).add(withNote).build();
         assertEquals(1, bundle.size());
-        assertTrue(java.util.Objects.requireNonNull(bundle.primary(), "primary").notes().isEmpty());
+        assertTrue(Objects.requireNonNull(bundle.primary(), "primary").notes().isEmpty());
         assertEquals(0, bundle.elided());
         assertEquals(0, bundle.filtered());
     }
@@ -121,7 +119,7 @@ class FindingBundleTest {
         assertEquals(List.of("a1", "b1"), narrowed.findings().stream().map(Finding::message).limit(2).toList());
         assertEquals(
             1,
-            narrowed.findings().stream().filter(finding -> finding.code().equals(Codes.BUNDLE_TRUNCATED.code())).count()
+            narrowed.findings().stream().filter(finding -> finding.code().equals(Codes.bundleTruncated.code())).count()
         );
         assertEquals(3, narrowed.size());
     }
@@ -162,8 +160,8 @@ class FindingBundleTest {
         Finding a = expected("a", 0);
         Finding b = negation("b", 0);
         FindingBundle bundle = FindingBundle.of(List.of(b, a));
-        assertEquals(List.of(a), bundle.ofCode(Codes.EXPECTED.code()));
-        assertEquals(List.of(a, b), bundle.ofSeverity(Severity.WARNING));
+        assertEquals(List.of(a), bundle.ofCode(Codes.expected.code()));
+        assertEquals(List.of(a, b), bundle.ofSeverity(Severity.warning));
     }
 
     @Test
@@ -191,12 +189,12 @@ class FindingBundleTest {
     @Test
     void truncationUsesTheLatestPhaseSeen() {
         FindingBundle bundle = FindingBundle.builder(new FindingOptions(0, 0, true, true)).add(expected("w", 0))
-                .add(error("e", Phase.SETTLE)).build();
+                .add(error("e", Phase.settle)).build();
         Finding truncation = bundle.findings().get(bundle.size() - 1);
-        assertEquals(Phase.SETTLE, truncation.phase());
+        assertEquals(Phase.settle, truncation.phase());
         assertEquals(
             NamespacedId.of("structurecumulus", "modules/finding"),
-            Codes.BUNDLE_TRUNCATED.explanation().seeAlso().get(0)
+            Codes.bundleTruncated.explanation().seeAlso().get(0)
         );
     }
 }

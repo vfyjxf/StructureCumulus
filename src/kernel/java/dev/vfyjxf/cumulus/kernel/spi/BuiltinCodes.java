@@ -11,7 +11,7 @@ final class BuiltinCodes {
 
     static Catalog<CodeEntry> catalog() {
         Catalog.Builder<CodeEntry> builder = Catalog.builder(NamespacedId.of("structurecumulus", "codes"));
-        for (CodeEntry entry : Codes.ALL) {
+        for (CodeEntry entry : Codes.all) {
             builder.put(NamespacedId.of("structurecumulus", entry.code().text().toLowerCase(Locale.ROOT)), entry);
         }
         return builder.build();

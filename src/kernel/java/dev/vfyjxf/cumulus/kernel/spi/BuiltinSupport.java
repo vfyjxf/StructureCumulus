@@ -19,7 +19,7 @@ final class BuiltinSupport {
         String text = value instanceof Value.StringValue string ? string.value() : null;
         NamespacedId id = NamespacedId.parse(text);
         if (id == null) {
-            report(ctx, Codes.DOCUMENT_FIELD, "expected an id at " + key);
+            report(ctx, Codes.documentField, "expected an id at " + key);
         }
         return id;
     }
@@ -27,7 +27,7 @@ final class BuiltinSupport {
     static @Nullable LatticePoint cell(Value args, String key, FactoryContext ctx) {
         Value value = args.get(key);
         if (value == null || !value.isArray() || value.elements().size() != 3) {
-            report(ctx, Codes.DOCUMENT_FIELD, "expected a cell at " + key);
+            report(ctx, Codes.documentField, "expected a cell at " + key);
             return null;
         }
         long x = value.elements().get(0).asNumber(Long.MIN_VALUE);
@@ -43,7 +43,7 @@ final class BuiltinSupport {
                 || z < Integer.MIN_VALUE
                 || z > Integer.MAX_VALUE
                 || !LatticePoint.inLattice((int) x, (int) y, (int) z)) {
-            report(ctx, Codes.CUBOID_OFF_LATTICE, "cell out of the lattice at " + key);
+            report(ctx, Codes.cuboidOffLattice, "cell out of the lattice at " + key);
             return null;
         }
         return LatticePoint.of((int) x, (int) y, (int) z);
@@ -53,13 +53,13 @@ final class BuiltinSupport {
         Value value = args.get(key);
         String text = value instanceof Value.StringValue string ? string.value() : null;
         if (text == null) {
-            report(ctx, Codes.DOCUMENT_FIELD, "expected a string at " + key);
+            report(ctx, Codes.documentField, "expected a string at " + key);
         }
         return text;
     }
 
     static void report(FactoryContext ctx, CodeEntry entry, String message) {
-        Finding.Builder builder = Finding.builder(entry).phase(Phase.COMPILE).message(message);
+        Finding.Builder builder = Finding.builder(entry).phase(Phase.compile).message(message);
         if (ctx.source() != null) {
             Locus locus = Locus.definition(ctx.source());
             builder.label(Label.primary(locus, message));

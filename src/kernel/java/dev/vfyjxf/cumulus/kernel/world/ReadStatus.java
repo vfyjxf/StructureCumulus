@@ -1,9 +1,9 @@
 package dev.vfyjxf.cumulus.kernel.world;
 
 public enum ReadStatus {
-    READABLE, OUT_OF_BOUNDS, NOT_CAPTURED, DENIED;
+    readable, outOfBounds, notCaptured, denied;
 
     public boolean readable() {
-        return this == READABLE;
+        return this == readable;
     }
 }

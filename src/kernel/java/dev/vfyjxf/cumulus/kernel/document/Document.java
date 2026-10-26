@@ -16,7 +16,7 @@ public record Document(
     Map<String, Value> extensions
 ) {
 
-    public static final int CURRENT_VERSION = 1;
+    public static final int currentVersion = 1;
 
     public Document {
         Objects.requireNonNull(root, "root");

@@ -43,7 +43,7 @@ package dev.vfyjxf.cumulus.kernel.document;
 public record Document(int schemaVersion, BlueprintSpec root,
                        java.util.Map<NamespacedId, BlueprintSpec> definitions,
                        java.util.Map<String, Value> extensions) {
-    public static final int CURRENT_VERSION = 1;
+    public static final int currentVersion = 1;
     public Document { /* version >= 1; maps immutable and ordered */ }
 }
 
@@ -193,8 +193,8 @@ hash-ordered collection. Equal documents produce equal blueprints (I-13).
 
 ### 4.4 Findings
 
-A `COMPILE` finding carries a `DEFINITION` label when the reader supplied a span, otherwise a
-`LOCAL` label on the offending cells (or a label-less finding for a document-level failure). The
+A `compile` finding carries a `definition` label when the reader supplied a span, otherwise a
+`local` label on the offending cells (or a label-less finding for a document-level failure). The
 compiler never throws for bad data; a reader that cannot parse returns `null` and appends
 `SC-DOC-0013`.
 
@@ -243,7 +243,7 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
 - The declared output key is authoritative. A factory that returns a different output key is
   `SC-DOC-0003`; the compiler never silently retargets.
 - Document content never throws. Every malformed field, cycle, unknown factory or invalid blueprint
-  becomes a located finding; `CompileResult.blueprint()` is null whenever an ERROR exists.
+  becomes a located finding; `CompileResult.blueprint()` is null whenever an error exists.
 
 ## 9. Pipeline
 

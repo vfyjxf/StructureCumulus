@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,19 +31,22 @@ class LevelSnapshotTest {
     @Test
     void airIsSynthesizedOnlyInsideTheCapturedBounds() {
         SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 1);
-        SectionKey key = SectionKey.of(snapshot.world(), 0, LatticePoint.ORIGIN, 16);
-        OccupantSnapshot stone = occupant(snapshot, LatticePoint.ORIGIN, "stone");
-        SectionSnapshot section = SectionSnapshot.of(key, Map.of(LatticePoint.ORIGIN, stone), 42L);
+        SectionKey key = SectionKey.of(snapshot.world(), 0, LatticePoint.origin, 16);
+        OccupantSnapshot stone = occupant(snapshot, LatticePoint.origin, "stone");
+        SectionSnapshot section = SectionSnapshot.of(key, Map.of(LatticePoint.origin, stone), 42L);
         LevelSnapshot view = new LevelSnapshot(
             snapshot,
             Cuboid.of(0, 0, 0, 2, 2, 2),
             Map.of(key, new SectionSlot.Present(section))
         );
 
-        assertSame(stone, view.occupant(LatticePoint.ORIGIN));
-        assertEquals(OccupantSnapshot.AIR, java.util.Objects.requireNonNull(view.occupant(LatticePoint.of(1, 0, 0)), "air").descriptor().type());
+        assertSame(stone, view.occupant(LatticePoint.origin));
+        assertEquals(
+            OccupantSnapshot.air,
+            Objects.requireNonNull(view.occupant(LatticePoint.of(1, 0, 0)), "air").descriptor().type()
+        );
         assertNull(view.occupant(LatticePoint.of(2, 0, 0)));
-        assertEquals(ReadStatus.OUT_OF_BOUNDS, view.slot(view.sectionOf(LatticePoint.of(16, 0, 0))).status());
+        assertEquals(ReadStatus.outOfBounds, view.slot(view.sectionOf(LatticePoint.of(16, 0, 0))).status());
         assertTrue(view.slot(key).readable());
         assertEquals(42L, view.contentDigest(key));
         assertFalse(view.occupants(Cuboid.of(0, 0, 0, 2, 2, 2), OccupantFilter.any()).isEmpty());
@@ -50,10 +54,10 @@ class LevelSnapshotTest {
 
     private static OccupantSnapshot occupant(SnapshotId snapshot, LatticePoint cell, String type) {
         NamespacedId id = NamespacedId.of("test", type);
-        OccupantRef ref = new OccupantRef(snapshot, 0, id, OccupantKind.BLOCK, cell);
+        OccupantRef ref = new OccupantRef(snapshot, 0, id, OccupantKind.block, cell);
         return new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(id, OccupantKind.BLOCK, Map.of(), List.of()),
+            new OccupantDescriptor(id, OccupantKind.block, Map.of(), List.of()),
             Cuboid.of(cell),
             List.of()
         );

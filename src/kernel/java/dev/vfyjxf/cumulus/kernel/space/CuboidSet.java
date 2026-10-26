@@ -13,7 +13,7 @@ import java.util.TreeSet;
 /** A canonical, disjoint, sorted set of boxes. */
 public final class CuboidSet {
 
-    private static final CuboidSet EMPTY = new CuboidSet(List.of());
+    private static final CuboidSet empty = new CuboidSet(List.of());
 
     private final List<Cuboid> boxes;
 
@@ -22,7 +22,7 @@ public final class CuboidSet {
     }
 
     public static CuboidSet empty() {
-        return EMPTY;
+        return empty;
     }
 
     public static CuboidSet of(Cuboid... boxes) {
@@ -39,7 +39,7 @@ public final class CuboidSet {
             }
         }
         if (nonEmpty.isEmpty()) {
-            return EMPTY;
+            return empty;
         }
         TreeSet<Integer> xBoundaries = new TreeSet<>();
         TreeSet<Integer> zBoundaries = new TreeSet<>();

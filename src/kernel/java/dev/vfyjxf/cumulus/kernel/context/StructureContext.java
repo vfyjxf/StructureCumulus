@@ -24,7 +24,7 @@ public record StructureContext(
     Spend spend
 ) implements ContextView {
 
-    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator.comparing((ContextKey<?> key) -> key.id())
+    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
             .thenComparing(key -> key.type().getName());
 
     public StructureContext {
@@ -35,7 +35,7 @@ public record StructureContext(
         if (revision < 0) {
             throw new IllegalArgumentException("revision >= 0");
         }
-        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(KEY_ORDER);
+        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(keyOrder);
         for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
             ContextKey<?> key = Objects.requireNonNull(entry.getKey(), "key");
             Object value = Objects.requireNonNull(entry.getValue(), "value");
@@ -48,7 +48,7 @@ public record StructureContext(
     }
 
     public static StructureContext empty(InstanceId instance) {
-        return new StructureContext(instance, 0, Map.of(), FindingBundle.empty(), Spend.ZERO);
+        return new StructureContext(instance, 0, Map.of(), FindingBundle.empty(), Spend.zero);
     }
 
     @Override

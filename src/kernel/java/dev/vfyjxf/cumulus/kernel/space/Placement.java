@@ -7,7 +7,7 @@ import java.util.Objects;
 /** An orientation plus an integer offset. */
 public record Placement(Orientation orientation, LatticePoint offset) {
 
-    public static final Placement IDENTITY = new Placement(Orientation.IDENTITY, LatticePoint.ORIGIN);
+    public static final Placement identity = new Placement(Orientation.identity, LatticePoint.origin);
 
     public Placement {
         Objects.requireNonNull(orientation, "orientation");
@@ -59,7 +59,7 @@ public record Placement(Orientation orientation, LatticePoint offset) {
     }
 
     private static @Nullable LatticePoint negate(LatticePoint point) {
-        if (point.x() == LatticePoint.MIN_XZ || point.y() == LatticePoint.MIN_Y || point.z() == LatticePoint.MIN_XZ) {
+        if (point.x() == LatticePoint.minXz || point.y() == LatticePoint.minY || point.z() == LatticePoint.minXz) {
             return null;
         }
         return LatticePoint.of(-point.x(), -point.y(), -point.z());

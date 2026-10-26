@@ -45,23 +45,23 @@ They are the acceptance suite; a module test that does not feed one of them is o
    the published `Long`, and that `check` wrote no claim.
 2. **Furnace** — shell/cavity/mouth, `Box` cavity, door expectation, `volume` + capacity deriver;
    asserts claim rows, context revision, and a second check at the same siting does not self-conflict.
-3. **Door** — one bay, two halves, `ONE_SUBJECT + Bound`; missing half → `Undecided`; wrong half →
+3. **Door** — one bay, two halves, `oneSubject + Bound`; missing half → `Undecided`; wrong half →
    `Failed` with one finding and two labels; both correct → two rows.
-4. **Hatch** — two `SHARED` owners coexist; an `EXCLUSIVE` owner conflicts; `release` lets a third
+4. **Hatch** — two `shared` owners coexist; an `exclusive` owner conflicts; `release` lets a third
    settle; a revision moved once retries, twice is `Undecided`.
-5. **Pipe corner** — `EVERY_CELL + Bound`; eight asserted, four owned; a neighbour's corner does not
+5. **Pipe corner** — `everyCell + Bound`; eight asserted, four owned; a neighbour's corner does not
    conflict over the four air cells.
-6. **Entity pen** — `ANY_SUBJECT + Bound`, entity focus, window read; a footprint leaving the bay is
-   `Failed`; two entities is ambiguous; a body wider than `MAX_ENTITY_SPAN` is a build error.
+6. **Entity pen** — `anySubject + Bound`, entity focus, window read; a footprint leaving the bay is
+   `Failed`; two entities is ambiguous; a body wider than `maxEntitySpan` is a build error.
 7. **Absence** — a refused middle section makes a contributed key absent; a check reading it is
    `Unreadable`, never a short sum; `whenAbsent` is used only when all sections are readable.
-8. **Budget** — a budget too small for the section pass is `Undecided(BUDGET_EXHAUSTED)`, no claims.
+8. **Budget** — a budget too small for the section pass is `Undecided(budgetExhausted)`, no claims.
 9. **Gate** — a lease that is no longer current at the start or after the units is `Dropped`, no
    claims, no context publish.
 10. **Bindings** — a subject from another snapshot, a nested frame, a cell outside the bay, and an
     empty exclusive `Bound` are each `Failed(SC-CLM-0004/0005)`; nothing is written.
 11. **Derive** — derivers run in `(order, id)`, one publish, missing deriver is `SC-CTX-0004`, a
-    `MATCH` output is rejected, a stale context is not possible by contract.
+    `match` output is rejected, a stale context is not possible by contract.
 12. **Document parity** — the campfire/furnace as a `Document` and as a builder produce equal
     blueprints; a bad schema field/kind/placement produces the documented code and no blueprint.
 
@@ -71,7 +71,7 @@ They are the acceptance suite; a module test that does not feed one of them is o
 | --- | --- |
 | `core` | id grammar, catalog freeze, Value content equality, budget, key equality |
 | `space` | packing bijection, cuboid edges, CuboidSet normalization and semantic-equality laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
-| `finding` | code parse, `Codes.ALL` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
+| `finding` | code parse, `Codes.all` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
 | `world` | air vs refused, statusOf, multi-cell, nested frame/ref, section digest, descriptor/trait, window |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution |
 | `structure` | bay/coverage rules, reply combinators, focus kinds, build table, plan DAG, anchors, computations |
@@ -83,16 +83,16 @@ They are the acceptance suite; a module test that does not feed one of them is o
 
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. A test reads `Codes.ALL` and asserts:
+The authoritative table is `finding.md` §6. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
 - every code appears exactly once in the producer table (a hand-maintained `Map<FindingCode,String>`
-  in the test, checked against `Codes.ALL`);
-- no producer row names a code absent from `Codes.ALL`;
-- `SC-MC-*` are absent from `Codes.ALL` (adapter-only).
+  in the test, checked against `Codes.all`);
+- no producer row names a code absent from `Codes.all`;
+- `SC-MC-*` are absent from `Codes.all` (adapter-only).
 
 A code with no producer is deleted, not reserved. An unknown addon code is legal; it is not in
-`Codes.ALL`.
+`Codes.all`.
 
 ## 6. Falsification questions
 
@@ -104,7 +104,7 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 4. Can a `Bound` footprint own a cell no check asserted? (claim/structure)
 5. Can a nested subject become a parent claim? (engine: frame check)
 6. Can a `Bay` with a `CuboidSet` shell be split differently by the Java and JSON paths? (same `Bay`)
-7. Can two `SHARED` bays of one blueprint conflict? (matrix: same owner/siting excluded)
+7. Can two `shared` bays of one blueprint conflict? (matrix: same owner/siting excluded)
 8. Can a finding be ordered differently by two JVMs? (all orders are explicit)
 9. Can a document with reordered members produce a different blueprint? (canonical compile)
 10. Can a stale lease produce a `Formed`? (gate before and after)
@@ -113,7 +113,9 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The NeoForge adapter and game tests; the adapter spec is reviewed, not executed.
+- The rest of the NeoForge adapter and its GameTests: the M1 capture/snapshot/lease slice is executed
+  by `runGameTestServer`; nested frames, entities/traits, claims/context persistence, JSON I/O,
+  commands and the orientation/door/furnace GameTests are still reviewed, not executed.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.

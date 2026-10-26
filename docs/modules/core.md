@@ -24,17 +24,17 @@ parsing, catalogs of concrete extension families (only the generic `Catalog<T>`)
 | `InstanceId` | record | `(world, serial)`, one placed structure |
 | `SnapshotId` | record | `(world, revision)`, one capture |
 | `OwnerId` | record | who holds a claim |
-| `Phase` | enum | `COMPILE`, `CHECK`, `SETTLE` |
+| `Phase` | enum | `compile`, `check`, `settle`; `wireName()` is the uppercase tag |
 | `SourceSpan` | record | half-open character range in one document |
 | `Budget` | record | `(cells, sections)` ceiling |
 | `Spend` | record | `(cells, sections)` consumed |
 | `ContextKey<T>` | record | typed identity + retention + optional merge + optional absent value |
 | `ContextKeys` | final class | the only key factory |
 | `Merge<T>` | functional interface | associative fold, no identity |
-| `Retention` | enum | `MATCH` (attempt only), `INSTANCE` (published) |
+| `Retention` | enum | `match` (attempt only), `instance` (published) |
 | `Outcome<T>` | sealed interface | `Found(value)` / `Missing` |
 | `CancelToken` | functional interface | host-injected cooperative cancellation |
-| `FindingCode` | record | `SC-<FAMILY>-<NNNN>`; identity only, shared by every module |
+| `FindingCode` | record | `SC-<FAMILY>-<NNNN>`; explicit uppercase family tag; identity only, shared by every module |
 | `ContextView` | interface | typed read face over a key→value map |
 | `Catalog<T>` | final class | frozen namespaced family, insertion ordered |
 | `Value` | sealed interface | six scalar/aggregate nodes with optional source spans |
@@ -47,7 +47,7 @@ parsing, catalogs of concrete extension families (only the generic `Catalog<T>`)
 package dev.vfyjxf.cumulus.kernel.core;
 
 public record NamespacedId(String namespace, String path) implements Comparable<NamespacedId> {
-    public static final String DEFAULT_NAMESPACE = "structurecumulus";
+    public static final String defaultNamespace = "structurecumulus";
     public static NamespacedId of(String namespace, String path);
     public static NamespacedId of(String path);
     public static @Nullable NamespacedId parse(String text);
@@ -75,8 +75,9 @@ public record OwnerId(NamespacedId id) {
 }
 
 public enum Phase {
-    COMPILE, CHECK, SETTLE;
+    compile, check, settle;
     public int rank();
+    public String wireName();
 }
 
 public record SourceSpan(NamespacedId document, int start, int end) {
@@ -88,8 +89,8 @@ public record SourceSpan(NamespacedId document, int start, int end) {
 }
 
 public record Budget(int cells, int sections) {
-    public static final Budget ZERO;
-    public static final Budget UNBOUNDED;
+    public static final Budget zero;
+    public static final Budget unbounded;
     public Budget { if (cells < 0 || sections < 0) throw new IllegalArgumentException("non-negative"); }
     public static Budget of(int cells, int sections);
     public static Budget unbounded();
@@ -97,12 +98,12 @@ public record Budget(int cells, int sections) {
 }
 
 public record Spend(int cells, int sections) {
-    public static final Spend ZERO;
+    public static final Spend zero;
     public Spend { if (cells < 0 || sections < 0) throw new IllegalArgumentException("non-negative"); }
     public Spend plus(Spend other);
 }
 
-public enum Retention { MATCH, INSTANCE }
+public enum Retention { match, instance }
 
 @FunctionalInterface
 public interface Merge<T> {
@@ -144,7 +145,8 @@ public interface CancelToken {
 
 public record FindingCode(Family family, int number) implements Comparable<FindingCode> {
     public enum Family {
-        SPC, OCC, EXP, CLM, BPT, CHK, DOC, CTX, ENG, DIA, RMD, SPI, MC;
+        spc("SPC"), occ("OCC"), exp("EXP"), clm("CLM"), bpt("BPT"), chk("CHK"), doc("DOC"), ctx("CTX"),
+        eng("ENG"), dia("DIA"), rmd("RMD"), spi("SPI"), mc("MC");
         public String subject();
     }
     public static FindingCode of(Family family, int number);       // 1..9999
@@ -235,9 +237,11 @@ public final class Checks {
 
 **L1 — id grammar.** `namespace` matches `[a-z0-9_.-]{1,64}`, `path` matches
 `[a-z0-9/._-]{1,256}` with no leading, trailing or doubled `/`. Uppercase is refused, never folded.
-`of(namespace, path)` has no default; `of(path)` uses `DEFAULT_NAMESPACE`. `parse` returns `null` for
+`of(namespace, path)` has no default; `of(path)` uses `defaultNamespace`. `parse` returns `null` for
 malformed input; it never partially accepts. `text()` is `namespace + ":" + path`; `compareTo` is
-`namespace` then `path`, both `String.compareTo` (code point, locale-free).
+`namespace` then `path`, both `String.compareTo` (code point, locale-free). `Phase.wireName()` and the
+explicit `Family` tags are the wire vocabulary: the enum identifiers are lowerCamel, the tags stay
+`COMPILE`/`CHECK`/`SETTLE` and `SPC`…`MC`, and `FindingCode.text()`/`parse` use only those tags.
 
 **L2 — identities are values.** `World`, `OwnerId`, `InstanceId` and `SnapshotId` are records with
 structural equality. `InstanceId.serial` and `SnapshotId.revision` are positive. There is no clock
@@ -257,8 +261,8 @@ never supplies an identity. A key with `merge != null` is section-contributed; a
 `merge == null` is single-writer. `whenAbsent` is used only when every section of the region was
 readable and no contribution was produced. It may be `null`, which means "absent".
 
-**L6 — retention is lifetime.** `MATCH` values live in `MatchOutcome` and are readable by later
-units of the same attempt; they are never published. `INSTANCE` values are published once by a
+**L6 — retention is lifetime.** `match` values live in `MatchOutcome` and are readable by later
+units of the same attempt; they are never published. `instance` values are published once by a
 successful `settle` or `derive`, keyed by `InstanceId`.
 
 **L7 — value tree order and equality.** `Value.ObjectValue.members()` iterates in ascending Unicode
@@ -295,6 +299,8 @@ This module produces no findings. It defines `SourceSpan` and `Phase`, which eve
 - `Value`: object key order is code-point; `contentEquals` ignores spans; arrays preserve order;
   number is a `long`.
 - `Budget`/`Spend`: admits, plus, zero, unbounded.
+- `FindingCode`: `text()`/`parse` round-trip over every family tag; `Phase.wireName()` is the
+  uppercase tag while the constant is lowerCamel.
 - `ContextKey`: equality includes all components; `contributed()` matches `merge != null`.
 - `Outcome`: fold exhaustiveness.
 

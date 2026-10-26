@@ -147,7 +147,7 @@ public final class Focuses {
             }
             Map<OccupantRef, OccupantSnapshot> found = new LinkedHashMap<>();
             for (OccupantSnapshot candidate : ctx.view().occupants(bounds, OccupantFilter.ofType(type))) {
-                if (candidate.ref().kind().equals(OccupantKind.ENTITY)
+                if (candidate.ref().kind().equals(OccupantKind.entity)
                         && worldCells.containsAll(candidate.footprint().asSet())) {
                     found.putIfAbsent(candidate.ref(), candidate);
                 }
@@ -205,7 +205,7 @@ public final class Focuses {
                 Locus locus = world == null
                         ? Locus.local(CuboidSet.of(Cuboid.of(cell)))
                         : Locus.world(CuboidSet.of(Cuboid.of(world)));
-                Finding finding = Finding.builder(Codes.NESTED_CUT).phase(ctx.phase())
+                Finding finding = Finding.builder(Codes.nestedCut).phase(ctx.phase())
                         .message("the nested view at " + cell + " was cut by depth")
                         .label(Label.primary(locus, "nested view cut")).build();
                 return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
@@ -260,7 +260,7 @@ public final class Focuses {
                 return new FocusResult.Taken<>(found.value(), List.of(), FindingBundle.empty());
             }
             Locus locus = Locus.key(ctx.instance(), key.id());
-            Finding finding = Finding.builder(FindingCode.of(FindingCode.Family.CTX, 7), Severity.ERROR)
+            Finding finding = Finding.builder(FindingCode.of(FindingCode.Family.ctx, 7), Severity.error)
                     .phase(ctx.phase()).message("context key " + key.id() + " is absent")
                     .label(Label.primary(locus, "no value for " + key.id())).build();
             return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
@@ -296,8 +296,8 @@ public final class Focuses {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {
-                        if (ctx.view().statusOf(LatticePoint.of(x, y, z)) != ReadStatus.READABLE) {
-                            Finding warning = Finding.builder(Codes.FOOTPRINT_CLIPPED).phase(ctx.phase())
+                        if (ctx.view().statusOf(LatticePoint.of(x, y, z)) != ReadStatus.readable) {
+                            Finding warning = Finding.builder(Codes.footprintClipped).phase(ctx.phase())
                                     .message("the subject footprint leaves the snapshot")
                                     .label(
                                         Label.primary(

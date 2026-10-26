@@ -57,7 +57,7 @@ public final class FindingRenderer {
 
     private static void appendFinding(StringBuilder out, Finding finding, RenderContext context) {
         String severity = finding.severity().name().toLowerCase(Locale.ROOT);
-        if (context.color() == RenderContext.ColorMode.ANSI) {
+        if (context.color() == RenderContext.ColorMode.ansi) {
             out.append(ansi(finding.severity())).append(severity).append("\u001B[0m");
         } else {
             out.append(severity);
@@ -66,7 +66,7 @@ public final class FindingRenderer {
 
         int primaryIndex = -1;
         for (int index = 0; index < finding.labels().size(); index++) {
-            if (finding.labels().get(index).role() == LabelRole.PRIMARY) {
+            if (finding.labels().get(index).role() == LabelRole.primary) {
                 primaryIndex = index;
                 break;
             }
@@ -101,7 +101,7 @@ public final class FindingRenderer {
 
     private static void appendPrimary(StringBuilder out, Label label, RenderContext context) {
         Locus locus = label.locus();
-        if (locus.frame() == LocusFrame.DEFINITION) {
+        if (locus.frame() == LocusFrame.definition) {
             SourceSpan span = locus.source();
             if (span == null) {
                 return;
@@ -154,10 +154,10 @@ public final class FindingRenderer {
 
     private static String locusText(Locus locus) {
         return switch (locus.frame()) {
-            case DEFINITION -> "definition " + spanText(locus.source());
-            case LOCAL -> "local " + boxesText(locus.cells());
-            case WORLD -> "world " + boxesText(locus.cells());
-            case KEY -> "key " + keyText(locus.key());
+            case definition -> "definition " + spanText(locus.source());
+            case local -> "local " + boxesText(locus.cells());
+            case world -> "world " + boxesText(locus.cells());
+            case key -> "key " + keyText(locus.key());
         };
     }
 
@@ -197,9 +197,9 @@ public final class FindingRenderer {
 
     private static String ansi(Severity severity) {
         return switch (severity) {
-            case ERROR -> "\u001B[31m";
-            case WARNING -> "\u001B[33m";
-            case INFO -> "\u001B[36m";
+            case error -> "\u001B[31m";
+            case warning -> "\u001B[33m";
+            case info -> "\u001B[36m";
         };
     }
 
@@ -207,9 +207,9 @@ public final class FindingRenderer {
         out.append("{\"code\":");
         quote(out, finding.code().text());
         out.append(",\"severity\":");
-        quote(out, finding.severity().name());
+        quote(out, finding.severity().wireName());
         out.append(",\"phase\":");
-        quote(out, finding.phase().name());
+        quote(out, finding.phase().wireName());
         out.append(",\"message\":");
         quote(out, finding.message());
         out.append(",\"labels\":[");
@@ -239,7 +239,7 @@ public final class FindingRenderer {
             out.append("{\"message\":");
             quote(out, suggestion.message());
             out.append(",\"applicability\":");
-            quote(out, suggestion.applicability().name());
+            quote(out, suggestion.applicability().wireName());
             out.append(",\"remedy\":");
             appendJsonId(out, suggestion.remedy());
             out.append('}');
@@ -249,9 +249,9 @@ public final class FindingRenderer {
 
     private static void appendJsonLabel(StringBuilder out, Label label) {
         out.append("{\"role\":");
-        quote(out, label.role().name());
+        quote(out, label.role().wireName());
         out.append(",\"frame\":");
-        quote(out, label.locus().frame().name());
+        quote(out, label.locus().frame().wireName());
         out.append(",\"cells\":");
         appendJsonCells(out, label.locus().cells());
         out.append(",\"source\":");
@@ -271,7 +271,7 @@ public final class FindingRenderer {
             return;
         }
         out.append("{\"frame\":");
-        quote(out, locus.frame().name());
+        quote(out, locus.frame().wireName());
         out.append(",\"cells\":");
         appendJsonCells(out, locus.cells());
         out.append(",\"source\":");

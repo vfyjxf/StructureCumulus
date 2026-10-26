@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,8 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DocumentCompilerTest {
 
-    private static final NamespacedId STONE = NamespacedId.of("minecraft", "stone_bricks");
-    private static final NamespacedId CAMPFIRE = NamespacedId.of("minecraft", "campfire");
+    private static final NamespacedId stone = NamespacedId.of("minecraft", "stone_bricks");
+    private static final NamespacedId campfire = NamespacedId.of("minecraft", "campfire");
 
     private static NamespacedId id(String path) {
         return NamespacedId.of("test", path);
@@ -58,7 +59,7 @@ class DocumentCompilerTest {
                 .subtract(Cuboid.of(1, 0, 1, 2, 1, 2));
         CuboidSet hollowCells = CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2));
         CuboidSet fireCells = CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2));
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.INSTANCE, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
 
         Value block = Value.object(Map.of("kind", Value.string("block"), "id", Value.string("minecraft:stone_bricks")));
         Value airElement = Value.object(Map.of("kind", Value.string("air")));
@@ -79,22 +80,22 @@ class DocumentCompilerTest {
                 new BaySpec(
                     id("shell"),
                     shellCells,
-                    Coverage.EVERY_CELL,
+                    Coverage.everyCell,
                     Footprint.box(),
-                    Sharing.EXCLUSIVE,
+                    Sharing.exclusive,
                     null,
                     null
                 ),
                 new BaySpec(
                     id("hollow"),
                     hollowCells,
-                    Coverage.EVERY_CELL,
+                    Coverage.everyCell,
                     Footprint.box(),
-                    Sharing.EXCLUSIVE,
+                    Sharing.exclusive,
                     null,
                     null
                 ),
-                new BaySpec(id("fire"), fireCells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE, null, null)
+                new BaySpec(id("fire"), fireCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
             ),
             List.of(),
             List.of(
@@ -132,7 +133,7 @@ class DocumentCompilerTest {
                     null
                 )
             ),
-            List.of(new KeySpec(id("air_cells"), "long", Retention.INSTANCE, NamespacedId.of("sum"), null, null)),
+            List.of(new KeySpec(id("air_cells"), "long", Retention.instance, NamespacedId.of("sum"), null, null)),
             List.of(),
             List.of(),
             null,
@@ -147,19 +148,19 @@ class DocumentCompilerTest {
         Blueprint compiled = result.blueprint();
         assertNotNull(compiled);
 
-        Bay shell = Bay.of(id("shell"), shellCells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
-        Bay hollow = Bay.of(id("hollow"), hollowCells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
-        Bay fire = Bay.of(id("fire"), fireCells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Bay shell = Bay.of(id("shell"), shellCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay hollow = Bay.of(id("hollow"), hollowCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay fire = Bay.of(id("fire"), fireCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Blueprint javaBlueprint = Blueprint.builder(id("campfire")).bounds(Cuboid.of(0, 0, 0, 3, 3, 3))
                 .check(
-                    Check.of(id("shell_bricks"), shell, Focuses.bay(), Expectations.eachCell(Expectations.block(STONE)))
+                    Check.of(id("shell_bricks"), shell, Focuses.bay(), Expectations.eachCell(Expectations.block(stone)))
                 ).check(Check.of(id("hollow_air"), hollow, Focuses.bay(), Expectations.eachCell(Expectations.air())))
                 .check(
                     Check.of(
                         id("lit"),
                         fire,
                         Focuses.occupant(LatticePoint.of(1, 0, 1)),
-                        Expectations.allOf(Expectations.block(CAMPFIRE), Expectations.property("lit", "true"))
+                        Expectations.allOf(Expectations.block(campfire), Expectations.property("lit", "true"))
                     )
                 ).computation(Computations.air(air, hollowCells)).build();
         assertEquals(javaBlueprint, compiled);
@@ -172,9 +173,7 @@ class DocumentCompilerTest {
             id("unit"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             Value.object(),
-            List.of(
-                new BaySpec(id("wall"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE, null, null)
-            ),
+            List.of(new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
             List.of(),
             List.of(),
             List.of(),
@@ -222,7 +221,7 @@ class DocumentCompilerTest {
         assertNotNull(blueprint.bay(id("south/wall")));
         assertEquals(
             CuboidSet.of(Cuboid.of(1, 0, 0, 2, 1, 1)),
-            java.util.Objects.requireNonNull(blueprint.bay(id("south/wall")), "bay").cells()
+            Objects.requireNonNull(blueprint.bay(id("south/wall")), "bay").cells()
         );
     }
 
@@ -247,8 +246,8 @@ class DocumentCompilerTest {
         CompileResult version = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of()), context());
         assertNull(version.blueprint());
         assertEquals(
-            FindingCode.of(FindingCode.Family.DOC, 1),
-            java.util.Objects.requireNonNull(version.findings().primary(), "primary").code()
+            FindingCode.of(FindingCode.Family.doc, 1),
+            Objects.requireNonNull(version.findings().primary(), "primary").code()
         );
 
         CheckSpec missingBay = new CheckSpec(
@@ -281,8 +280,8 @@ class DocumentCompilerTest {
         assertNull(missing.blueprint());
         assertFalse(missing.findings().isEmpty());
         assertEquals(
-            FindingCode.of(FindingCode.Family.DOC, 6),
-            java.util.Objects.requireNonNull(missing.findings().primary(), "primary").code()
+            FindingCode.of(FindingCode.Family.doc, 6),
+            Objects.requireNonNull(missing.findings().primary(), "primary").code()
         );
     }
 
@@ -295,8 +294,8 @@ class DocumentCompilerTest {
             Cuboid.of(0, 0, 0, 1, 1, 1),
             Value.object(),
             List.of(
-                new BaySpec(id("a"), cell, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE, null, null),
-                new BaySpec(id("b"), cell, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE, null, null)
+                new BaySpec(id("a"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null),
+                new BaySpec(id("b"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
             ),
             List.of(),
             List.of(
@@ -333,8 +332,8 @@ class DocumentCompilerTest {
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
         assertNull(result.blueprint());
         assertEquals(
-            FindingCode.of(FindingCode.Family.BPT, 2),
-            java.util.Objects.requireNonNull(result.findings().primary(), "primary").code()
+            FindingCode.of(FindingCode.Family.bpt, 2),
+            Objects.requireNonNull(result.findings().primary(), "primary").code()
         );
     }
 }

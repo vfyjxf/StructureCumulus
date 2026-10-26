@@ -10,8 +10,9 @@ never a source of a new signature. A generator may read `src/kernelTest` only to
 idea, not an API.
 
 **Output:** `src/kernel/java/dev/vfyjxf/cumulus/kernel/{core,space,finding,world,claim,structure,
-context,document,engine,remedy,spi}`, `src/kernelTest/java`, and the unchanged `src/main/java` mod
-entry. The adapter (`mc`) is not implemented in this round.
+context,document,engine,remedy,spi}`, `src/kernelTest/java`, and the `src/main/java` mod entry with
+the M1 adapter slice (`LevelCapture`, `LevelSnapshot`, `LevelLease`, one capture GameTest). Commands,
+persistence and the rest of the adapter remain pending.
 
 ## 2. The order
 
@@ -52,7 +53,7 @@ module file.
 | 3 | `src/kernelTest/java` compiles and all tests pass | JUnit launcher; 0 failures, 0 skipped |
 | 4 | the twelve scenarios in `06-verification.md` §3 pass | named test classes |
 | 5 | every public type in code is in a module file, and vice versa | `tools/spec-check.py` |
-| 6 | every `SC-` code in code is in `Codes.ALL`, and every `Codes.ALL` entry is in a producer row | registry test |
+| 6 | every `SC-` code in code is in `Codes.all`, and every `Codes.all` entry is in a producer row | registry test |
 | 7 | no `TODO`/`FIXME`/`UnsupportedOperationException`/empty public body | grep |
 | 8 | two runs over one tuple are equal | golden test |
 | 9 | the campfire/furnace examples in `04-api.md` compile as test sources | `ScenarioTest`; the document form in `DocumentCompilerTest` |
@@ -76,8 +77,9 @@ the exact failure this set exists to prevent.
 
 ## 7. What the next round owes
 
-- The adapter (`modules/adapter.md`) implemented against the four ports, with a GameTest for capture,
-  orientation, a door and a furnace.
+- The rest of the adapter (`modules/adapter.md`) against the four ports: nested frames, entities,
+  traits, claims/context persistence, JSON reader/writer, commands, and GameTests for orientation, a
+  door and a furnace. The M1 capture GameTest already runs.
 - A host scheduler with coalescing, dirty windows and a per-world ledger, outside the kernel.
 - A real JSON reader/writer and a datapack reload.
 - A performance pass: claim-row volume for large structures, `statusOf` cost, and the section pass.

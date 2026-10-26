@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,9 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FindingTest {
 
-    private static final NamespacedId DOC = NamespacedId.of("test", "doc");
-    private static final World WORLD = World.of(NamespacedId.of("test", "world"));
-    private static final InstanceId INSTANCE = new InstanceId(WORLD, 1);
+    private static final NamespacedId doc = NamespacedId.of("test", "doc");
+    private static final World world = World.of(NamespacedId.of("test", "world"));
+    private static final InstanceId instance = new InstanceId(world, 1);
 
     private static Locus local(int x) {
         return Locus.local(CuboidSet.of(Cuboid.of(x, 0, 0, x + 1, 1, 1)));
@@ -34,31 +35,31 @@ class FindingTest {
     }
 
     private static Locus key(String path) {
-        return Locus.key(INSTANCE, NamespacedId.of("test", path));
+        return Locus.key(instance, NamespacedId.of("test", path));
     }
 
     @Test
     void builderDefaultsMessageFromPrimary() {
-        Finding finding = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).label(local(0), "expected oak").build();
+        Finding finding = Finding.builder(Codes.expected).phase(Phase.check).label(local(0), "expected oak").build();
         assertEquals("expected oak", finding.message());
-        assertEquals(Severity.ERROR, finding.severity());
-        assertEquals(Codes.EXPECTED.code(), finding.code());
-        assertEquals(Phase.CHECK, finding.phase());
+        assertEquals(Severity.error, finding.severity());
+        assertEquals(Codes.expected.code(), finding.code());
+        assertEquals(Phase.check, finding.phase());
         assertTrue(finding.hasPrimary());
-        assertEquals("expected oak", java.util.Objects.requireNonNull(finding.primaryLabel(), "primary").message());
+        assertEquals("expected oak", Objects.requireNonNull(finding.primaryLabel(), "primary").message());
     }
 
     @Test
     void labelLessFindingRequiresAMessageAndPhase() {
         assertThrows(
             IllegalArgumentException.class,
-            () -> Finding.builder(Codes.BUDGET_EXHAUSTED).message("budget").build()
+            () -> Finding.builder(Codes.budgetExhausted).message("budget").build()
         );
         assertThrows(
             IllegalArgumentException.class,
-            () -> Finding.builder(Codes.BUDGET_EXHAUSTED).phase(Phase.CHECK).build()
+            () -> Finding.builder(Codes.budgetExhausted).phase(Phase.check).build()
         );
-        Finding finding = Finding.builder(Codes.BUDGET_EXHAUSTED).phase(Phase.CHECK).message("budget").build();
+        Finding finding = Finding.builder(Codes.budgetExhausted).phase(Phase.check).message("budget").build();
         assertNull(finding.primaryLabel());
         assertFalse(finding.hasPrimary());
         assertEquals("budget", finding.message());
@@ -66,7 +67,7 @@ class FindingTest {
 
     @Test
     void atMostOnePrimaryLabelAndNonBlankProse() {
-        Finding.Builder builder = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).label(local(0), "one")
+        Finding.Builder builder = Finding.builder(Codes.expected).phase(Phase.check).label(local(0), "one")
                 .label(local(1), "two");
         assertThrows(IllegalArgumentException.class, builder::build);
 
@@ -74,16 +75,16 @@ class FindingTest {
         assertThrows(IllegalArgumentException.class, () -> Note.of(""));
         assertThrows(
             IllegalArgumentException.class,
-            () -> Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).message(" ").build()
+            () -> Finding.builder(Codes.expected).phase(Phase.check).message(" ").build()
         );
     }
 
     @Test
     void labelsSortByRoleFramePositionAndInsertion() {
-        Finding finding = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).label(Label.context(key("k"), "key"))
+        Finding finding = Finding.builder(Codes.expected).phase(Phase.check).label(Label.context(key("k"), "key"))
                 .label(Label.secondary(world(3), "world3")).label(Label.secondary(local(0), "local"))
-                .label(Label.secondary(Locus.definition(new SourceSpan(DOC, 10, 12)), "d10"))
-                .label(Label.secondary(Locus.definition(new SourceSpan(DOC, 4, 6)), "d4"))
+                .label(Label.secondary(Locus.definition(new SourceSpan(doc, 10, 12)), "d10"))
+                .label(Label.secondary(Locus.definition(new SourceSpan(doc, 4, 6)), "d4"))
                 .label(Label.primary(world(5), "primary")).label(Label.secondary(world(1), "world1")).build();
         List<String> messages = finding.labels().stream().map(Label::message).toList();
         assertEquals(List.of("primary", "d4", "d10", "local", "world1", "world3", "key"), messages);
@@ -91,11 +92,11 @@ class FindingTest {
 
     @Test
     void keyLabelsKeepInsertionOrder() {
-        Finding finding = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).label(Label.primary(local(0), "primary"))
+        Finding finding = Finding.builder(Codes.expected).phase(Phase.check).label(Label.primary(local(0), "primary"))
                 .label(Label.context(key("b"), "first")).label(Label.context(key("a"), "second")).build();
         assertEquals(
             List.of("first", "second"),
-            finding.labelsOf(LabelRole.CONTEXT).stream().map(Label::message).toList()
+            finding.labelsOf(LabelRole.context).stream().map(Label::message).toList()
         );
     }
 
@@ -106,13 +107,13 @@ class FindingTest {
         List<Note> notes = new ArrayList<>();
         notes.add(Note.of("note"));
         Finding finding = new Finding(
-            Codes.EXPECTED.code(),
-            Severity.ERROR,
+            Codes.expected.code(),
+            Severity.error,
             "message",
             labels,
             notes,
             null,
-            Phase.CHECK
+            Phase.check
         );
         labels.clear();
         notes.clear();
@@ -123,36 +124,36 @@ class FindingTest {
 
     @Test
     void notesAndSuggestionArePreserved() {
-        Finding finding = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).message("door mismatch").note("a note")
+        Finding finding = Finding.builder(Codes.expected).phase(Phase.check).message("door mismatch").note("a note")
                 .note("located", local(2))
-                .suggest("replace the door", Applicability.MACHINE_APPLICABLE, NamespacedId.of("test", "remedy"))
+                .suggest("replace the door", Applicability.machineApplicable, NamespacedId.of("test", "remedy"))
                 .build();
         assertEquals(2, finding.notes().size());
         assertEquals("located", finding.notes().get(1).message());
         assertEquals(
-            Applicability.MACHINE_APPLICABLE,
-            java.util.Objects.requireNonNull(finding.suggestion(), "suggestion").applicability()
+            Applicability.machineApplicable,
+            Objects.requireNonNull(finding.suggestion(), "suggestion").applicability()
         );
         assertEquals(
             NamespacedId.of("test", "remedy"),
-            java.util.Objects.requireNonNull(finding.suggestion(), "suggestion").remedy()
+            Objects.requireNonNull(finding.suggestion(), "suggestion").remedy()
         );
     }
 
     @Test
     void builderFromEntryUsesTheCanonicalSeverity() {
-        Finding finding = Finding.builder(Codes.BUNDLE_TRUNCATED).phase(Phase.SETTLE).message("truncated").build();
-        assertEquals(Severity.WARNING, finding.severity());
-        assertEquals(Codes.BUNDLE_TRUNCATED.code(), finding.code());
+        Finding finding = Finding.builder(Codes.bundleTruncated).phase(Phase.settle).message("truncated").build();
+        assertEquals(Severity.warning, finding.severity());
+        assertEquals(Codes.bundleTruncated.code(), finding.code());
     }
 
     @Test
     void labelsOfFiltersByRole() {
-        Finding finding = Finding.builder(Codes.EXPECTED).phase(Phase.CHECK).label(Label.primary(local(0), "p"))
+        Finding finding = Finding.builder(Codes.expected).phase(Phase.check).label(Label.primary(local(0), "p"))
                 .label(Label.secondary(local(1), "s")).label(Label.secondary(local(2), "s2"))
                 .label(Label.context(local(3), "c")).build();
-        assertEquals(2, finding.labelsOf(LabelRole.SECONDARY).size());
-        assertEquals(1, finding.labelsOf(LabelRole.PRIMARY).size());
-        assertEquals(1, finding.labelsOf(LabelRole.CONTEXT).size());
+        assertEquals(2, finding.labelsOf(LabelRole.secondary).size());
+        assertEquals(1, finding.labelsOf(LabelRole.primary).size());
+        assertEquals(1, finding.labelsOf(LabelRole.context).size());
     }
 }

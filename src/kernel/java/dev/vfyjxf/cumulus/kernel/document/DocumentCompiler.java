@@ -66,7 +66,7 @@ public final class DocumentCompiler {
             List<Finding> findings = new ArrayList<>();
             error(
                 findings,
-                Codes.DOCUMENT_FIELD,
+                Codes.documentField,
                 "the document cannot be lowered: " + rejected.getMessage(),
                 document.root().source(),
                 documentLocus(document)
@@ -77,10 +77,10 @@ public final class DocumentCompiler {
 
     private static CompileResult compileChecked(Document document, CompilerContext context) {
         List<Finding> findings = new ArrayList<>();
-        if (document.schemaVersion() != Document.CURRENT_VERSION) {
+        if (document.schemaVersion() != Document.currentVersion) {
             error(
                 findings,
-                Codes.SCHEMA_VERSION,
+                Codes.schemaVersion,
                 "unsupported schema version " + document.schemaVersion(),
                 null,
                 documentLocus(document)
@@ -89,7 +89,7 @@ public final class DocumentCompiler {
         }
         Flat flat = new Flat(document.root());
         Set<String> active = new HashSet<>();
-        flatten(document.root(), document, context, "", LatticePoint.ORIGIN, flat, findings, active);
+        flatten(document.root(), document, context, "", LatticePoint.origin, flat, findings, active);
         if (hasErrors(findings)) {
             return new CompileResult(FindingBundle.of(findings), null);
         }
@@ -166,7 +166,7 @@ public final class DocumentCompiler {
     ) {
         String key = owner.root().id() + "/" + spec.id();
         if (!active.add(key)) {
-            error(findings, Codes.DEFINITION_CYCLE, "definition cycle at " + spec.id(), spec.source(), null);
+            error(findings, Codes.definitionCycle, "definition cycle at " + spec.id(), spec.source(), null);
             return;
         }
         if (!prefix.isEmpty()) {
@@ -178,7 +178,7 @@ public final class DocumentCompiler {
                     || spec.orientation() != null) {
                 error(
                     findings,
-                    Codes.DOCUMENT_FIELD,
+                    Codes.documentField,
                     "a definition may contribute only bays, seams and placements",
                     spec.source(),
                     null
@@ -195,14 +195,14 @@ public final class DocumentCompiler {
         for (BaySpec bay : spec.bays()) {
             CuboidSet translated = translate(bay.cells(), offset);
             if (translated == null) {
-                error(findings, Codes.PLACEMENT_OUTSIDE, "bay " + bay.id() + " leaves the lattice", bay.source(), null);
+                error(findings, Codes.placementOutside, "bay " + bay.id() + " leaves the lattice", bay.source(), null);
                 continue;
             }
             Footprint footprint = translate(bay.footprint(), offset);
             if (footprint == null) {
                 error(
                     findings,
-                    Codes.PLACEMENT_OUTSIDE,
+                    Codes.placementOutside,
                     "the footprint of " + bay.id() + " leaves the lattice",
                     bay.source(),
                     null
@@ -226,7 +226,7 @@ public final class DocumentCompiler {
             if (translated == null) {
                 error(
                     findings,
-                    Codes.PLACEMENT_OUTSIDE,
+                    Codes.placementOutside,
                     "seam " + seam.id() + " leaves the lattice",
                     seam.source(),
                     null
@@ -251,7 +251,7 @@ public final class DocumentCompiler {
                 if (external == null) {
                     error(
                         findings,
-                        Codes.DEFINITION_MISSING,
+                        Codes.definitionMissing,
                         "no definition " + placement.definition(),
                         placement.source(),
                         null
@@ -265,7 +265,7 @@ public final class DocumentCompiler {
             }
             LatticePoint next = offset.offset(placement.offset().x(), placement.offset().y(), placement.offset().z());
             if (next == null) {
-                error(findings, Codes.PLACEMENT_OUTSIDE, "placement leaves the lattice", placement.source(), null);
+                error(findings, Codes.placementOutside, "placement leaves the lattice", placement.source(), null);
                 continue;
             }
             String nextPrefix = prefix.isEmpty()
@@ -300,7 +300,7 @@ public final class DocumentCompiler {
             if (previous != null && !previous.equals(key)) {
                 error(
                     findings,
-                    Codes.DOCUMENT_DUPLICATE,
+                    Codes.documentDuplicate,
                     "key " + key.id() + " is declared twice with different content",
                     spec.source(),
                     null
@@ -337,7 +337,7 @@ public final class DocumentCompiler {
         NamespacedId id = NamespacedId.parse(name);
         Class<?> custom = id == null ? null : context.types().get(id);
         if (custom == null) {
-            error(findings, Codes.KEY_TYPE, "unknown key type " + name, spec.source(), null);
+            error(findings, Codes.keyType, "unknown key type " + name, spec.source(), null);
         }
         return custom;
     }
@@ -364,7 +364,7 @@ public final class DocumentCompiler {
         if (candidate == null) {
             error(
                 findings,
-                Codes.KEY_TYPE,
+                Codes.keyType,
                 "merge " + merge + " does not fit type " + type.getName(),
                 spec.source(),
                 null
@@ -401,7 +401,7 @@ public final class DocumentCompiler {
                 return id;
             }
         }
-        error(findings, Codes.KEY_TYPE, "whenAbsent does not fit key " + spec.id(), spec.source(), null);
+        error(findings, Codes.keyType, "whenAbsent does not fit key " + spec.id(), spec.source(), null);
         return null;
     }
 
@@ -412,7 +412,7 @@ public final class DocumentCompiler {
             if (!boundsSet.containsAll(spec.cells())) {
                 error(
                     findings,
-                    Codes.PLACEMENT_OUTSIDE,
+                    Codes.placementOutside,
                     "bay " + spec.id() + " leaves the blueprint bounds",
                     spec.source(),
                     Locus.local(spec.cells())
@@ -432,7 +432,7 @@ public final class DocumentCompiler {
                 if (previous != null && !previous.equals(bay)) {
                     error(
                         findings,
-                        Codes.DOCUMENT_DUPLICATE,
+                        Codes.documentDuplicate,
                         "two different bays share id " + bay.id(),
                         spec.source(),
                         null
@@ -440,7 +440,7 @@ public final class DocumentCompiler {
                 }
             } catch (IllegalArgumentException rejected) {
                 String message = rejected.getMessage();
-                error(findings, Codes.DOCUMENT_FIELD, message == null ? "invalid bay" : message, spec.source(), null);
+                error(findings, Codes.documentField, message == null ? "invalid bay" : message, spec.source(), null);
             }
         }
         return bays;
@@ -451,7 +451,7 @@ public final class DocumentCompiler {
         Set<SeamId> ids = new HashSet<>();
         for (SeamSpec spec : specs) {
             if (!ids.add(spec.id())) {
-                error(findings, Codes.DOCUMENT_DUPLICATE, "duplicate seam id " + spec.id(), spec.source(), null);
+                error(findings, Codes.documentDuplicate, "duplicate seam id " + spec.id(), spec.source(), null);
                 continue;
             }
             seams.add(new Seam(spec.id(), spec.cells(), spec.kind(), spec.properties()));
@@ -471,14 +471,14 @@ public final class DocumentCompiler {
         Set<NamespacedId> ids = new HashSet<>();
         for (CheckSpec spec : specs) {
             if (!ids.add(spec.id())) {
-                error(findings, Codes.DOCUMENT_DUPLICATE, "duplicate check id " + spec.id(), spec.source(), null);
+                error(findings, Codes.documentDuplicate, "duplicate check id " + spec.id(), spec.source(), null);
                 continue;
             }
             Bay bay = bays.get(spec.bay());
             if (bay == null) {
                 error(
                     findings,
-                    Codes.BAY_UNRESOLVED,
+                    Codes.bayUnresolved,
                     "check " + spec.id() + " names no merged bay " + spec.bay(),
                     spec.source(),
                     null
@@ -505,7 +505,7 @@ public final class DocumentCompiler {
             } catch (IllegalArgumentException rejected) {
                 error(
                     findings,
-                    Codes.DOCUMENT_FIELD,
+                    Codes.documentField,
                     "check " + spec.id() + ": " + rejected.getMessage(),
                     spec.source(),
                     null
@@ -528,12 +528,12 @@ public final class DocumentCompiler {
         List<Finding> findings
     ) {
         if (kind.path().equals("missing_kind")) {
-            error(findings, Codes.FACTORY_UNKNOWN, "a focus has no kind", factory.source(), null);
+            error(findings, Codes.factoryUnknown, "a focus has no kind", factory.source(), null);
             return null;
         }
         FocusFactory registered = lookup(context.focuses(), kind);
         if (registered == null) {
-            error(findings, Codes.DOCUMENT_FACTORY, "no focus factory " + kind, factory.source(), null);
+            error(findings, Codes.documentFactory, "no focus factory " + kind, factory.source(), null);
             return null;
         }
         Focus<?> focus;
@@ -542,7 +542,7 @@ public final class DocumentCompiler {
         } catch (RuntimeException failure) {
             error(
                 findings,
-                Codes.FACTORY_BAD,
+                Codes.factoryBad,
                 "focus factory " + kind + " failed: " + failure.getMessage(),
                 factory.source(),
                 null
@@ -550,7 +550,7 @@ public final class DocumentCompiler {
             return null;
         }
         if (focus == null) {
-            error(findings, Codes.FACTORY_BAD, "focus factory " + kind + " returned null", factory.source(), null);
+            error(findings, Codes.factoryBad, "focus factory " + kind + " returned null", factory.source(), null);
         }
         return focus;
     }
@@ -565,7 +565,7 @@ public final class DocumentCompiler {
     ) {
         String name = kind.path();
         if (name.equals("missing_kind")) {
-            error(findings, Codes.FACTORY_UNKNOWN, "an expectation has no kind", factory.source(), null);
+            error(findings, Codes.factoryUnknown, "an expectation has no kind", factory.source(), null);
             return null;
         }
         List<Expectation<?>> children = new ArrayList<>();
@@ -573,7 +573,7 @@ public final class DocumentCompiler {
             case "all_of", "any_of", "sequence" -> {
                 children = children(args, context, factory, findings);
                 if (children.isEmpty()) {
-                    error(findings, Codes.DOCUMENT_FIELD, name + " needs at least one child", factory.source(), null);
+                    error(findings, Codes.documentField, name + " needs at least one child", factory.source(), null);
                     return null;
                 }
                 if (!subjectsAgree(children, factory, findings)) {
@@ -589,7 +589,7 @@ public final class DocumentCompiler {
             case "not" -> {
                 Value child = args.get("child");
                 if (child == null) {
-                    error(findings, Codes.DOCUMENT_FIELD, "not needs a child", factory.source(), null);
+                    error(findings, Codes.documentField, "not needs a child", factory.source(), null);
                     return null;
                 }
                 Expectation<?> compiled = expectation(context, kindOf(child), child, factory, findings);
@@ -598,7 +598,7 @@ public final class DocumentCompiler {
             case "each_cell" -> {
                 Value element = args.get("element");
                 if (element == null) {
-                    error(findings, Codes.DOCUMENT_FIELD, "each_cell needs an element", factory.source(), null);
+                    error(findings, Codes.documentField, "each_cell needs an element", factory.source(), null);
                     return null;
                 }
                 Expectation<?> compiled = expectation(context, kindOf(element), element, factory, findings);
@@ -608,7 +608,7 @@ public final class DocumentCompiler {
                 if (!compiled.subject().equals(OccupantSnapshot.class)) {
                     error(
                         findings,
-                        Codes.DOCUMENT_FIELD,
+                        Codes.documentField,
                         "each_cell needs an OccupantSnapshot expectation",
                         factory.source(),
                         null
@@ -621,12 +621,12 @@ public final class DocumentCompiler {
                 Value count = args.get("count");
                 long n = count == null ? -1 : count.asNumber(-1);
                 if (n < 0 || n > Integer.MAX_VALUE) {
-                    error(findings, Codes.DOCUMENT_FIELD, name + " needs a count", factory.source(), null);
+                    error(findings, Codes.documentField, name + " needs a count", factory.source(), null);
                     return null;
                 }
                 children = children(args, context, factory, findings);
                 if (children.isEmpty()) {
-                    error(findings, Codes.DOCUMENT_FIELD, name + " needs children", factory.source(), null);
+                    error(findings, Codes.documentField, name + " needs children", factory.source(), null);
                     return null;
                 }
                 if (!subjectsAgree(children, factory, findings)) {
@@ -642,7 +642,7 @@ public final class DocumentCompiler {
             default -> {
                 ExpectationFactory registered = lookup(context.expectations(), kind);
                 if (registered == null) {
-                    error(findings, Codes.DOCUMENT_FACTORY, "no expectation factory " + kind, factory.source(), null);
+                    error(findings, Codes.documentFactory, "no expectation factory " + kind, factory.source(), null);
                     return null;
                 }
                 try {
@@ -650,7 +650,7 @@ public final class DocumentCompiler {
                     if (compiled == null) {
                         error(
                             findings,
-                            Codes.FACTORY_BAD,
+                            Codes.factoryBad,
                             "expectation factory " + kind + " returned null",
                             factory.source(),
                             null
@@ -660,7 +660,7 @@ public final class DocumentCompiler {
                 } catch (RuntimeException failure) {
                     error(
                         findings,
-                        Codes.FACTORY_BAD,
+                        Codes.factoryBad,
                         "expectation factory " + kind + " failed: " + failure.getMessage(),
                         factory.source(),
                         null
@@ -681,7 +681,7 @@ public final class DocumentCompiler {
             if (!child.subject().equals(subject)) {
                 error(
                     findings,
-                    Codes.DOCUMENT_FIELD,
+                    Codes.documentField,
                     "children of one combinator disagree on subject: " + subject.getName() + " vs "
                             + child.subject().getName(),
                     factory.source(),
@@ -735,14 +735,14 @@ public final class DocumentCompiler {
         Set<NamespacedId> ids = new HashSet<>();
         for (ComputationSpec spec : specs) {
             if (!ids.add(spec.id())) {
-                error(findings, Codes.DOCUMENT_DUPLICATE, "duplicate computation id " + spec.id(), spec.source(), null);
+                error(findings, Codes.documentDuplicate, "duplicate computation id " + spec.id(), spec.source(), null);
                 continue;
             }
             ContextKey<?> output = keys.get(spec.output());
             if (output == null) {
                 error(
                     findings,
-                    Codes.KEY_UNDECLARED,
+                    Codes.keyUndeclared,
                     "computation " + spec.id() + " names undeclared key " + spec.output(),
                     spec.source(),
                     null
@@ -752,7 +752,7 @@ public final class DocumentCompiler {
             if (spec.bay() != null && spec.region() != null) {
                 error(
                     findings,
-                    Codes.DOCUMENT_FIELD,
+                    Codes.documentField,
                     "computation " + spec.id() + " declares both a bay and a region",
                     spec.source(),
                     null
@@ -765,7 +765,7 @@ public final class DocumentCompiler {
                 if (bay == null) {
                     error(
                         findings,
-                        Codes.BAY_UNRESOLVED,
+                        Codes.bayUnresolved,
                         "computation " + spec.id() + " names no merged bay " + spec.bay(),
                         spec.source(),
                         null
@@ -778,7 +778,7 @@ public final class DocumentCompiler {
             } else {
                 error(
                     findings,
-                    Codes.DOCUMENT_FIELD,
+                    Codes.documentField,
                     "computation " + spec.id() + " needs a bay or a region",
                     spec.source(),
                     null
@@ -789,7 +789,7 @@ public final class DocumentCompiler {
                 if (!keys.containsKey(input)) {
                     error(
                         findings,
-                        Codes.KEY_UNDECLARED,
+                        Codes.keyUndeclared,
                         "computation " + spec.id() + " reads undeclared key " + input,
                         spec.source(),
                         null
@@ -798,7 +798,7 @@ public final class DocumentCompiler {
             }
             ComputationFactory factory = lookup(context.computations(), spec.kind());
             if (factory == null) {
-                error(findings, Codes.DOCUMENT_FACTORY, "no computation factory " + spec.kind(), spec.source(), null);
+                error(findings, Codes.documentFactory, "no computation factory " + spec.kind(), spec.source(), null);
                 continue;
             }
             FactoryContext fctx = new FactoryContext(document.root().id(), spec.source(), keys::get, findings::add);
@@ -808,7 +808,7 @@ public final class DocumentCompiler {
             } catch (RuntimeException failure) {
                 error(
                     findings,
-                    Codes.FACTORY_BAD,
+                    Codes.factoryBad,
                     "computation factory " + spec.kind() + " failed: " + failure.getMessage(),
                     spec.source(),
                     null
@@ -818,7 +818,7 @@ public final class DocumentCompiler {
             if (created == null) {
                 error(
                     findings,
-                    Codes.FACTORY_BAD,
+                    Codes.factoryBad,
                     "computation factory " + spec.kind() + " returned null",
                     spec.source(),
                     null
@@ -828,7 +828,7 @@ public final class DocumentCompiler {
             if (!created.output().equals(output)) {
                 error(
                     findings,
-                    Codes.FACTORY_BAD,
+                    Codes.factoryBad,
                     "computation factory " + spec.kind() + " produced " + created.output().id() + ", not "
                             + output.id(),
                     spec.source(),
@@ -939,7 +939,7 @@ public final class DocumentCompiler {
             if (!keys.containsKey(spec.output())) {
                 error(
                     findings,
-                    Codes.KEY_UNDECLARED,
+                    Codes.keyUndeclared,
                     "derivation " + spec.deriver() + " names undeclared key " + spec.output(),
                     null,
                     fallback
@@ -947,11 +947,11 @@ public final class DocumentCompiler {
                 continue;
             }
             if (!orders.add(spec.order())) {
-                error(findings, Codes.DERIVE_DUPLICATE, "duplicate derivation order " + spec.order(), null, fallback);
+                error(findings, Codes.deriveDuplicate, "duplicate derivation order " + spec.order(), null, fallback);
                 continue;
             }
             if (!outputs.add(spec.output())) {
-                error(findings, Codes.DERIVE_DUPLICATE, "two derivations produce " + spec.output(), null, fallback);
+                error(findings, Codes.deriveDuplicate, "two derivations produce " + spec.output(), null, fallback);
                 continue;
             }
             derivations.add(spec);
@@ -983,13 +983,13 @@ public final class DocumentCompiler {
                 text = text.substring(0, text.length() - 1);
             }
             FindingCode code = FindingCode.parse(text);
-            for (CodeEntry entry : Codes.ALL) {
+            for (CodeEntry entry : Codes.all) {
                 if (entry.code().equals(code)) {
                     return entry;
                 }
             }
         }
-        return Codes.BLUEPRINT_INVALID;
+        return Codes.blueprintInvalid;
     }
 
     private static @Nullable CuboidSet translate(CuboidSet cells, LatticePoint offset) {
@@ -1022,7 +1022,7 @@ public final class DocumentCompiler {
         @Nullable SourceSpan source,
         @Nullable Locus locus
     ) {
-        Finding.Builder builder = Finding.builder(entry).phase(Phase.COMPILE).message(message);
+        Finding.Builder builder = Finding.builder(entry).phase(Phase.compile).message(message);
         if (source != null) {
             builder.label(Label.primary(Locus.definition(source), message));
         } else if (locus != null) {
@@ -1033,7 +1033,7 @@ public final class DocumentCompiler {
 
     private static boolean hasErrors(List<Finding> findings) {
         for (Finding finding : findings) {
-            if (finding.severity() == Severity.ERROR) {
+            if (finding.severity() == Severity.error) {
                 return true;
             }
         }

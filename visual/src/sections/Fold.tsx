@@ -33,7 +33,7 @@ export function Fold() {
 
   const snippet = `ContextKey<Long> air = ContextKeys.of(
         id("air_cells"), Long.class,
-        Retention.INSTANCE, Merges.${merge}(), ${whenAbsent ? '0L' : 'null'});`;
+        Retention.instance, Merges.${merge}(), ${whenAbsent ? '0L' : 'null'});`;
 
   const toggleRefused = (index: number) => {
     setRefused((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index]);

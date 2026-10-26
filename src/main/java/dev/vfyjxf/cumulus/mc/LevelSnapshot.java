@@ -158,6 +158,6 @@ public final class LevelSnapshot implements WorldView {
     }
 
     private static SectionSlot refused() {
-        return new SectionSlot.Refused(ReadStatus.OUT_OF_BOUNDS, FindingCode.of(FindingCode.Family.MC, 1));
+        return new SectionSlot.Refused(ReadStatus.outOfBounds, FindingCode.of(FindingCode.Family.mc, 1));
     }
 }

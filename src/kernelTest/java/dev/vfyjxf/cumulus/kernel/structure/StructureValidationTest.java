@@ -27,8 +27,8 @@ class StructureValidationTest {
     @Test
     void sectionComputationHasNoInputs() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.INSTANCE, (l, r) -> l);
-        ContextKey<Long> b = ContextKeys.of(id("b"), Long.class, Retention.INSTANCE, (l, r) -> l);
+        ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.instance, (l, r) -> l);
+        ContextKey<Long> b = ContextKeys.of(id("b"), Long.class, Retention.instance, (l, r) -> l);
         SectionComputation<Long> first = Computations.volume(a, cells);
         SectionComputation<Long> second = new SectionComputation<>() {
             @Override
@@ -56,7 +56,7 @@ class StructureValidationTest {
                 return cells;
             }
         };
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Check<?> check = Check.of(id("cells"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
         assertThrows(
             IllegalArgumentException.class,
@@ -68,8 +68,8 @@ class StructureValidationTest {
     @Test
     void duplicateOutputAndEmptyRegionAreBuildErrors() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.INSTANCE, (l, r) -> l);
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.instance, (l, r) -> l);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Check<?> check = Check.of(id("cells"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
         assertThrows(
             IllegalArgumentException.class,
@@ -87,7 +87,7 @@ class StructureValidationTest {
     void whenAbsentMustMatchTheKeyType() {
         assertThrows(
             IllegalArgumentException.class,
-            () -> new ContextKey(id("bad"), Long.class, Retention.INSTANCE, null, "x")
+            () -> new ContextKey(id("bad"), Long.class, Retention.instance, null, "x")
         );
     }
 

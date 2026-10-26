@@ -1,7 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.space;
 
 public enum Heading {
-    NORTH(0, 0, -1), SOUTH(0, 0, 1), WEST(-1, 0, 0), EAST(1, 0, 0), UP(0, 1, 0), DOWN(0, -1, 0);
+    north(0, 0, -1), south(0, 0, 1), west(-1, 0, 0), east(1, 0, 0), up(0, 1, 0), down(0, -1, 0);
 
     private final int stepX;
     private final int stepY;
@@ -27,20 +27,20 @@ public enum Heading {
 
     public Heading opposite() {
         return switch (this) {
-            case NORTH -> SOUTH;
-            case SOUTH -> NORTH;
-            case WEST -> EAST;
-            case EAST -> WEST;
-            case UP -> DOWN;
-            case DOWN -> UP;
+            case north -> south;
+            case south -> north;
+            case west -> east;
+            case east -> west;
+            case up -> down;
+            case down -> up;
         };
     }
 
     public Axis axis() {
         return switch (this) {
-            case NORTH, SOUTH -> Axis.Z;
-            case WEST, EAST -> Axis.X;
-            case UP, DOWN -> Axis.Y;
+            case north, south -> Axis.z;
+            case west, east -> Axis.x;
+            case up, down -> Axis.y;
         };
     }
 

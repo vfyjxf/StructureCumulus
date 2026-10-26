@@ -14,7 +14,7 @@ public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @
         Objects.requireNonNull(frame, "frame");
         Objects.requireNonNull(cells, "cells");
         switch (frame) {
-            case DEFINITION -> {
+            case definition -> {
                 if (source == null) {
                     throw new IllegalArgumentException("a DEFINITION locus requires a source span");
                 }
@@ -22,7 +22,7 @@ public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @
                     throw new IllegalArgumentException("a DEFINITION locus carries no key");
                 }
             }
-            case LOCAL, WORLD -> {
+            case local, world -> {
                 if (source != null) {
                     throw new IllegalArgumentException("a cell locus carries no source span");
                 }
@@ -33,7 +33,7 @@ public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @
                     throw new IllegalArgumentException("a cell locus requires cells");
                 }
             }
-            case KEY -> {
+            case key -> {
                 if (key == null) {
                     throw new IllegalArgumentException("a KEY locus requires a key");
                 }
@@ -48,23 +48,23 @@ public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key, @
     }
 
     public static Locus definition(SourceSpan source) {
-        return new Locus(LocusFrame.DEFINITION, CuboidSet.empty(), null, source);
+        return new Locus(LocusFrame.definition, CuboidSet.empty(), null, source);
     }
 
     public static Locus definition(CuboidSet cells, SourceSpan source) {
-        return new Locus(LocusFrame.DEFINITION, cells, null, source);
+        return new Locus(LocusFrame.definition, cells, null, source);
     }
 
     public static Locus local(CuboidSet cells) {
-        return new Locus(LocusFrame.LOCAL, cells, null, null);
+        return new Locus(LocusFrame.local, cells, null, null);
     }
 
     public static Locus world(CuboidSet cells) {
-        return new Locus(LocusFrame.WORLD, cells, null, null);
+        return new Locus(LocusFrame.world, cells, null, null);
     }
 
     public static Locus key(InstanceId instance, NamespacedId key) {
-        return new Locus(LocusFrame.KEY, CuboidSet.empty(), new KeyLocus(instance, key), null);
+        return new Locus(LocusFrame.key, CuboidSet.empty(), new KeyLocus(instance, key), null);
     }
 
     public boolean hasCells() {

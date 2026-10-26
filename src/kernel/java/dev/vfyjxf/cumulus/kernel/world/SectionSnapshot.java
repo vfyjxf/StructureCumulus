@@ -16,7 +16,7 @@ import java.util.TreeMap;
 /** One frozen section's non-air occupants. */
 public record SectionSnapshot(SectionKey key, Map<LatticePoint, OccupantSnapshot> occupants, long contentDigest) {
 
-    private static final Comparator<OccupantSnapshot> REF_ORDER = Comparator.comparing(OccupantSnapshot::ref);
+    private static final Comparator<OccupantSnapshot> refOrder = Comparator.comparing(OccupantSnapshot::ref);
 
     public SectionSnapshot {
         Objects.requireNonNull(key, "key");
@@ -50,7 +50,7 @@ public record SectionSnapshot(SectionKey key, Map<LatticePoint, OccupantSnapshot
                 result.add(occupant);
             }
         }
-        result.sort(REF_ORDER);
+        result.sort(refOrder);
         return List.copyOf(result);
     }
 }

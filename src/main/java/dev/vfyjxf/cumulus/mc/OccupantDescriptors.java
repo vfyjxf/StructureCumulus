@@ -25,8 +25,8 @@ public final class OccupantDescriptors {
 
     public static OccupantSnapshot block(SnapshotId snapshot, int frame, LatticePoint cell, BlockState state) {
         NamespacedId type = id(BuiltInRegistries.BLOCK.getKey(state.getBlock()));
-        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.BLOCK, properties(state), List.of());
-        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.BLOCK, cell);
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.block, properties(state), List.of());
+        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.block, cell);
         return new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), List.of());
     }
 
@@ -40,11 +40,11 @@ public final class OccupantDescriptors {
         NamespacedId type = id(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(entity.getType()));
         OccupantDescriptor descriptor = new OccupantDescriptor(
             type,
-            OccupantKind.BLOCK_ENTITY,
+            OccupantKind.blockEntity,
             properties(state),
             List.of()
         );
-        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.BLOCK_ENTITY, cell);
+        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.blockEntity, cell);
         return new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), List.of());
     }
 

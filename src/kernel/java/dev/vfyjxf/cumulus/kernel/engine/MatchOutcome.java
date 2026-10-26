@@ -22,7 +22,7 @@ public record MatchOutcome(
     Spend spend
 ) {
 
-    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator.comparing((ContextKey<?> key) -> key.id())
+    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
             .thenComparing(key -> key.type().getName());
 
     public MatchOutcome {
@@ -31,7 +31,7 @@ public record MatchOutcome(
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(reads, "reads");
         Objects.requireNonNull(spend, "spend");
-        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(KEY_ORDER);
+        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(keyOrder);
         for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
             ContextKey<?> key = Objects.requireNonNull(entry.getKey(), "key");
             Object value = Objects.requireNonNull(entry.getValue(), "value");

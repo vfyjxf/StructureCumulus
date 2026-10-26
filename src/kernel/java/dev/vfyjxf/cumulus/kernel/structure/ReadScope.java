@@ -16,14 +16,14 @@ import java.util.TreeSet;
 /** What a check declares it reads: cells, keys and entity windows. */
 public record ReadScope(CuboidSet cells, Set<ContextKey<?>> keys, List<EntityWindow> windows) {
 
-    private static final Comparator<ContextKey<?>> KEY_ORDER = Comparator.comparing((ContextKey<?> key) -> key.id())
+    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
             .thenComparing(key -> key.type().getName());
 
     public ReadScope {
         Objects.requireNonNull(cells, "cells");
         Objects.requireNonNull(keys, "keys");
         Objects.requireNonNull(windows, "windows");
-        TreeSet<ContextKey<?>> sorted = new TreeSet<>(KEY_ORDER);
+        TreeSet<ContextKey<?>> sorted = new TreeSet<>(keyOrder);
         sorted.addAll(keys);
         keys = Collections.unmodifiableSet(sorted);
         windows = List.copyOf(new LinkedHashSet<>(windows));
@@ -55,7 +55,7 @@ public record ReadScope(CuboidSet cells, Set<ContextKey<?>> keys, List<EntityWin
     }
 
     private static Set<ContextKey<?>> unionKeys(Set<ContextKey<?>> left, Set<ContextKey<?>> right) {
-        TreeSet<ContextKey<?>> merged = new TreeSet<>(KEY_ORDER);
+        TreeSet<ContextKey<?>> merged = new TreeSet<>(keyOrder);
         merged.addAll(left);
         merged.addAll(right);
         return merged;

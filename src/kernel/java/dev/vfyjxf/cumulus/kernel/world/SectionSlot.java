@@ -35,6 +35,6 @@ public sealed interface SectionSlot {
     }
 
     default ReadStatus status() {
-        return this instanceof Refused refused ? refused.status() : ReadStatus.READABLE;
+        return this instanceof Refused refused ? refused.status() : ReadStatus.readable;
     }
 }

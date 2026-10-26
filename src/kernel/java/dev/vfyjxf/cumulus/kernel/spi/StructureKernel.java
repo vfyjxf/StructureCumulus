@@ -112,7 +112,7 @@ public final class StructureKernel {
                         if (remedy == null) {
                             problems.add(
                                 solveProblem(
-                                    Codes.REMEDY_MALFORMED,
+                                    Codes.remedyMalformed,
                                     finding,
                                     "provider " + id + " returned a null remedy"
                                 )
@@ -123,11 +123,7 @@ public final class StructureKernel {
                     }
                 } catch (RuntimeException failure) {
                     problems.add(
-                        solveProblem(
-                            Codes.REMEDY_FAILED,
-                            finding,
-                            "provider " + id + " failed: " + failure.getMessage()
-                        )
+                        solveProblem(Codes.remedyFailed, finding, "provider " + id + " failed: " + failure.getMessage())
                     );
                 }
             }
@@ -161,7 +157,7 @@ public final class StructureKernel {
     private static int applicability(Remedy remedy) {
         return remedy instanceof Remedy.Repair repair
                 ? repair.applicability().rank()
-                : Applicability.UNSPECIFIED.rank();
+                : Applicability.unspecified.rank();
     }
 
     private static Finding solveProblem(CodeEntry entry, Finding finding, String message) {

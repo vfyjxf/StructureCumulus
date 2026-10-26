@@ -24,7 +24,7 @@ final class BuiltinExpectations {
             try {
                 return body.create(args, context);
             } catch (RuntimeException failure) {
-                BuiltinSupport.report(context, Codes.FACTORY_BAD, "factory " + id + " failed: " + failure.getMessage());
+                BuiltinSupport.report(context, Codes.factoryBad, "factory " + id + " failed: " + failure.getMessage());
                 return null;
             }
         }

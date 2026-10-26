@@ -18,13 +18,13 @@ source file's life cycle (host), localisation catalogues (host), the owning `Loc
 
 | Type | Kind | Contract |
 | --- | --- | --- |
-| `Severity` | enum | `ERROR`, `WARNING`, `INFO`; declaration order is strength |
-| `FindingCode` | record (core) | `SC-<FAMILY>-<NNNN>`; identity only; declared in `core` so `world` can name it |
+| `Severity` | enum | `error`, `warning`, `info`; declaration order is strength; `wireName()` is the uppercase tag |
+| `FindingCode` | record (core) | `SC-<FAMILY>-<NNNN>`; the family carries an explicit uppercase tag; identity only; declared in `core` so `world` can name it |
 | `Label` | record | `(Locus, message, LabelRole)`; at most one primary per finding |
-| `LabelRole` | enum | `PRIMARY`, `SECONDARY`, `CONTEXT` |
+| `LabelRole` | enum | `primary`, `secondary`, `context`; `wireName()` is the uppercase tag |
 | `Note` | record | `(message, @Nullable Locus)`; a fact with no cell of its own |
 | `Suggestion` | record | `(message, Applicability, @Nullable NamespacedId remedy)` |
-| `Applicability` | enum | machine-applicable → unspecified, top first |
+| `Applicability` | enum | machine-applicable → unspecified, top first; `wireName()` is the uppercase tag |
 | `Finding` | record | 7 components, validates and sorts its labels |
 | `FindingBundle` | final class | immutable canonical bundle with counters |
 | `FindingOptions` | record | caps and floors, warnings/info only |
@@ -33,7 +33,7 @@ source file's life cycle (host), localisation catalogues (host), the owning `Loc
 | `SourceText` | record | one text plus offset→line/column |
 | `Explanation` | record | one code's long form |
 | `CodeEntry` | record | code + canonical severity + explanation |
-| `Codes` | final class | one constant per shipped code; `ALL` is the registry source |
+| `Codes` | final class | one constant per shipped code; `all` is the registry source |
 
 ## 3. Signatures
 
@@ -41,16 +41,18 @@ source file's life cycle (host), localisation catalogues (host), the owning `Loc
 package dev.vfyjxf.cumulus.kernel.finding;
 
 public enum Severity {
-    ERROR, WARNING, INFO;
+    error, warning, info;
     public int rank();
     public boolean atLeast(Severity floor);
+    public String wireName();
 }
 
 // FindingCode lives in dev.vfyjxf.cumulus.kernel.core; this module consumes it.
 
 public enum LabelRole {
-    PRIMARY, SECONDARY, CONTEXT;
+    primary, secondary, context;
     public int rank();
+    public String wireName();
 }
 
 public record Label(Locus locus, String message, LabelRole role) {
@@ -65,8 +67,9 @@ public record Note(String message, @Nullable Locus locus) {
 }
 
 public enum Applicability {
-    MACHINE_APPLICABLE, MAYBE_INCORRECT, HAS_PLACEHOLDERS, UNSPECIFIED;
+    machineApplicable, maybeIncorrect, hasPlaceholders, unspecified;
     public int rank();
+    public String wireName();
 }
 
 public record Suggestion(String message, Applicability applicability,
@@ -86,7 +89,7 @@ public record Finding(FindingCode code, Severity severity, String message,
         public Builder phase(Phase phase);
         public Builder message(String message);
         public Builder label(Label label);
-        public Builder label(Locus locus, String message);                     // PRIMARY
+        public Builder label(Locus locus, String message);                     // primary
         public Builder label(Locus locus, LabelRole role, String message);
         public Builder secondary(Locus locus, String message);
         public Builder context(Locus locus, String message);
@@ -136,7 +139,7 @@ public final class FindingRenderer {
 
 public record RenderContext(java.util.List<SourceText> sources, @Nullable NamespacedId document,
                             int width, ColorMode color, java.util.Locale locale) {
-    public enum ColorMode { PLAIN, ANSI }
+    public enum ColorMode { plain, ansi }
     public static RenderContext plain();
     public static RenderContext of(SourceText source);
     public @Nullable SourceText sourceFor(NamespacedId id);
@@ -156,62 +159,62 @@ public record Explanation(FindingCode code, String summary, String body,
 public record CodeEntry(FindingCode code, Severity severity, Explanation explanation) { }
 
 public final class Codes {
-    public static final CodeEntry LOCUS_UNMAPPED = ...;            // SC-SPC-0001
-    public static final CodeEntry CUBOID_OFF_LATTICE = ...;        // SC-SPC-0002
-    public static final CodeEntry UNREADABLE_CELL = ...;           // SC-OCC-0001
-    public static final CodeEntry FOOTPRINT_CLIPPED = ...;         // SC-OCC-0002
-    public static final CodeEntry NESTED_CUT = ...;                // SC-OCC-0003
-    public static final CodeEntry EXPECTED = ...;                  // SC-EXP-0001
-    public static final CodeEntry NEGATION_MATCHED = ...;          // SC-EXP-0002
-    public static final CodeEntry THRESHOLD_IMPOSSIBLE = ...;      // SC-EXP-0003
-    public static final CodeEntry FACTORY_UNKNOWN = ...;           // SC-EXP-0004
-    public static final CodeEntry FACTORY_BAD = ...;               // SC-EXP-0005
-    public static final CodeEntry CLAIM_CONFLICT = ...;            // SC-CLM-0001
-    public static final CodeEntry LEDGER_UNAVAILABLE = ...;        // SC-CLM-0002
-    public static final CodeEntry LEDGER_MOVED = ...;              // SC-CLM-0003
-    public static final CodeEntry BINDING_INVALID = ...;           // SC-CLM-0004
-    public static final CodeEntry BOUND_EMPTY = ...;               // SC-CLM-0005
-    public static final CodeEntry BLUEPRINT_INVALID = ...;         // SC-BPT-0001
-    public static final CodeEntry BAYS_OVERLAP = ...;              // SC-BPT-0002
-    public static final CodeEntry BAY_OUTSIDE = ...;               // SC-BPT-0003
-    public static final CodeEntry DUPLICATE_ID = ...;              // SC-BPT-0004
-    public static final CodeEntry COVERAGE_INVALID = ...;          // SC-BPT-0005
-    public static final CodeEntry ANCHOR_INVALID = ...;            // SC-BPT-0006
-    public static final CodeEntry PLAN_INVALID = ...;              // SC-BPT-0007
-    public static final CodeEntry DERIVATION_INVALID = ...;        // SC-BPT-0008
-    public static final CodeEntry SEAM_OUTSIDE = ...;              // SC-BPT-0009
-    public static final CodeEntry FOOTPRINT_OUTSIDE = ...;         // SC-BPT-0010
-    public static final CodeEntry SUBJECT_MISMATCH = ...;          // SC-CHK-0001
-    public static final CodeEntry CHECK_READS_DERIVATION = ...;    // SC-CHK-0002
-    public static final CodeEntry FOCUS_OUTSIDE = ...;             // SC-CHK-0003
-    public static final CodeEntry SCHEMA_VERSION = ...;            // SC-DOC-0001
-    public static final CodeEntry DOCUMENT_FIELD = ...;            // SC-DOC-0002
-    public static final CodeEntry DOCUMENT_FACTORY = ...;          // SC-DOC-0003
-    public static final CodeEntry DOCUMENT_DUPLICATE = ...;        // SC-DOC-0004
-    public static final CodeEntry PLACEMENT_OUTSIDE = ...;         // SC-DOC-0005
-    public static final CodeEntry BAY_UNRESOLVED = ...;            // SC-DOC-0006
-    public static final CodeEntry KEY_UNDECLARED = ...;            // SC-DOC-0007
-    public static final CodeEntry KEY_TYPE = ...;                  // SC-DOC-0008
-    public static final CodeEntry DEFINITION_CYCLE = ...;          // SC-DOC-0009
-    public static final CodeEntry DERIVE_DUPLICATE = ...;          // SC-DOC-0010
-    public static final CodeEntry DEFINITION_MISSING = ...;        // SC-DOC-0011
-    public static final CodeEntry NO_POSITIONS = ...;              // SC-DOC-0012
-    public static final CodeEntry READER_FAILED = ...;             // SC-DOC-0013
-    public static final CodeEntry COMPUTATION_FAILED = ...;        // SC-CTX-0001
-    public static final CodeEntry DERIVER_MISSING = ...;           // SC-CTX-0004
-    public static final CodeEntry DERIVER_FAILED = ...;            // SC-CTX-0005
-    public static final CodeEntry FOLD_REFUSED = ...;              // SC-CTX-0006
-    public static final CodeEntry KEY_ABSENT = ...;                // SC-CTX-0007
-    public static final CodeEntry BUDGET_EXHAUSTED = ...;          // SC-ENG-0001
-    public static final CodeEntry SNAPSHOT_STALE = ...;            // SC-ENG-0002
-    public static final CodeEntry DESIGN_DEFECT = ...;             // SC-ENG-0004
-    public static final CodeEntry CANCELLED = ...;                 // SC-ENG-0005
-    public static final CodeEntry BUNDLE_TRUNCATED = ...;          // SC-DIA-0001
-    public static final CodeEntry REMEDY_FAILED = ...;             // SC-RMD-0001
-    public static final CodeEntry REMEDY_MALFORMED = ...;          // SC-RMD-0002
-    public static final CodeEntry EXTENSION_FAILED = ...;          // SC-SPI-0001
-    public static final CodeEntry CATALOG_DUPLICATE = ...;         // SC-SPI-0003
-    public static final java.util.List<CodeEntry> ALL;
+    public static final CodeEntry locusUnmapped = ...;             // SC-SPC-0001
+    public static final CodeEntry cuboidOffLattice = ...;          // SC-SPC-0002
+    public static final CodeEntry unreadableCell = ...;            // SC-OCC-0001
+    public static final CodeEntry footprintClipped = ...;          // SC-OCC-0002
+    public static final CodeEntry nestedCut = ...;                 // SC-OCC-0003
+    public static final CodeEntry expected = ...;                  // SC-EXP-0001
+    public static final CodeEntry negationMatched = ...;           // SC-EXP-0002
+    public static final CodeEntry thresholdImpossible = ...;       // SC-EXP-0003
+    public static final CodeEntry factoryUnknown = ...;            // SC-EXP-0004
+    public static final CodeEntry factoryBad = ...;                // SC-EXP-0005
+    public static final CodeEntry claimConflict = ...;             // SC-CLM-0001
+    public static final CodeEntry ledgerUnavailable = ...;         // SC-CLM-0002
+    public static final CodeEntry ledgerMoved = ...;               // SC-CLM-0003
+    public static final CodeEntry bindingInvalid = ...;            // SC-CLM-0004
+    public static final CodeEntry boundEmpty = ...;                // SC-CLM-0005
+    public static final CodeEntry blueprintInvalid = ...;          // SC-BPT-0001
+    public static final CodeEntry baysOverlap = ...;               // SC-BPT-0002
+    public static final CodeEntry bayOutside = ...;                // SC-BPT-0003
+    public static final CodeEntry duplicateId = ...;               // SC-BPT-0004
+    public static final CodeEntry coverageInvalid = ...;           // SC-BPT-0005
+    public static final CodeEntry anchorInvalid = ...;             // SC-BPT-0006
+    public static final CodeEntry planInvalid = ...;               // SC-BPT-0007
+    public static final CodeEntry derivationInvalid = ...;         // SC-BPT-0008
+    public static final CodeEntry seamOutside = ...;               // SC-BPT-0009
+    public static final CodeEntry footprintOutside = ...;          // SC-BPT-0010
+    public static final CodeEntry subjectMismatch = ...;           // SC-CHK-0001
+    public static final CodeEntry checkReadsDerivation = ...;      // SC-CHK-0002
+    public static final CodeEntry focusOutside = ...;              // SC-CHK-0003
+    public static final CodeEntry schemaVersion = ...;             // SC-DOC-0001
+    public static final CodeEntry documentField = ...;             // SC-DOC-0002
+    public static final CodeEntry documentFactory = ...;           // SC-DOC-0003
+    public static final CodeEntry documentDuplicate = ...;         // SC-DOC-0004
+    public static final CodeEntry placementOutside = ...;          // SC-DOC-0005
+    public static final CodeEntry bayUnresolved = ...;             // SC-DOC-0006
+    public static final CodeEntry keyUndeclared = ...;             // SC-DOC-0007
+    public static final CodeEntry keyType = ...;                   // SC-DOC-0008
+    public static final CodeEntry definitionCycle = ...;           // SC-DOC-0009
+    public static final CodeEntry deriveDuplicate = ...;           // SC-DOC-0010
+    public static final CodeEntry definitionMissing = ...;         // SC-DOC-0011
+    public static final CodeEntry noPositions = ...;               // SC-DOC-0012
+    public static final CodeEntry readerFailed = ...;              // SC-DOC-0013
+    public static final CodeEntry computationFailed = ...;         // SC-CTX-0001
+    public static final CodeEntry deriverMissing = ...;            // SC-CTX-0004
+    public static final CodeEntry deriverFailed = ...;             // SC-CTX-0005
+    public static final CodeEntry foldRefused = ...;               // SC-CTX-0006
+    public static final CodeEntry keyAbsent = ...;                 // SC-CTX-0007
+    public static final CodeEntry budgetExhausted = ...;           // SC-ENG-0001
+    public static final CodeEntry snapshotStale = ...;             // SC-ENG-0002
+    public static final CodeEntry designDefect = ...;              // SC-ENG-0004
+    public static final CodeEntry cancelled = ...;                 // SC-ENG-0005
+    public static final CodeEntry bundleTruncated = ...;           // SC-DIA-0001
+    public static final CodeEntry remedyFailed = ...;              // SC-RMD-0001
+    public static final CodeEntry remedyMalformed = ...;           // SC-RMD-0002
+    public static final CodeEntry extensionFailed = ...;           // SC-SPI-0001
+    public static final CodeEntry catalogDuplicate = ...;          // SC-SPI-0003
+    public static final java.util.List<CodeEntry> all;
     private Codes() {}
 }
 ```
@@ -221,31 +224,33 @@ public final class Codes {
 ### 4.1 The code
 
 `SC-<FAMILY>-<NNNN>`, family one of the 13, number `1..9999` zero-padded. `parse` returns `null`
-for a malformed string; `text()` and `parse` are inverse on well-formed input. A code is allocated
-once and never reused, renumbered or re-pointed. A code's canonical severity and explanation live in
-its `CodeEntry`; a producer copies the severity. An unknown but well-formed code still constructs,
-orders and renders; the registry has no entry, so `explain` returns `null` and
-`explainOrFallback` synthesises the family text.
+for a malformed string; `text()` and `parse` are inverse on well-formed input. The `Family` constants
+are lowerCamel and each carries an explicit uppercase tag: `text()` renders that tag and `parse`
+accepts only an uppercase tag from the table, so the wire text stays `SC-SPC-0001`, never
+`SC-spc-0001`. A code is allocated once and never reused, renumbered or re-pointed. A code's canonical
+severity and explanation live in its `CodeEntry`; a producer copies the severity. An unknown but
+well-formed code still constructs, orders and renders; the registry has no entry, so `explain`
+returns `null` and `explainOrFallback` synthesises the family text.
 
 ### 4.2 Finding validation
 
 - `code`, `severity`, `phase`, `message` non-null; `message` non-blank after `strip()`.
-- at most one `PRIMARY` label; every label message non-blank; every note message non-blank.
-- a `KEY` locus carries no cells (enforced by `Locus`); a `DEFINITION` locus carries a source.
+- at most one `primary` label; every label message non-blank; every note message non-blank.
+- a `key` locus carries no cells (enforced by `Locus`); a `definition` locus carries a source.
 - `message` defaults to the primary label's message when it was not set; a finding with no primary
   label must set a message.
 - labels are sorted by `(role.rank, frame.rank, source.start or canonical first cell, insertion)`.
-  `frame.rank` is `DEFINITION 0, LOCAL 1, WORLD 2, KEY 3`. A `KEY` label sorts by insertion.
+  `frame.rank` is `definition 0, local 1, world 2, key 3`. A `key` label sorts by insertion.
 - The constructor throws `IllegalArgumentException` for a violated local rule. This is a producer
   bug; the engine guards extensions and converts it to `SC-SPI-0001`.
 
 ### 4.3 The bundle
 
-Builder order: stamp phase (already present), floor (`includeInfo=false` drops `INFO`), dedup by
+Builder order: stamp phase (already present), floor (`includeInfo=false` drops `info`), dedup by
 `(severity, phase, code, labels, notes)` keeping the first insertion, sort by
 `(severity.rank, phase.rank, code, primary locus, insertion)`, per-code cap and total cap over
-`WARNING`/`INFO` only, strip notes if `includeNotes=false`, append `SC-DIA-0001` when
-`elided + filtered > 0`. `ERROR` is never capped. A smaller cap yields a prefix of a larger one.
+`warning`/`info` only, strip notes if `includeNotes=false`, append `SC-DIA-0001` when
+`elided + filtered > 0`. `error` is never capped. A smaller cap yields a prefix of a larger one.
 `filter` re-applies floors/caps against the stored findings and counts what this narrowing dropped.
 `primary()` is `findings().get(0)` or null.
 
@@ -255,25 +260,30 @@ and ANDs the booleans; a sink can narrow but never widen.
 ### 4.4 Rendering
 
 `human` is rustc-shaped: `severity[code]: message`, a `-->` line for the primary word/local frame, a
-source frame with carets when a `DEFINITION` label has a `SourceText`, one `= frame ...` line per
+source frame with carets when a `definition` label has a `SourceText`, one `= frame ...` line per
 local/world label, `= note:` and `= help:` lines, a blank line between findings, and a
 `= N elided, M filtered` trailer. It never fabricates a source line. `json` is one object per
 finding; the schema is versioned additive with `schema`, `findings`, `elided`, `filtered`; fields are
 `code`, `severity`, `phase`, `message`, `labels` (role, frame, cells, source, message), `notes`,
-`suggestion`. Both are pure functions of `(bundle, context)`; they never reorder or filter.
+`suggestion`. `json` writes `wireName()` for `severity`, `phase`, label `role`, locus `frame` and
+suggestion `applicability`, and the `SC-*` text for `code`; the serialized tags stay
+`ERROR`/`WARNING`/`INFO`, `COMPILE`/`CHECK`/`SETTLE`, `PRIMARY`/`SECONDARY`/`CONTEXT`,
+`DEFINITION`/`LOCAL`/`WORLD`/`KEY` and
+`MACHINE_APPLICABLE`/`MAYBE_INCORRECT`/`HAS_PLACEHOLDERS`/`UNSPECIFIED`, never the lowerCamel
+constant names. Both are pure functions of `(bundle, context)`; they never reorder or filter.
 
 ### 4.5 Explanations
 
 `CodeEntry.explanation` is one `Explanation` per shipped code: a one-sentence summary, a body that
 says what triggers the code and what to check, and `seeAlso` topic ids (never code text). The
-registry is `Codes.ALL`; `Catalogs.codes()` is its frozen catalog; `StructureKernel.explain` looks
+registry is `Codes.all`; `Catalogs.codes()` is its frozen catalog; `StructureKernel.explain` looks
 up by code. A missing entry is legal for an addon code; `explainOrFallback` synthesises
 `no explanation is registered for SC-…` plus the family subject.
 
 ## 5. Pipeline role
 
-Findings are produced in all three phases. `COMPILE` findings carry a `DEFINITION` primary with a
-source span when the document has one; `CHECK`/`SETTLE` findings carry `LOCAL`/`WORLD`/`KEY` labels.
+Findings are produced in all three phases. `compile` findings carry a `definition` primary with a
+source span when the document has one; `check`/`settle` findings carry `local`/`world`/`key` labels.
 The engine collects a bundle; it never renders. `FindingBundle` is the only aggregator.
 
 ## 6. Code producers
@@ -341,8 +351,10 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 
 ## 7. Tests
 
-- Code parse/text round-trip; malformed parse returns null; `Codes.ALL` has one entry per code and
-  every entry has an explanation; every code in `ALL` appears in the producer table.
+- Code parse/text round-trip; malformed parse returns null; `Codes.all` has one entry per code and
+  every entry has an explanation; every code in `all` appears in the producer table.
+- Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`
+  round-trip `SC-<TAG>-<NNNN>`, and the JSON renderer emits tags rather than constant names.
 - Finding builder: primary label requirement, message defaulting, label sort, blank rejection.
 - Bundle: dedup, order, caps (errors uncapped), truncation note, idempotent build, filter prefixes.
 - Renderers: golden human text for a door/finding; JSON schema fields; no fabricated source line.

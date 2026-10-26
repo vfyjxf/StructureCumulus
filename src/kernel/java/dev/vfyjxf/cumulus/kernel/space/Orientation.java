@@ -10,19 +10,19 @@ import java.util.Map;
 /** One of the 48 signed axis permutations. */
 public record Orientation(int ordinal) implements Comparable<Orientation> {
 
-    public static final Orientation IDENTITY = new Orientation(0);
+    public static final Orientation identity = new Orientation(0);
 
-    private static final int[][][] MATRICES = new int[48][][];
-    private static final Turn[] TURNS = new Turn[48];
-    private static final Tilt[] TILTS = new Tilt[48];
-    private static final boolean[] MIRRORS = new boolean[48];
-    private static final Map<String, Integer> ORDINALS = new HashMap<>();
-    private static final List<Orientation> ALL;
+    private static final int[][][] matrices = new int[48][][];
+    private static final Turn[] turns = new Turn[48];
+    private static final Tilt[] tilts = new Tilt[48];
+    private static final boolean[] mirrors = new boolean[48];
+    private static final Map<String, Integer> ordinals = new HashMap<>();
+    private static final List<Orientation> orientations;
 
     static {
         List<Orientation> all = new ArrayList<>(48);
         int[][] identity = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-        int[][] frontBack = Flip.FRONT_BACK.matrix();
+        int[][] frontBack = Flip.frontBack.matrix();
         for (int turn = 0; turn < 4; turn++) {
             for (int tilt = 0; tilt < 6; tilt++) {
                 for (int parity = 0; parity < 2; parity++) {
@@ -31,16 +31,16 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
                         Turn.values()[turn].matrix(),
                         multiply(Tilt.values()[tilt].matrix(), parity == 0 ? identity : frontBack)
                     );
-                    MATRICES[ordinal] = matrix;
-                    TURNS[ordinal] = Turn.values()[turn];
-                    TILTS[ordinal] = Tilt.values()[tilt];
-                    MIRRORS[ordinal] = determinant(matrix) < 0;
-                    ORDINALS.put(key(matrix), ordinal);
+                    matrices[ordinal] = matrix;
+                    turns[ordinal] = Turn.values()[turn];
+                    tilts[ordinal] = Tilt.values()[tilt];
+                    mirrors[ordinal] = determinant(matrix) < 0;
+                    ordinals.put(key(matrix), ordinal);
                     all.add(new Orientation(ordinal));
                 }
             }
         }
-        ALL = List.copyOf(all);
+        orientations = List.copyOf(all);
     }
 
     public Orientation {
@@ -51,7 +51,7 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
 
     public static Orientation of(Turn turn, Tilt tilt, Flip flip) {
         int[][] matrix = multiply(turn.matrix(), multiply(tilt.matrix(), flip.matrix()));
-        Integer ordinal = ORDINALS.get(key(matrix));
+        Integer ordinal = ordinals.get(key(matrix));
         if (ordinal == null) {
             throw new IllegalStateException("generator triple is not an orientation");
         }
@@ -59,12 +59,12 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
     }
 
     public static List<Orientation> all() {
-        return ALL;
+        return orientations;
     }
 
     public Orientation compose(Orientation other) {
-        int[][] matrix = multiply(MATRICES[ordinal], MATRICES[other.ordinal]);
-        Integer result = ORDINALS.get(key(matrix));
+        int[][] matrix = multiply(matrices[ordinal], matrices[other.ordinal]);
+        Integer result = ordinals.get(key(matrix));
         if (result == null) {
             throw new IllegalStateException("composition left the group");
         }
@@ -72,8 +72,8 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
     }
 
     public Orientation inverse() {
-        int[][] inverse = transpose(MATRICES[ordinal]);
-        Integer result = ORDINALS.get(key(inverse));
+        int[][] inverse = transpose(matrices[ordinal]);
+        Integer result = ordinals.get(key(inverse));
         if (result == null) {
             throw new IllegalStateException("inverse left the group");
         }
@@ -96,7 +96,7 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
     public @Nullable Cuboid apply(Cuboid cuboid) {
         int[] lo = new int[3];
         int[] hi = new int[3];
-        int[][] matrix = MATRICES[ordinal];
+        int[][] matrix = matrices[ordinal];
         for (int axis = 0; axis < 3; axis++) {
             int source = -1;
             int sign = 0;
@@ -138,19 +138,19 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
     }
 
     public Turn turn() {
-        return TURNS[ordinal];
+        return turns[ordinal];
     }
 
     public Tilt tilt() {
-        return TILTS[ordinal];
+        return tilts[ordinal];
     }
 
     public boolean isMirror() {
-        return MIRRORS[ordinal];
+        return mirrors[ordinal];
     }
 
     private int[] applyVector(int x, int y, int z) {
-        int[][] matrix = MATRICES[ordinal];
+        int[][] matrix = matrices[ordinal];
         int[] result = new int[3];
         for (int axis = 0; axis < 3; axis++) {
             result[axis] = matrix[axis][0] * x + matrix[axis][1] * y + matrix[axis][2] * z;

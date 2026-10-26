@@ -17,10 +17,10 @@ public record RenderContext(
     Locale locale
 ) {
 
-    private static final int DEFAULT_WIDTH = 100;
+    private static final int defaultWidth = 100;
 
     public enum ColorMode {
-        PLAIN, ANSI
+        plain, ansi
     }
 
     public RenderContext {
@@ -32,12 +32,12 @@ public record RenderContext(
     }
 
     public static RenderContext plain() {
-        return new RenderContext(List.of(), null, DEFAULT_WIDTH, ColorMode.PLAIN, Locale.ROOT);
+        return new RenderContext(List.of(), null, defaultWidth, ColorMode.plain, Locale.ROOT);
     }
 
     public static RenderContext of(SourceText source) {
         Checks.checkNotNull(source, "source");
-        return new RenderContext(List.of(source), source.id(), DEFAULT_WIDTH, ColorMode.PLAIN, Locale.ROOT);
+        return new RenderContext(List.of(source), source.id(), defaultWidth, ColorMode.plain, Locale.ROOT);
     }
 
     public @Nullable SourceText sourceFor(NamespacedId id) {

@@ -48,11 +48,11 @@ import java.util.TreeSet;
 
 final class TestWorld {
 
-    static final World WORLD = World.of(NamespacedId.of("test", "overworld"));
-    static final SnapshotId SNAPSHOT = new SnapshotId(WORLD, 1);
-    static final NamespacedId STONE = NamespacedId.of("minecraft", "stone_bricks");
-    static final NamespacedId CAMPFIRE = NamespacedId.of("minecraft", "campfire");
-    static final NamespacedId DOOR = NamespacedId.of("minecraft", "oak_door");
+    static final World world = World.of(NamespacedId.of("test", "overworld"));
+    static final SnapshotId snapshot = new SnapshotId(world, 1);
+    static final NamespacedId stone = NamespacedId.of("minecraft", "stone_bricks");
+    static final NamespacedId campfire = NamespacedId.of("minecraft", "campfire");
+    static final NamespacedId door = NamespacedId.of("minecraft", "oak_door");
 
     private TestWorld() {}
 
@@ -66,13 +66,13 @@ final class TestWorld {
         Map<String, String> properties,
         List<Trait<?>> traits
     ) {
-        OccupantRef ref = new OccupantRef(SNAPSHOT, 0, type, OccupantKind.BLOCK, cell);
-        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.BLOCK, properties, List.of());
+        OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.block, cell);
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.block, properties, List.of());
         return new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), traits);
     }
 
     static OccupantSnapshot airOccupant(LatticePoint cell) {
-        return OccupantSnapshot.air(SNAPSHOT, 0, cell);
+        return OccupantSnapshot.air(snapshot, 0, cell);
     }
 
     static final class View implements WorldView {
@@ -109,7 +109,7 @@ final class TestWorld {
 
         @Override
         public SnapshotId snapshotId() {
-            return SNAPSHOT;
+            return snapshot;
         }
 
         @Override
@@ -124,7 +124,7 @@ final class TestWorld {
 
         @Override
         public LatticePoint origin() {
-            return LatticePoint.ORIGIN;
+            return LatticePoint.origin;
         }
 
         @Override
@@ -139,16 +139,16 @@ final class TestWorld {
 
         @Override
         public SectionKey sectionOf(LatticePoint cell) {
-            return SectionKey.of(WORLD, 0, cell, sectionSize);
+            return SectionKey.of(world, 0, cell, sectionSize);
         }
 
         @Override
         public SectionSlot slot(SectionKey key) {
             if (refusedSections.contains(key)) {
-                return new SectionSlot.Refused(ReadStatus.NOT_CAPTURED, FindingCode.of(FindingCode.Family.OCC, 3));
+                return new SectionSlot.Refused(ReadStatus.notCaptured, FindingCode.of(FindingCode.Family.occ, 3));
             }
-            if (!key.world().equals(WORLD) || key.frame() != 0) {
-                return new SectionSlot.Refused(ReadStatus.OUT_OF_BOUNDS, FindingCode.of(FindingCode.Family.OCC, 3));
+            if (!key.world().equals(world) || key.frame() != 0) {
+                return new SectionSlot.Refused(ReadStatus.outOfBounds, FindingCode.of(FindingCode.Family.occ, 3));
             }
             Map<LatticePoint, OccupantSnapshot> slice = new LinkedHashMap<>();
             for (Map.Entry<LatticePoint, OccupantSnapshot> entry : occupants.entrySet()) {
@@ -172,7 +172,7 @@ final class TestWorld {
 
         @Override
         public @Nullable OccupantSnapshot occupant(OccupantRef ref) {
-            if (!ref.snapshot().equals(SNAPSHOT) || ref.frame() != 0) {
+            if (!ref.snapshot().equals(snapshot) || ref.frame() != 0) {
                 return null;
             }
             OccupantSnapshot candidate = occupants.get(ref.anchor());
@@ -216,7 +216,7 @@ final class TestWorld {
 
         @Override
         public SnapshotId id() {
-            return SNAPSHOT;
+            return snapshot;
         }
 
         @Override
@@ -242,7 +242,7 @@ final class TestWorld {
 
         @Override
         public World world() {
-            return WORLD;
+            return world;
         }
 
         @Override
@@ -262,7 +262,7 @@ final class TestWorld {
                             List.of(incumbent),
                             FindingBundle.of(
                                 List.of(
-                                    Finding.builder(Codes.CLAIM_CONFLICT).phase(Phase.SETTLE).message("test conflict")
+                                    Finding.builder(Codes.claimConflict).phase(Phase.settle).message("test conflict")
                                             .label(
                                                 Label.primary(
                                                     Locus.world(Cuboid.of(incumbent.cell().point()).asSet()),
@@ -318,7 +318,7 @@ final class TestWorld {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {
                         LatticePoint cell = LatticePoint.of(x, y, z);
-                        map.put(cell, block(STONE, cell));
+                        map.put(cell, block(stone, cell));
                     }
                 }
             }

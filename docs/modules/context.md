@@ -90,7 +90,7 @@ not runtime values).
 `publish(instance, values, findings, spend)`:
 
 1. Read the current context; the new revision is `current.revision() + 1`.
-2. Reject a key with `Retention.MATCH` in `values` (`IllegalArgumentException`): only `INSTANCE`
+2. Reject a key with `Retention.match` in `values` (`IllegalArgumentException`): only `instance`
    values are published.
 3. Merge: every entry in `values` replaces the current entry; keys not mentioned keep their old
    value. A published `null` is not representable; absence is the absence of an entry.
@@ -100,7 +100,7 @@ not runtime values).
 
 `publish` is total and single-writer: the engine publishes at most once per settle and once per
 derive, both on the server thread, and the host serialises them per instance. A concurrent publish
-is a host contract violation, not a kernel outcome. A successful `settle` publishes the `INSTANCE`
+is a host contract violation, not a kernel outcome. A successful `settle` publishes the `instance`
 values once; a `derive` publishes its own batch once at `revision + 1`. There is no base-revision CAS
 and no stale-publish finding.
 
@@ -112,8 +112,8 @@ derivers run in `(order, id)` order; each sees the context published by the sett
 produced earlier in the same derive pass. A `Deriver.requires` key must be present or the deriver is
 skipped with `SC-CTX-0007`; a `Missing` return makes the output absent and adds the deriver's own
 findings, or `SC-CTX-0005` if it reported none. All `Found` values of one derive pass are published
-in one `ContextStore.publish`; a `MATCH` key produced by a deriver is rejected with `SC-CTX-0005`
-(only `INSTANCE` values are persisted). A derive pass publishes one revision, never a partial batch.
+in one `ContextStore.publish`; a `match` key produced by a deriver is rejected with `SC-CTX-0005`
+(only `instance` values are persisted). A derive pass publishes one revision, never a partial batch.
 
 A deriver has no world view and no lease: it reads `DeriveContext` (the base context) only. A
 deriver that needs the world must be a computation, not a deriver. `DerivationSpec.arguments` is
@@ -130,17 +130,17 @@ this list. The engine owns the fold; the merge only combines two values.
 
 | Retention | Where the value goes | Read by | Persisted |
 | --- | --- | --- | --- |
-| `MATCH` | `MatchOutcome.values` | later checks/aggregates of the same attempt | no |
-| `INSTANCE` | `StructureContext` after a successful settle/derive | checks, derivers, remedies, host | yes, by the host |
+| `match` | `MatchOutcome.values` | later checks/aggregates of the same attempt | no |
+| `instance` | `StructureContext` after a successful settle/derive | checks, derivers, remedies, host | yes, by the host |
 
 There is no `ATTEMPT`, no `OUTCOME`, no tier and no frame. A value that is only needed for a
-diagnostic is a `MATCH` value; a value the instance keeps is `INSTANCE`.
+diagnostic is a `match` value; a value the instance keeps is `instance`.
 
 ## 5. Pipeline role
 
 - `check`: the engine folds section contributions and runs aggregates into a local value map;
-  `Retention.MATCH` values stay in the outcome; `INSTANCE` values are carried but not published.
-- `settle`: after `Settled`, publish the `INSTANCE` values once; `Formed.contextRevision` is the new
+  `Retention.match` values stay in the outcome; `instance` values are carried but not published.
+- `settle`: after `Settled`, publish the `instance` values once; `Formed.contextRevision` is the new
   revision.
 - `derive`: run derivers over the formed context; publish one batch; return the new
   `StructureContext`.
@@ -157,7 +157,7 @@ and `engine.derive`.
 ## 7. Tests
 
 - `StructureContext`: sorted keys, typed get/require, empty, immutability.
-- Publish: merge semantics, revision growth, `MATCH` rejection, cumulative spend, latest findings,
+- Publish: merge semantics, revision growth, `match` rejection, cumulative spend, latest findings,
   one writer per instance.
 - Derive: order, requires, missing deriver, stale base, one batch, no partial publish.
 - Merges: associativity for each built-in; `union` canonical.

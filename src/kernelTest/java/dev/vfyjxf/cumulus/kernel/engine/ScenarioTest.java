@@ -58,6 +58,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,9 +68,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScenarioTest {
 
-    private static final Siting AT_ORIGIN = Siting.of(LatticePoint.ORIGIN, Orientation.IDENTITY);
-    private static final OwnerId OWNER = OwnerId.of(id("owner"));
-    private static final InstanceId INSTANCE = new InstanceId(TestWorld.WORLD, 1);
+    private static final Siting atOrigin = Siting.of(LatticePoint.origin, Orientation.identity);
+    private static final OwnerId owner = OwnerId.of(id("owner"));
+    private static final InstanceId instance = new InstanceId(TestWorld.world, 1);
 
     private static NamespacedId id(String path) {
         return NamespacedId.of("test", path);
@@ -83,24 +84,24 @@ class ScenarioTest {
     void campfireChecksSettlesAndDerives() {
         CuboidSet shellCells = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(Cuboid.of(1, 1, 1, 2, 2, 2))
                 .subtract(Cuboid.of(1, 0, 1, 2, 1, 2));
-        Bay shell = Bay.of(id("shell"), shellCells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Bay shell = Bay.of(id("shell"), shellCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Bay hollow = Bay.of(
             id("hollow"),
             CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)),
-            Coverage.EVERY_CELL,
+            Coverage.everyCell,
             Footprint.box(),
-            Sharing.EXCLUSIVE
+            Sharing.exclusive
         );
         Bay fire = Bay.of(
             id("fire"),
             CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2)),
-            Coverage.EVERY_CELL,
+            Coverage.everyCell,
             Footprint.box(),
-            Sharing.EXCLUSIVE
+            Sharing.exclusive
         );
 
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.INSTANCE, Merges.sum(), null);
-        ContextKey<Long> capacity = ContextKeys.of(id("capacity"), Long.class, Retention.INSTANCE);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> capacity = ContextKeys.of(id("capacity"), Long.class, Retention.instance);
         DerivationSpec capacitySpec = new DerivationSpec(id("capacity_deriver"), Value.object(), capacity.id(), 0);
 
         Blueprint campfire = Blueprint.builder(id("campfire")).bounds(Cuboid.of(0, 0, 0, 3, 3, 3))
@@ -109,7 +110,7 @@ class ScenarioTest {
                         id("shell_bricks"),
                         shell,
                         Focuses.bay(),
-                        Expectations.eachCell(Expectations.block(TestWorld.STONE))
+                        Expectations.eachCell(Expectations.block(TestWorld.stone))
                     )
                 ).check(Check.of(id("hollow_air"), hollow, Focuses.bay(), Expectations.eachCell(Expectations.air())))
                 .check(
@@ -117,7 +118,7 @@ class ScenarioTest {
                         id("lit"),
                         fire,
                         Focuses.occupant(LatticePoint.of(1, 0, 1)),
-                        Expectations.allOf(Expectations.block(TestWorld.CAMPFIRE), Expectations.property("lit", "true"))
+                        Expectations.allOf(Expectations.block(TestWorld.campfire), Expectations.property("lit", "true"))
                     )
                 ).computation(Computations.air(air, hollow.cells())).derive(capacitySpec).build();
 
@@ -126,11 +127,11 @@ class ScenarioTest {
             view.put(entry.getValue());
         }
         view.air(LatticePoint.of(1, 1, 1));
-        view.put(TestWorld.block(TestWorld.CAMPFIRE, LatticePoint.of(1, 0, 1), Map.of("lit", "true"), List.of()));
+        view.put(TestWorld.block(TestWorld.campfire, LatticePoint.of(1, 0, 1), Map.of("lit", "true"), List.of()));
         TestWorld.Lease lease = new TestWorld.Lease(view);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest
-                .of(campfire, AT_ORIGIN, lease, INSTANCE, OWNER, Budget.unbounded(), new ClaimView(List.of(), 0, true));
+                .of(campfire, atOrigin, lease, instance, owner, Budget.unbounded(), new ClaimView(List.of(), 0, true));
 
         MatchResult checked = MatchEngine.check(request);
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, checked);
@@ -177,31 +178,24 @@ class ScenarioTest {
     @Test
     void doorOwnsExactlyItsBoundCells() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(3, 0, 0, 4, 1, 1), Cuboid.of(3, 1, 0, 4, 2, 1));
-        Bay bay = Bay.of(id("door"), cells, Coverage.ONE_SUBJECT, Footprint.bound(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("door"), cells, Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
         Check<?> check = Check.of(
             id("oak_door"),
             bay,
             Focuses.door(LatticePoint.of(3, 0, 0)),
             Expectations.custom(
                 DoorView.class,
-                ExpectationMeta.of(id("door_test"), 10, FindingCode.of(FindingCode.Family.EXP, 1)),
+                ExpectationMeta.of(id("door_test"), 10, FindingCode.of(FindingCode.Family.exp, 1)),
                 ctx -> Reply.match()
             )
         );
         Blueprint blueprint = Blueprint.builder(id("door")).bounds(Cuboid.of(0, 0, 0, 8, 4, 8)).check(check).build();
-        TestWorld.View view = new TestWorld.View().put(TestWorld.block(TestWorld.DOOR, LatticePoint.of(3, 0, 0)))
-                .put(TestWorld.block(TestWorld.DOOR, LatticePoint.of(3, 1, 0)));
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(TestWorld.door, LatticePoint.of(3, 0, 0)))
+                .put(TestWorld.block(TestWorld.door, LatticePoint.of(3, 1, 0)));
         TestWorld.Lease lease = new TestWorld.Lease(view);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
-        MatchRequest request = MatchRequest.of(
-            blueprint,
-            AT_ORIGIN,
-            lease,
-            INSTANCE,
-            OWNER,
-            Budget.unbounded(),
-            new ClaimView(List.of(), 0, true)
-        );
+        MatchRequest request = MatchRequest
+                .of(blueprint, atOrigin, lease, instance, owner, Budget.unbounded(), new ClaimView(List.of(), 0, true));
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
@@ -216,9 +210,9 @@ class ScenarioTest {
         Focus<OccupantSnapshot> focus = new Focus<>() {
             @Override
             public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
-                OccupantSnapshot occupant = ctx.occupantAt(LatticePoint.ORIGIN);
+                OccupantSnapshot occupant = ctx.occupantAt(LatticePoint.origin);
                 if (occupant == null || occupant.isAir()) {
-                    Finding finding = Finding.builder(Codes.UNREADABLE_CELL).phase(Phase.CHECK).message("no hatch")
+                    Finding finding = Finding.builder(Codes.unreadableCell).phase(Phase.check).message("no hatch")
                             .label(Label.primary(ctx.locus(), "no hatch")).build();
                     return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
                 }
@@ -235,20 +229,20 @@ class ScenarioTest {
                 return CuboidSet.empty();
             }
         };
-        Bay shared = Bay.of(id("hatch"), cell, Coverage.ANY_SUBJECT, Footprint.bound(), Sharing.SHARED);
+        Bay shared = Bay.of(id("hatch"), cell, Coverage.anySubject, Footprint.bound(), Sharing.shared);
         Blueprint sharedBlueprint = Blueprint.builder(id("shared_hatch"))
                 .bounds(
-                    java.util.Objects.requireNonNull(cell.bounds(), "bounds")
-                            .bounding(java.util.Objects.requireNonNull(cell.bounds(), "bounds"))
+                    Objects.requireNonNull(cell.bounds(), "bounds")
+                            .bounding(Objects.requireNonNull(cell.bounds(), "bounds"))
                 ).check(Check.of(id("hatch"), shared, focus, Expectations.anyOccupant())).build();
-        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.ORIGIN));
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.origin));
         TestWorld.Lease lease = new TestWorld.Lease(view);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest first = MatchRequest.of(
             sharedBlueprint,
-            AT_ORIGIN,
+            atOrigin,
             lease,
-            INSTANCE,
+            instance,
             OwnerId.of(id("a")),
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
@@ -266,9 +260,9 @@ class ScenarioTest {
 
         MatchRequest second = MatchRequest.of(
             sharedBlueprint,
-            AT_ORIGIN,
+            atOrigin,
             lease,
-            new InstanceId(TestWorld.WORLD, 2),
+            new InstanceId(TestWorld.world, 2),
             OwnerId.of(id("b")),
             Budget.unbounded(),
             ledger.read(cell.bounds())
@@ -284,43 +278,42 @@ class ScenarioTest {
         );
         assertEquals(2, ledger.all().size());
 
-        Bay exclusive = Bay.of(id("hatch"), cell, Coverage.ANY_SUBJECT, Footprint.bound(), Sharing.EXCLUSIVE);
+        Bay exclusive = Bay.of(id("hatch"), cell, Coverage.anySubject, Footprint.bound(), Sharing.exclusive);
         Blueprint exclusiveBlueprint = Blueprint.builder(id("exclusive_hatch"))
                 .bounds(
-                    java.util.Objects.requireNonNull(cell.bounds(), "bounds")
-                            .bounding(java.util.Objects.requireNonNull(cell.bounds(), "bounds"))
+                    Objects.requireNonNull(cell.bounds(), "bounds")
+                            .bounding(Objects.requireNonNull(cell.bounds(), "bounds"))
                 ).check(Check.of(id("hatch"), exclusive, focus, Expectations.anyOccupant())).build();
         MatchRequest third = MatchRequest.of(
             exclusiveBlueprint,
-            AT_ORIGIN,
+            atOrigin,
             lease,
-            new InstanceId(TestWorld.WORLD, 3),
+            new InstanceId(TestWorld.world, 3),
             OwnerId.of(id("c")),
             Budget.unbounded(),
             ledger.read(cell.bounds())
         );
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, MatchEngine.check(third));
         assertTrue(
-            failed.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.CLAIM_CONFLICT.code()))
+            failed.findings().findings().stream().anyMatch(finding -> finding.code().equals(Codes.claimConflict.code()))
         );
     }
 
     @Test
     void staleLeaseDropsAndTinyBudgetUndecides() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Blueprint blueprint = Blueprint.builder(id("one")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.air())).build();
-        TestWorld.View view = new TestWorld.View().air(LatticePoint.ORIGIN);
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air())).build();
+        TestWorld.View view = new TestWorld.View().air(LatticePoint.origin);
         TestWorld.Lease lease = new TestWorld.Lease(view);
         MatchRequest request = MatchRequest
-                .of(blueprint, AT_ORIGIN, lease, INSTANCE, OWNER, Budget.of(0, 0), new ClaimView(List.of(), 0, true));
+                .of(blueprint, atOrigin, lease, instance, owner, Budget.of(0, 0), new ClaimView(List.of(), 0, true));
         MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, MatchEngine.check(request));
-        assertEquals(UndecidedReason.BUDGET_EXHAUSTED, undecided.reason());
+        assertEquals(UndecidedReason.budgetExhausted, undecided.reason());
         assertTrue(
             undecided.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.BUDGET_EXHAUSTED.code()))
+                    .anyMatch(finding -> finding.code().equals(Codes.budgetExhausted.code()))
         );
         lease.invalidate();
         assertInstanceOf(MatchResult.Dropped.class, MatchEngine.check(request));
@@ -329,36 +322,36 @@ class ScenarioTest {
     @Test
     void doorWithOneHalfIsUndecided() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(3, 0, 0, 4, 1, 1), Cuboid.of(3, 1, 0, 4, 2, 1));
-        Bay bay = Bay.of(id("door"), cells, Coverage.ONE_SUBJECT, Footprint.bound(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("door"), cells, Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
         Check<?> check = Check.of(
             id("oak_door"),
             bay,
             Focuses.door(LatticePoint.of(3, 0, 0)),
             Expectations.custom(
                 DoorView.class,
-                ExpectationMeta.of(id("door_test"), 10, FindingCode.of(FindingCode.Family.EXP, 1)),
+                ExpectationMeta.of(id("door_test"), 10, FindingCode.of(FindingCode.Family.exp, 1)),
                 ctx -> Reply.match()
             )
         );
         Blueprint blueprint = Blueprint.builder(id("door")).bounds(Cuboid.of(0, 0, 0, 8, 4, 8)).check(check).build();
-        TestWorld.View view = new TestWorld.View().put(TestWorld.block(TestWorld.DOOR, LatticePoint.of(3, 0, 0)));
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(TestWorld.door, LatticePoint.of(3, 0, 0)));
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
         MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, MatchEngine.check(request));
-        assertEquals(UndecidedReason.UNREADABLE, undecided.reason());
+        assertEquals(UndecidedReason.unreadable, undecided.reason());
     }
 
     @Test
     void pipeCornerAssertsEightAndOwnsFour() {
         CuboidSet corner = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 2, 2));
-        Bay bay = Bay.of(id("corner"), corner, Coverage.EVERY_CELL, Footprint.bound(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("corner"), corner, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
         TestWorld.View view = new TestWorld.View();
         List<Check<?>> checks = new ArrayList<>();
         for (LatticePoint cell : List.of(
@@ -385,10 +378,10 @@ class ScenarioTest {
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
@@ -407,13 +400,13 @@ class ScenarioTest {
     @Test
     void entityPenOwnsItsBoundFootprint() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
-        Bay bay = Bay.of(id("pen"), cells, Coverage.ANY_SUBJECT, Footprint.bound(), Sharing.SHARED);
+        Bay bay = Bay.of(id("pen"), cells, Coverage.anySubject, Footprint.bound(), Sharing.shared);
         Focus<OccupantSnapshot> entityFocus = new Focus<>() {
             @Override
             public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
-                OccupantSnapshot occupant = ctx.occupantAt(LatticePoint.ORIGIN);
+                OccupantSnapshot occupant = ctx.occupantAt(LatticePoint.origin);
                 if (occupant == null || occupant.isAir()) {
-                    Finding finding = Finding.builder(Codes.UNREADABLE_CELL).phase(Phase.CHECK).message("no entity")
+                    Finding finding = Finding.builder(Codes.unreadableCell).phase(Phase.check).message("no entity")
                             .label(Label.primary(ctx.locus(), "no entity")).build();
                     return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
                 }
@@ -432,10 +425,10 @@ class ScenarioTest {
         };
         Blueprint blueprint = Blueprint.builder(id("pen")).bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
                 .check(Check.of(id("cow"), bay, entityFocus, Expectations.anyOccupant())).build();
-        OccupantRef ref = new OccupantRef(TestWorld.SNAPSHOT, 0, mc("cow"), OccupantKind.ENTITY, LatticePoint.ORIGIN);
+        OccupantRef ref = new OccupantRef(TestWorld.snapshot, 0, mc("cow"), OccupantKind.entity, LatticePoint.origin);
         OccupantSnapshot cow = new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(mc("cow"), OccupantKind.ENTITY, Map.of(), List.of()),
+            new OccupantDescriptor(mc("cow"), OccupantKind.entity, Map.of(), List.of()),
             Cuboid.of(0, 0, 0, 2, 1, 1),
             List.of()
         );
@@ -443,10 +436,10 @@ class ScenarioTest {
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
@@ -465,26 +458,26 @@ class ScenarioTest {
     @Test
     void refusedCellMakesTheAttemptUndecided() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.INSTANCE, Merges.sum(), null);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
         Blueprint blueprint = Blueprint.builder(id("refused")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.air()))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))
                 .computation(Computations.air(air, cells)).build();
-        TestWorld.View view = new TestWorld.View().refuse(LatticePoint.ORIGIN);
+        TestWorld.View view = new TestWorld.View().refuse(LatticePoint.origin);
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
         MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, MatchEngine.check(request));
-        assertEquals(UndecidedReason.UNREADABLE, undecided.reason());
+        assertEquals(UndecidedReason.unreadable, undecided.reason());
         assertTrue(
             undecided.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.UNREADABLE_CELL.code()))
+                    .anyMatch(finding -> finding.code().equals(Codes.unreadableCell.code()))
         );
     }
 
@@ -494,9 +487,9 @@ class ScenarioTest {
         Focus<OccupantSnapshot> focus = new Focus<>() {
             @Override
             public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
-                OccupantSnapshot occupant = ctx.occupantAt(LatticePoint.ORIGIN);
+                OccupantSnapshot occupant = ctx.occupantAt(LatticePoint.origin);
                 if (occupant == null || occupant.isAir()) {
-                    Finding finding = Finding.builder(Codes.UNREADABLE_CELL).phase(Phase.CHECK).message("no hatch")
+                    Finding finding = Finding.builder(Codes.unreadableCell).phase(Phase.check).message("no hatch")
                             .label(Label.primary(ctx.locus(), "no hatch")).build();
                     return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
                 }
@@ -513,16 +506,16 @@ class ScenarioTest {
                 return CuboidSet.empty();
             }
         };
-        Bay hatch = Bay.of(id("hatch"), cell, Coverage.ANY_SUBJECT, Footprint.bound(), Sharing.SHARED);
+        Bay hatch = Bay.of(id("hatch"), cell, Coverage.anySubject, Footprint.bound(), Sharing.shared);
         Blueprint blueprint = Blueprint.builder(id("hatch")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
                 .check(Check.of(id("hatch"), hatch, focus, Expectations.anyOccupant())).build();
-        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.ORIGIN));
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.origin));
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest a = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
+            instance,
             OwnerId.of(id("a")),
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
@@ -530,9 +523,9 @@ class ScenarioTest {
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(a));
         MatchRequest b = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            new InstanceId(TestWorld.WORLD, 2),
+            new InstanceId(TestWorld.world, 2),
             OwnerId.of(id("b")),
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
@@ -561,13 +554,13 @@ class ScenarioTest {
         CuboidSet cavityCells = CuboidSet.of(Cuboid.of(1, 1, 1, 6, 5, 6));
         CuboidSet mouthCells = CuboidSet.of(Cuboid.of(3, 1, 0, 4, 3, 1));
         CuboidSet wallCells = bounds.subtract(cavityCells).subtract(mouthCells);
-        Bay wall = Bay.of(id("wall"), wallCells, Coverage.EVERY_CELL, Footprint.bound(), Sharing.EXCLUSIVE);
-        Bay cavity = Bay.of(id("cavity"), cavityCells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
-        Bay mouth = Bay.of(id("mouth"), mouthCells, Coverage.ONE_SUBJECT, Footprint.bound(), Sharing.EXCLUSIVE);
+        Bay wall = Bay.of(id("wall"), wallCells, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Bay cavity = Bay.of(id("cavity"), cavityCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay mouth = Bay.of(id("mouth"), mouthCells, Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
         ContextKey<Long> volume = ContextKeys
-                .of(id("cavity_volume"), Long.class, Retention.INSTANCE, Merges.sum(), null);
+                .of(id("cavity_volume"), Long.class, Retention.instance, Merges.sum(), null);
         Blueprint blueprint = Blueprint.builder(id("furnace")).bounds(Cuboid.of(0, 0, 0, 7, 6, 7)).check(
-            Check.of(id("wall_bricks"), wall, Focuses.bay(), Expectations.eachCell(Expectations.block(TestWorld.STONE)))
+            Check.of(id("wall_bricks"), wall, Focuses.bay(), Expectations.eachCell(Expectations.block(TestWorld.stone)))
         ).check(Check.of(id("cavity_air"), cavity, Focuses.bay(), Expectations.eachCell(Expectations.air())))
                 .check(
                     Check.of(
@@ -576,7 +569,7 @@ class ScenarioTest {
                         Focuses.door(LatticePoint.of(3, 1, 0)),
                         Expectations.custom(
                             DoorView.class,
-                            ExpectationMeta.of(id("door_test"), 10, FindingCode.of(FindingCode.Family.EXP, 1)),
+                            ExpectationMeta.of(id("door_test"), 10, FindingCode.of(FindingCode.Family.exp, 1)),
                             ctx -> Reply.match()
                         )
                     )
@@ -586,15 +579,15 @@ class ScenarioTest {
             view.put(entry.getValue());
         }
         for (LatticePoint cell : List.of(LatticePoint.of(3, 1, 0), LatticePoint.of(3, 2, 0))) {
-            view.put(TestWorld.block(TestWorld.DOOR, cell));
+            view.put(TestWorld.block(TestWorld.door, cell));
         }
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
@@ -610,19 +603,19 @@ class ScenarioTest {
     @Test
     void localCellsMapThroughTheSiting() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Blueprint blueprint = Blueprint.builder(id("offset")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.air())).build();
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air())).build();
         LatticePoint world = LatticePoint.of(10, 64, 10);
         TestWorld.View view = new TestWorld.View().air(world);
-        Siting siting = Siting.of(world, Orientation.IDENTITY);
+        Siting siting = Siting.of(world, Orientation.identity);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest.of(
             blueprint,
             siting,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
@@ -641,34 +634,34 @@ class ScenarioTest {
     @Test
     void bindingFromAnotherSnapshotIsRefused() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        Bay bay = Bay.of(id("bay"), cells, Coverage.ONE_SUBJECT, Footprint.bound(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
         Blueprint blueprint = Blueprint.builder(id("binding")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.anyOccupant()))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.anyOccupant()))
                 .build();
-        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.ORIGIN));
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.origin));
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
-        OccupantSnapshot foreign = TestWorld.block(mc("barrel"), LatticePoint.ORIGIN);
+        OccupantSnapshot foreign = TestWorld.block(mc("barrel"), LatticePoint.origin);
         OccupantRef foreignRef = new OccupantRef(
-            new SnapshotId(TestWorld.WORLD, 2),
+            new SnapshotId(TestWorld.world, 2),
             0,
             mc("barrel"),
-            OccupantKind.BLOCK,
-            LatticePoint.ORIGIN
+            OccupantKind.block,
+            LatticePoint.origin
         );
         OccupantSnapshot wrong = new OccupantSnapshot(
             foreignRef,
-            new OccupantDescriptor(mc("barrel"), OccupantKind.BLOCK, Map.of(), List.of()),
-            Cuboid.of(LatticePoint.ORIGIN),
+            new OccupantDescriptor(mc("barrel"), OccupantKind.block, Map.of(), List.of()),
+            Cuboid.of(LatticePoint.origin),
             List.of()
         );
         MatchOutcome outcome = new MatchOutcome(
@@ -676,12 +669,12 @@ class ScenarioTest {
             Map.of(),
             List.of(new BayBinding(bay, List.of(wrong))),
             ReadScope.none(),
-            Spend.ZERO
+            Spend.zero
         );
         MatchResult.Admitted forged = new MatchResult.Admitted(
-            Phase.CHECK,
-            INSTANCE,
-            AT_ORIGIN,
+            Phase.check,
+            instance,
+            atOrigin,
             outcome,
             0,
             true,
@@ -693,29 +686,29 @@ class ScenarioTest {
         );
         assertTrue(
             failed.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.BINDING_INVALID.code()))
+                    .anyMatch(finding -> finding.code().equals(Codes.bindingInvalid.code()))
         );
     }
 
     @Test
     void sectionComputationMapsThroughSiting() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.INSTANCE, Merges.sum(), null);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
         Blueprint blueprint = Blueprint.builder(id("section_offset")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.air()))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))
                 .computation(Computations.air(air, cells)).build();
         LatticePoint world = LatticePoint.of(10, 64, 10);
         TestWorld.View view = new TestWorld.View().air(world)
-                .refuseSection(SectionKey.of(TestWorld.WORLD, 0, LatticePoint.ORIGIN, 16));
-        Siting siting = Siting.of(world, Orientation.IDENTITY);
+                .refuseSection(SectionKey.of(TestWorld.world, 0, LatticePoint.origin, 16));
+        Siting siting = Siting.of(world, Orientation.identity);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest.of(
             blueprint,
             siting,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
@@ -731,7 +724,7 @@ class ScenarioTest {
     @Test
     void aMissingSectionContributionIsAComputationFailure() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> key = ContextKeys.of(id("missing"), Long.class, Retention.INSTANCE, Merges.sum(), null);
+        ContextKey<Long> key = ContextKeys.of(id("missing"), Long.class, Retention.instance, Merges.sum(), null);
         SectionComputation<Long> missing = new SectionComputation<>() {
             @Override
             public Outcome<Long> compute(SectionContext ctx) {
@@ -758,60 +751,59 @@ class ScenarioTest {
                 return cells;
             }
         };
-        Bay bay = Bay.of(id("bay"), cells, Coverage.EVERY_CELL, Footprint.box(), Sharing.EXCLUSIVE);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Blueprint blueprint = Blueprint.builder(id("missing_section")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.ORIGIN), Expectations.air()))
+                .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))
                 .computation(missing).build();
-        TestWorld.View view = new TestWorld.View().air(LatticePoint.ORIGIN);
+        TestWorld.View view = new TestWorld.View().air(LatticePoint.origin);
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
         assertTrue(
             admitted.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.COMPUTATION_FAILED.code()))
+                    .anyMatch(finding -> finding.code().equals(Codes.computationFailed.code()))
         );
         assertFalse(
-            admitted.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.FOLD_REFUSED.code()))
+            admitted.findings().findings().stream().anyMatch(finding -> finding.code().equals(Codes.foldRefused.code()))
         );
     }
 
     @Test
     void aClippedEntityFootprintIsUnreadable() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
-        Bay bay = Bay.of(id("pen"), cells, Coverage.ANY_SUBJECT, Footprint.bound(), Sharing.SHARED);
+        Bay bay = Bay.of(id("pen"), cells, Coverage.anySubject, Footprint.bound(), Sharing.shared);
         Blueprint blueprint = Blueprint.builder(id("pen")).bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
                 .check(Check.of(id("cow"), bay, Focuses.entity(mc("cow")), Expectations.anyOccupant())).build();
-        OccupantRef ref = new OccupantRef(TestWorld.SNAPSHOT, 0, mc("cow"), OccupantKind.ENTITY, LatticePoint.ORIGIN);
+        OccupantRef ref = new OccupantRef(TestWorld.snapshot, 0, mc("cow"), OccupantKind.entity, LatticePoint.origin);
         OccupantSnapshot cow = new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(mc("cow"), OccupantKind.ENTITY, Map.of(), List.of()),
+            new OccupantDescriptor(mc("cow"), OccupantKind.entity, Map.of(), List.of()),
             Cuboid.of(0, 0, 0, 2, 1, 1),
             List.of()
         );
         TestWorld.View view = new TestWorld.View().put(cow).sectionSize(1)
-                .refuseSection(SectionKey.of(TestWorld.WORLD, 0, LatticePoint.of(1, 0, 0), 1));
+                .refuseSection(SectionKey.of(TestWorld.world, 0, LatticePoint.of(1, 0, 0), 1));
         MatchRequest request = MatchRequest.of(
             blueprint,
-            AT_ORIGIN,
+            atOrigin,
             new TestWorld.Lease(view),
-            INSTANCE,
-            OWNER,
+            instance,
+            owner,
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
         MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, MatchEngine.check(request));
-        assertEquals(UndecidedReason.UNREADABLE, undecided.reason());
+        assertEquals(UndecidedReason.unreadable, undecided.reason());
         assertTrue(
             undecided.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.FOOTPRINT_CLIPPED.code()))
+                    .anyMatch(finding -> finding.code().equals(Codes.footprintClipped.code()))
         );
     }
 }

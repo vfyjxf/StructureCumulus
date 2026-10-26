@@ -113,7 +113,7 @@ entries first. Two entries with one id and different values throw `IllegalArgume
 
 `Host.empty()` is `(DocumentSource.empty(), null, ContextStore.inMemory(), Map.of())`. A kernel
 created without a host can compile and check, but `settle` with claimable rows is
-`Undecided(LEDGER_UNAVAILABLE)`.
+`Undecided(ledgerUnavailable)`.
 
 ### 4.3 The facade
 
@@ -129,7 +129,7 @@ created without a host can compile and check, but `settle` with claimable rows i
   host's context store.
 - **`solve(findings, context)`** iterates the remedy catalog by id, calls each provider once per
   finding, catches `RuntimeException` (`SC-RMD-0001`), dedupes by value and caps at
-  `context.maxResults()`; the cap puts `MACHINE_APPLICABLE` first.
+  `context.maxResults()`; the cap puts `machineApplicable` first.
 - **`explain(code)`** looks up `structurecumulus:<code-text-lowercase>` in the code catalog; an addon
   code is not found, which is legal.
 - **`explainOrFallback(code)`** returns the registered explanation or a synthesised family-level one.

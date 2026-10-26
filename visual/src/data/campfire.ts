@@ -216,10 +216,10 @@ export const SITING = {
 };
 
 export const QUARTER_TURNS = [
-  { quarter: 0 as const, label: '0°', turn: 'Turn.NONE', note: 'identity' },
-  { quarter: 1 as const, label: '90°', turn: 'Turn.CLOCKWISE', note: 'clockwise' },
-  { quarter: 2 as const, label: '180°', turn: 'Turn.HALF', note: 'half turn' },
-  { quarter: 3 as const, label: '270°', turn: 'Turn.COUNTERCLOCKWISE', note: 'counterclockwise' },
+  { quarter: 0 as const, label: '0°', turn: 'Turn.none', note: 'identity' },
+  { quarter: 1 as const, label: '90°', turn: 'Turn.clockwise', note: 'clockwise' },
+  { quarter: 2 as const, label: '180°', turn: 'Turn.half', note: 'half turn' },
+  { quarter: 3 as const, label: '270°', turn: 'Turn.counterclockwise', note: 'counterclockwise' },
 ];
 
 export function orientPoint(x: number, y: number, z: number, quarter: number): [number, number, number] {
@@ -285,7 +285,7 @@ export const DOCUMENT_SNIPPET = `{
 }`;
 
 export const JAVA_SNIPPET = `ContextKey<Long> air = ContextKeys.of(id("air_cells"),
-        Long.class, Retention.INSTANCE, Merges.sum(), null);
+        Long.class, Retention.instance, Merges.sum(), null);
 
 Blueprint campfire = Blueprint.builder(id("campfire"))
         .bounds(Cuboid.of(0, 0, 0, 3, 3, 3))

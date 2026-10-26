@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodesTest {
 
-    private static final String PRODUCERS = """
+    private static final String producers = """
             SC-SPC-0001 ERROR
             SC-SPC-0002 ERROR
             SC-OCC-0001 ERROR
@@ -73,25 +74,34 @@ class CodesTest {
             SC-SPI-0003 ERROR
             """;
 
+    private static Severity severity(String wire) {
+        for (Severity severity : Severity.values()) {
+            if (severity.wireName().equals(wire)) {
+                return severity;
+            }
+        }
+        throw new IllegalArgumentException("unknown severity " + wire);
+    }
+
     @Test
     void tableMatchesTheProducerRowsExactlyOnce() {
         List<String> rows = new ArrayList<>();
-        for (String line : PRODUCERS.split("\\R")) {
+        for (String line : producers.split("\\R")) {
             if (!line.isBlank()) {
                 rows.add(line);
             }
         }
         assertEquals(55, rows.size());
-        assertEquals(rows.size(), Codes.ALL.size());
+        assertEquals(rows.size(), Codes.all.size());
 
         Set<FindingCode> seen = new HashSet<>();
         FindingCode previous = null;
         for (int index = 0; index < rows.size(); index++) {
             String[] parts = rows.get(index).split("\\s+");
             FindingCode code = FindingCode.of(parts[0]);
-            CodeEntry entry = Codes.ALL.get(index);
+            CodeEntry entry = Codes.all.get(index);
             assertEquals(code, entry.code());
-            assertEquals(Severity.valueOf(parts[1]), entry.severity());
+            assertEquals(severity(parts[1]), entry.severity());
             assertEquals(code, entry.explanation().code());
             assertTrue(seen.add(code), "duplicate code: " + code);
             if (previous != null) {
@@ -103,7 +113,7 @@ class CodesTest {
 
     @Test
     void everyEntryCarriesAUsableExplanation() {
-        for (CodeEntry entry : Codes.ALL) {
+        for (CodeEntry entry : Codes.all) {
             Explanation explanation = entry.explanation();
             assertFalse(explanation.summary().isBlank());
             assertFalse(explanation.body().isBlank());
@@ -111,18 +121,18 @@ class CodesTest {
             assertTrue(explanation.summary().endsWith("."));
             assertEquals(
                 entry.code().text(),
-                java.util.Objects.requireNonNull(FindingCode.parse(entry.code().text()), "parsed").text()
+                Objects.requireNonNull(FindingCode.parse(entry.code().text()), "parsed").text()
             );
         }
     }
 
     @Test
     void adapterCodesAreAbsent() {
-        for (CodeEntry entry : Codes.ALL) {
-            assertFalse(entry.code().family() == FindingCode.Family.MC);
+        for (CodeEntry entry : Codes.all) {
+            assertFalse(entry.code().family() == FindingCode.Family.mc);
         }
-        assertNotNull(Codes.BUNDLE_TRUNCATED);
-        assertEquals("SC-DIA-0001", Codes.BUNDLE_TRUNCATED.code().text());
-        assertEquals(Severity.WARNING, Codes.BUNDLE_TRUNCATED.severity());
+        assertNotNull(Codes.bundleTruncated);
+        assertEquals("SC-DIA-0001", Codes.bundleTruncated.code().text());
+        assertEquals(Severity.warning, Codes.bundleTruncated.severity());
     }
 }

@@ -9,11 +9,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SourceTextTest {
 
-    private static final NamespacedId DOC = NamespacedId.of("test", "doc");
+    private static final NamespacedId doc = NamespacedId.of("test", "doc");
 
     @Test
     void crlfAndEmptyLines() {
-        SourceText source = SourceText.of(DOC, "first\r\nsecond\n\nlast");
+        SourceText source = SourceText.of(doc, "first\r\nsecond\n\nlast");
         assertEquals("first", source.lineAt(0));
         assertEquals("first", source.lineAt(5));
         assertEquals("first", source.lineAt(6));
@@ -31,13 +31,13 @@ class SourceTextTest {
 
     @Test
     void noTrailingNewlineAndTrailingNewline() {
-        SourceText plain = SourceText.of(DOC, "abc");
+        SourceText plain = SourceText.of(doc, "abc");
         assertEquals("abc", plain.lineAt(0));
         assertEquals("abc", plain.lineAt(3));
         assertEquals(4, plain.column(3));
         assertNull(plain.lineAt(4));
 
-        SourceText trailing = SourceText.of(DOC, "abc\n");
+        SourceText trailing = SourceText.of(doc, "abc\n");
         assertEquals("", trailing.lineAt(4));
         assertEquals(2, trailing.lineNumber(4));
         assertEquals(1, trailing.column(4));
@@ -45,7 +45,7 @@ class SourceTextTest {
 
     @Test
     void emptyTextAndOutOfRange() {
-        SourceText empty = SourceText.of(DOC, "");
+        SourceText empty = SourceText.of(doc, "");
         assertEquals("", empty.lineAt(0));
         assertEquals(1, empty.lineNumber(0));
         assertEquals(1, empty.column(0));
@@ -56,7 +56,7 @@ class SourceTextTest {
 
     @Test
     void bareCarriageReturnIsALineBreak() {
-        SourceText source = SourceText.of(DOC, "a\rb");
+        SourceText source = SourceText.of(doc, "a\rb");
         assertEquals("a", source.lineAt(1));
         assertEquals("b", source.lineAt(2));
         assertEquals(2, source.lineNumber(2));

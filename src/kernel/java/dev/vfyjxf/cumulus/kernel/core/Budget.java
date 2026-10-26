@@ -3,8 +3,8 @@ package dev.vfyjxf.cumulus.kernel.core;
 /** A ceiling for one attempt: cells and sections. */
 public record Budget(int cells, int sections) {
 
-    public static final Budget ZERO = new Budget(0, 0);
-    public static final Budget UNBOUNDED = new Budget(Integer.MAX_VALUE, Integer.MAX_VALUE);
+    public static final Budget zero = new Budget(0, 0);
+    public static final Budget unbounded = new Budget(Integer.MAX_VALUE, Integer.MAX_VALUE);
 
     public Budget {
         if (cells < 0 || sections < 0) {
@@ -17,7 +17,7 @@ public record Budget(int cells, int sections) {
     }
 
     public static Budget unbounded() {
-        return UNBOUNDED;
+        return unbounded;
     }
 
     public boolean admits(Spend spend) {

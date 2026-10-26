@@ -11,9 +11,61 @@ VISUAL = Path(__file__).resolve().parent.parent
 ROOT = VISUAL.parent
 DATA = VISUAL / "src" / "data"
 
+KERNEL_FAMILIES = ("SPC", "OCC", "EXP", "CLM", "BPT", "CHK", "DOC", "CTX", "ENG", "DIA", "RMD", "SPI", "MC")
+SEVERITIES = ("ERROR", "WARNING", "INFO")
+CODE_PATTERN = re.compile(r"SC-([A-Z]{2,6})-(\d{4})\Z")
+ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\Z")
+ENTRY_PATTERN = re.compile(r"public static final CodeEntry (\w+) = entry\((.*?)\);\n", re.S)
+ENTRY_DECLARATION = re.compile(r"public static final CodeEntry (\w+)\s*(?:=|;)")
+
+
+def strip_comments(text: str) -> str:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"//[^\n]*", "", text)
+
 
 def write(path: Path, body: str) -> None:
     path.write_text(body)
+
+
+def fail(message: str) -> None:
+    raise SystemExit(f"review data: {message}")
+
+
+def canonical_id(field: str) -> str:
+    """A CodeEntry field name (lowerCamel after the rename) back to its UPPER_SNAKE data id."""
+    if field.isupper():
+        return field
+    head = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", field)
+    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", head).upper()
+
+
+def canonical_family(token: str) -> str:
+    family = token.upper()
+    if family not in KERNEL_FAMILIES:
+        fail(f"FindingCode.Family.{token} is not a kernel family {KERNEL_FAMILIES}")
+    return family
+
+
+def canonical_severity(token: str) -> str:
+    severity = token.upper()
+    if severity not in SEVERITIES:
+        fail(f"Severity.{token} is not a canonical severity {SEVERITIES}")
+    return severity
+
+
+def validate_entry(entry: dict) -> None:
+    match = CODE_PATTERN.match(entry["code"])
+    if not match:
+        fail(f"{entry['code']!r} is not an SC-<FAMILY>-<NNNN> code")
+    if match.group(1) != entry["family"]:
+        fail(f"{entry['code']!r} disagrees with family {entry['family']!r}")
+    if not ID_PATTERN.match(entry["id"]):
+        fail(f"{entry['id']!r} is not an UPPER_SNAKE data id")
+    if entry["severity"] not in SEVERITIES:
+        fail(f"{entry['id']!r} has non-canonical severity {entry['severity']!r}")
+    if not entry["producer"]:
+        fail(f"{entry['code']!r} has no producer row in docs/modules/finding.md")
 
 
 def extract_codes() -> None:
@@ -24,26 +76,36 @@ def extract_codes() -> None:
         if match:
             producers[match.group(1)] = match.group(2).replace("`", "").strip()
     entries = []
-    for match in re.finditer(r"public static final CodeEntry (\w+) = entry\((.*?)\);\n", source, re.S):
+    parsed_names = []
+    for match in ENTRY_PATTERN.finditer(source):
         name, body = match.group(1), match.group(2)
         head = re.search(r"FindingCode\.Family\.(\w+),\s*(\d+),\s*Severity\.(\w+)", body)
         if not head:
-            continue
+            fail(f"CodeEntry {name} does not match entry(FindingCode.Family.<tag>, <number>, Severity.<tag>)")
+        parsed_names.append(name)
         strings = []
         for literal in re.findall(r'"((?:\\.|[^"\\])*)"', body):
             try:
                 strings.append(json.loads('"' + literal + '"'))
             except Exception:
                 strings.append(literal)
-        code = f"SC-{head.group(1)}-{int(head.group(2)):04d}"
+        family = canonical_family(head.group(1))
+        number = int(head.group(2))
+        code = f"SC-{family}-{number:04d}"
         entries.append({
-            "id": name, "code": code, "family": head.group(1),
-            "number": int(head.group(2)), "severity": head.group(3),
+            "id": canonical_id(name), "code": code, "family": family,
+            "number": number, "severity": canonical_severity(head.group(3)),
             "summary": strings[0] if strings else "",
             "body": "".join(strings[1:]),
             "producer": producers.get(code, ""),
         })
+    declared_names = [match.group(1) for match in ENTRY_DECLARATION.finditer(strip_comments(source))]
+    unparsed = [name for name in declared_names if name not in set(parsed_names)]
+    if unparsed:
+        fail("CodeEntry declarations were not recognized as entry(...): " + ", ".join(unparsed))
     entries = sorted({entry["code"]: entry for entry in entries}.values(), key=lambda entry: entry["code"])
+    for entry in entries:
+        validate_entry(entry)
     lines = [
         "export type Code = {", "  id: string;", "  code: string;", "  family: string;",
         "  number: number;", '  severity: "ERROR" | "WARNING" | "INFO";',

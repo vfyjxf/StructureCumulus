@@ -11,23 +11,23 @@ public record LocusMap(Siting siting) {
 
     public @Nullable Locus toWorld(Locus local) {
         return switch (local.frame()) {
-            case WORLD -> local;
-            case LOCAL -> {
+            case world -> local;
+            case local -> {
                 CuboidSet world = siting.toWorld(local.cells());
                 yield world == null ? null : Locus.world(world);
             }
-            case DEFINITION, KEY -> null;
+            case definition, key -> null;
         };
     }
 
     public @Nullable Locus toLocal(Locus world) {
         return switch (world.frame()) {
-            case LOCAL -> world;
-            case WORLD -> {
+            case local -> world;
+            case world -> {
                 CuboidSet local = siting.toLocal(world.cells());
                 yield local == null ? null : Locus.local(local);
             }
-            case DEFINITION, KEY -> null;
+            case definition, key -> null;
         };
     }
 }

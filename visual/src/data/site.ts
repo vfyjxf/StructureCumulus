@@ -78,20 +78,20 @@ export const DOCS = [
   { group: 'Modules', file: 'docs/modules/space.md', title: 'space' },
   { group: 'Modules', file: 'docs/modules/remedy.md', title: 'remedy' },
   { group: 'Modules', file: 'docs/modules/spi.md', title: 'spi' },
-  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (spec only)' },
+  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (M1 capture)' },
 ];
 
 export const HERO_STATS = [
-  { value: '95', label: 'tests', note: 'JUnit 5 · direct harness' },
+  { value: '97', label: 'tests', note: 'JUnit 5 · direct harness' },
   { value: '55', label: 'codes', note: '12 kernel families + MC' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
   { value: '23', label: 'decisions', note: 'rulings, not preferences' },
 ];
 
 export const GATES = [
-  { label: 'Compile', value: 'PASS', note: 'javac 21 · Gradle/spotless unrun' },
+  { label: 'Compile', value: 'PASS', note: 'javac 21 · gradlew check green' },
   { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
-  { label: 'Tests', value: '95/95', note: 'JUnit 5 · 15 containers' },
+  { label: 'Tests', value: '97/97', note: 'JUnit 5 · 15 containers' },
   { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 55 codes' },
   { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
   { label: 'Determinism', value: 'N/R', note: 'not run in this sandbox' },

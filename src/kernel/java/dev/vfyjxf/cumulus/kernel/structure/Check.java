@@ -63,7 +63,7 @@ public record Check<T>(
     }
 
     static FindingBundle missing(FocusContext ctx, String message) {
-        Finding finding = Finding.builder(FindingCode.of(FindingCode.Family.OCC, 1), Severity.ERROR).phase(ctx.phase())
+        Finding finding = Finding.builder(FindingCode.of(FindingCode.Family.occ, 1), Severity.error).phase(ctx.phase())
                 .message(message).label(Label.primary(ctx.locus(), message)).build();
         List<Finding> findings = new ArrayList<>();
         findings.add(finding);

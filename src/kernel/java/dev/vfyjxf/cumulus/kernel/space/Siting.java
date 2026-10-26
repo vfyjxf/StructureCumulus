@@ -13,7 +13,7 @@ public record Siting(LatticePoint origin, Placement placement) {
     }
 
     public static Siting of(LatticePoint origin, Orientation orientation) {
-        return new Siting(origin, new Placement(orientation, LatticePoint.ORIGIN));
+        return new Siting(origin, new Placement(orientation, LatticePoint.origin));
     }
 
     public static Siting of(LatticePoint origin, Placement placement) {

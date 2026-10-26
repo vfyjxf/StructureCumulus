@@ -2,7 +2,7 @@ package dev.vfyjxf.cumulus.kernel.space;
 
 /** A yaw quarter turn; a generator, not a name for one of the 48 orientations. */
 public enum Turn {
-    NONE, CLOCKWISE, HALF, COUNTERCLOCKWISE;
+    none, clockwise, half, counterclockwise;
 
     public Turn compose(Turn other) {
         int sum = (ordinal() + other.ordinal()) % 4;
@@ -15,10 +15,10 @@ public enum Turn {
 
     int[][] matrix() {
         return switch (this) {
-            case NONE -> new int[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-            case CLOCKWISE -> new int[][]{{0, 0, -1}, {0, 1, 0}, {1, 0, 0}};
-            case HALF -> new int[][]{{-1, 0, 0}, {0, 1, 0}, {0, 0, -1}};
-            case COUNTERCLOCKWISE -> new int[][]{{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}};
+            case none -> new int[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+            case clockwise -> new int[][]{{0, 0, -1}, {0, 1, 0}, {1, 0, 0}};
+            case half -> new int[][]{{-1, 0, 0}, {0, 1, 0}, {0, 0, -1}};
+            case counterclockwise -> new int[][]{{0, 0, 1}, {0, 1, 0}, {-1, 0, 0}};
         };
     }
 }

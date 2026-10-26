@@ -63,7 +63,7 @@ public final class ClaimPlanner {
                 }
                 case Footprint.None ignored -> CuboidSet.empty();
             };
-            if (owned.isEmpty() && bay.sharing() == Sharing.EXCLUSIVE) {
+            if (owned.isEmpty() && bay.sharing() == Sharing.exclusive) {
                 throw new IllegalArgumentException("SC-CLM-0005: exclusive bay " + bay.id() + " owns no cell");
             }
             for (Cuboid box : owned.boxes()) {

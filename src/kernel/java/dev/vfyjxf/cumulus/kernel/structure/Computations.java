@@ -16,19 +16,19 @@ import java.util.Set;
 public final class Computations {
 
     public static SectionComputation<Long> count(ContextKey<Long> output, CuboidSet region) {
-        return new Builtin(output, region, Mode.COUNT);
+        return new Builtin(output, region, Mode.count);
     }
 
     public static SectionComputation<Long> volume(ContextKey<Long> output, CuboidSet region) {
-        return new Builtin(output, region, Mode.VOLUME);
+        return new Builtin(output, region, Mode.volume);
     }
 
     public static SectionComputation<Long> air(ContextKey<Long> output, CuboidSet region) {
-        return new Builtin(output, region, Mode.AIR);
+        return new Builtin(output, region, Mode.air);
     }
 
     private enum Mode {
-        COUNT, VOLUME, AIR
+        count, volume, air
     }
 
     private record Builtin(ContextKey<Long> output, CuboidSet region, Mode mode) implements SectionComputation<Long> {
@@ -37,7 +37,7 @@ public final class Computations {
             Objects.requireNonNull(output, "output");
             Objects.requireNonNull(region, "region");
             Objects.requireNonNull(mode, "mode");
-            if (output.retention() != Retention.INSTANCE && output.retention() != Retention.MATCH) {
+            if (output.retention() != Retention.instance && output.retention() != Retention.match) {
                 throw new IllegalArgumentException("unsupported retention");
             }
         }
@@ -65,9 +65,9 @@ public final class Computations {
         @Override
         public Outcome<Long> compute(SectionContext ctx) {
             return switch (mode) {
-                case COUNT -> Outcome.found((long) ctx.occupants().size());
-                case VOLUME -> Outcome.found(ctx.cells().volume());
-                case AIR -> Outcome.found(countAir(ctx));
+                case count -> Outcome.found((long) ctx.occupants().size());
+                case volume -> Outcome.found(ctx.cells().volume());
+                case air -> Outcome.found(countAir(ctx));
             };
         }
 

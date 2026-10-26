@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class LevelCapture implements WorldCapture {
 
     private static final int cellSize = 16;
-    private static final FindingCode notCaptured = FindingCode.of(FindingCode.Family.MC, 1);
+    private static final FindingCode notCaptured = FindingCode.of(FindingCode.Family.mc, 1);
 
     private final ServerLevel level;
     private final World world;
@@ -67,7 +67,7 @@ public final class LevelCapture implements WorldCapture {
                 LevelChunk chunk = level.getChunkSource().getChunkNow(chunkX, chunkZ);
                 if (chunk == null) {
                     revisions.decrementAndGet();
-                    return new CaptureResult.Unavailable(ReadStatus.NOT_CAPTURED, notCaptured);
+                    return new CaptureResult.Unavailable(ReadStatus.notCaptured, notCaptured);
                 }
                 for (int sectionY = minSectionY; sectionY <= maxSectionY; sectionY++) {
                     int sectionIndex = chunk.getSectionIndex(sectionY * cellSize);

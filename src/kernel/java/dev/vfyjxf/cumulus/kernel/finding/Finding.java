@@ -34,7 +34,7 @@ public record Finding(
         int primaryCount = 0;
         for (Label label : ordered) {
             Checks.checkNotNull(label, "label");
-            if (label.role() == LabelRole.PRIMARY) {
+            if (label.role() == LabelRole.primary) {
                 primaryCount++;
             }
         }
@@ -55,7 +55,7 @@ public record Finding(
 
     public @Nullable Label primaryLabel() {
         for (Label label : labels) {
-            if (label.role() == LabelRole.PRIMARY) {
+            if (label.role() == LabelRole.primary) {
                 return label;
             }
         }
@@ -88,10 +88,10 @@ public record Finding(
         if (byFrame != 0) {
             return byFrame;
         }
-        if (leftLocus.frame() == LocusFrame.KEY) {
+        if (leftLocus.frame() == LocusFrame.key) {
             return 0;
         }
-        if (leftLocus.frame() == LocusFrame.DEFINITION) {
+        if (leftLocus.frame() == LocusFrame.definition) {
             SourceSpan leftSource = leftLocus.source();
             SourceSpan rightSource = rightLocus.source();
             if (leftSource == null || rightSource == null) {
@@ -173,7 +173,7 @@ public record Finding(
             }
             Label primary = null;
             for (Label label : labels) {
-                if (label.role() == LabelRole.PRIMARY) {
+                if (label.role() == LabelRole.primary) {
                     Checks.checkArgument(primary == null, "at most one PRIMARY label");
                     primary = label;
                 }

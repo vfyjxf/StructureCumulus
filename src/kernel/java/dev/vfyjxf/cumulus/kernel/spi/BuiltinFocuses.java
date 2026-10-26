@@ -23,7 +23,7 @@ final class BuiltinFocuses {
             try {
                 return body.create(args, context);
             } catch (RuntimeException failure) {
-                BuiltinSupport.report(context, Codes.FACTORY_BAD, "factory " + id + " failed: " + failure.getMessage());
+                BuiltinSupport.report(context, Codes.factoryBad, "factory " + id + " failed: " + failure.getMessage());
                 return null;
             }
         }
@@ -56,7 +56,7 @@ final class BuiltinFocuses {
             }
             var resolved = ctx.keys().apply(key);
             if (resolved == null) {
-                BuiltinSupport.report(ctx, Codes.KEY_UNDECLARED, "context focus names undeclared key " + key);
+                BuiltinSupport.report(ctx, Codes.keyUndeclared, "context focus names undeclared key " + key);
                 return null;
             }
             return Focuses.context(resolved);

@@ -2,7 +2,7 @@ package dev.vfyjxf.cumulus.kernel.finding;
 
 /** Declaration order is strength. */
 public enum Severity {
-    ERROR, WARNING, INFO;
+    error, warning, info;
 
     public int rank() {
         return ordinal();
@@ -10,5 +10,13 @@ public enum Severity {
 
     public boolean atLeast(Severity floor) {
         return rank() <= floor.rank();
+    }
+
+    public String wireName() {
+        return switch (this) {
+            case error -> "ERROR";
+            case warning -> "WARNING";
+            case info -> "INFO";
+        };
     }
 }

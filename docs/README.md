@@ -43,16 +43,18 @@ Then the module files, in dependency order:
 ## Status
 
 - Design revision: **v1.0**, 2026-10-26.
-- Scope of this round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
-  is specified but not implemented in this round.
+- Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
+  was specified only in that round. Current status: the M1 capture slice (`LevelCapture`,
+  `LevelSnapshot`, `LevelLease`, one capture GameTest) is implemented; commands, persistence and the
+  full adapter remain pending.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-26): the kernel compiles with `javac --release 21` and JSpecify only; 95
-  JUnit 5 tests pass; `tools/spec-check.py` is clean; the adapter is specified, not implemented.
-  Gradle could not run in the generation sandbox, so `./gradlew check` is the first thing to run on
-  a normal machine (it also applies the project formatter).
+- Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 97
+  JUnit 5 tests pass; `tools/spec-check.py` is clean; `./gradlew check` is green and the adapter's
+  `runGameTestServer` capture GameTest passes. The adapter is implemented to M1 only; commands,
+  persistence and the full adapter remain pending.
 
 ## The one rule
 

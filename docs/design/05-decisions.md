@@ -18,13 +18,15 @@ section. The acceptance gate is the regenerated kernel.
 
 ### D-02 — Scope of v1
 
-Core kernel + document compiler + thin remedy SPI. The NeoForge adapter is specified
-(`modules/adapter.md`) and not implemented. No scheduler, no dirty index, no overlay renderer, no
-schematic importer, no client code. This keeps the first regeneration small enough to prove, while
-the ports make the adapter a later, independent exercise.
+Core kernel + document compiler + thin remedy SPI. The v1 round scoped the NeoForge adapter to
+`modules/adapter.md` and left it unimplemented at the time; no scheduler, no dirty index, no overlay
+renderer, no schematic importer, no client code. This kept the first regeneration small enough to
+prove, while the ports make the adapter a later, independent exercise. Current status: the M1 capture
+slice (`LevelCapture`, `LevelSnapshot`, `LevelLease`, one capture GameTest) is implemented;
+claims/context persistence, document I/O, commands and the rest of the adapter remain pending.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is the only missing piece for a game.
+full adapter remains the missing piece for a game.
 
 ### D-03 — English only
 
@@ -49,7 +51,7 @@ focus/expectation/check into one `structure` package removes both cycles by cons
 
 ### D-05 — Three phases, no stages
 
-`Phase` is `COMPILE`, `CHECK`, `SETTLE`; it labels a finding and a result. No unit declares a stage;
+`Phase` is `compile`, `check`, `settle`; it labels a finding and a result. No unit declares a stage;
 no request chooses one; there is no `expand(stage)`, no `ContextTier`, no `Stage.STALE`, no
 `Deferred`/`RetryToken`. The check runs the whole plan; the settle writes claims; compile validates
 before the world is touched.
@@ -70,12 +72,12 @@ and makes the Java and JSON forms agree.
 
 **Consequence:** `Check` carries the `Bay` value; `bay(...)` is not a separate builder call; a
 blueprint's bays are the distinct bays of its checks; two intersecting bays are legal only when both
-are `SHARED`.
+are `shared`.
 
 ### D-07 — One key, two retentions, one publication
 
-`ContextKey<T>` is the only key. `Retention` is `MATCH` (attempt only) or `INSTANCE` (published).
-A successful settle publishes the `INSTANCE` values once; a derive publishes one batch once. There
+`ContextKey<T>` is the only key. `Retention` is `match` (attempt only) or `instance` (published).
+A successful settle publishes the `instance` values once; a derive publishes one batch once. There
 is no `ContextTier`, `ContextFrame`, `ATTEMPT`/`OUTCOME`/`CONTEXT`, `Augment*`, `RuntimeState` or
 `ContextDraft` in the public API.
 
@@ -199,7 +201,7 @@ could not express "present but valueless", which the furnace/hatch semantics nee
 
 ### D-19 — One producer per code, one explanation
 
-`Codes.ALL` is the table; every entry has a code, a canonical severity and an explanation; the
+`Codes.all` is the table; every entry has a code, a canonical severity and an explanation; the
 producer table in `finding.md` names one module/site per code. An unproduced code is deleted, not
 marked reserved. `DESIGN` violations are findings from the compiler; a `Blueprint.build()` throw is a
 programmer proof failure with the code in the message.
@@ -216,17 +218,17 @@ between `13` and `15`. A test asserts the table is bijective with the producers.
 | Q3 view model | Section-based recursive `WorldView`, `Bay.cells` is a `CuboidSet` (D-06/D-10). |
 | Q4 `ReadSet`/`ReadScope`/`ChangeSet` | One `ReadScope`; the other two are deleted. |
 | Q5 `check` publication / re-emission | `check` writes nothing; `settle` publishes once; no re-emission. |
-| Q6 internal overlap | Build error for any overlapping pair with an `EXCLUSIVE` side; both `SHARED` is legal. |
+| Q6 internal overlap | Build error for any overlapping pair with an `exclusive` side; both `shared` is legal. |
 | Q7 `DecisionKind`/`Coverage` | Only `Coverage`; `Focus.staticCells` replaces the decision kind. |
 | Q8 `Reply`/`Bindings.merge` | Sealed four-state `Reply`; `Bindings` deleted. |
-| Q9 `UndecidedReason` | Eight values: `BUDGET_EXHAUSTED`, `CANCELLED`, `UNREADABLE`, `ABSTAINED`, `NO_CHECKS`, `LEDGER_UNAVAILABLE`, `LEDGER_MOVED`, `DESIGN_DEFECT`. |
+| Q9 `UndecidedReason` | Eight values: `budgetExhausted`, `cancelled`, `unreadable`, `abstained`, `noChecks`, `ledgerUnavailable`, `ledgerMoved`, `designDefect`. |
 | Q10 `OccupantRef`/`SnapshotId` | `SnapshotId` in core; ref carries snapshot + frame + type + kind + anchor; no footprint. |
 | Q11 capture SPI | One `WorldCapture.capture(CaptureRequest)` returning `Captured(view, lease)`/`TooLarge`/`Unavailable`. |
 | Q12 section phase read | `SectionComputation`/`SectionContext` has no `read`; `AggregateComputation` has no `contribute`. |
 | Q13 step vocabulary | No step types; `Plan` has sections/aggregates/checks; a check cannot read a derivation output. |
 | Q14 facade | Five operations, one final class, one `Host` (D-17). |
 | Q15 code table | One table in `finding`, one producer, no dead codes (D-19). |
-| Q16 `LocusMap`/`DEFINITION` | `LocusMap` maps local↔world only; a definition label is created where the source is in hand; no `toDefinition`. |
+| Q16 `LocusMap`/`definition` | `LocusMap` maps local↔world only; a definition label is created where the source is in hand; no `toDefinition`. |
 | Q18 U10 | Thin values + provider (D-16). |
 | Q19 named-but-unimplemented | `DataView`/`DataKind` → `Value`; `Codes` implemented; `Checks` in core; `Stability`/`ExplainBook` deleted; no empty names. |
 | Q20 trait model | Typed `Trait` with present-null (D-18). |

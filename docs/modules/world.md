@@ -19,14 +19,14 @@ capture implementation (`mc`), dirty tracking or scheduling (host).
 
 | Type | Kind | Contract |
 | --- | --- | --- |
-| `OccupantKind` | record | open family id with constants `BLOCK`, `BLOCK_ENTITY`, `ENTITY`, `NESTED` |
+| `OccupantKind` | record | open family id with constants `block`, `blockEntity`, `entity`, `nested` |
 | `OccupantRef` | record | `(snapshot, frame, type, kind, anchor)`; identity within one capture and frame |
 | `OccupantDescriptor` | record | `(type, kind, properties, tags)`; ids and strings only |
 | `TraitKey<T>` | record | `(id, Class<T>)` |
 | `Trait<T>` | record | `(key, @Nullable value)`; present-with-null is a fact |
 | `OccupantSnapshot` | record | ref + descriptor + footprint + traits; air is a real occupant |
 | `OccupantFilter` | record | optional type/kind/trait predicates for a box query |
-| `ReadStatus` | enum | `READABLE`, `OUT_OF_BOUNDS`, `NOT_CAPTURED`, `DENIED` |
+| `ReadStatus` | enum | `readable`, `outOfBounds`, `notCaptured`, `denied` |
 | `SectionSlot` | sealed | `Air(revision)`, `Present(section)`, `Refused(status, code)` |
 | `SectionSnapshot` | record | one frozen section's non-air occupants and content digest |
 | `WorldView` | interface | recursive, section-based, immutable read face |
@@ -37,7 +37,7 @@ capture implementation (`mc`), dirty tracking or scheduling (host).
 | `SnapshotLease` | interface | view + `isCurrent()`; host-owned resource |
 | `OccupantResolver<R>` | interface | raw host value → occupant snapshot, or decline |
 | `ResolveContext` | record | what a resolver may see |
-| `EntityWindow` | record | `(Cuboid cells, NamespacedId type)`, inflated by `MAX_ENTITY_SPAN` |
+| `EntityWindow` | record | `(Cuboid cells, NamespacedId type)`, inflated by `maxEntitySpan` |
 
 ## 3. Signatures
 
@@ -45,10 +45,10 @@ capture implementation (`mc`), dirty tracking or scheduling (host).
 package dev.vfyjxf.cumulus.kernel.world;
 
 public record OccupantKind(NamespacedId id) implements Comparable<OccupantKind> {
-    public static final OccupantKind BLOCK;
-    public static final OccupantKind BLOCK_ENTITY;
-    public static final OccupantKind ENTITY;
-    public static final OccupantKind NESTED;
+    public static final OccupantKind block;
+    public static final OccupantKind blockEntity;
+    public static final OccupantKind entity;
+    public static final OccupantKind nested;
     public static OccupantKind of(NamespacedId id);
     @Override public int compareTo(OccupantKind other);
 }
@@ -74,7 +74,7 @@ public record Trait<T>(TraitKey<T> key, @Nullable T value) {
 
 public record OccupantSnapshot(OccupantRef ref, OccupantDescriptor descriptor, Cuboid footprint,
                                java.util.List<Trait<?>> traits) {
-    public static final NamespacedId AIR;
+    public static final NamespacedId air;
     public static OccupantSnapshot air(SnapshotId snapshot, int frame, LatticePoint cell);
     public boolean isAir();
     public <T> @Nullable Trait<T> find(TraitKey<T> key);
@@ -93,7 +93,7 @@ public record OccupantFilter(java.util.function.Predicate<NamespacedId> type,
 }
 
 public enum ReadStatus {
-    READABLE, OUT_OF_BOUNDS, NOT_CAPTURED, DENIED;
+    readable, outOfBounds, notCaptured, denied;
     public boolean readable();
 }
 
@@ -167,7 +167,7 @@ public record ResolveContext(SnapshotId snapshot, int frame, LatticePoint anchor
                              int remainingDepth, SnapshotPolicy policy) { }
 
 public record EntityWindow(Cuboid cells, NamespacedId type) {
-    public static final int MAX_ENTITY_SPAN = 3;
+    public static final int maxEntitySpan = 3;
     public static @Nullable EntityWindow of(Cuboid declared, NamespacedId type); // inflates by 3
 }
 ```
@@ -178,12 +178,12 @@ public record EntityWindow(Cuboid cells, NamespacedId type) {
 
 `occupant(cell)` returns a non-null `OccupantSnapshot` exactly when the cell's section is readable
 (`Air` or `Present`). A cell in a refused section returns `null`, never air. An air cell is a real
-`OccupantSnapshot` with `ref.type == AIR`, kind `BLOCK`, footprint one cell, no traits. A predicate
+`OccupantSnapshot` with `ref.type == air`, kind `block`, footprint one cell, no traits. A predicate
 that sees air as "nothing there" is wrong; it sees a definite occupant whose type is air.
 
-`statusOf(cell)` is the section's status: `READABLE` for `Air`/`Present`, otherwise the `Refused`
-status. `DENIED` is a host decision; `NOT_CAPTURED` is a cap/depth/unloaded decision;
-`OUT_OF_BOUNDS` is outside the captured bounds or a key of another frame.
+`statusOf(cell)` is the section's status: `readable` for `Air`/`Present`, otherwise the `Refused`
+status. `denied` is a host decision; `notCaptured` is a cap/depth/unloaded decision;
+`outOfBounds` is outside the captured bounds or a key of another frame.
 
 ### 4.2 A footprint is evidence, not a permission
 
@@ -191,7 +191,7 @@ status. `DENIED` is a host decision; `NOT_CAPTURED` is a cap/depth/unloaded deci
 an occupant if its footprint intersects `box`; the whole occupant is returned, never a clip. The
 footprint does **not** make a refused cell readable: a consumer that walks the footprint must ask
 `occupant` for each cell and stop at `null`. A check over a multi-cell body whose tail is
-`NOT_CAPTURED` is `Unreadable`, never a clipped match.
+`notCaptured` is `Unreadable`, never a clipped match.
 
 ### 4.3 One occupant per cell
 
@@ -199,7 +199,7 @@ Two occupants may overlap only through a host-resolved body (an entity over a bl
 structure over a cell). `occupant(cell)` narrows by: non-air, then smaller footprint volume, then
 `OccupantRef` order. A block section's cell maps to its block snapshot; an entity footprint maps
 every covered cell to the entity snapshot; a nested structure's anchor maps to the nested occupant.
-A host that cannot decide is `DENIED`, not a guess.
+A host that cannot decide is `denied`, not a guess.
 
 ### 4.4 Identity and frames
 
@@ -217,7 +217,7 @@ frame. `Air(revision)` means read and empty. `Present` holds a `SectionSnapshot`
 occupants; a missing cell in a present section is air. `Refused` carries a status and a code; its
 `occupantAt` is null. `contentDigest(key)` is the host's stable digest of the frozen content; it is
 `0` for `Air` and `Refused`. A view answers a key of another frame/world with
-`Refused(OUT_OF_BOUNDS, SC-OCC-0003)`.
+`Refused(outOfBounds, SC-OCC-0003)`.
 
 ### 4.6 Capture and lease
 
@@ -229,7 +229,7 @@ is the host's monotonic per-world counter; `SnapshotId.revision` is stamped from
 
 `SnapshotPolicy` is a ceiling, not a request to over-read: `maxElements` and `maxDepth` bound the
 capture; `kinds` and `traits` say what must be resolved; `windows` names the entity windows a read
-scope needs. A required trait that cannot be resolved makes the cell `NOT_CAPTURED`, never a default.
+scope needs. A required trait that cannot be resolved makes the cell `notCaptured`, never a default.
 
 ### 4.7 Traits and descriptors
 
@@ -244,7 +244,7 @@ primitive, `NamespacedId`, an immutable record/collection); a live host object i
 ### 4.8 Entity windows
 
 An entity can move within a section without a block change, so an entity check declares a window:
-the bay box inflated by `MAX_ENTITY_SPAN` on every axis, clamped to the lattice. The window is a
+the bay box inflated by `maxEntitySpan` on every axis, clamped to the lattice. The window is a
 read-scope entry, not a capture bound; `SnapshotPolicy.windows` asks the host to include it. The
 kernel has no type-body data, so a body wider than one section is the host's capture concern, not a
 blueprint build error.
@@ -274,7 +274,7 @@ chosen by the consumer, not by the slot.
 - `SectionSnapshot`: canonical occupant order, `contentDigest`, box query.
 - Descriptor: properties/tags immutable, sorted; trait find/has/absent.
 - Lease gate: `isCurrent` false after the host invalidates; `check` returns `Dropped`.
-- `EntityWindow.of` inflation and lattice clamp; `MAX_ENTITY_SPAN` rejection.
+- `EntityWindow.of` inflation and lattice clamp; `maxEntitySpan` rejection.
 
 ## 8. Dependencies
 

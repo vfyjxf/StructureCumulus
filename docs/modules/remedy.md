@@ -60,11 +60,11 @@ public record OverlayModel(Cuboid bounds, java.util.Map<LatticeKey, CellMark> ce
     public OverlayModel { /* immutable; cells sorted by key */ }
 }
 
-public enum CellMark { EXPECTED, PRESENT, MISSING, EXTRA, WRONG, BLOCKED, UNKNOWN }
+public enum CellMark { expected, present, missing, extra, wrong, blocked, unknown }
 
 public record Marker(Locus locus, String label, MarkerKind kind) { }
 
-public enum MarkerKind { ERROR, WARNING, INFO, ANCHOR, SEAM }
+public enum MarkerKind { error, warning, info, anchor, seam }
 
 public interface RemedyProvider {
     NamespacedId id();
@@ -89,11 +89,11 @@ public record SolveResult(java.util.List<Remedy> remedies, FindingBundle finding
   and reports `SC-RMD-0001`; a malformed remedy reports `SC-RMD-0002`. Results are deduplicated by
   value and capped at `maxResults`; the cap applies to warnings/info-style suggestions, never to a
   machine-applicable repair? Keep it simple: cap the whole list at `maxResults`, preserving
-  `MACHINE_APPLICABLE` first by `Applicability.rank`.
-- `Applicability.MACHINE_APPLICABLE` is the only rung a host may auto-apply; a `HAS_PLACEHOLDERS`
+  `machineApplicable` first by `Applicability.rank`.
+- `Applicability.machineApplicable` is the only rung a host may auto-apply; a `hasPlaceholders`
   plan needs a human edit.
 - An `EditPlan` is ordered; `EditStep.locus` is the same locus vocabulary as a finding. A plan that
-  carries a `KEY` locus is not executable (no cell), which is why the step's `Edit` always has cells
+  carries a `key` locus is not executable (no cell), which is why the step's `Edit` always has cells
   or a trait at a cell.
 - `OverlayModel` is pure data: bounds, per-cell marks, markers. Rendering, colours and translation
   are the host's.

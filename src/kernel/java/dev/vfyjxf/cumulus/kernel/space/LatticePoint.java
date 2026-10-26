@@ -5,11 +5,11 @@ import org.jspecify.annotations.Nullable;
 /** An integer point inside Minecraft's packing range. */
 public record LatticePoint(int x, int y, int z) implements Comparable<LatticePoint> {
 
-    public static final int MIN_XZ = -33_554_432;
-    public static final int MAX_XZ = 33_554_431;
-    public static final int MIN_Y = -2_048;
-    public static final int MAX_Y = 2_047;
-    public static final LatticePoint ORIGIN = new LatticePoint(0, 0, 0);
+    public static final int minXz = -33_554_432;
+    public static final int maxXz = 33_554_431;
+    public static final int minY = -2_048;
+    public static final int maxY = 2_047;
+    public static final LatticePoint origin = new LatticePoint(0, 0, 0);
 
     public LatticePoint {
         if (!inLattice(x, y, z)) {
@@ -22,14 +22,14 @@ public record LatticePoint(int x, int y, int z) implements Comparable<LatticePoi
     }
 
     public static boolean inLattice(int x, int y, int z) {
-        return x >= MIN_XZ && x <= MAX_XZ && y >= MIN_Y && y <= MAX_Y && z >= MIN_XZ && z <= MAX_XZ;
+        return x >= minXz && x <= maxXz && y >= minY && y <= maxY && z >= minXz && z <= maxXz;
     }
 
     public @Nullable LatticePoint offset(int dx, int dy, int dz) {
         long nx = (long) x + dx;
         long ny = (long) y + dy;
         long nz = (long) z + dz;
-        if (nx < MIN_XZ || nx > MAX_XZ || ny < MIN_Y || ny > MAX_Y || nz < MIN_XZ || nz > MAX_XZ) {
+        if (nx < minXz || nx > maxXz || ny < minY || ny > maxY || nz < minXz || nz > maxXz) {
             return null;
         }
         return new LatticePoint((int) nx, (int) ny, (int) nz);

@@ -30,7 +30,7 @@ extension path is one interface and one catalog registration. The host path is f
 | **F-02** | The kernel is version-independent. No `net.minecraft`, `net.neoforged` or `com.mojang` name appears under `kernel.**`. | `kernel` source set has no Minecraft on its classpath; `kernelPurity` scans text. |
 | **F-03** | A match produces typed runtime context, not only a boolean. | `context`: `ContextKey<T>`, `Computation`, `Deriver`, `StructureContext`. |
 | **F-04** | No controller entity is required. The orientation comes from a declared anchor property at the definition origin. | `structure`: `AnchorSpec`, `OrientationPolicy`; `space`: 48 orientations, `Siting`. |
-| **F-05** | A bay is a rectangular region tested atomically; a door is the canonical two-cell case. | `structure`: `Bay`, `Focus`, `Expectation<DoorView>`, `Coverage.ONE_SUBJECT`. |
+| **F-05** | A bay is a rectangular region tested atomically; a door is the canonical two-cell case. | `structure`: `Bay`, `Focus`, `Expectation<DoorView>`, `Coverage.oneSubject`. |
 | **F-06** | Claims are explicit: shared vs exclusive, per cell, with one conflict predicate and one compare-and-set. | `claim`: `Sharing`, `ClaimRow`, `ClaimMatrix`, `ClaimLedger`. |
 | **F-07** | Checking and claiming are separate entry points. `check` writes nothing; `settle` is the only writer. | `engine`: `check`, `settle`; `spi`: `StructureKernel`. |
 | **F-08** | Structure definitions are data-driven and code-driven at once: one IR, two frontends. | `document`: `Document`, `BlueprintSpec`, `DocumentCompiler`; `structure`: `BlueprintBuilder`. |

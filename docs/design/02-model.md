@@ -11,7 +11,7 @@
 | instance | `InstanceId` | core | `(world, serial)`, one placed structure |
 | snapshot | `SnapshotId` | core | `(world, revision)`, one capture |
 | owner | `OwnerId` | core | who holds a claim |
-| phase | `Phase` | core | `COMPILE`, `CHECK`, `SETTLE` |
+| phase | `Phase` | core | `compile`, `check`, `settle` |
 | cell | `LatticePoint` | space | integer `(x,y,z)` in a blueprint's local frame |
 | box | `Cuboid` | space | half-open axis-aligned box |
 | region | `CuboidSet` | space | normalized disjoint box set; value equality is by cells |
@@ -58,7 +58,7 @@ MatchRequest(blueprint, siting, lease, instance, owner, budget, claims)
    │    → Admitted | Failed | Undecided | Dropped        (writes nothing)
    │
    ├─ SETTLE       engine.settle(request, admitted)
-   │    gate → validate bindings → derive rows → one CAS → publish INSTANCE values
+   │    gate → validate bindings → derive rows → one CAS → publish instance values
    │    → Formed | Failed | Undecided | Dropped          (the only writer)
    │
    └─ DERIVE       engine.derive(formed, derivationSpecs)
@@ -70,16 +70,17 @@ MatchRequest(blueprint, siting, lease, instance, owner, budget, claims)
 
 | Phase | Input | Reads world | Writes | Output |
 | --- | --- | --- | --- | --- |
-| `COMPILE` | `Document` | no | nothing | `Blueprint` + findings |
-| `CHECK` | `MatchRequest` + lease | the immutable view | nothing | `Admitted` / `Failed` / `Undecided` / `Dropped` |
-| `SETTLE` | request + `Admitted` | the lease's gate | claims + context | `Formed` / `Failed` / `Undecided` / `Dropped` |
+| `compile` | `Document` | no | nothing | `Blueprint` + findings |
+| `check` | `MatchRequest` + lease | the immutable view | nothing | `Admitted` / `Failed` / `Undecided` / `Dropped` |
+| `settle` | request + `Admitted` | the lease's gate | claims + context | `Formed` / `Failed` / `Undecided` / `Dropped` |
 
 A `Phase` appears only in a `Finding` and in a result, to say when the fact became knowable. It is
 not a scheduling unit and not declared by a blueprint.
 
 ## 4. The check pipeline in detail
 
-1. **Gate.** If the lease is not current, `Dropped(SNAPSHOT_INVALID)`; nothing is read.
+1. **Gate.** If the lease is not current, the result is `Dropped(check, findings)` with `SC-ENG-0002`
+   in the bundle; nothing is read.
 2. **Section pass.** For each `SectionComputation`, for each section of its `region` intersecting the
    captured sections, call `compute(SectionContext)`. A `Found(value)` becomes a contribution
    stamped with the section; a `Missing` makes the whole key absent. Charge cells and sections.
@@ -96,20 +97,20 @@ not a scheduling unit and not declared by a blueprint.
 7. **Verdict fold.** Any `Mismatch` → `Failed`. Else any `Unreadable` or `Abstain` or zero checks →
    `Undecided`. Else `Admitted` with the values, bindings and spend.
 8. **Claim prediction.** Derive rows from the bindings, compare with the frozen `ClaimView`. An
-   unavailable view is `Undecided(LEDGER_UNAVAILABLE)`; a conflict is `Failed(SC-CLM-0002)`; else
+   unavailable view is `Undecided(ledgerUnavailable)`; a conflict is `Failed(SC-CLM-0002)`; else
    `Admitted` carries the view's revision.
 
 ## 5. The settle pipeline
 
 1. Gate.
 2. Validate every binding: the bay is this blueprint's; every subject was minted under this
-   snapshot; the subjects' footprints lie inside the bay (equal for `ONE_SUBJECT`); an `EXCLUSIVE`
+   snapshot; the subjects' footprints lie inside the bay (equal for `oneSubject`); an `exclusive`
    `Bound` bay bound at least one non-air cell.
 3. Derive rows with `ClaimPlanner`; the caller supplied none.
 4. `ClaimLedger.settle(SettleRequest)` at the revision the check read.
 5. `RevisionMoved` → re-read the same box, re-run the matrix, retry once at the new revision.
-6. `Conflict` → `Failed` with the incumbent rows. `Moved` twice → `Undecided(LEDGER_MOVED)`.
-7. `Settled` → publish the `INSTANCE` values to the `ContextStore` at `revision + 1`, then return
+6. `Conflict` → `Failed` with the incumbent rows. `Moved` twice → `Undecided(ledgerMoved)`.
+7. `Settled` → publish the `instance` values to the `ContextStore` at `revision + 1`, then return
    `Formed` carrying the `ClaimSet`, `contextRevision` and `ledgerRevision`.
 
 ## 6. The value algebra

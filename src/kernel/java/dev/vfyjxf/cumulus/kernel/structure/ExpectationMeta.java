@@ -32,7 +32,7 @@ public record ExpectationMeta(NamespacedId id, int specificity, Set<ContextKey<?
             NamespacedId.of("anonymous"),
             0,
             Set.of(),
-            FindingCode.of(FindingCode.Family.EXP, 1)
+            FindingCode.of(FindingCode.Family.exp, 1)
         );
     }
 

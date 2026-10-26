@@ -7,10 +7,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
-/** The box one entity type may move in, inflated by {@link #MAX_ENTITY_SPAN}. */
+/** The box one entity type may move in, inflated by {@link #maxEntitySpan}. */
 public record EntityWindow(Cuboid cells, NamespacedId type) {
 
-    public static final int MAX_ENTITY_SPAN = 3;
+    public static final int maxEntitySpan = 3;
 
     public EntityWindow {
         Objects.requireNonNull(cells, "cells");
@@ -23,12 +23,12 @@ public record EntityWindow(Cuboid cells, NamespacedId type) {
         if (declared.isEmpty()) {
             return null;
         }
-        int minX = clamp(declared.min().x() - MAX_ENTITY_SPAN, LatticePoint.MIN_XZ, LatticePoint.MAX_XZ);
-        int minY = clamp(declared.min().y() - MAX_ENTITY_SPAN, LatticePoint.MIN_Y, LatticePoint.MAX_Y);
-        int minZ = clamp(declared.min().z() - MAX_ENTITY_SPAN, LatticePoint.MIN_XZ, LatticePoint.MAX_XZ);
-        int maxX = clamp(declared.max().x() + MAX_ENTITY_SPAN, LatticePoint.MIN_XZ, LatticePoint.MAX_XZ);
-        int maxY = clamp(declared.max().y() + MAX_ENTITY_SPAN, LatticePoint.MIN_Y, LatticePoint.MAX_Y);
-        int maxZ = clamp(declared.max().z() + MAX_ENTITY_SPAN, LatticePoint.MIN_XZ, LatticePoint.MAX_XZ);
+        int minX = clamp(declared.min().x() - maxEntitySpan, LatticePoint.minXz, LatticePoint.maxXz);
+        int minY = clamp(declared.min().y() - maxEntitySpan, LatticePoint.minY, LatticePoint.maxY);
+        int minZ = clamp(declared.min().z() - maxEntitySpan, LatticePoint.minXz, LatticePoint.maxXz);
+        int maxX = clamp(declared.max().x() + maxEntitySpan, LatticePoint.minXz, LatticePoint.maxXz);
+        int maxY = clamp(declared.max().y() + maxEntitySpan, LatticePoint.minY, LatticePoint.maxY);
+        int maxZ = clamp(declared.max().z() + maxEntitySpan, LatticePoint.minXz, LatticePoint.maxXz);
         return new EntityWindow(Cuboid.of(minX, minY, minZ, maxX, maxY, maxZ), type);
     }
 

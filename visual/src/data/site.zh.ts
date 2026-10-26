@@ -68,7 +68,7 @@ export const ZH_DOCS: Record<string, string> = {
   'docs/modules/space.md': 'space',
   'docs/modules/remedy.md': 'remedy',
   'docs/modules/spi.md': 'spi',
-  'docs/modules/adapter.md': 'adapter（仅规范）',
+  'docs/modules/adapter.md': 'adapter（M1 capture）',
 };
 
 export const ZH_GROUPS: Record<string, string> = {
@@ -77,7 +77,7 @@ export const ZH_GROUPS: Record<string, string> = {
 };
 
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
-  Compile: { label: '编译', note: 'javac 21 · Gradle/spotless 未跑' },
+  Compile: { label: '编译', note: 'javac 21 · gradlew check 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
   Tests: { label: '测试', note: 'JUnit 5 · 15 个容器' },
   'Spec index': { label: '规范索引', note: 'spec-check.py · 55 codes' },

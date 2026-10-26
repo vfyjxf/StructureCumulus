@@ -1,15 +1,18 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, spec only)
+# Module `dev.vfyjxf.cumulus.mc` (adapter)
 
-> The only code allowed to name Minecraft. This round specifies it; it is not implemented. The kernel
-> is complete without it: a host that implements the four ports can run every scenario.
+> The only code allowed to name Minecraft. M1 implements capture, a root snapshot, the lease,
+> block/block-entity descriptors and one capture GameTest; the rest of this file is still the
+> specification. The kernel is complete without it: a host that implements the four ports can run
+> every scenario.
 
 ## 1. Position
 
 - Source set `main`; package `dev.vfyjxf.cumulus.mc`; the mod entry is
   `dev.vfyjxf.cumulus.StructureCumulus`.
 - Minecraft 1.21.1 / NeoForge 21.1.x; one baseline, no loader abstraction and no version branches.
-- The adapter implements `WorldCapture`, `WorldView`, `SnapshotLease`, `ClaimLedger`,
-  `ContextStore`, `DocumentReader`, `DocumentWriter`, `OccupantResolver` and the command surface.
+- At M1 the adapter implements `WorldCapture`, `WorldView`, `SnapshotLease` and block/block-entity
+  descriptor mapping; `ClaimLedger`, `ContextStore`, `DocumentReader`, `DocumentWriter`,
+  entity/trait resolution and the command surface remain pending.
 - No kernel type names a Minecraft type; the adapter may name every kernel type.
 
 ## 2. Types
@@ -35,15 +38,18 @@
 
 ## 3. Capture
 
+M1 copies blocks and block entities into the root frame; the entity, trait, nested and window rules
+below are still pending.
+
 - One server-thread call. `ServerChunkCache.getChunkNow`; never `Level.getChunk`, never a chunk load.
 - Sections are copied with `PalettedContainer.copy()`; an all-air section is `Air(revision)`; an
-  unloaded chunk is `Refused(NOT_CAPTURED, SC-MC-0001)`. A section is never lazily resolved.
+  unloaded chunk is `Refused(notCaptured, SC-MC-0001)`. A section is never lazily resolved.
 - Block entities are read with `saveWithoutMetadata`; a required trait that cannot be read makes the
-  cell `Refused(NOT_CAPTURED)`; a block entity whose body cannot be read is `SC-MC-0002`.
-- Entities intersecting `bounds.inflate(MAX_ENTITY_SPAN)` are admitted tracked-type-first; their
+  cell `Refused(notCaptured)`; a block entity whose body cannot be read is `SC-MC-0002`.
+- Entities intersecting `bounds.inflate(maxEntitySpan)` are admitted tracked-type-first; their
   footprints are indexed cell→occupant. A body leaving the capture is not clipped; its covered cells
   outside are unreadable.
-- Nested structures recurse with `maxDepth - 1`; a cycle is cut with `Refused(NOT_CAPTURED,
+- Nested structures recurse with `maxDepth - 1`; a cycle is cut with `Refused(notCaptured,
   SC-MC-0003)` and a finding.
 - `SnapshotId` is stamped last from the per-world counter; a content-equal refresh may return the
   same view object (no new id).
@@ -79,7 +85,11 @@ a crash. A `RuntimeState` type does not exist: the `StructureContext` is the per
 `placements`, `bays` (`box`/`boxes`/`minus`), `checks` (focus/expectation trees), `computations`,
 `keys`, `derivations`, `anchors`, `orientation`, `arguments`, `extensions`. Unknown members are
 `SC-DOC-0002`; spans are attached when the parser records offsets. `JsonWriter` writes the schema in
-canonical order, with `bounds` as origin+size and object members ascending.
+canonical order, with `bounds` as origin+size and object members ascending. LowerCamel enum constants
+never change a serialized tag: finding JSON takes `severity`/`phase`/`role`/`frame`/`applicability`
+from `wireName()`, `SC-*` codes take their family tag from the explicit table, and both stay
+uppercase, while the document shape keeps its separate lowercase vocabulary (`every_cell`,
+`exclusive`, `identity`).
 
 `DatapackBlueprints` scans `data/<ns>/cumulus/structure/*.json` on reload, stores `Document`s and
 serves them through `DocumentSource.find`. A duplicate id with different bytes is a reload finding;
@@ -88,10 +98,11 @@ the first file in path order wins and the duplicate is reported.
 ## 8. Orientation
 
 `OrientationMapping` maps `Heading` to `Direction`, `Turn`/`Tilt`/`Flip` to `Rotation`/`Mirror` and
-applies the state transform to a `BlockState`. `Tilt.PITCH_*`/`ROLL_*` are legal for blocks that
-support six-way facing; a block whose state cannot express the chosen orientation is a capture-time
-mismatch (`SC-MC-0004`), never a silent identity. The definition origin's anchor property is read from
-the `BlockState` properties, not from NBT.
+applies the state transform to a `BlockState`. `Tilt.pitchUp`/`Tilt.pitchDown` and
+`Tilt.rollLeft`/`Tilt.rollRight` are legal for blocks that support six-way facing; a block whose
+state cannot express the chosen orientation is a capture-time mismatch (`SC-MC-0004`), never a silent
+identity. The definition origin's anchor property is read from the `BlockState` properties, not
+from NBT.
 
 ## 9. Commands and lifecycle
 

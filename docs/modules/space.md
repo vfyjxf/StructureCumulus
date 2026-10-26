@@ -20,18 +20,18 @@ structure owns (`claim`), the text a source span points into (`core`).
 | --- | --- | --- |
 | `LatticePoint` | record | in-range `(x,y,z)`; origin is `(0,0,0)`; ordered `(y,z,x)` |
 | `LatticeKey` | record | one `long`, x:26 / z:26 / y:12; `Comparable` by point order |
-| `Axis` | enum | `X`, `Y`, `Z` |
+| `Axis` | enum | `x`, `y`, `z` |
 | `Cuboid` | record | half-open `[min,max)`; empty is legal; no union/difference |
 | `CuboidSet` | final class | normalized, disjoint, sorted, empty-free boxes; equality by cells |
 | `SectionKey` | record | `(world, frame, x, y, z)`; the view's section index |
-| `Heading` | enum | `NORTH,SOUTH,WEST,EAST,UP,DOWN` |
+| `Heading` | enum | `north,south,west,east,up,down`; anchor text is matched case-insensitively |
 | `Turn` | enum | yaw quarter turn, cyclic order 4 |
 | `Tilt` | enum | the six proper rotations with distinct `up()` |
-| `Flip` | enum | `NONE` plus two reflections |
+| `Flip` | enum | `none` plus two reflections |
 | `Orientation` | record | one of 48 signed axis permutations |
 | `Placement` | record | `(orientation, offset)`; nullable composition/inverse |
 | `Siting` | record | `(origin, placement)`; local↔world mapping |
-| `LocusFrame` | enum | `DEFINITION, LOCAL, WORLD, KEY` |
+| `LocusFrame` | enum | `definition, local, world, key`; `wireName()` is the uppercase tag |
 | `KeyLocus` | record | `(InstanceId, NamespacedId)`; one key of one instance |
 | `Locus` | record | frame + cells + optional key + optional source span |
 | `LocusMap` | record | local↔world conversion for one `Siting` |
@@ -42,9 +42,9 @@ structure owns (`claim`), the text a source span points into (`core`).
 package dev.vfyjxf.cumulus.kernel.space;
 
 public record LatticePoint(int x, int y, int z) implements Comparable<LatticePoint> {
-    public static final int MIN_XZ = -33_554_432, MAX_XZ = 33_554_431;
-    public static final int MIN_Y = -2_048, MAX_Y = 2_047;
-    public static final LatticePoint ORIGIN;
+    public static final int minXz = -33_554_432, maxXz = 33_554_431;
+    public static final int minY = -2_048, maxY = 2_047;
+    public static final LatticePoint origin;
     public static LatticePoint of(int x, int y, int z);
     public static boolean inLattice(int x, int y, int z);
     public @Nullable LatticePoint offset(int dx, int dy, int dz);
@@ -59,7 +59,7 @@ public record LatticeKey(long packed) implements Comparable<LatticeKey> {
     @Override public int compareTo(LatticeKey other);             // point order, never packed order
 }
 
-public enum Axis { X, Y, Z }
+public enum Axis { x, y, z }
 
 public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<Cuboid> {
     public Cuboid { /* min <= max on every axis; both in lattice */ }
@@ -111,7 +111,7 @@ public record SectionKey(World world, int frame, int x, int y, int z)
 }
 
 public enum Heading {
-    NORTH, SOUTH, WEST, EAST, UP, DOWN;
+    north, south, west, east, up, down;
     public Heading opposite();
     public Axis axis();
     public int stepX();  public int stepY();  public int stepZ();
@@ -119,23 +119,23 @@ public enum Heading {
 }
 
 public enum Turn {
-    NONE, CLOCKWISE, HALF, COUNTERCLOCKWISE;
+    none, clockwise, half, counterclockwise;
     public Turn compose(Turn other);       // this after other
     public Turn inverse();
 }
 
 public enum Tilt {
-    LEVEL, PITCH_UP, PITCH_DOWN, ROLL_LEFT, ROLL_RIGHT, INVERTED;
+    level, pitchUp, pitchDown, rollLeft, rollRight, inverted;
     public Heading up();
 }
 
 public enum Flip {
-    NONE, LEFT_RIGHT, FRONT_BACK;
+    none, leftRight, frontBack;
     public boolean isMirror();
 }
 
 public record Orientation(int ordinal) implements Comparable<Orientation> {
-    public static final Orientation IDENTITY;
+    public static final Orientation identity;
     public static Orientation of(Turn turn, Tilt tilt, Flip flip);
     public static java.util.List<Orientation> all();               // 48, canonical order
     public Orientation compose(Orientation other);                // this after other
@@ -149,7 +149,7 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
 }
 
 public record Placement(Orientation orientation, LatticePoint offset) {
-    public static final Placement IDENTITY;
+    public static final Placement identity;
     public @Nullable Placement compose(Placement other);           // this after other
     public @Nullable Placement inverse();
     public @Nullable LatticePoint apply(LatticePoint point);
@@ -170,8 +170,9 @@ public record Siting(LatticePoint origin, Placement placement) {
 }
 
 public enum LocusFrame {
-    DEFINITION, LOCAL, WORLD, KEY;
+    definition, local, world, key;
     public int rank();
+    public String wireName();
 }
 
 public record KeyLocus(InstanceId instance, NamespacedId key) { }
@@ -188,8 +189,8 @@ public record Locus(LocusFrame frame, CuboidSet cells, @Nullable KeyLocus key,
 
 public record LocusMap(Siting siting) {
     public static LocusMap of(Siting siting);
-    public @Nullable Locus toWorld(Locus local);      // LOCAL → WORLD; WORLD unchanged; else null
-    public @Nullable Locus toLocal(Locus world);      // WORLD → LOCAL; LOCAL unchanged; else null
+    public @Nullable Locus toWorld(Locus local);      // local → world; world unchanged; else null
+    public @Nullable Locus toLocal(Locus world);      // world → local; local unchanged; else null
 }
 ```
 
@@ -240,14 +241,18 @@ kernel.
 ### 4.4 Orientations
 
 An orientation is a signed permutation: `world(a) = s_a · local(π(a))`, with `π` a permutation of
-`{X,Y,Z}` and one sign per world axis. There are `6 × 8 = 48`. Storage is the ordinal
+`{x,y,z}` and one sign per world axis. There are `6 × 8 = 48`. Storage is the ordinal
 `(turn × 6 + tilt) × 2 + parity`; `of(turn,tilt,flip)` normalises the triple through the 48-element
-group, so `of(HALF, LEVEL, LEFT_RIGHT)` equals `of(NONE, LEVEL, FRONT_BACK)`. `all()` is the 48 in
+group, so `of(half, level, leftRight)` equals `of(none, level, frontBack)`. `all()` is the 48 in
 ordinal order.
 
-`Turn` is a generator about `Y`; `Tilt` is a transversal (six proper rotations with distinct
+`Turn` is a generator about the `y` axis; `Tilt` is a transversal (six proper rotations with distinct
 `up()`); `Flip` is a reflection. They are not a unique name for 48 elements: 72 triples map onto 48.
-`isMirror` is the determinant sign; `INVERTED` is proper (a half turn about `X`).
+`isMirror` is the determinant sign; `inverted` is proper (a half turn about the `x` axis).
+
+`Heading` constants are lowerCamel and have no wire tag: the anchor read in `structure` lowercases
+the block-state property text before `Heading.valueOf`, so the accepted strings stay `north`, `south`,
+`west`, `east`, `up`, `down` (case-insensitive), and `ofStep` remains the only numeric construction.
 
 Point image: `world(a) = s_a · local(π(a))`. Cuboid image per world axis with source axis `c`:
 `+1: [min[c], max[c])`, `-1: [1 - max[c], 1 - min[c])`. The `1 -` is required; using the stored
@@ -258,7 +263,7 @@ corners directly loses the image of `min` and adds a cell nobody's image is. Vol
 `Placement.apply(p) = o(p) + t`. `compose` is `(o_P ∘ o_Q, o_P(t_Q) + t_P)` (Q first) and returns
 `null` when the offset sum leaves the lattice. `inverse` is `(o⁻¹, -o⁻¹(t))` and is `null` when the
 negated offset leaves the lattice. The inverse law holds when both are non-null:
-`P.inverse().compose(P) == IDENTITY`. `Siting.toWorld(p) = origin + o(p) + t`, checked; `toLocal` is
+`P.inverse().compose(P) == identity`. `Siting.toWorld(p) = origin + o(p) + t`, checked; `toLocal` is
 the inverse. A local delta must be oriented before it is added to a world point: `toWorld` is affine,
 not linear.
 
@@ -273,16 +278,19 @@ snapshot. A `SectionKey` is not a cache key and carries no content.
 
 | Frame | Coordinates | Cells | Key | Source |
 | --- | --- | --- | --- | --- |
-| `DEFINITION` | authoring document | optional | absent | required |
-| `LOCAL` | blueprint grid | non-empty | absent | absent |
-| `WORLD` | absolute lattice | non-empty | absent | absent |
-| `KEY` | one typed key of one instance | empty | required | absent |
+| `definition` | authoring document | optional | absent | required |
+| `local` | blueprint grid | non-empty | absent | absent |
+| `world` | absolute lattice | non-empty | absent | absent |
+| `key` | one typed key of one instance | empty | required | absent |
 
 `Locus`'s constructor enforces the table. A label's locus is one frame; a producer that has both a
 cell and a definition writes two labels, never one locus with two sources. `LocusMap.toWorld` maps
-`LOCAL → WORLD` and fixes `WORLD`; `toLocal` maps `WORLD → LOCAL` and fixes `LOCAL`; both return
-`null` for `DEFINITION`/`KEY` and when the image leaves the lattice. There is no
+`local → world` and fixes `world`; `toLocal` maps `world → local` and fixes `local`; both return
+`null` for `definition`/`key` and when the image leaves the lattice. There is no
 `toDefinition`: a definition label is created where the source is in hand.
+
+`LocusFrame.wireName()` returns `DEFINITION`/`LOCAL`/`WORLD`/`KEY`; the finding JSON renderer writes
+that tag for a label's `frame`, so the wire text does not follow the lowerCamel constants.
 
 ## 5. Pipeline role
 
@@ -310,6 +318,8 @@ lattice. `SC-SPC-0002` (ERROR): a `CuboidSet` operation would leave the lattice.
 - Placement: compose/inverse when non-null; off-lattice returns null; affine equivariance.
 - `SectionKey`: floorDiv for negative coordinates; frame separates nested views; order.
 - Locus: frame/field table enforced; `LocusMap` round-trip and null cases.
+- Wire tags: `LocusFrame.wireName()` is the uppercase tag; a heading property parses from `north`
+  and `NORTH` alike.
 
 ## 8. Dependencies
 

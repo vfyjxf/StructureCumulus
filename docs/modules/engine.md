@@ -48,8 +48,8 @@ public record MatchOutcome(WorldView view, java.util.Map<ContextKey<?>, Object> 
 public record BayBinding(Bay bay, java.util.List<OccupantSnapshot> subjects) { }
 
 public enum UndecidedReason {
-    BUDGET_EXHAUSTED, CANCELLED, UNREADABLE, ABSTAINED, NO_CHECKS,
-    LEDGER_UNAVAILABLE, LEDGER_MOVED, DESIGN_DEFECT
+    budgetExhausted, cancelled, unreadable, abstained, noChecks,
+    ledgerUnavailable, ledgerMoved, designDefect
 }
 
 public sealed interface MatchResult {
@@ -94,14 +94,14 @@ public final class ClaimPlanner {
 
 ```
 check(request):
-  if !request.lease().isCurrent()                      -> Dropped(CHECK) + SC-ENG-0002
+  if !request.lease().isCurrent()                      -> Dropped(check) + SC-ENG-0002
   plan = request.blueprint().plan()
-  if plan.checks().isEmpty()                           -> Undecided(NO_CHECKS)
+  if plan.checks().isEmpty()                           -> Undecided(noChecks)
   session = new Session(request)
   for each section computation in plan.sections():      // declaration order
       for each section of region ∩ view:
-          if budget exhausted                          -> Undecided(BUDGET_EXHAUSTED)
-          if cancelled                                 -> Undecided(CANCELLED)
+          if budget exhausted                          -> Undecided(budgetExhausted)
+          if cancelled                                 -> Undecided(cancelled)
           if slot not readable                         -> session.refuse(key, SC-CTX-0006)
           else                                         -> compute; Found -> contribute
   fold contributions per key                           // SectionKey order
@@ -114,12 +114,12 @@ check(request):
       charge check.reads()
       result = check.run(focus context)
       collect reply, subjects per bay, notes
-  if !lease.isCurrent()                                -> Dropped(CHECK) + SC-ENG-0002
-  fold replies: any Mismatch -> Failed; any Unreadable -> Undecided(UNREADABLE);
-                any Abstain -> Undecided(ABSTAINED); else Admitted
+  if !lease.isCurrent()                                -> Dropped(check) + SC-ENG-0002
+  fold replies: any Mismatch -> Failed; any Unreadable -> Undecided(unreadable);
+                any Abstain -> Undecided(abstained); else Admitted
   admitted:
       if no claimable bay                              -> ledgerAvailable=false, revision=0
-      else if request.claims() == null/!available      -> Undecided(LEDGER_UNAVAILABLE)
+      else if request.claims() == null/!available      -> Undecided(ledgerUnavailable)
       else derive rows; matrix against claims.rows()
            conflict -> Failed(SC-CLM-0001)
            else     -> Admitted(revision = claims.revision, ledgerAvailable = true)
@@ -131,28 +131,28 @@ check(request):
 
 ```
 settle(request, admitted, ledger, contexts):
-  if !request.lease().isCurrent()                      -> Dropped(SETTLE) + SC-ENG-0002
-  if admitted.phase() != CHECK                          -> Undecided(DESIGN_DEFECT)
+  if !request.lease().isCurrent()                      -> Dropped(settle) + SC-ENG-0002
+  if admitted.phase() != check                          -> Undecided(designDefect)
   bindings = admitted.outcome().bindings()
-  validate(bindings)                                    // blueprint, snapshot, frame, cells, ONE_SUBJECT
+  validate(bindings)                                    // blueprint, snapshot, frame, cells, oneSubject
       failure -> Failed(SC-CLM-0004)
   rows = ClaimPlanner.derive(blueprint, siting, owner, bindings)
   if rows.isEmpty():
       context = contexts.publish(instance, instanceValues, findings, spend)
-      return Formed(SETTLE, instance, siting, outcome, new ClaimSet([], ledger == null ? 0 : ledger.revision()),
+      return Formed(settle, instance, siting, outcome, new ClaimSet([], ledger == null ? 0 : ledger.revision()),
                     context.revision(), ledger == null ? 0 : ledger.revision(), findings)
-  if ledger == null                                     -> Undecided(LEDGER_UNAVAILABLE)
+  if ledger == null                                     -> Undecided(ledgerUnavailable)
   verdict = ledger.settle(new SettleRequest(owner, siting, rows, admitted.ledgerRevision()))
   if RevisionMoved:
       fresh = ledger.read(derived.footprint())
-      if !fresh.available()                             -> Undecided(LEDGER_UNAVAILABLE)
+      if !fresh.available()                             -> Undecided(ledgerUnavailable)
       if matrix(rows, fresh.rows()) conflict            -> Failed(SC-CLM-0001)
       verdict = ledger.settle(new SettleRequest(owner, siting, rows, fresh.revision()))
-      if RevisionMoved                                  -> Undecided(LEDGER_MOVED)
+      if RevisionMoved                                  -> Undecided(ledgerMoved)
   if Conflict                                           -> Failed(SC-CLM-0001) with incumbents
   Settled:
       context = contexts.publish(instance, instanceValues, findings, spend)
-      return Formed(SETTLE, instance, siting, outcome, new ClaimSet(rows, settled.revision()),
+      return Formed(settle, instance, siting, outcome, new ClaimSet(rows, settled.revision()),
                     context.revision(), settled.revision(), findings)
 ```
 
@@ -175,8 +175,8 @@ derive(formed, specs, derivers, contexts):
   return contexts.publish(formed.instance(), values, findings, formed.outcome().spend())
 ```
 
-A derive pass publishes one revision. A `MATCH` key produced by a deriver is rejected with
-`SC-CTX-0005` (only `INSTANCE` values are persisted). A missing deriver id is a finding, not a throw.
+A derive pass publishes one revision. A `match` key produced by a deriver is rejected with
+`SC-CTX-0005` (only `instance` values are persisted). A missing deriver id is a finding, not a throw.
 
 ## 7. Laws
 
@@ -191,7 +191,7 @@ boundaries; a long extension checks its own token. `CancelToken.never()` is the 
 ### 7.2 Outcome
 
 `MatchOutcome.values` contains the folded section values, the aggregate values, and the
-`Retention.MATCH`/`INSTANCE` values; keys are sorted by `(id, type name)`. `bindings` has one
+`Retention.match`/`instance` values; keys are sorted by `(id, type name)`. `bindings` has one
 `BayBinding` per bay that has checks, in bay declaration order; a bay with no non-air subject carries
 an empty list, which is how an empty `Bound` claim is detected. `reads` is the union of every check's
 read scope and every computation's region. `spend` is the sum of every charge.
@@ -200,7 +200,7 @@ read scope and every computation's region. `spend` is the sum of every charge.
 
 `Admitted` is not a structure: no claims, no `ClaimSet`, no `Formed`. `Formed` exists only after a
 `Settled` (or an empty-row registration that needed no ledger) and carries the claims, the context
-revision and the ledger revision. `Failed` has at least one `ERROR` finding. `Undecided` carries a
+revision and the ledger revision. `Failed` has at least one `error` finding. `Undecided` carries a
 reason and, when available, a partial outcome. `Dropped` means the snapshot was no longer current;
 the attempt read nothing that can be trusted.
 
@@ -217,12 +217,12 @@ version. A stale snapshot never publishes a claim or a context value.
 `ClaimPlanner` is the only row factory; it is pure and takes no view and no ledger. `Box` and
 `Declared` are local sets translated by the siting; `Bound` is the union of the subjects' world
 footprints; a subject from a nested frame (`frame != 0`) is invalid for a claimable bay. Rows are one
-per cell per bay; a cell may carry two rows only when both bays are `SHARED` (the blueprint refuses
+per cell per bay; a cell may carry two rows only when both bays are `shared` (the blueprint refuses
 an exclusive overlap). `rows` is sorted by `(cell, owner, bay)`.
 
 `settle` validates before deriving: each bay is this blueprint's; each subject's ref belongs to this
 snapshot and the root frame; every subject footprint lies inside the bay's world cells; for
-`ONE_SUBJECT` the union equals the bay; for `EXCLUSIVE + Bound` at least one non-air subject exists.
+`oneSubject` the union equals the bay; for `exclusive + Bound` at least one non-air subject exists.
 A failure is `Failed(SC-CLM-0004)`/`SC-CLM-0005)` and nothing is written.
 
 ### 7.6 Budget and determinism
@@ -230,7 +230,7 @@ A failure is `Failed(SC-CLM-0004)`/`SC-CLM-0005)` and nothing is written.
 Charges: a section computation charges the slice volume plus one section per section run; a check
 charges its declared cells' volume plus the sections they touch, and a window charges its inflated
 volume plus its sections; an aggregate charges nothing. Charges happen before the unit runs; a
-refusal returns `Undecided(BUDGET_EXHAUSTED)`. The budget is the request's; the engine does not reset
+refusal returns `Undecided(budgetExhausted)`. The budget is the request's; the engine does not reset
 it. For a fixed tuple the result value, finding order and spend are identical; `Plan` order is fixed
 at build; the fold sorts by `SectionKey`; the finding bundle sorts.
 
@@ -248,13 +248,13 @@ revision moved twice, `SC-CLM-0004` invalid binding, `SC-CLM-0005` empty exclusi
 - Door: two subjects, one bay, one claim; missing half is `Undecided`, wrong half is `Failed`.
 - Hatch: shared/shared coexists; exclusive conflicts; release re-claims.
 - Pipe corner: eight asserted, four owned; neighbour does not conflict.
-- Entity pen: window read, subject footprint, `ANY_SUBJECT + Bound`.
+- Entity pen: window read, subject footprint, `anySubject + Bound`.
 - Absence: a refused section makes the key absent; a read is `Unreadable`, never a short sum.
 - Budget: a too-small budget is `Undecided`; no claims.
 - Gate: an invalidated lease is `Dropped`; nothing written.
 - Ledger: revision moved once retries; twice is `Undecided`; conflict is `Failed`; no row on failure.
 - Bindings: another snapshot, a nested frame, a cell outside the bay, an empty exclusive bound.
-- Derive: order, missing deriver, missing key, one publish, stale MATCH key.
+- Derive: order, missing deriver, missing key, one publish, stale match key.
 
 ## 10. Dependencies
 

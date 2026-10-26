@@ -52,17 +52,17 @@ public final class Expectations {
 
     @SafeVarargs
     public static <T> Expectation<T> allOf(Expectation<T>... children) {
-        return new Junction<>(Junction.Mode.ALL, List.of(children));
+        return new Junction<>(Junction.Mode.all, List.of(children));
     }
 
     @SafeVarargs
     public static <T> Expectation<T> anyOf(Expectation<T>... children) {
-        return new Junction<>(Junction.Mode.ANY, List.of(children));
+        return new Junction<>(Junction.Mode.any, List.of(children));
     }
 
     @SafeVarargs
     public static <T> Expectation<T> sequence(Expectation<T>... children) {
-        return new Junction<>(Junction.Mode.SEQUENCE, List.of(children));
+        return new Junction<>(Junction.Mode.sequence, List.of(children));
     }
 
     public static <T> Expectation<T> not(Expectation<T> child) {
@@ -71,17 +71,17 @@ public final class Expectations {
 
     @SafeVarargs
     public static <T> Expectation<T> atLeast(int count, Expectation<T>... children) {
-        return new Threshold<>(Threshold.Mode.AT_LEAST, count, List.of(children));
+        return new Threshold<>(Threshold.Mode.atLeast, count, List.of(children));
     }
 
     @SafeVarargs
     public static <T> Expectation<T> atMost(int count, Expectation<T>... children) {
-        return new Threshold<>(Threshold.Mode.AT_MOST, count, List.of(children));
+        return new Threshold<>(Threshold.Mode.atMost, count, List.of(children));
     }
 
     @SafeVarargs
     public static <T> Expectation<T> exactly(int count, Expectation<T>... children) {
-        return new Threshold<>(Threshold.Mode.EXACTLY, count, List.of(children));
+        return new Threshold<>(Threshold.Mode.exactly, count, List.of(children));
     }
 
     public static Expectation<BayView> eachCell(Expectation<OccupantSnapshot> element) {
@@ -101,7 +101,7 @@ public final class Expectations {
     }
 
     private static FindingCode code(int number) {
-        return FindingCode.of(FindingCode.Family.EXP, number);
+        return FindingCode.of(FindingCode.Family.exp, number);
     }
 
     private static Locus locusOf(FocusContext ctx, OccupantSnapshot occupant) {
@@ -111,7 +111,7 @@ public final class Expectations {
 
     private static Finding problem(FocusContext ctx, OccupantSnapshot occupant, String message) {
         Locus locus = locusOf(ctx, occupant);
-        return Finding.builder(code(1), Severity.ERROR).phase(ctx.phase()).message(message)
+        return Finding.builder(code(1), Severity.error).phase(ctx.phase()).message(message)
                 .label(Label.primary(locus, message)).build();
     }
 
@@ -254,7 +254,7 @@ public final class Expectations {
     private record Junction<T>(Mode mode, List<Expectation<T>> children) implements Expectation<T> {
 
         private enum Mode {
-            ALL, ANY, SEQUENCE
+            all, any, sequence
         }
 
         private Junction {
@@ -294,7 +294,7 @@ public final class Expectations {
                     case Reply.Abstain ignored -> abstained = true;
                 }
             }
-            if (mode == Mode.ANY) {
+            if (mode == Mode.any) {
                 if (matched) {
                     return Reply.match();
                 }
@@ -326,17 +326,17 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             int specificity = switch (mode) {
-                case ALL, SEQUENCE -> children.stream().mapToInt(child -> child.meta().specificity()).max().orElse(0);
-                case ANY -> children.stream().mapToInt(child -> child.meta().specificity()).min().orElse(0);
+                case all, sequence -> children.stream().mapToInt(child -> child.meta().specificity()).max().orElse(0);
+                case any -> children.stream().mapToInt(child -> child.meta().specificity()).min().orElse(0);
             };
             Set<ContextKey<?>> requires = new LinkedHashSet<>();
             for (Expectation<T> child : children) {
                 requires.addAll(child.meta().requires());
             }
             String name = switch (mode) {
-                case ALL -> "all_of";
-                case ANY -> "any_of";
-                case SEQUENCE -> "sequence";
+                case all -> "all_of";
+                case any -> "any_of";
+                case sequence -> "sequence";
             };
             return new ExpectationMeta(id(name), specificity, requires, code(1));
         }
@@ -361,7 +361,7 @@ public final class Expectations {
         public Reply test(ExpectationContext<T> ctx) {
             return switch (child.test(ctx)) {
                 case Reply.Match ignored -> {
-                    Finding finding = Finding.builder(code(2), Severity.ERROR).phase(ctx.phase())
+                    Finding finding = Finding.builder(code(2), Severity.error).phase(ctx.phase())
                             .message("a negated test matched")
                             .label(Label.primary(ctx.locus(), "the negated test matched")).build();
                     yield mismatch(finding);
@@ -391,7 +391,7 @@ public final class Expectations {
     private record Threshold<T>(Mode mode, int count, List<Expectation<T>> children) implements Expectation<T> {
 
         private enum Mode {
-            AT_LEAST, AT_MOST, EXACTLY
+            atLeast, atMost, exactly
         }
 
         private Threshold {
@@ -431,22 +431,22 @@ public final class Expectations {
                 }
             }
             boolean fail = switch (mode) {
-                case AT_LEAST -> matches + unreadable + abstained < count;
-                case AT_MOST -> matches > count;
-                case EXACTLY -> matches > count || matches + unreadable + abstained < count;
+                case atLeast -> matches + unreadable + abstained < count;
+                case atMost -> matches > count;
+                case exactly -> matches > count || matches + unreadable + abstained < count;
             };
             if (fail) {
                 findings.add(
-                    Finding.builder(code(3), Severity.ERROR).phase(ctx.phase())
+                    Finding.builder(code(3), Severity.error).phase(ctx.phase())
                             .message("threshold " + mode + "(" + count + ") cannot be met")
                             .label(Label.primary(ctx.locus(), "the threshold failed")).build()
                 );
                 return Reply.mismatch(FindingBundle.of(findings));
             }
             boolean canStill = switch (mode) {
-                case AT_LEAST -> matches >= count;
-                case AT_MOST -> matches + unreadable + abstained <= count;
-                case EXACTLY -> matches == count && unreadable + abstained == 0;
+                case atLeast -> matches >= count;
+                case atMost -> matches + unreadable + abstained <= count;
+                case exactly -> matches == count && unreadable + abstained == 0;
             };
             if (canStill) {
                 return Reply.match();
@@ -469,9 +469,9 @@ public final class Expectations {
                 requires.addAll(child.meta().requires());
             }
             String name = switch (mode) {
-                case AT_LEAST -> "at_least";
-                case AT_MOST -> "at_most";
-                case EXACTLY -> "exactly";
+                case atLeast -> "at_least";
+                case atMost -> "at_most";
+                case exactly -> "exactly";
             };
             return new ExpectationMeta(id(name), 0, requires, code(1));
         }
@@ -507,7 +507,7 @@ public final class Expectations {
                             if (occupant == null) {
                                 unreadable = true;
                                 findings.add(
-                                    Finding.builder(FindingCode.of(FindingCode.Family.OCC, 1), Severity.ERROR)
+                                    Finding.builder(FindingCode.of(FindingCode.Family.occ, 1), Severity.error)
                                             .phase(ctx.phase()).message("unreadable cell " + cell)
                                             .label(Label.primary(ctx.locus(), "unreadable cell " + cell)).build()
                                 );

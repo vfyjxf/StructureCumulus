@@ -26,7 +26,7 @@ public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<C
         long maxX = (long) x + sizeX;
         long maxY = (long) y + sizeY;
         long maxZ = (long) z + sizeZ;
-        if (maxX > LatticePoint.MAX_XZ || maxY > LatticePoint.MAX_Y || maxZ > LatticePoint.MAX_XZ) {
+        if (maxX > LatticePoint.maxXz || maxY > LatticePoint.maxY || maxZ > LatticePoint.maxXz) {
             throw new IllegalArgumentException("box leaves the lattice");
         }
         return new Cuboid(LatticePoint.of(x, y, z), LatticePoint.of((int) maxX, (int) maxY, (int) maxZ));

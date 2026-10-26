@@ -46,14 +46,14 @@ optional lookup; it never means "unreadable".
 ## Law 5 — One publication, at the end
 
 A check computes values into its `MatchOutcome` and writes nothing. A successful settle publishes
-the `Retention.INSTANCE` values once, at a new `contextRevision`. A derive publishes its own batch
+the `Retention.instance` values once, at a new `contextRevision`. A derive publishes its own batch
 once. There are no context tiers, no stage frames, and no per-phase store writes.
 
 ## Law 6 — Claims are derived, compared and replaced
 
 A `ClaimRow` is produced only by `ClaimPlanner` from `(blueprint, siting, owner, bindings)`. The
 caller cannot hand rows to `settle`. One ledger handle answers for one world. One predicate decides
-conflict: a cell is contested when either row is `EXCLUSIVE` and the rows differ in
+conflict: a cell is contested when either row is `exclusive` and the rows differ in
 `(owner, siting)`. One compare-and-set replaces every row of `(owner, siting)`; a revision move is
 re-read once, then reported.
 

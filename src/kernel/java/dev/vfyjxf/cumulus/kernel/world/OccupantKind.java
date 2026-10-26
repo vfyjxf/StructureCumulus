@@ -7,10 +7,10 @@ import java.util.Objects;
 /** An open occupant family with four reserved constants. */
 public record OccupantKind(NamespacedId id) implements Comparable<OccupantKind> {
 
-    public static final OccupantKind BLOCK = new OccupantKind(NamespacedId.of("block"));
-    public static final OccupantKind BLOCK_ENTITY = new OccupantKind(NamespacedId.of("block_entity"));
-    public static final OccupantKind ENTITY = new OccupantKind(NamespacedId.of("entity"));
-    public static final OccupantKind NESTED = new OccupantKind(NamespacedId.of("nested"));
+    public static final OccupantKind block = new OccupantKind(NamespacedId.of("block"));
+    public static final OccupantKind blockEntity = new OccupantKind(NamespacedId.of("block_entity"));
+    public static final OccupantKind entity = new OccupantKind(NamespacedId.of("entity"));
+    public static final OccupantKind nested = new OccupantKind(NamespacedId.of("nested"));
 
     public OccupantKind {
         Objects.requireNonNull(id, "id");

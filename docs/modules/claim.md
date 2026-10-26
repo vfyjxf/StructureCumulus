@@ -19,7 +19,7 @@ text (`finding`), persistence (`mc`), the bay's `Coverage` (`structure`). A conf
 
 | Type | Kind | Contract |
 | --- | --- | --- |
-| `Sharing` | enum | `EXCLUSIVE`, `SHARED`; `blocks()` is true only for exclusive |
+| `Sharing` | enum | `exclusive`, `shared`; `blocks()` is true only for exclusive |
 | `Footprint` | sealed | `Box`, `Bound`, `Declared`, `None`: which cells a bay owns |
 | `ClaimRow` | record | one cell of one world held by one bay of one owner at one siting |
 | `ClaimSet` | record | the rows of one settlement + the revision written |
@@ -35,7 +35,7 @@ text (`finding`), persistence (`mc`), the bay's `Coverage` (`structure`). A conf
 package dev.vfyjxf.cumulus.kernel.claim;
 
 public enum Sharing {
-    EXCLUSIVE, SHARED;
+    exclusive, shared;
     public boolean blocks();
 }
 
@@ -110,14 +110,14 @@ worlds are two ledgers. This removes the whole "row from another world" class of
    with itself, so a re-settle replaces its own rows;
 3. at least one of `a.sharing().blocks()` / `b.sharing().blocks()`.
 
-`SHARED`/`SHARED` coexists. `EXCLUSIVE`/`SHARED` conflicts in both directions. There is no strength
+`shared`/`shared` coexists. `exclusive`/`shared` conflicts in both directions. There is no strength
 order on `Sharing`; the matrix is the only rule and the adapter has no second predicate.
 
 ### 4.3 Order and identity
 
 `ClaimRow` order is `(cell, owner, bay)`, implemented once in `compareTo`; `ClaimSet` and
 `ClaimVerdict` sort by it. A row is identified by the full record; two bays of one owner at one siting
-may hold the same cell only when both are `SHARED` (the blueprint refuses an exclusive overlap), and
+may hold the same cell only when both are `shared` (the blueprint refuses an exclusive overlap), and
 the two rows stay distinct by `bay`. A settlement replaces every row of `(owner, siting)` in one
 compare-and-set; it never merges per row or per bay.
 
