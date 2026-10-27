@@ -18,6 +18,7 @@ import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.SectionSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
+import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldCapture;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import net.minecraft.core.BlockPos;
@@ -57,6 +58,7 @@ public final class LevelCapture implements WorldCapture {
     private final ServerLevel level;
     private final World world;
     private final NestedExtentLookup nestedLookup;
+    private final TraitLookup traitLookup;
     private final AtomicLong revisions = new AtomicLong();
 
     public LevelCapture(ServerLevel level) {
@@ -64,8 +66,13 @@ public final class LevelCapture implements WorldCapture {
     }
 
     LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup) {
+        this(level, nestedLookup, TraitLookup.capabilities());
+    }
+
+    LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup, TraitLookup traitLookup) {
         this.level = Objects.requireNonNull(level, "level");
         this.nestedLookup = Objects.requireNonNull(nestedLookup, "nestedLookup");
+        this.traitLookup = Objects.requireNonNull(traitLookup, "traitLookup");
         var location = level.dimension().location();
         this.world = World.of(NamespacedId.of(location.getNamespace(), location.getPath()));
     }
@@ -313,9 +320,12 @@ public final class LevelCapture implements WorldCapture {
                         LatticePoint cell = LatticePoint.of(x, y, z);
                         BlockPos worldPos = new BlockPos(worldX, worldY, worldZ);
                         BlockEntity blockEntity = state.hasBlockEntity() ? chunk.getBlockEntity(worldPos) : null;
+                        List<TraitSlot> traits = OccupantTraits
+                                .block(context.policy(), traitLookup, level, worldPos, state, blockEntity);
                         OccupantSnapshot occupant = blockEntity == null
-                                ? OccupantDescriptors.block(context.snapshot(), frame, cell, state)
-                                : OccupantDescriptors.blockEntity(context.snapshot(), frame, cell, state, blockEntity);
+                                ? OccupantDescriptors.block(context.snapshot(), frame, cell, state, traits)
+                                : OccupantDescriptors
+                                        .blockEntity(context.snapshot(), frame, cell, state, blockEntity, traits);
                         occupants.put(cell, occupant);
                         if (nestedEnabled && (!state.hasBlockEntity() || blockEntity != null)) {
                             NestedExtent extent = blockExtent(worldPos, state, blockEntity);
@@ -347,8 +357,15 @@ public final class LevelCapture implements WorldCapture {
                     continue;
                 }
                 bodies.add(
-                    OccupantDescriptors
-                            .entity(context.snapshot(), frame, anchor, candidate.type(), candidate.id(), footprint)
+                    OccupantDescriptors.entity(
+                        context.snapshot(),
+                        frame,
+                        anchor,
+                        candidate.type(),
+                        candidate.id(),
+                        footprint,
+                        OccupantTraits.entity(context.policy(), traitLookup, candidate.entity())
+                    )
                 );
             }
             return bodies;
