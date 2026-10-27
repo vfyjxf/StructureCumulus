@@ -29,11 +29,13 @@ public final class ServerState {
 
     private final Catalogs catalogs;
     private final StructureKernel kernel;
+    private final DatapackBlueprints blueprints;
     private final Map<ServerLevel, LevelStore> levels = new HashMap<>();
     private final Map<ServerLevel, LevelCapture> captures = new HashMap<>();
 
     private ServerState() {
         this.catalogs = Catalogs.builtin();
+        this.blueprints = DatapackBlueprints.attach();
         this.kernel = StructureKernel
                 .create(catalogs, new Host(BuiltinDocuments.source(), null, ContextStore.inMemory(), Map.of()));
     }
@@ -46,9 +48,11 @@ public final class ServerState {
         ServerState state = current;
         current = null;
         if (state != null) {
+            state.blueprints.close();
             state.captures.clear();
             state.levels.clear();
         }
+        DatapackBlueprints.clearPending();
     }
 
     public static void unload(LevelEvent.Unload event) {
@@ -65,6 +69,10 @@ public final class ServerState {
 
     StructureKernel kernel() {
         return kernel;
+    }
+
+    DatapackBlueprints blueprints() {
+        return blueprints;
     }
 
     StructureKernel kernel(ServerLevel level) {

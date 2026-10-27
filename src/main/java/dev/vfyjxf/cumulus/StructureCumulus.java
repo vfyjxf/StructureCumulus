@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus;
 
 import dev.vfyjxf.cumulus.mc.CumulusCommand;
+import dev.vfyjxf.cumulus.mc.DatapackBlueprints;
 import dev.vfyjxf.cumulus.mc.ServerState;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -20,6 +21,7 @@ public final class StructureCumulus {
     public static final Logger logger = LoggerFactory.getLogger("StructureCumulus");
 
     public StructureCumulus(ModContainer container, IEventBus modBus) {
+        NeoForge.EVENT_BUS.addListener(DatapackBlueprints::addReloadListener);
         NeoForge.EVENT_BUS.addListener(ServerState::open);
         NeoForge.EVENT_BUS.addListener(ServerState::close);
         NeoForge.EVENT_BUS.addListener(ServerState::unload);
