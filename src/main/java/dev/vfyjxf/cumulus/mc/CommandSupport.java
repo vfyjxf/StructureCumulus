@@ -89,9 +89,10 @@ final class CommandSupport {
         NamespacedId id,
         Cuboid bounds,
         SnapshotPolicy policy,
-        @Nullable Orientation audit
+        @Nullable Orientation orientation
     ) {
-        CaptureResult result = state.capture(source.getLevel()).capture(new CaptureRequest(bounds, policy), audit);
+        CaptureResult result = state.capture(source.getLevel())
+                .capture(new CaptureRequest(bounds, policy), orientation);
         if (result instanceof CaptureResult.Captured captured) {
             return new Captured(captured.lease(), captured.report());
         }

@@ -22,10 +22,11 @@ reader/writer), M4b at `76a8e5c` (datapack reload) and the command slice at `489
 compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25`, the determinism
 gate with `DeterminismTest`, the rotated-siting two-phase capture (P1) at `56c632c`, the
 event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
-`ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. M3 persistence
-is compatible with Model C. Pending only: the pre-existing siting-aware `property` expectation gap,
-the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
-There is no regeneration milestone.
+`ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. The sited-root
+descriptor projection (S6, D-29) is implemented and closes the siting-aware `property` expectation gap
+(`SitedDescriptorGameTest`). M3 persistence is compatible with Model C. Pending only: the
+performance/cost pass (block-entity-lazy
+and entity sweep) and fresh visual review screenshots. There is no regeneration milestone.
 
 ## 2. The order
 
@@ -95,10 +96,6 @@ the exact failure this set exists to prevent.
 
 ## 7. What the next round owes
 
-- **Siting-aware property expectation.** The kernel's built-in `property` expectation compares the
-  raw descriptor value, so a rotated siting can report `SC-EXP-0001` beside the capture's
-  `SC-MC-0004` capability warning. `FocusContext.siting()` is the seam; this is a pre-existing
-  kernel gap, not an adapter one.
 - **Performance/cost pass.** The block-entity-lazy and entity sweep, plus the known costs: claim-row
   volume for large structures, the per-cell `read`/`statusOf` cost, the section pass and the
   nested-frame budget. If a row form other than per-cell is needed, it is a `ClaimRow`/ledger
@@ -107,3 +104,6 @@ the exact failure this set exists to prevent.
   regenerated; it is a reading aid, never a source.
 - A host scheduler with coalescing, dirty windows and a per-world ledger stays outside v1; this round
   does not owe it.
+
+The siting-aware `property` expectation, previously owed here, is closed by D-29: a sited root capture
+publishes definition-frame descriptors (S6), so no kernel change is needed.

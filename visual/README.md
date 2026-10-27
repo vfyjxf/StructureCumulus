@@ -3,8 +3,8 @@
 An interactive, adversarial review of the kernel design. Not a feature tour: each chapter is a claim
 the kernel must survive — a frame mapping, a write, a conflict, a missing value, a finding.
 
-The design of record is [`../docs/README.md`](../docs/README.md). The adapter is committed through
-M5e: M1 is the host, `/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`,
+The design of record is [`../docs/README.md`](../docs/README.md). The adapter is complete through
+S6: M1 is the host, `/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`,
 `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, `ServerState`, in-memory
 `BuiltinDocuments`); M2a adds loaded-entity capture with policy windows, full footprint indexing and
 entity-vs-block precedence; M2b adds upright orientation mapping (`Heading`/`Direction`,
@@ -13,12 +13,12 @@ M2c adds Model C — body identity, the total read with `SC-OCC-0004`, partial s
 traits; M2d adds the nested capability (`NestedExtent`/`NestedExtents`, frames, cuts, child
 entities); M3 adds `SavedClaims`/`SavedContexts` at `d4b6d82`, compatible with Model C. M4a JSON
 (`JsonReader`/`JsonWriter`) is committed at `f2659c7`, M4b datapack reload at `76a8e5c`, and the
-command slice (settle at `4899d86`, plus compile, explain, claims) is green. M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping and M5e's capture
-report (D-28) are complete; the determinism gate (`DeterminismTest`) covers canonical bytes, the
+command slice (settle at `4899d86`, plus compile, explain, claims) is green. M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping, M5e's capture report
+(D-28) and S6's sited-root descriptor projection (D-29, the siting-aware property expectation) are
+complete; the determinism gate (`DeterminismTest`) covers canonical bytes, the
 parse/write fixed point, equal compile runs and stable finding order, and capture-revision lease
-invalidation landed at `0f0bf25`. Pending only the siting-aware property expectation, a
-performance/cost pass and fresh review screenshots.
-125 kernel tests, 130 adapter unit tests and 60/60 GameTests are green. The UI opens in **中文**; the
+invalidation landed at `0f0bf25`. Pending only a performance/cost pass and fresh review screenshots.
+125 kernel tests, 130 adapter unit tests and 66/66 GameTests are green. The UI opens in **中文**; the
 **EN** button in the top bar switches to the English reading layer. Technical identifiers, code,
 JSON, Java and finding codes stay in their original form in both languages.
 
@@ -37,7 +37,7 @@ network request.
 
 ## What is inside
 
-125 kernel tests, 130 adapter unit tests, 60 GameTests, 56 codes, 28 decisions and 11 ranked kernel
+125 kernel tests, 130 adapter unit tests, 66 GameTests, 56 codes, 29 decisions and 11 ranked kernel
 packages. One complete document and a Java builder excerpt target the same IR.
 
 | Chapter | What you can do |
@@ -49,7 +49,7 @@ packages. One complete document and a Java builder excerpt target the same IR.
 | **04 / Ledger** | Move two owners' bays, change `EXCLUSIVE`/`SHARED`, settle, race the revision, and see the conflict matrix and rows. |
 | **05 / Fold** | Refuse a section, change `sum`/`max`, toggle `whenAbsent`, and see the key become absent and a derive skip. |
 | **06 / Codes** | Search/filter all 56 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail. |
-| **07 / Proof** | Read the gate report, the falsifiers, the 28 decisions, the regeneration protocol and the document index. |
+| **07 / Proof** | Read the gate report, the falsifiers, the 29 decisions, the regeneration protocol and the document index. |
 
 Press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> for the index. Use **EN / 中文** in the top bar to switch languages. The **NIGHT** switch flips the same
 information to a dark instrument palette. The layout is responsive down to 390 px.
@@ -73,4 +73,4 @@ history; this app documents design v1.2 and is the one to run.
 ## Caveat
 
 The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check`, the adapter’s 130 unit
-tests and its 60 GameTests (`runGameTestServer` 60/60) are green.
+tests and its 66 GameTests (`runGameTestServer` 66/66) are green.

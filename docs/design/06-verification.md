@@ -18,23 +18,26 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current evidence (2026-10-27, HEAD `28d0334`): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are
+Current evidence (2026-10-27): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are
 committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`),
 capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase capture (P1, `56c632c`),
 the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright orientation remap (M5d,
-`ac11d0c`) and the capture report (M5e, `28d0334`) are implemented. `./gradlew check` is green: 125
-kernel tests and 130 adapter unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 60/60.
+`ac11d0c`), the capture report (M5e, `28d0334`) and the sited-root descriptor projection (S6, D-29)
+are implemented. `./gradlew check` is green: 125
+kernel tests and 130 adapter unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 66/66.
 `tools/spec-check.py` is clean. Model C, body identity, trait capture, the nested capability, the
-mark counter and the capture-report channel are implemented, not pending. The determinism gate is
+mark counter, the capture-report channel and the definition-frame descriptor projection are
+implemented, not pending. The determinism gate is
 implemented (`DeterminismTest`): canonical bytes across member order, the parse/write fixed point,
-equal compile runs and stable finding order. `Codes.all` has 56 entries and the decision record has 28
-decisions (D-28).
+equal compile runs and stable finding order. `Codes.all` has 56 entries and the decision record has 29
+decisions (D-29).
 
-**What remains.** Three items only, none of them a kernel registry or API gap: the `property`
-expectation is not siting-aware (a pre-existing kernel gap — it compares the raw descriptor value, so
-a rotated siting can report `SC-EXP-0001` next to the capture's `SC-MC-0004` capability warning; the
-`FocusContext.siting()` seam exists), the performance/cost pass over the block-entity-lazy and entity
-sweep, and fresh visual review screenshots. There is no regeneration milestone.
+**What remains.** Two items only: the performance/cost pass over the block-entity-lazy and entity
+sweep, and fresh visual review screenshots. There is no regeneration milestone. The former
+siting-aware `property` gap is closed by the host-side root descriptor projection (D-29): a sited root
+publishes definition-frame descriptor properties, so `Expectations.property` needs no kernel change;
+only an `Unrepresentable` state keeps the raw descriptor, and the same capture reports `SC-MC-0004`
+for it. The projection adds no kernel type, so the spec index is unaffected.
 
 **Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
 in code documented; it is green. There is no documented-but-not-in-code list and no suppression.
@@ -115,7 +118,7 @@ They are the acceptance suite; a module test that does not feed one of them is o
 | `core` | id grammar, catalog freeze, Value content equality, budget, key equality |
 | `space` | packing bijection, cuboid edges, CuboidSet normalization and semantic-equality laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
 | `finding` | code parse, `Codes.all` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
-| `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors |
+| `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors, descriptor frame (the property leaf compares the published string and never transforms it) |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |
 | `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations |
 | `context` | context view, publish merge/revision, derive order, merges |
@@ -176,22 +179,25 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. All 60 GameTests are executed by
+- The rest of the NeoForge adapter and its GameTests. All 66 GameTests are executed by
   `runGameTestServer`: M1 capture/host, M2a entity precedence, M2b orientation, M3 claims, M2c traits,
   M2d nested frames/cuts, capture-revision lease invalidation (`LeaseLifecycleGameTest`), the
   watched-region mark counter (`LeaseMarkCounterGameTest`), the rotated-siting two-phase capture
   (`RotatedSitingGameTest`), the M4 command surface (`SettleCommandGameTest`, `CommandGameTest`), the
-  M5e capture report (`CaptureAuditGameTest`, `CommandCaptureReportGameTest`, `NestedCaptureGameTest`)
-  and the claims read in check (`CheckClaimsGameTest`). Unit evidence: `LevelSnapshotTest` for
+  M5e capture report (`CaptureAuditGameTest`, `CommandCaptureReportGameTest`, `NestedCaptureGameTest`),
+  the claims read in check (`CheckClaimsGameTest`) and the S6 projection
+  (`SitedDescriptorGameTest`: upright and non-upright definition-frame descriptors,
+  unoriented/identity raw descriptors, the unrepresentable raw fallback with `SC-MC-0004`, a
+  `property` expectation matching at a rotated siting, and child frames staying world-frame). Unit
+  evidence: `LevelSnapshotTest` for
   body/precedence/partial reads, `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for
   the capability declaration, `SavedClaimsTest`/`SavedContextsTest` for persistence,
   `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
   parse/write fixed point and equal compile runs, `ServerStateDocumentSourceTest`/
   `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing, `LevelWatchTest`
   for the mark counter's refcounts and lazy fingerprints, and `CaptureReportsTest` for the report
-  site. **What remains:** the pre-existing kernel gap that a `property` expectation is not
-  siting-aware, the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review
-  screenshots. There is no regeneration milestone.
+  site. **What remains:** the performance/cost pass (block-entity-lazy and entity sweep) and fresh
+  visual review screenshots. There is no regeneration milestone.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.

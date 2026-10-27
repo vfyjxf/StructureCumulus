@@ -40,16 +40,19 @@
   non-upright orientation remap with `MappingResult.Unrepresentable` (`ac11d0c`). M5e: the capture
   report (over-cap `SC-MC-0005`, cut `SC-MC-0003`, the sited-capture `SC-MC-0004` audit, the
   `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`.
-- **Pending.** Three items only: the pre-existing kernel gap that a `property` expectation is not
-  siting-aware, the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review
-  screenshots. There is no regeneration milestone.
+- **Implemented (S6).** The sited-root descriptor projection (D-29): a capture carrying a siting
+  orientation publishes definition-frame descriptor properties, so a `property` expectation matches at
+  a rotated siting without a kernel change (§3, §10); an unrepresentable state keeps its raw
+  descriptor and still reports `SC-MC-0004` (`SitedDescriptorGameTest`).
+- **Pending.** Two items only: the performance/cost pass (block-entity-lazy and entity sweep) and fresh
+  visual review screenshots. There is no regeneration milestone.
 - No kernel type names a Minecraft type; the adapter may name every kernel type.
 
 ## 2. Types
 
 | Type | Implements | Role |
 | --- | --- | --- |
-| `LevelCapture` | `WorldCapture` | server-thread capture into a `LevelSnapshot`; nested extents as declarations only |
+| `LevelCapture` | `WorldCapture` | server-thread capture into a `LevelSnapshot`; a sited root's descriptors projected into the definition frame; nested extents as declarations only |
 | `LevelSnapshot` | `WorldView` | one immutable view over every frame; `read`, `bounds`, `policy`, `nested` |
 | `FrameData` | — | package-private per-frame sections, entities, nested bodies/extents and children |
 | `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
@@ -113,10 +116,20 @@ The rules below are implemented.
   extra detail; its own `SC-MC-0001` code already is its finding.
 - The orientation audit runs inside the sited capture, in the same loop that already read each
   `BlockState`, so it needs no chunk load and no second traversal. `LevelCapture` exposes an
-  adapter-only overload `capture(CaptureRequest, @Nullable Orientation audit)`; the orientation comes
-  from the two-phase command path (`siting.placement().orientation()`, §11), the anchor-cell phase
-  passes none and only the root frame is audited. A nested child is an absolute extent and is not
-  rotated by the parent's siting.
+  adapter-only overload `capture(CaptureRequest, @Nullable Orientation orientation)`; the orientation
+  comes from the two-phase command path (`siting.placement().orientation()`, §11), the anchor-cell
+  phase passes none and only the root frame is audited. A nested child is an absolute extent and is
+  not rotated by the parent's siting.
+- A sited root capture publishes **definition-frame descriptors** (D-29): each root-frame `BlockState`
+  is projected through the inverse siting orientation (`siting.placement().orientation().inverse()`,
+  the pose that recovers the definition-frame state from the observed world state) before
+  `OccupantDescriptors`, so
+  `OccupantDescriptor.properties` answers the definition frame and `Expectations.property` matches
+  without a kernel change. Only the descriptor is projected — the actual state still feeds the
+  block-entity lookup, the trait capabilities, the nested capability, the audit and the watch
+  fingerprints. An `Unrepresentable` state keeps its raw (world-frame) descriptor and reports
+  `SC-MC-0004`. Child/nested frames and the phase-1 anchor capture stay world-frame: a child extent is
+  an absolute structure, and the anchor read needs the world's actual property.
 
 ## 4. Lease and gate
 
@@ -361,23 +374,28 @@ cannot express the pose — the payload `SC-MC-0004` reports. The normative rule
 support six-way facing; a block whose state cannot express the chosen orientation is a capture-time
 mismatch (`SC-MC-0004`), never a silent identity.
 
-The **orientation audit** (M5e, `28d0334`) runs in the sited (phase-2) capture: for every captured
-non-air block of the root frame the adapter applies the siting orientation to the live `BlockState`
-it already read and, when the result is `Unrepresentable`, groups the cell by
+The **orientation audit** (M5e, `28d0334`; fused with the S6 projection) runs in the sited (phase-2)
+capture: for every captured
+non-air block of the root frame the adapter projects the live `BlockState` it already read through the
+inverse siting orientation and, when the result is `Unrepresentable`, groups the cell by
 `(block type, property, value)`. One
 `SC-MC-0004` entry (WARNING) per group carries the code, the message, notes (`block`, `property`,
-`value`, `cells`, `orientation`) and the union of the group's world cells as its region. An upright
-siting is not audited (an upright pose is always expressible), and the audit never reads the world
+`value`, `cells`, `orientation`) and the union of the group's world cells as its region. The
+projection of an upright siting always succeeds, so it produces no entry (an upright pose is always
+expressible), and the audit never reads the world
 again: no chunk load, no second traversal, no `ReadRefusal`. The orientation comes from the
 two-phase command path (§11); a capture taken without a siting orientation reports none.
 
 `SC-MC-0004` is a capability fact about the observed blocks, not a value fact about the check. The
-kernel's built-in `property` expectation compares the raw descriptor value and is not siting-aware,
-so a rotated siting with a property expectation can also produce a `SC-EXP-0001` mismatch:
-capability and value, two findings, not a contradiction. A siting-aware property expectation is a
-pre-existing kernel gap and the one non-visual item still owed (`07-regeneration.md` §7); the
-`FocusContext.siting()` seam exists. The definition origin's anchor property is read from the
-`BlockState` properties, and `SC-MC-0004` never becomes a `ReadRefusal`.
+former siting-aware `property` gap is closed by the host-side projection (D-29): a `Mapped` state
+supplies definition-frame descriptor properties, so `Expectations.property` compares definition-frame
+values with no kernel change. An `Unrepresentable` state keeps its raw world-frame descriptor — the
+fallback is never silent, because the same capture reports `SC-MC-0004` — and a property expectation
+on that cell can still report `SC-EXP-0001`: capability and value, two findings, not a contradiction.
+The projection is the inverse-orientation `OrientationMapping.transform` result described above,
+applied at publication time; the kernel's property leaf and `FocusContext.siting()` are unchanged. The
+definition origin's anchor property is read from the world's `BlockState` properties (the phase-1
+capture is not projected), and `SC-MC-0004` never becomes a `ReadRefusal`.
 
 ## 11. Commands and lifecycle
 
@@ -423,6 +441,9 @@ child. `SC-MC-0004` a captured block state cannot express the siting orientation
 one per `(block type, property, value)` group, never a `ReadRefusal` (§10). `SC-MC-0005` the root is
 over the element ceiling: an ERROR entry on `CaptureResult.TooLarge`, which stays the refusal.
 `SC-MC-0001`…`0005` are adapter-only: the kernel never mints `SC-MC`, and none enters `Codes.all`.
+A capture taken with a siting orientation publishes definition-frame descriptors for its representable
+root states (D-29); only an unrepresentable state keeps the world-frame descriptor, so `SC-EXP-0001`
+on a rotated siting is possible only for a cell that also carries `SC-MC-0004`.
 
 The adapter registers those codes in its own code catalog through `Catalogs.Builder.codes`
 (`AdapterCodes` holds the five codes and their entries), so each carries the canonical severity

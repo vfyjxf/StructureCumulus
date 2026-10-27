@@ -12,14 +12,15 @@ client overlay, network payload, schematic importer, GUI or scheduler.
 ## Order and state at 2026-10-27
 
 The commit order was **M1 → M2a → M2b → M3 → M2c → M2d**, then **M4a → M4b → the command slice**,
-then **M5a → M5d → M5e**. M3
+then **M5a → M5d → M5e → S6**. M3
 was committed before Model C landed; its `SavedClaims`/`SavedContexts` code is compatible as-is, so the
 "rebase" is a checkpoint, not a rewrite. The kernel was regenerated from the design set at `4a6e093`,
 so the regeneration objective is historical, not pending; there is no regeneration milestone and no
 M6. Every milestone is implemented, and a milestone is complete only when its code and its named
-tests are both on the tree and re-run. Current counts (2026-10-27, HEAD
-`28d0334`): **125 kernel tests, 130 adapter unit tests, 60 GameTests**, `Codes.all` 56 entries, 28
-decisions (D-28); `./gradlew check`, `runGameTestServer` and `tools/spec-check.py` are green.
+tests are both on the tree and re-run. Current counts (2026-10-27): **125 kernel tests, 130 adapter
+unit tests, 66 GameTests**, `Codes.all` 56 entries, 29 decisions (D-29); `./gradlew check`,
+`runGameTestServer` and `tools/spec-check.py` are green. Pending only: the performance/cost pass and
+fresh review screenshots.
 
 | Milestone | Deliverable | State |
 | --- | --- | --- |
@@ -35,6 +36,7 @@ decisions (D-28); `./gradlew check`, `runGameTestServer` and `tools/spec-check.p
 | M5a | **Mark counter**: `LevelWatch`/`WatchEvents`, refcounted watched chunks, event-edged marks, lazy entity and block-entity fingerprints, `LevelWatchTest` + `LeaseMarkCounterGameTest` | **implemented at `d1fa42f`** |
 | M5d | **Non-upright mapping**: the 40 pitch/roll/inverted orientations, capability-aware state remap, `MappingResult.Unrepresentable` as the `SC-MC-0004` payload | **implemented at `ac11d0c`**; `OrientationMappingTest` |
 | M5e | **Capture report (D-28)**: `world.CaptureReport` on every `CaptureResult` arm, `SC-MC-0005` over-cap, `SC-MC-0003` cut, the sited-capture `SC-MC-0004` audit, the host code catalog, `CaptureReports` + the command report block | **implemented at `28d0334`** (P1's two-phase capture at `56c632c`) |
+| S6 | **Sited-root descriptor projection (D-29)**: root-frame `BlockState` properties projected into the definition frame before `OccupantDescriptors`; unrepresentable states keep the raw descriptor and report `SC-MC-0004`; child/nested frames and the phase-1 anchor capture stay world-frame | **implemented**; `SitedDescriptorGameTest` green |
 
 ## Acceptance
 
@@ -48,6 +50,7 @@ decisions (D-28); `./gradlew check`, `runGameTestServer` and `tools/spec-check.p
 | M5a | Met: `LevelWatchTest` covers the refcounted watched chunks, the epoch and the lazy fingerprints; `LeaseMarkCounterGameTest` covers set-block, outside-chunk, revert, entity join/leave/move, a 10k high-frequency move sweep with no dispatch, chunk unload and level epoch; a stale lease is never current and no chunk is loaded. |
 | M5d | Met: `OrientationMappingTest` covers the 8 upright and 40 non-upright orientations, the mapped and unrepresentable fixtures and the inverse round-trip; no silent identity. |
 | M5e | Met: `CaptureReportTest` covers the payload and the compatibility constructors; `CaptureReportsTest` covers severity, the trust guard, the world label and notes; `NestedCaptureGameTest` covers the over-cap entry and a cut reason with the unchanged `nested(cell) == null`; `CaptureAuditGameTest` covers the grouped orientation audit and no chunk load; `CommandCaptureReportGameTest` covers the print order and the `SC-MC-0005` command surfacing. `Codes.all` stays at 56 and `./gradlew check` plus `runGameTestServer` are green. |
+| S6 | Met: `SitedDescriptorGameTest` covers upright and non-upright definition-frame descriptors, unoriented/identity raw descriptors, the unrepresentable raw fallback with `SC-MC-0004`, a `property` expectation matching at a rotated siting, and child frames staying world-frame; `world` §4.7 owns the frame law and the kernel keeps no transform. |
 
 ## Owners
 
@@ -57,8 +60,9 @@ decisions (D-28); `./gradlew check`, `runGameTestServer` and `tools/spec-check.p
 - C: `mc/document`, `mc/host`, `mc/command`, mod entry (M4).
 - D: GameTests and test resources.
 - E: build/CI, determinism, lease invalidation and the mark counter (M5/M5a).
-- M5d/M5e slices: mapping (`ac11d0c`), capture report (`28d0334`, with P1 at `56c632c`); the docs
-  amendment (S0) and the evidence refresh (S5) are part of the same close-out.
+- M5d/M5e/S6 slices: mapping (`ac11d0c`), capture report (`28d0334`, with P1 at `56c632c`) and the
+  sited-root descriptor projection (D-29, `SitedDescriptorGameTest`); the docs amendment (S0) and the
+  evidence refresh (S5) are part of the same close-out.
 
 ## Rules
 

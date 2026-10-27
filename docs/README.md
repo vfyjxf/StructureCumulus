@@ -65,17 +65,19 @@ Then the module files, in dependency order:
   with the two-phase anchored capture at `56c632c`; M5d remaps the 40 non-upright orientations at
   `ac11d0c`; M5e adds the capture report (D-28: `world.CaptureReport` on every `CaptureResult` arm,
   `SC-MC-0003` cut / `SC-MC-0004` orientation / `SC-MC-0005` over-cap, the host code catalog and the
-  command report block) at `28d0334`. Pending only: the pre-existing kernel gap that the `property`
-  expectation is not siting-aware, the performance/cost pass (block-entity-lazy and entity sweep),
-  and fresh visual review screenshots. There is no regeneration milestone.
+  command report block) at `28d0334`. S6 implements the sited-root descriptor projection (D-29) and
+  closes the siting-aware `property` expectation gap: a sited root publishes definition-frame
+  descriptors, an unrepresentable state keeps the raw one and still reports `SC-MC-0004`. Pending
+  only: the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review
+  screenshots. There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 125
-  kernel JUnit 5 tests and 130 adapter unit tests pass; `runGameTestServer` passes 60/60; `./gradlew
+  kernel JUnit 5 tests and 130 adapter unit tests pass; `runGameTestServer` passes 66/66; `./gradlew
   check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean. `Codes.all` has 56
-  entries and the decision record has 28 decisions (D-28).
+  entries and the decision record has 29 decisions (D-29).
 
 ## The one rule
 

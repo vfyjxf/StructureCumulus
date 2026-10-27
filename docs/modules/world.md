@@ -361,6 +361,15 @@ the trait reports an unreadable trait, never a mismatch. The same rule holds for
 name. Properties are a sorted immutable map; tags are sorted and deduped. `property(k)` returns
 `null` when the host published nothing, never `false`.
 
+A descriptor is published in the frame the host captured it in, and the kernel's property leaf
+compares a descriptor property to the declaration's literal without transforming it (`structure`
+§4). Publishing a sited root's properties in the **definition frame** is the host's job: the shipped
+adapter projects each root-frame state through the inverse siting orientation (the pose that recovers
+the definition-frame state from the observed world state) before building the descriptor, and a state
+the orientation cannot express keeps its raw (world-frame) properties and is reported as `SC-MC-0004`
+(`adapter` §10, D-29). A host that publishes world-frame descriptors is legal; it fixes the frame its
+checks are written in, and the kernel never guesses one.
+
 `OccupantSnapshot.traits` is one `TraitSlot` per trait id, sorted by id. The four states are
 exhaustive:
 
@@ -490,6 +499,9 @@ the host's findings (`adapter` §12).
   anchor-only.
 - `SectionSnapshot`: canonical occupant order, `contentDigest`, box query.
 - Descriptor: properties/tags immutable, sorted; trait find/has/absent.
+- Descriptor frame: a descriptor's properties are the view's frame and the kernel's property leaf
+  never transforms them; a host that projects a sited root publishes definition-frame properties, and
+  an unrepresentable state keeps its raw properties (D-29, `adapter` §10).
 - Lease gate: `isCurrent` false after the host invalidates; `check` returns `Dropped`.
 - `EntityWindow.of` inflation and lattice clamp; `maxEntitySpan` rejection.
 - `SnapshotPolicy`: `traits` is a set of ids; a non-empty set stays non-empty; duplicate ids collapse

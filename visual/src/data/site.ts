@@ -78,20 +78,20 @@ export const DOCS = [
   { group: 'Modules', file: 'docs/modules/space.md', title: 'space' },
   { group: 'Modules', file: 'docs/modules/remedy.md', title: 'remedy' },
   { group: 'Modules', file: 'docs/modules/spi.md', title: 'spi' },
-  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (M5a/M5d/M5e complete)' },
+  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (S6 complete)' },
 ];
 
 export const HERO_STATS = [
-  { value: '125', label: 'tests', note: 'kernel JUnit 5 · adapter 130 · GameTests 60/60' },
+  { value: '125', label: 'tests', note: 'kernel JUnit 5 · adapter 130 · GameTests 66/66' },
   { value: '56', label: 'codes', note: '12 kernel families + MC' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
-  { value: '28', label: 'decisions', note: 'rulings, not preferences' },
+  { value: '29', label: 'decisions', note: 'rulings, not preferences' },
 ];
 
 export const GATES = [
   { label: 'Compile', value: 'PASS', note: 'javac 21 · gradlew check green' },
   { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
-  { label: 'Tests', value: '125/125', note: 'kernel JUnit 5 · 17 containers; adapter 130 · GameTests 60/60' },
+  { label: 'Tests', value: '125/125', note: 'kernel JUnit 5 · 17 containers; adapter 130 · GameTests 66/66' },
   { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 56 codes' },
   { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
   { label: 'Determinism', value: 'PASS', note: 'DeterminismTest · canonical bytes, fixed point, compile runs' },

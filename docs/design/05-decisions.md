@@ -33,15 +33,16 @@ settle/release and reload codecs) are committed. M4a/M4b and the command slice (
 `4899d86`, plus `compile`, `explain`, `claims`) are implemented, and capture-revision lease
 invalidation landed at `0f0bf25`. The rotated-siting two-phase capture (P1) landed at `56c632c`, the
 event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
-`ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. Pending only:
-the pre-existing kernel gap that a `property` expectation is not siting-aware, the performance/cost
-pass (block-entity-lazy and entity sweep) and fresh visual review screenshots. There is no
-regeneration milestone.
+`ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. The sited-root
+descriptor projection (S6, D-29) is implemented and closes the siting-aware `property` expectation
+gap (`SitedDescriptorGameTest`). Pending only: the performance/cost pass (block-entity-lazy and entity
+sweep) and fresh visual review screenshots. There is no regeneration milestone.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is implemented through M5e. The spec index is green at v1.2: the M5e amendment was applied
-docs-first (`world` §4.10, D-28) and its carrier landed, so the index is green; no pending signature
-is ever documented as implemented (`06-verification.md` §1).
+adapter is implemented through S6. The spec index is green at v1.2: the M5e amendment was applied
+docs-first (`world` §4.10, D-28) and its carrier landed, so the index is green; D-29 adds no public
+type, so the index was unaffected while the S6 projection landed. No pending signature is ever
+documented as implemented (`06-verification.md` §1).
 
 ### D-03 — English only
 
@@ -476,7 +477,64 @@ prevents impersonation of a kernel code, and that stays a host review issue. A c
 fails a check, never enters a `MatchResult` and never changes a command's exit code. The evidence is
 the capture-report kernel test, the report-site unit test and the capture GameTests
 (`06-verification.md` §3). **Status (v1.2):** implemented at `28d0334` (the carrier at `0419f06`,
-blank-note validation at `1fddb29`), on the P1 two-phase capture at `56c632c`.
+blank-note validation at `1fddb29`), on the P1 two-phase capture at `56c632c`; its adapter-only
+capture overload (`audit`) becomes the siting `orientation` when it also feeds the root descriptor
+projection (D-29).
+
+### D-29 — A sited root capture publishes definition-frame descriptors
+
+The kernel's `property` expectation compares a descriptor's property string to a literal declared in
+the definition frame (`world` §4.7). A root view of a sited capture is not the world frame: the
+definition is posed at `siting.orientation()`, so before this decision a correct structure
+at a rotated siting reported `SC-EXP-0001` for every orientation-bearing property, next to the
+capture's `SC-MC-0004` capability warning. The kernel could not close it: `world` may not name a block
+state and has no property vocabulary, and a kernel transform would make the generic property leaf
+depend on Minecraft state semantics.
+
+The replacement is a host contract, not an API change: **the root frame's descriptors are published in
+the definition frame.** A capture that carries a siting orientation projects every root-frame
+`BlockState` through `OrientationMapping.transform(orientation.inverse(), state)` before
+`OccupantDescriptors`; the inverse pose is what recovers the definition-frame state from the observed
+world state, and a `MappingResult.Mapped` state supplies the descriptor's properties, so
+`Expectations.property` compares definition-frame values with no kernel change. An `Unrepresentable`
+state keeps its raw state (the descriptor stays world-frame, so the value finding remains honest), and
+the same capture carries the `SC-MC-0004` warning for it (D-28, `adapter` §10).
+
+The boundaries this record fixes:
+
+- **Only the root frame, only a non-null orientation.** A child/nested frame is an absolute extent, not
+  rotated by the parent siting, so it stays in its captured frame; the phase-1 anchor-cell capture and
+  an anchorless identity capture pass no orientation and stay world-frame (an identity projection is a
+  no-op anyway).
+- **An upright siting projects too.** The projection is not limited to non-level tilts: a mirror or
+  rotation siting also publishes definition-frame properties, and because an upright pose is always
+  expressible it produces no `SC-MC-0004` entry.
+- **The descriptor is the only projected fact.** The actual state still feeds the block-entity lookup,
+  the trait capabilities, the nested capability, the audit and the watch fingerprints: this is a
+  publication choice for `OccupantDescriptor.properties`, not a substitution of the captured content.
+- **The kernel stays raw.** `Expectations.property` still compares the published string to the
+  literal; `world` §4.7 states that a descriptor is published in the view's frame and that the host
+  owns the frame. A host that publishes world-frame descriptors keeps the old behaviour; the kernel
+  neither knows nor transforms.
+- **The unrepresentable fallback is visible.** A state whose properties cannot express the pose keeps
+  its world-frame descriptor and reports `SC-MC-0004`; a property expectation on such a cell can still
+  mismatch. Capability (warning) and value (error) are two findings, not a contradiction, and the
+  fallback is never silent.
+
+**Why:** the frame of a descriptor is exactly the fact only the host can know — it owns the state model
+and the siting — while the kernel owns the frame arithmetic (`Siting`) and the generic property leaf.
+Projecting at publication closes the gap with zero public API change, keeps `Expectations.property` a
+pure string comparison, and leaves a custom host free to publish whatever frame its capture is in.
+
+**Consequence:** a check at a rotated siting matches property expectations for representable states;
+the property leaf's meaning is "the declaration's frame", which for a kernel-built `MatchRequest` is
+the siting's definition frame. `SC-EXP-0001` on a rotated siting is now possible only for a cell that
+also carries `SC-MC-0004`, and the audit still reports the capability fact. The evidence is the
+rotated-siting adapter GameTests: stairs at clockwise/half/pitchUp publish definition-frame values, a
+`property` expectation settles at a rotated siting, identity/phase-1 captures are unchanged, and an
+unrepresentable state keeps the raw descriptor with the warning. **Status (v1.2):** implemented in
+`LevelCapture` (inverse-orientation projection before `OccupantDescriptors`) with
+`SitedDescriptorGameTest`; no kernel type was added.
 
 ## 3. Consequences a reviewer should attack
 
@@ -498,14 +556,15 @@ blank-note validation at `1fddb29`), on the P1 two-phase capture at `56c632c`.
   warning by a different host. That is the price of the host owning the reason; the match result
   stays deterministic (Law 11).
 - The orientation audit reads only observed blocks: a `SC-MC-0004` says the pose is not realisable
-  for those blocks, not that a declaration is wrong, and the kernel's `property` expectation is not
-  siting-aware, so capability and value findings can co-occur.
+  for those blocks, not that a declaration is wrong. Since D-29 projects a sited root's descriptors
+  into the definition frame, `SC-EXP-0001` on a rotated siting is possible only for an unrepresentable
+  state: capability and value, two findings, not a contradiction.
 - The nested source is a third-party capability; the adapter's block-over-entity precedence and
   first-provider-wins rule are policy, not a merge. A mod that wants two nested bodies at one cell
   cannot express it (D-26).
-- Model C, the nested capability and the capture report are implemented and the spec index is green;
-  what remains is the pre-existing siting-aware `property` expectation gap, the performance/cost pass
-  and fresh visual review screenshots (D-02, `07-regeneration.md` §7).
+- Model C, the nested capability, the capture report and the root descriptor projection (D-29) are
+  implemented, and the spec index is green; what remains is the performance/cost pass and
+  fresh visual review screenshots (D-02, `07-regeneration.md` §7).
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates
