@@ -94,7 +94,7 @@ the exact failure this set exists to prevent.
   `SavedContexts` stores.
 - **M5.** The remaining host gates: determinism golden test, lease invalidation by epoch/mark
   counter, and the command/GameTest coverage that M4 adds. The kernel and adapter suites are already
-  green (116 kernel, 56 adapter, 22 GameTests).
+  green (116 kernel, 92 adapter, 22 GameTests).
 - **Non-upright tilt.** The 40 pitch/roll/inverted orientations, capability-aware state remapping
   and `SC-MC-0004` emission.
 - **`SC-MC-0005`** capture-over-cap emission at the host boundary, and the deferred `SC-MC-0003`

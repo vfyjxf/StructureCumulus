@@ -38,7 +38,7 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
-  97 tests / 97 successful / 0 failed
+  116 tests / 116 successful / 0 failed
 $ python3 tools/spec-check.py
   spec-check: ok
 $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
@@ -85,7 +85,7 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、97 个 kernel 测试、18 个 adapter 单元测试、55 个 code、23 条决策。五道 gate 通过；determinism 在沙箱里没有运行。adapter 处于 M1（host + <code>/cumulus check</code>）+ 部分 M2：M2a 的 loaded-entity capture 和 M2b 的 upright orientation mapping，三个 GameTest（capture-only；capture → compile → check；capture entity over block）。M2 尚未完成 —— traits、nested views、非 upright pitch/roll、SC-MC-0002–0005、lease invalidation —— M3/M4 仍待完成。</> : <>Six gates, 97 kernel tests, 18 adapter unit tests, 55 codes and 23 decisions. Five gates are green; determinism was not run in this sandbox. The adapter is at M1 (host + <code>/cumulus check</code>) plus partial M2: M2a loaded-entity capture and M2b upright orientation mapping, with three GameTests (capture-only; capture → compile → check; capture entity over block). M2 is not complete — traits, nested views, non-upright pitch/roll, SC-MC-0002–0005, lease invalidation — and M3/M4 remain.</>}
+        note={zh ? <>六道 gate、116 个 kernel 测试、92 个 adapter 单元测试、56 个 code、27 条决策。五道 gate 通过；determinism 在沙箱里没有运行。adapter 已提交到 M3：M2c 的 Model C、body identity、total read 和四态 traits；M2d 的 nested extents、frames 和 cuts；M3 的 <code>SavedClaims</code>/<code>SavedContexts</code> 在 <code>d4b6d82</code> 提交，兼容 Model C。M4a JSON reader/writer 在 <code>f2659c7</code> 提交；M4b 的 datapack reload 在 <code>76a8e5c</code> 提交，剩余 commands、M5 的 determinism/lease invalidation、M6 的 clean regeneration 仍待完成。非 upright pitch/roll、<code>SC-MC-0004</code>/<code>0005</code> emission 和 deferred <code>SC-MC-0003</code> channel 仍待完成。</> : <>Six gates, 116 kernel tests, 92 adapter unit tests, 56 codes and 27 decisions. Five gates are green; determinism was not run in this sandbox. The adapter is committed through M3: M2c Model C, body identity, total read and four-state traits; M2d nested extents, frames and cuts; M3 <code>SavedClaims</code>/<code>SavedContexts</code> at <code>d4b6d82</code>, compatible with Model C. M4a JSON reader/writer is committed at <code>f2659c7</code>; M4b datapack reload is committed at <code>76a8e5c</code>; the remaining commands, M5 determinism/lease invalidation and M6 clean regeneration remain pending. Non-upright pitch/roll, <code>SC-MC-0004</code>/<code>0005</code> emission and the deferred <code>SC-MC-0003</code> channel remain pending.</>}
       />
 
       <Reveal>
@@ -114,7 +114,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 15 JUnit containers
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 16 JUnit containers
               </div>
             </div>
           </div>
@@ -127,9 +127,9 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green; the transcript below is the direct javac/JUnit harness. GameTests: runGameTestServer 3/3 (capture-only; capture→compile→check; capture entity over block).</div>
+            <div className="warn">check: ./gradlew check is green; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 22/22 (M1 capture/host; M2a entity precedence; M2b orientation; M3 claims; M2c traits; M2d nested frames).</div>
             <div style={{ height: 14 }} />
-            <div className="cmd">{zh ? '下一个攻击点：M2 剩余部分（traits、nested views、非 upright orientation、SC-MC-0002–0005、lease invalidation），然后是 M3/M4（claims/context persistence、JSON/datapack、剩余 commands），不是 kernel。' : 'Next attack: the rest of M2 (traits, nested views, non-upright orientation, SC-MC-0002–0005, lease invalidation), then M3/M4 (claims/context persistence, JSON/datapack, the remaining commands), not the kernel.'}</div>
+            <div className="cmd">{zh ? '下一个攻击点：M4b 的剩余 commands（compile、settle、explain、claims），然后是 M5 的 determinism/lease invalidation 和 M6 的 clean regeneration；非 upright tilt 和 SC-MC-0004/0005 emission 也仍未完成，不是 kernel。' : 'Next attack: the remaining M4b commands (compile, settle, explain, claims), then M5 determinism/lease invalidation and M6 clean regeneration; non-upright tilt and SC-MC-0004/0005 emission also remain, not the kernel.'}</div>
           </div>
         </div>
       </Reveal>

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NAV, type ModuleId, type SectionId } from './data/site';
+import { CODE_COUNT } from './data/codes';
+import { DECISION_COUNT } from './data/decisions';
+import { TEST_COUNT } from './data/tests';
 import { ZH_NAV } from './data/site.zh';
 import { useLanguage } from './i18n/Language';
 import { Hero } from './components/Hero';
@@ -124,8 +127,8 @@ export default function App() {
         </div>
         <div className="rail-meta">
           StructureCumulus<br />
-          {zh ? '设计之书 / v1.0' : 'design of record / v1.0'}<br />
-          {zh ? '2026 年 10 月 26 日' : '26 oct 2026'}
+          {zh ? '设计之书 / v1.2' : 'design of record / v1.2'}<br />
+          {zh ? '2026 年 10 月 27 日' : '27 oct 2026'}
         </div>
         <nav className="rail-nav">
           {NAV.map((entry) => (
@@ -151,10 +154,10 @@ export default function App() {
           </div>
           <div className="rail-bar"><span style={{ width: `${progress}%` }} /></div>
           <div className="rail-gates">
-            <div className="rail-gate">{zh ? '测试' : 'tests'}<strong>97/97</strong></div>
-            <div className="rail-gate">{zh ? '代码' : 'codes'}<strong>55</strong></div>
+            <div className="rail-gate">{zh ? '测试' : 'tests'}<strong>{TEST_COUNT}/{TEST_COUNT}</strong></div>
+            <div className="rail-gate">{zh ? '代码' : 'codes'}<strong>{CODE_COUNT}</strong></div>
             <div className="rail-gate">{zh ? '纯度' : 'purity'}<strong>0</strong></div>
-            <div className="rail-gate">{zh ? '裁决' : 'rulings'}<strong>23</strong></div>
+            <div className="rail-gate">{zh ? '裁决' : 'rulings'}<strong>{DECISION_COUNT}</strong></div>
           </div>
         </div>
       </aside>
@@ -200,16 +203,16 @@ export default function App() {
                 {zh ? <>真正的地基是 <em>设计</em>。</> : <>The <em>design</em> is the source.</>}
               </h3>
               <div className="footer-meta">
-                StructureCumulus / {zh ? '设计 review 1.0' : 'design review 1.0'}<br />
+                StructureCumulus / {zh ? '设计 review 1.2' : 'design review 1.2'}<br />
                 {zh ? '8 份设计文件 · 11 个 kernel 模块 + adapter 规范' : '8 design files · 11 kernel modules + adapter spec'}<br />
-                {zh ? 'kernel 11 个 package · 55 个 code · 97 个 kernel 测试' : 'kernel 11 packages · 55 codes · 97 kernel tests'}<br />
-                kernel commit 0d1218e
+                {zh ? <>kernel 11 个 package · {CODE_COUNT} 个 code · {TEST_COUNT} 个 kernel 测试</> : <>kernel 11 packages · {CODE_COUNT} codes · {TEST_COUNT} kernel tests</>}<br />
+                kernel commit b5f9857
               </div>
             </div>
             <div className="footer-rule rule" />
             <div className="footer-small">
               <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
-              <span>{zh ? 'Adapter M1 + 部分 M2；其余待完成' : 'Adapter M1 + partial M2; rest pending'}</span>
+              <span>{zh ? 'Adapter M1–M3 + M4a JSON；M4b/M5/M6 待完成' : 'Adapter M1–M3 + M4a JSON; M4b/M5/M6 pending'}</span>
               <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>

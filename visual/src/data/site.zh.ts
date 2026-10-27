@@ -68,7 +68,7 @@ export const ZH_DOCS: Record<string, string> = {
   'docs/modules/space.md': 'space',
   'docs/modules/remedy.md': 'remedy',
   'docs/modules/spi.md': 'spi',
-  'docs/modules/adapter.md': 'adapter（M1 + 部分 M2）',
+  'docs/modules/adapter.md': 'adapter（M1–M3，M4a JSON；M4b/M5/M6 待完成）',
 };
 
 export const ZH_GROUPS: Record<string, string> = {
@@ -79,14 +79,14 @@ export const ZH_GROUPS: Record<string, string> = {
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
   Compile: { label: '编译', note: 'javac 21 · gradlew check 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 15 个容器；adapter 18 · GameTests 3/3' },
-  'Spec index': { label: '规范索引', note: 'spec-check.py · 55 codes' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 16 个容器；adapter 92 · GameTests 22/22' },
+  'Spec index': { label: '规范索引', note: 'spec-check.py · 56 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: '沙箱里没有运行' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 18 · GameTests 3/3' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 92 · GameTests 22/22' },
   codes: { label: '代码', note: '12 个 kernel family + MC' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
   decisions: { label: '决策', note: 'ruling，不是偏好' },

@@ -154,7 +154,7 @@ export function CodeAtlas() {
               {zh ? <>BUNDLE<br />ERROR 从不截断 · warning 可能省略<br />一条 SC-DIA-0001 截断尾巴<br />human 与 JSON 投影共享同一个值</> : <>THE BUNDLE<br />ERROR never capped · warnings may elide<br />one SC-DIA-0001 truncation tail<br />human and JSON projections share one value</>}
             </div>
             <div style={{ marginTop: 18 }}>
-              <div className="tag tag-green"><span className="dot" /> {zh ? '55 个已注册 · 一张表' : '55 registered · one table'}</div>
+              <div className="tag tag-green"><span className="dot" /> {zh ? `${CODE_COUNT} 个已注册 · 一张表` : `${CODE_COUNT} registered · one table`}</div>
             </div>
               </>
             ) : (

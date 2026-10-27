@@ -48,6 +48,7 @@ export const CODE_ZH: Record<string, { summary: string; body: string }> = {
   'SC-OCC-0001': { summary: '无法从 snapshot 读取该 cell。', body: 'view 对请求的 cell 没有可读 occupant。检查 capture bounds、depth 和 host 权限。' },
   'SC-OCC-0002': { summary: 'occupant footprint 越出了 snapshot。', body: '只比较了 snapshot 内的交集。检查 capture bounds 和 occupant 的完整身体。' },
   'SC-OCC-0003': { summary: 'nested view 被 depth 或 cap 截断。', body: 'nested view 在被检查 cells 可用前停止。检查 capture depth 和 element ceiling。' },
+  'SC-OCC-0004': { summary: '要求的读取不可用。', body: 'check 需要的 cell、section 或 trait 读不出来。检查 capture bounds、depth 和 host 权限，声明所需读取后重试。' },
   'SC-RMD-0001': { summary: 'remedy provider 抛错。', body: 'provider 在 solve 时失败。检查 provider 和输入。' },
   'SC-RMD-0002': { summary: 'provider 返回畸形 remedy。', body: 'remedy 值不完整或不一致。检查 provider 的输出。' },
   'SC-SPC-0001': { summary: 'cell 或 locus 无法映射到请求的 frame。', body: 'siting 或 locus map 对请求的 frame 没有 image。retry 前检查 placement、origin 和 lattice bounds。' },

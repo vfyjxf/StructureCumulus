@@ -14,7 +14,7 @@ clean kernel regeneration. No client overlay, network payload, schematic importe
 The commit order was **M1 → M2a → M2b → M3 → M2c → M2d**. M3 was committed before Model C landed;
 its `SavedClaims`/`SavedContexts` code is compatible as-is, so the "rebase" is a checkpoint, not a
 rewrite. M4 is the next milestone. A milestone is complete only when its code and its named tests are
-both on the tree and re-run; the current counts are 116 kernel tests, 56 adapter unit tests and 22
+both on the tree and re-run; the current counts are 116 kernel tests, 92 adapter unit tests and 22
 GameTests, with `./gradlew check` and `tools/spec-check.py` green.
 
 | Milestone | Deliverable | State |
@@ -27,7 +27,7 @@ GameTests, with `./gradlew check` and `tools/spec-check.py` green.
 | M2d | **Nested capability**: `NestedExtent`/`NestedExtents`, one `LevelSnapshot` + `FrameData`, child frames, budgets/cuts, child entities, fake-provider seam | committed at `f3e0338`/`d6aefc2`; nested unit + GameTests green |
 | M3 | `SavedClaims`, `SavedContexts`, CAS/release/reload, per-level `ServerState` | committed at `d4b6d82`; compatible checkpoint passed; settle command/lease pending |
 | M4 | JSON reader/writer, datapack reload, remaining commands (`compile`, `settle`, `explain`, `claims`) | **next; pending** |
-| M5 | Remaining GameTests, determinism golden test, lease invalidation, Gradle gates | partial: 116 kernel + 56 adapter + 22/22 GameTests and `check` green; determinism and lease invalidation pending |
+| M5 | Remaining GameTests, determinism golden test, lease invalidation, Gradle gates | partial: 116 kernel + 92 adapter + 22/22 GameTests and `check` green; determinism and lease invalidation pending |
 | M6 | Clean delete/regenerate on a branch | pending |
 
 ## Acceptance

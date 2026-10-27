@@ -1,19 +1,23 @@
-# StructureCumulus — Design Review 1.0
+# StructureCumulus — Design Review 1.2
 
 An interactive, adversarial review of the kernel design. Not a feature tour: each chapter is a claim
 the kernel must survive — a frame mapping, a write, a conflict, a missing value, a finding.
 
-The design of record is [`../docs/README.md`](../docs/README.md). The adapter is at M1 plus partial
-M2: M1 is the host, `/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`,
+The design of record is [`../docs/README.md`](../docs/README.md). The adapter is committed through
+M3: M1 is the host, `/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`,
 `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, `ServerState`, in-memory
 `BuiltinDocuments`); M2a adds loaded-entity capture with policy windows, full footprint indexing and
 entity-vs-block precedence; M2b adds upright orientation mapping (`Heading`/`Direction`,
-`Turn`/`Rotation`, `Flip`/`Mirror`, mirror-then-rotate; non-level tilts return `UnsupportedTilt`).
-M2 is not complete: traits, nested views, non-upright pitch/roll mapping, `SC-MC-0002`–`0005`,
-window/mark-counter lease invalidation, claims/persistence, JSON/datapack and the remaining commands
-are pending. Three GameTests and 18 adapter unit tests are green. The UI opens in **中文**; the **EN**
-button in the top bar switches to the English reading layer. Technical identifiers, code, JSON, Java
-and finding codes stay in their original form in both languages.
+`Turn`/`Rotation`, `Flip`/`Mirror`, mirror-then-rotate; non-level tilts return `UnsupportedTilt`);
+M2c adds Model C — body identity, the total read with `SC-OCC-0004`, partial sections and four-state
+traits; M2d adds the nested capability (`NestedExtent`/`NestedExtents`, frames, cuts, child
+entities); M3 adds `SavedClaims`/`SavedContexts` at `d4b6d82`, compatible with Model C. M4a JSON
+(`JsonReader`/`JsonWriter`) is committed at `f2659c7`. M4b (datapack reload and the remaining
+commands), M5 (determinism, lease invalidation) and M6 (clean regeneration) are pending, as are
+non-upright pitch/roll mapping, `SC-MC-0004`/`0005` emission and the deferred `SC-MC-0003` channel.
+116 kernel tests, 92 adapter unit tests and 22/22 GameTests are green. The UI opens in **中文**; the
+**EN** button in the top bar switches to the English reading layer. Technical identifiers, code,
+JSON, Java and finding codes stay in their original form in both languages.
 
 ## Run
 
@@ -30,7 +34,7 @@ network request.
 
 ## What is inside
 
-97 kernel tests, 18 adapter unit tests, three GameTests, 55 codes, 23 decisions and 11 ranked kernel
+116 kernel tests, 92 adapter unit tests, 22 GameTests, 56 codes, 27 decisions and 11 ranked kernel
 packages. One complete document and a Java builder excerpt target the same IR.
 
 | Chapter | What you can do |
@@ -41,8 +45,8 @@ packages. One complete document and a Java builder excerpt target the same IR.
 | **03 / Workbench** | Inspect the campfire shell/hollow/fire, switch bays, explode/assemble, step `COMPILE → CHECK → SETTLE` (then the derive aftermath), toggle JSON/Java, and move the siting through origin and quarter turns. |
 | **04 / Ledger** | Move two owners' bays, change `EXCLUSIVE`/`SHARED`, settle, race the revision, and see the conflict matrix and rows. |
 | **05 / Fold** | Refuse a section, change `sum`/`max`, toggle `whenAbsent`, and see the key become absent and a derive skip. |
-| **06 / Codes** | Search/filter all 55 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail. |
-| **07 / Proof** | Read the gate report, the falsifiers, the 23 decisions, the regeneration protocol and the document index. |
+| **06 / Codes** | Search/filter all 56 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail. |
+| **07 / Proof** | Read the gate report, the falsifiers, the 27 decisions, the regeneration protocol and the document index. |
 
 Press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> for the index. Use **EN / 中文** in the top bar to switch languages. The **NIGHT** switch flips the same
 information to a dark instrument palette. The layout is responsive down to 390 px.
@@ -61,9 +65,9 @@ python3 scripts/extract-review-data.py
 ## Historical note
 
 This replaces the 2026-10-21 NASA-punk atlas. That atlas documented design v0.2 and is kept in git
-history; this app documents v1.0 and is the one to run.
+history; this app documents design v1.2 and is the one to run.
 
 ## Caveat
 
-The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check`, the adapter’s 18 unit
-tests and its three GameTests (`runGameTestServer` 3/3) are green.
+The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check`, the adapter’s 56 unit
+tests and its 22 GameTests (`runGameTestServer` 22/22) are green.

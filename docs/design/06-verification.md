@@ -19,7 +19,7 @@ regeneration session without the wrapper cache must still run `javac` and the JU
 and record the commands.
 
 Current evidence (2026-10-27): M1, M2a, M2b, M2c and M2d are committed; M3 is committed at
-`d4b6d82` and compatible with Model C. `./gradlew check` is green: 116 kernel tests and 56 adapter
+`d4b6d82` and compatible with Model C. `./gradlew check` is green: 116 kernel tests and 92 adapter
 unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 22/22. `tools/spec-check.py` is clean.
 Model C, body identity, trait capture and the nested capability are implemented, not pending.
 

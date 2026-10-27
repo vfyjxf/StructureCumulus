@@ -8,7 +8,7 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
   return (
     <header className="hero">
       <div className="hero-copy">
-        <div className="hero-kicker kicker">StructureCumulus / {zh ? '设计 review 1.0' : 'Design review 1.0'}</div>
+        <div className="hero-kicker kicker">StructureCumulus / {zh ? '设计 review 1.2' : 'Design review 1.2'}</div>
         <h1 className="hero-title">
           {zh ? <>一座可以被<br /><em>证明</em>的<br />结构。</> : <>A structure<br />you can <em>prove.</em></>}
         </h1>
@@ -107,8 +107,8 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
       </div>
 
       <div className="hero-foot">
-        <span>{zh ? 'Review 于 2026.10.26 · kernel commit 0d1218e' : 'Reviewed 2026.10.26 · kernel commit 0d1218e'}</span>
-        <span>{zh ? '英文设计是唯一权威 · adapter M1 + 部分 M2；其余待完成' : 'English source only · adapter M1 + partial M2; rest pending'}</span>
+        <span>{zh ? 'Review 于 2026.10.27 · kernel commit b5f9857' : 'Reviewed 2026.10.27 · kernel commit b5f9857'}</span>
+        <span>{zh ? '英文设计是唯一权威 · adapter M1–M3 + M4a JSON；M4b/M5/M6 待完成' : 'English source only · adapter M1–M3 + M4a JSON; M4b/M5/M6 pending'}</span>
       </div>
     </header>
   );
