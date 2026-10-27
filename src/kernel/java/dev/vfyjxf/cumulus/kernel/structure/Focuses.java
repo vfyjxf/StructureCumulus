@@ -238,6 +238,11 @@ public final class Focuses {
         }
 
         @Override
+        public boolean bindsSubjects() {
+            return false;
+        }
+
+        @Override
         public ReadScope reads(CuboidSet bayCells) {
             return ReadScope.cells(staticCells(bayCells)).withKinds(Set.of(OccupantKind.nested)).withDepth(1);
         }
