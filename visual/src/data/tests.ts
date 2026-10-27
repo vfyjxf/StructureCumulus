@@ -21,6 +21,7 @@ export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/space/SpaceTest.java", "package": "space", "className": "SpaceTest", "count": 14},
   {"file": "dev/vfyjxf/cumulus/kernel/structure/AnchorsTest.java", "package": "structure", "className": "AnchorsTest", "count": 1},
   {"file": "dev/vfyjxf/cumulus/kernel/structure/StructureValidationTest.java", "package": "structure", "className": "StructureValidationTest", "count": 7},
+  {"file": "dev/vfyjxf/cumulus/kernel/world/CaptureReportTest.java", "package": "world", "className": "CaptureReportTest", "count": 9},
   {"file": "dev/vfyjxf/cumulus/kernel/world/WorldTest.java", "package": "world", "className": "WorldTest", "count": 10},
 ];
 
@@ -33,7 +34,7 @@ export const TEST_GROUPS = [
   {"name": "finding", "count": 34},
   {"name": "space", "count": 14},
   {"name": "structure", "count": 8},
-  {"name": "world", "count": 10},
+  {"name": "world", "count": 19},
 ];
 
-export const TEST_COUNT = 116;
+export const TEST_COUNT = 125;

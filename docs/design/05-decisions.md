@@ -31,16 +31,17 @@ M1 (host + command + capture-check), M2a (loaded-entity capture), M2b (upright o
 extents, frames, cuts, child entities) and M3 (`d4b6d82`: `SavedClaims`, `SavedContexts`, CAS
 settle/release and reload codecs) are committed. M4a/M4b and the command slice (`settle` at
 `4899d86`, plus `compile`, `explain`, `claims`) are implemented, and capture-revision lease
-invalidation landed at `0f0bf25`. Non-upright pitch/roll state mapping is implemented at `ac11d0c`.
-The capture report (D-28), which closes the `SC-MC-0003` channel and emits `SC-MC-0004`/`0005`, is
-the M5e slice and is in flight; the watched-region mark-counter lease invalidation remains pending.
+invalidation landed at `0f0bf25`. The rotated-siting two-phase capture (P1) landed at `56c632c`, the
+event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
+`ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. Pending only:
+the pre-existing kernel gap that a `property` expectation is not siting-aware, the performance/cost
+pass (block-entity-lazy and entity sweep) and fresh visual review screenshots. There is no
+regeneration milestone.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is implemented through M4/M5e. The spec index is green at v1.2 and green again once the M5e
-two halves are on the tree: the docs-first half (`world` §4.10, D-28) is written before its code
-because a public shape is amended in the module file first (`07-regeneration.md` §5), and the index is
-red only while a slice is split that way; no pending signature is ever documented as implemented
-(`06-verification.md` §1).
+adapter is implemented through M5e. The spec index is green at v1.2: the M5e amendment was applied
+docs-first (`world` §4.10, D-28) and its carrier landed, so the index is green; no pending signature
+is ever documented as implemented (`06-verification.md` §1).
 
 ### D-03 — English only
 
@@ -474,8 +475,8 @@ code's severity comes from the host catalog, so a misleading host code is possib
 prevents impersonation of a kernel code, and that stays a host review issue. A capture report never
 fails a check, never enters a `MatchResult` and never changes a command's exit code. The evidence is
 the capture-report kernel test, the report-site unit test and the capture GameTests
-(`06-verification.md` §3). **Status:** accepted; M5e implementation in flight — S0 docs and the S1
-`world` carrier landed, the adapter emission/surfacing (S2–S4) follows.
+(`06-verification.md` §3). **Status (v1.2):** implemented at `28d0334` (the carrier at `0419f06`,
+blank-note validation at `1fddb29`), on the P1 two-phase capture at `56c632c`.
 
 ## 3. Consequences a reviewer should attack
 
@@ -502,9 +503,9 @@ the capture-report kernel test, the report-site unit test and the capture GameTe
 - The nested source is a third-party capability; the adapter's block-over-entity precedence and
   first-provider-wins rule are policy, not a merge. A mod that wants two nested bodies at one cell
   cannot express it (D-26).
-- Model C and the nested capability are implemented and the spec index is green; the remaining gaps
-  are the M5e capture report in flight (D-28) and the watched-region mark-counter invalidation
-  (D-02).
+- Model C, the nested capability and the capture report are implemented and the spec index is green;
+  what remains is the pre-existing siting-aware `property` expectation gap, the performance/cost pass
+  and fresh visual review screenshots (D-02, `07-regeneration.md` §7).
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates

@@ -70,11 +70,14 @@ Notes:
   nested capability (`mc.capability.NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
   `FrameData`); M3 adds `SavedClaims`/`SavedContexts` with CAS/release/reload at `d4b6d82` and is
   compatible with Model C; M4 adds the JSON reader/writer, the datapack source, the merged document
-  source and the five `/cumulus` subcommands; M5e adds the non-upright orientation remap (`ac11d0c`)
-  and the capture report the adapter answers with (`world.CaptureReport`, `SC-MC-0003`/`0004`/`0005`).
-  Still pending: the M5e capture-report emission and surfacing, and watched-region mark-counter lease
-  invalidation. `mc.capability` is a subpackage of `mc`; it adds no kernel edge. The main source set
-  also compiles the mod entry.
+  source and the five `/cumulus` subcommands; M5a adds the event-edged watched-region mark counter
+  (`LevelWatch`/`WatchEvents`, lazy entity and block-entity fingerprints) at `d1fa42f`; P1 fixes the
+  rotated-siting capture bounds with the two-phase anchored capture at `56c632c`; M5d adds the
+  non-upright orientation remap (`ac11d0c`); M5e adds the capture report the adapter answers with
+  (`world.CaptureReport`, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. Pending only: the pre-existing
+  kernel gap that a `property` expectation is not siting-aware, the performance/cost pass
+  (block-entity-lazy and entity sweep) and fresh visual review screenshots. `mc.capability` is a
+  subpackage of `mc`; it adds no kernel edge. The main source set also compiles the mod entry.
 
 ## 2. Ownership
 
@@ -147,6 +150,6 @@ Every module file has exactly these sections:
 A signature in section 3 that is absent from code is a regeneration defect; a public member in code
 that is absent from section 3 is a design defect. There is no pending signature block in v1.2; the
 spec index is green (`06-verification.md` §1). A slice is nonetheless amended docs-first
-(`07-regeneration.md` §5): the M5e capture report (D-28) is written into `world` §3/§4.10 before its
-carrier lands, so the index is red between the two halves and green again when S1 completes it — the
-module file is never split across two public shapes.
+(`07-regeneration.md` §5), as the M5e capture report (D-28) was: `world` §3/§4.10 landed before its
+carrier, the index was red between the two halves and green again when the carrier landed; a module
+file is never split across two public shapes.

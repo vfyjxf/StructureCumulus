@@ -212,7 +212,7 @@ export default function App() {
             <div className="footer-rule rule" />
             <div className="footer-small">
               <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
-              <span>{zh ? 'Adapter M1–M4；M5 determinism 已落地' : 'Adapter M1–M4; M5 determinism landed'}</span>
+              <span>{zh ? 'Adapter M1–M5e；M5a/M5d/M5e 完成' : 'Adapter M1–M5e; M5a/M5d/M5e complete'}</span>
               <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>

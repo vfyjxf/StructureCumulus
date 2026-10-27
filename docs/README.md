@@ -21,7 +21,7 @@ table defines who may emit each finding code.
 7. [design/06-verification.md](design/06-verification.md) — gates, scenario tests, code producers.
 8. [design/07-regeneration.md](design/07-regeneration.md) — how the kernel is rebuilt from this set.
 
-There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately; it now reflects the current v1.2 code, decision and test counts.
+There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
 Then the module files, in dependency order:
 
@@ -44,7 +44,7 @@ Then the module files, in dependency order:
 
 - Design revision: **v1.2**, 2026-10-27. The v1.1 round specified Model C (body identity, the
   narrowest-read refusal, four-state traits) and the nested capability; v1.2 records them as
-  implemented.
+  implemented, and its M5a/M5d/M5e slices close the adapter round.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -52,8 +52,7 @@ Then the module files, in dependency order:
   `/cumulus check <id> <origin>` (identity siting for anchorless blueprints). M2a adds loaded-entity
   capture with policy windows, full footprint indexing and entity-vs-block precedence (`world.md`
   §4.3). M2b adds `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror` and an upright
-  mirror-then-rotate `BlockState` transform; the 40 non-upright orientations remap through the
-  capability model at `ac11d0c`.
+  mirror-then-rotate `BlockState` transform.
   M2c implements Model C, body identity, the total read and trait capture at `cb06aa8`/`64d04ce`.
   M2d implements nested extents, frames, cuts and child entities at `f3e0338`/`d6aefc2`. M3 is
   committed at `d4b6d82`; its `SavedClaims`/`SavedContexts` persistence is compatible with Model C and
@@ -61,20 +60,22 @@ Then the module files, in dependency order:
   (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
   implemented; capture-revision lease invalidation landed at `0f0bf25`, and the determinism gate
   (`DeterminismTest`: canonical bytes, parse/write fixed point, equal compile runs, stable finding
-  order) is green. Non-upright pitch/roll state mapping (the 40 orientations) landed at `ac11d0c`.
-  The M5e capture report (D-28: `world.CaptureReport` on every `CaptureResult` arm, `SC-MC-0003`
-  cut / `SC-MC-0004` orientation / `SC-MC-0005` over-cap) is the one open slice: its docs and kernel
-  carrier are on the tree and its adapter half is pending; the watched-region mark-counter lease
-  invalidation remains pending.
+  order) is green. M5a adds the event-edged watched-region mark counter (`LevelWatch`/`WatchEvents`,
+  lazy entity and block-entity fingerprints) at `d1fa42f`; P1 fixes the rotated-siting capture bounds
+  with the two-phase anchored capture at `56c632c`; M5d remaps the 40 non-upright orientations at
+  `ac11d0c`; M5e adds the capture report (D-28: `world.CaptureReport` on every `CaptureResult` arm,
+  `SC-MC-0003` cut / `SC-MC-0004` orientation / `SC-MC-0005` over-cap, the host code catalog and the
+  command report block) at `28d0334`. Pending only: the pre-existing kernel gap that the `property`
+  expectation is not siting-aware, the performance/cost pass (block-entity-lazy and entity sweep),
+  and fresh visual review screenshots. There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 116
-  kernel JUnit 5 tests and 106 adapter unit tests pass; `runGameTestServer` passes 32/32; `./gradlew
-  check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean. These are the last
-  measured counts: they are re-measured when the M5e slice lands, and the spec index stays red only
-  for that slice's docs-first half (`design/06-verification.md` §1).
+- Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 125
+  kernel JUnit 5 tests and 130 adapter unit tests pass; `runGameTestServer` passes 60/60; `./gradlew
+  check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean. `Codes.all` has 56
+  entries and the decision record has 28 decisions (D-28).
 
 ## The one rule
 

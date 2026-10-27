@@ -19,11 +19,13 @@ CAS/release/reload), M2c at `cb06aa8`/`64d04ce` (Model C, body identity, total r
 traits, the five adapter trait keys) and M2d at `f3e0338`/`d6aefc2` (nested extents, one
 `LevelSnapshot` + `FrameData`, child frames, cuts, child entities), M4a at `f2659c7` (JSON
 reader/writer), M4b at `76a8e5c` (datapack reload) and the command slice at `4899d86` (settle, plus
-compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25` and the determinism
-gate landed with `DeterminismTest`. M3 persistence is
-compatible with Model C. Non-upright pitch/roll state mapping (the 40 orientations) landed at
-`ac11d0c`. The M5e capture report (D-28, `SC-MC-0003`/`0004`/`0005`) and the watched-region
-mark-counter lease invalidation are still pending.
+compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25`, the determinism
+gate with `DeterminismTest`, the rotated-siting two-phase capture (P1) at `56c632c`, the
+event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
+`ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. M3 persistence
+is compatible with Model C. Pending only: the pre-existing siting-aware `property` expectation gap,
+the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+There is no regeneration milestone.
 
 ## 2. The order
 
@@ -72,9 +74,9 @@ module file.
     kernel sources are gone | `git status`; only the new set remains |
 
 The spec index is green at v1.2: every documented type is implemented, every `SC-` code in code is
-in `Codes.all`, and every `Codes.all` entry has a producer row. The M5e capture-report amendment is
-docs-first, so the index is red between the two halves of that slice and green again when its
-carrier lands; there is no pending signature block and no suppressed gate (`06-verification.md` §1).
+in `Codes.all`, and every `Codes.all` entry has a producer row. The M5e capture-report amendment was
+applied docs-first and its carrier landed, so the index is green again; there is no pending signature
+block and no suppressed gate (`06-verification.md` §1).
 
 ## 5. Regeneration is not a one-way door
 
@@ -93,21 +95,15 @@ the exact failure this set exists to prevent.
 
 ## 7. What the next round owes
 
-- **M4.** Implemented: JSON reader/writer, datapack reload and the five commands (`compile`, `settle`,
-  `explain`, `claims`) on top of the committed `SavedClaims`/`SavedContexts` stores.
-- **M5.** The determinism gate is implemented (`DeterminismTest`: canonical bytes, the parse/write
-  fixed point, equal compile runs and stable finding order). The remaining host gate is the
-  watched-region mark-counter lease invalidation. The kernel and adapter suites were green at the
-  last measurement (116 kernel, 106 adapter, 32 GameTests); the counts are re-measured with M5e.
-- **Non-upright tilt.** Implemented at `ac11d0c`: the 40 pitch/roll/inverted orientations remap
-  their six-way `Direction`, `Direction.Axis` and `FrontAndTop` properties, and the first property
-  that cannot express the pose is `MappingResult.Unrepresentable` — the `SC-MC-0004` payload.
-- **M5e capture report.** `world.CaptureReport` carried by every `CaptureResult` arm, the
-  `SC-MC-0005` over-cap entry, the `SC-MC-0003` cut entry, the sited-capture orientation audit
-  (`SC-MC-0004`, grouped by block type/property/value), the host code catalog and the command report
-  block (D-28). `CaptureResult.TooLarge` stays the refused root and the check keeps reporting
-  `SC-OCC-0003` for a cut child.
-- A host scheduler with coalescing, dirty windows and a per-world ledger, outside the kernel.
-- A performance pass: claim-row volume for large structures, the per-cell `read`/`statusOf` cost, the
-  section pass and the nested-frame budget. If a row form other than per-cell is needed, it is a
-  `ClaimRow`/ledger amendment, not a hidden optimization.
+- **Siting-aware property expectation.** The kernel's built-in `property` expectation compares the
+  raw descriptor value, so a rotated siting can report `SC-EXP-0001` beside the capture's
+  `SC-MC-0004` capability warning. `FocusContext.siting()` is the seam; this is a pre-existing
+  kernel gap, not an adapter one.
+- **Performance/cost pass.** The block-entity-lazy and entity sweep, plus the known costs: claim-row
+  volume for large structures, the per-cell `read`/`statusOf` cost, the section pass and the
+  nested-frame budget. If a row form other than per-cell is needed, it is a `ClaimRow`/ledger
+  amendment, not a hidden optimization.
+- **Visual review screenshots.** `visual/` trails this design set until its data and screenshots are
+  regenerated; it is a reading aid, never a source.
+- A host scheduler with coalescing, dirty windows and a per-world ledger stays outside v1; this round
+  does not owe it.

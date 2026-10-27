@@ -38,7 +38,7 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
-  116 tests / 116 successful / 0 failed
+  125 tests / 125 successful / 0 failed
 $ python3 tools/spec-check.py
   spec-check: ok
 $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
@@ -85,7 +85,7 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、116 个 kernel 测试、106 个 adapter 单元测试、56 个 code、27 条决策。六道 gate 全部通过。adapter 已提交到 M4：M2c 的 Model C、body identity、total read 和四态 traits；M2d 的 nested extents、frames 和 cuts；M3 的 <code>SavedClaims</code>/<code>SavedContexts</code> 在 <code>d4b6d82</code> 提交，兼容 Model C。M4a JSON reader/writer 在 <code>f2659c7</code> 提交；M4b 的 datapack reload 在 <code>76a8e5c</code> 提交；命令切片（settle 在 <code>4899d86</code>，另有 compile/explain/claims）已实现；M5 的 determinism gate 在 <code>DeterminismTest</code> 里落地，capture-revision lease invalidation 在 <code>0f0bf25</code> 提交；watched-region mark counter 仍待完成。非 upright pitch/roll、<code>SC-MC-0004</code>/<code>0005</code> emission 和 deferred <code>SC-MC-0003</code> channel 仍待完成。</> : <>Six gates, 116 kernel tests, 106 adapter unit tests, 56 codes and 27 decisions. All six gates are green. The adapter is committed through M4: M2c Model C, body identity, total read and four-state traits; M2d nested extents, frames and cuts; M3 <code>SavedClaims</code>/<code>SavedContexts</code> at <code>d4b6d82</code>, compatible with Model C. M4a JSON reader/writer at <code>f2659c7</code>; M4b datapack reload at <code>76a8e5c</code>; the command slice (settle at <code>4899d86</code>, plus compile, explain, claims); M5 determinism gate landed in <code>DeterminismTest</code> and capture-revision lease invalidation at <code>0f0bf25</code>; the watched-region mark counter remains pending. Non-upright pitch/roll, <code>SC-MC-0004</code>/<code>0005</code> emission and the deferred <code>SC-MC-0003</code> channel remain pending.</>}
+        note={zh ? <>六道 gate、125 个 kernel 测试、130 个 adapter 单元测试、60 个 GameTests、56 个 code、28 条决策。六道 gate 全部通过。adapter 已提交到 M5e：M2c 的 Model C、body identity、total read 和四态 traits；M2d 的 nested extents、frames 和 cuts；M3 的 <code>SavedClaims</code>/<code>SavedContexts</code> 在 <code>d4b6d82</code> 提交，兼容 Model C。M4a JSON reader/writer 在 <code>f2659c7</code> 提交；M4b 的 datapack reload 在 <code>76a8e5c</code> 提交；命令切片（settle 在 <code>4899d86</code>，另有 compile/explain/claims）已实现；M5a 的 watched-region mark counter、M5d 的非 upright pitch/roll mapping 和 M5e 的 capture report（D-28）已完成。剩下：siting-aware property expectation、performance/cost pass 和 review screenshots。</> : <>Six gates, 125 kernel tests, 130 adapter unit tests, 60 GameTests, 56 codes and 28 decisions. All six gates are green. The adapter is committed through M5e: M2c Model C, body identity, total read and four-state traits; M2d nested extents, frames and cuts; M3 <code>SavedClaims</code>/<code>SavedContexts</code> at <code>d4b6d82</code>, compatible with Model C. M4a JSON reader/writer at <code>f2659c7</code>; M4b datapack reload at <code>76a8e5c</code>; the command slice (settle at <code>4899d86</code>, plus compile, explain, claims); M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping and M5e's capture report (D-28) are complete. Pending only the siting-aware property expectation, a performance/cost pass and fresh review screenshots.</>}
       />
 
       <Reveal>
@@ -114,7 +114,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 16 JUnit containers
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 17 JUnit containers
               </div>
             </div>
           </div>
@@ -127,9 +127,9 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 32/32 (M1 capture/host; M2a entity precedence; M2b orientation; M3 claims; M2c traits; M2d nested frames; lease lifecycle; M4 command surface).</div>
+            <div className="warn">check: ./gradlew check is green; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 60/60 (M1–M5e; capture report and orientation audit included).</div>
             <div style={{ height: 14 }} />
-            <div className="cmd">{zh ? '下一个攻击点：M5 的 watched-region mark counter、非 upright tilt 与 SC-MC-0004/0005 emission、SC-MC-0003 channel，以及更新的 review screenshots。' : 'Next attack: the M5 watched-region mark counter, non-upright tilt and SC-MC-0004/0005 emission, the SC-MC-0003 channel, and fresh review screenshots.'}</div>
+            <div className="cmd">{zh ? '下一个攻击点：siting-aware property expectation、performance/cost pass，以及更新的 review screenshots。' : 'Next attack: the siting-aware property expectation, a performance/cost pass, and fresh review screenshots.'}</div>
           </div>
         </div>
       </Reveal>

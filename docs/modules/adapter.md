@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5e)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -12,10 +12,11 @@
 > package-private `FrameData`, child frames and cuts. M3 is committed at `d4b6d82`; `SavedClaims`/
 > `SavedContexts` are compatible with Model C. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
 > (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
-> implemented; capture-revision lease invalidation landed at `0f0bf25`, and the watched-region mark
-> counter remains pending. M5e adds the non-upright orientation remap (`ac11d0c`) and the capture
-> report the adapter answers with (`SC-MC-0003`/`0004`/`0005`) plus the report site the commands
-> print.
+> implemented; capture-revision lease invalidation landed at `0f0bf25`. M5a adds the event-edged
+> watched-region mark counter with lazy entity and block-entity fingerprints (`d1fa42f`); P1 fixes the
+> rotated-siting capture bounds with the two-phase anchored capture (`56c632c`); M5d adds the
+> non-upright orientation remap (`ac11d0c`); M5e adds the capture report the adapter answers with
+> (`SC-MC-0003`/`0004`/`0005`) plus the report site the commands print (`28d0334`).
 
 ## 1. Position
 
@@ -33,12 +34,15 @@
   the datapack source, the merged document source and the five `/cumulus` subcommands. M5: the
   determinism gate (`DeterminismTest`) covers canonical bytes across member order, the parse/write
   fixed point, equal compile runs and stable finding order; capture-revision lease invalidation is
-  in place. M5e: the non-upright orientation remap with `MappingResult.Unrepresentable` (`ac11d0c`).
-- **Pending (M5e).** The adapter half of the capture report: the `SC-MC-0003` cut entry, the
-  `SC-MC-0004` orientation audit, the `SC-MC-0005` over-cap entry, the host code catalog and the
-  command surfacing. The kernel carrier (`world` §4.10) landed with the slice's first half. The
-  watched-region mark-counter lease invalidation also remains pending.
-- Non-upright pitch/roll state mapping is implemented at `ac11d0c`; it is no longer pending.
+  in place. M5a: the event-edged watched-region mark counter (`LevelWatch`/`WatchEvents`, refcounted
+  watched chunks, lazy entity and block-entity fingerprints) at `d1fa42f`. P1: the two-phase anchored
+  capture so the sited world bounds are captured under the resolved siting (`56c632c`). M5d: the
+  non-upright orientation remap with `MappingResult.Unrepresentable` (`ac11d0c`). M5e: the capture
+  report (over-cap `SC-MC-0005`, cut `SC-MC-0003`, the sited-capture `SC-MC-0004` audit, the
+  `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`.
+- **Pending.** Three items only: the pre-existing kernel gap that a `property` expectation is not
+  siting-aware, the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review
+  screenshots. There is no regeneration milestone.
 - No kernel type names a Minecraft type; the adapter may name every kernel type.
 
 ## 2. Types
@@ -48,7 +52,8 @@
 | `LevelCapture` | `WorldCapture` | server-thread capture into a `LevelSnapshot`; nested extents as declarations only |
 | `LevelSnapshot` | `WorldView` | one immutable view over every frame; `read`, `bounds`, `policy`, `nested` |
 | `FrameData` | — | package-private per-frame sections, entities, nested bodies/extents and children |
-| `LevelLease` | `SnapshotLease` | `isCurrent` while open and its capture is the level's latest; world epoch/mark counter pending |
+| `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
+| `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value ↔ `OccupantDescriptor`; entity body identity; nested body |
 | `OccupantTraits` | — | the five stable trait keys and the four-state slots one policy requests |
 | `TraitLookup` | interface, package-private | the trait-capability seam: fake in tests, capabilities in production |
@@ -66,14 +71,14 @@
 | `DatapackBlueprints` | `DocumentSource` | reload listener; ids under `data/<ns>/cumulus/structure/` (M4b); wins over `BuiltinDocuments` on an id collision |
 | `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/contexts and capture cache |
 | `CumulusCommand` | — | the five `/cumulus` subcommands (`check`, `compile`, `settle`, `explain`, `claims`) |
-| `FindingOutput` | — | human/JSON to chat, log or a file (pending) |
+| `FindingOutput` | — | human/JSON to chat, log or a file (absent; the commands print inline today) |
 | `MatchScheduler` | — | optional host execution: submit, coalesce, markDirty, tick (absent) |
 
 ## 3. Capture
 
 M1 copies blocks and block entities. M2a adds loaded entities, M2c adds trait slots and per-read
 refusal, M2d adds nested frames, and M5e adds the capture report and, with it, the orientation audit.
-The rules below are implemented, except the two capture-report bullets, which M5e lands (S2-S4).
+The rules below are implemented.
 
 - One server-thread call. `ServerChunkCache.getChunkNow`; never `Level.getChunk`, never a chunk load.
   A nested child uses the same rule: an unloaded chunk is a cut, never a load.
@@ -107,24 +112,38 @@ The rules below are implemented, except the two capture-report bullets, which M5
   (§10). An empty report is the normal case and `Unavailable` carries one only when the host has
   extra detail; its own `SC-MC-0001` code already is its finding.
 - The orientation audit runs inside the sited capture, in the same loop that already read each
-  `BlockState`, so it needs no chunk load and no second traversal. Its orientation comes from the
-  two-phase command path (`siting.placement().orientation()`, §11); the anchor-cell phase passes
-  none and only the root frame is audited. A nested child is an absolute extent and is not rotated
-  by the parent's siting.
+  `BlockState`, so it needs no chunk load and no second traversal. `LevelCapture` exposes an
+  adapter-only overload `capture(CaptureRequest, @Nullable Orientation audit)`; the orientation comes
+  from the two-phase command path (`siting.placement().orientation()`, §11), the anchor-cell phase
+  passes none and only the root frame is audited. A nested child is an absolute extent and is not
+  rotated by the parent's siting.
 
 ## 4. Lease and gate
 
 `LevelLease` is host-owned: `isCurrent()` is `!closed && the capture that minted it is still the
 level's latest`. `LevelCapture` bumps its epoch on every capture and exposes `close()`; a later
 capture, `LevelCapture.close()`, `LevelEvent.Unload` and `ServerStoppingEvent` invalidate older
-leases. The world epoch and watched-region mark counter below are the full specification; the
-watched-region mark counter remains pending, and M3's per-level stores do not change it.
+leases. The world epoch and the watched-region mark counter below are the full specification and are
+implemented (M5a, `d1fa42f`); M3's per-level stores do not change them.
+
+The mark counter is **event-edged**: `WatchEvents` listens for `BlockEvent.NeighborNotifyEvent`
+(receive-canceled), `BlockEvent.BreakEvent`, `BlockEvent.EntityPlaceEvent`, `ExplosionEvent.Detonate`,
+`PistonEvent.Pre`, `ChunkEvent.Unload`, `EntityJoinLevelEvent`, `EntityLeaveLevelEvent` and
+`LevelEvent.Unload`; each handler is a server-side filter that only marks the chunks of an active
+capture's watched region, so an unmarked world pays nothing and a 10k-move sweep dispatches no work.
+`LevelWatch` refcounts watched chunks per level, keeps a monotonic epoch, and stores the capture's
+lazy fingerprints: entity anchor/footprint/type/UUID (verified through `Level.getEntity`, no chunk
+load) and block-entity type/NBT (`saveWithoutMetadata`, re-read through `getChunkNow` only, never
+loaded). A missing, unreadable or different entity or block entity is `isCurrent == false`, which
+closes the block-entity-NBT event gap without polling. Nested child chunks join the same watch only
+when the child frame is built; a cut child contributes nothing.
 
 `LevelLease` holds the `SnapshotId`, the root view and two facts: the world epoch it was captured
 under, and the watched-region mark counter since capture. `isCurrent()` is
-`worldEpoch == currentEpoch && markCounter == 0 && !closed`. A block change, a block-entity change,
-an entity join/leave/move in a watched window, or a chunk unload increments the mark counter; a world
-unload increments the epoch. A lease is closed by the host that opened it; the kernel never closes.
+`worldEpoch == currentEpoch && markCounter == 0 && !closed` plus the lazy fingerprint check. A block
+change, a block-entity change, an entity join/leave/move in a watched window, or a chunk unload
+increments the mark counter; a world unload increments the epoch. A lease is closed by the host that
+opened it; the kernel never closes.
 
 ## 5. Claims
 
@@ -342,9 +361,10 @@ cannot express the pose — the payload `SC-MC-0004` reports. The normative rule
 support six-way facing; a block whose state cannot express the chosen orientation is a capture-time
 mismatch (`SC-MC-0004`), never a silent identity.
 
-The **orientation audit** runs in the sited (phase-2) capture: for every captured non-air block of
-the root frame the adapter applies the siting orientation to the live `BlockState` it already read
-and, when the result is `Unrepresentable`, groups the cell by `(block type, property, value)`. One
+The **orientation audit** (M5e, `28d0334`) runs in the sited (phase-2) capture: for every captured
+non-air block of the root frame the adapter applies the siting orientation to the live `BlockState`
+it already read and, when the result is `Unrepresentable`, groups the cell by
+`(block type, property, value)`. One
 `SC-MC-0004` entry (WARNING) per group carries the code, the message, notes (`block`, `property`,
 `value`, `cells`, `orientation`) and the union of the group's world cells as its region. An upright
 siting is not audited (an upright pose is always expressible), and the audit never reads the world
@@ -354,9 +374,10 @@ two-phase command path (§11); a capture taken without a siting orientation repo
 `SC-MC-0004` is a capability fact about the observed blocks, not a value fact about the check. The
 kernel's built-in `property` expectation compares the raw descriptor value and is not siting-aware,
 so a rotated siting with a property expectation can also produce a `SC-EXP-0001` mismatch:
-capability and value, two findings, not a contradiction. A siting-aware property expectation is not
-part of this round. The definition origin's anchor property is read from the `BlockState` properties,
-and `SC-MC-0004` never becomes a `ReadRefusal`.
+capability and value, two findings, not a contradiction. A siting-aware property expectation is a
+pre-existing kernel gap and the one non-visual item still owed (`07-regeneration.md` §7); the
+`FocusContext.siting()` seam exists. The definition origin's anchor property is read from the
+`BlockState` properties, and `SC-MC-0004` never becomes a `ReadRefusal`.
 
 ## 11. Commands and lifecycle
 
@@ -364,8 +385,8 @@ All five subcommands run on the server thread. `check` returns 1 whenever it rea
 
 - `/cumulus check <id> <origin>` — capture, siting, read the per-level claims view for the captured
   bounds, then `check`; print the result and findings. The claims read and the check write nothing.
-  An anchored blueprint captures twice: the anchor cell resolves the siting, and the sited bounds are
-  the capture the orientation audit runs on.
+  An anchored blueprint captures twice (P1, `56c632c`): the anchor cell resolves the siting, and the
+  sited bounds are the capture the orientation audit runs on.
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
   findings.
 - `/cumulus settle <id> <origin>` — capture once, `check`, then `settle` with the same request; print
@@ -383,12 +404,12 @@ All five subcommands run on the server thread. `check` returns 1 whenever it rea
   rows are not released; the next access reloads them from the world's saved data.
 
 A capture report is printed as its own block, `capture <id>: findings`, before the check/settle
-findings: a capture failure prints its failure line and then the report, a successful capture prints
-it only when it is non-empty. Capture findings are stamped `Phase.check`, relayed by `CaptureReports`
-(`world` §4.10) and never merged into a `MatchResult` bundle — so a `SC-MC-0003` cut warning can
-precede a `Formed` summary without contradiction. `/cumulus check` still returns 1 on a reached
-result and 0 only on an argument/document/capture/siting failure; a report never changes the exit
-code.
+findings (M5e, `28d0334`): a capture failure prints its failure line and then the report, and a
+successful capture prints it only when it is non-empty. Capture findings are stamped `Phase.check`,
+relayed by `CaptureReports` (`world` §4.10) and never merged into a `MatchResult` bundle — so a
+`SC-MC-0003` cut warning can precede a `Formed` summary without contradiction. `/cumulus check` still
+returns 1 on a reached result and 0 only on an argument/document/capture/siting failure; a report
+never changes the exit code.
 
 ## 12. Codes
 
