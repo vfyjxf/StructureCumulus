@@ -44,6 +44,11 @@ public record CaptureReport(List<CaptureReport.Entry> entries) {
                 throw new IllegalArgumentException("an entry message must not be blank");
             }
             notes = List.copyOf(notes);
+            for (String note : notes) {
+                if (note.isBlank()) {
+                    throw new IllegalArgumentException("an entry note must not be blank");
+                }
+            }
         }
 
         public Entry(FindingCode code, String message) {

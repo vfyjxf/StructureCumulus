@@ -59,6 +59,14 @@ class CaptureReportTest {
         notes.clear();
         assertEquals(List.of("first note", "second note"), entry.notes());
         assertThrows(UnsupportedOperationException.class, () -> entry.notes().add("third note"));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new CaptureReport.Entry(hostCode(4), "message", List.of("first note", " "), null)
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new CaptureReport.Entry(hostCode(4), "message", List.of(""), null)
+        );
     }
 
     @Test
