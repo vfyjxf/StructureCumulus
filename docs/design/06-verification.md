@@ -18,14 +18,17 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current evidence (2026-10-28, HEAD `110e797`): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are
+Current evidence (2026-10-28, HEAD `3e60ed4`): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are
 committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`),
 capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase capture (P1, `56c632c`),
 the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright orientation remap (M5d,
 `ac11d0c`), the capture report (M5e, `28d0334`) and the sited-root descriptor projection (S6, D-29)
-are implemented, and the kernel stress batch 1 (`kernel-stress-batch-1`, `110e797`) adds 44
-characterization scenarios (§3.1). `./gradlew check` is green: 169
-kernel tests and 130 adapter unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 66/66.
+are implemented, and the two stress batches add characterization scenarios: batch 1
+(`kernel-stress-batch-1`, `110e797`) 44 kernel scenarios (§3.1) and batch 2
+(`kernel-stress-batch-2`, `3e60ed4`) 17 kernel scenarios plus 11 adapter unit tests (§3.2).
+`./gradlew check` is green: 186
+kernel tests (33 test containers), 141 adapter unit tests, 0 failures, 0 skipped;
+`runGameTestServer` passes 66/66.
 `tools/spec-check.py` is clean. Model C, body identity, trait capture, the nested capability, the
 mark counter, the capture-report channel and the definition-frame descriptor projection are
 implemented, not pending. The determinism gate is
@@ -154,6 +157,40 @@ they are not owed work and not a pending list:
 `Coverage.everyCell` and a three-cell `everyCell` bay fails the build with undecided cells instead of
 being silently covered (`DoorCoverageScenarioTest`, `110e797`).
 
+### 3.2 Stress batch `kernel-stress-batch-2`
+
+The second characterization batch, tagged `kernel-stress-batch-2` and committed at `3e60ed4`: 4 kernel
+scenario classes (17 tests) in `kernelTest/.../engine` and 3 adapter unit classes (11 tests) in
+`src/test/.../mc`. The one code change is the `NestedFocus` fix below; the suite stays
+characterization, not a new kernel promise.
+
+| Suite | Class | Shape it drives | Tests |
+| --- | --- | --- | --- |
+| kernel | `NestedCoverageScenarioTest` | a nested focus binds no subject; `oneSubject + Bound` at build; `anySubject + Bound` at check; a cut child; a child-frame occupant | 4 |
+| kernel | `ClaimStressScenarioTest` | shared/exclusive walls, per-owner release, whole-key settle replacement, duplicate rows | 5 |
+| kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, `whenAbsent` on a check-only key, a derivation output | 4 |
+| kernel | `GateBudgetScenarioTest` | stale lease at check, mid-attempt invalidation, invalidation before settle, a tiny budget | 4 |
+| adapter | `EntityWindowPolicyTest` | the blueprint-local entity window copied into `CommandSupport.policy`, and a nonzero siting | 2 |
+| adapter | `SavedClaimsLifecycleTest` | stale CAS, conflict bytes, whole-key release, duplicate-row canonical collapse | 4 |
+| adapter | `SavedContextsLifecycleTest` | serial monotonicity, whole-context publish/reload, instance isolation, growth, unknown type | 5 |
+
+**Characterized gaps** — documented limitations, each with its asserting test; they are not owed work
+and not a pending list:
+
+| Gap | Asserted by |
+| --- | --- |
+| `Coverage.anySubject + Footprint.bound` accepts a nested body at build, then check rejects it with `SC-CLM-0004` | `NestedCoverageScenarioTest.nestedAnySubjectBoundBodyBuildsThenFailsAtCheck` |
+| Two `shared` bays over one cell write duplicate claim rows | `ClaimStressScenarioTest.duplicateRowsAreCharacterized` |
+| `whenAbsent` is a dead path for a check-only key: it needs a section computation, so a check cannot reach it | `ContextAggregateScenarioTest.whenAbsentIsADeadPathForACheckOnlyKey` |
+| D4: `CommandSupport.policy` copies the blueprint-local entity window and a nonzero siting never maps it to the world frame | `EntityWindowPolicyTest.policyCopiesTheLocalEntityWindow`, `EntityWindowPolicyTest.aNonzeroSitingStillLeavesThePolicyWindowLocal` |
+| D5: `SavedContexts` grows one entry per instance without eviction | `SavedContextsLifecycleTest.growthWithoutEvictionKeepsEveryInstance` |
+| Claim characterization: `release` removes the whole `(owner, siting)` key, not one row, and a reload collapses duplicate rows into one canonical order | `SavedClaimsLifecycleTest.releaseRemovesTheWholeOwnerSitingKey`, `SavedClaimsLifecycleTest.duplicateRowsCollapseAndReadIsCanonical` |
+
+**NestedFocus fixed.** `NestedFocus.bindsSubjects()` is now false, so a nested focus never backs a
+`Coverage.oneSubject` bay: `oneSubject + Bound + nested` fails the build with `SC-BPT-0005` instead of
+building a blueprint that can never admit (`NestedCoverageScenarioTest`, `3e60ed4`; `structure` §4.4).
+The `anySubject + Bound` acceptance above remains the open half and is characterized, not fixed.
+
 ## 4. Module tests
 
 | Module | Must test |
@@ -166,7 +203,7 @@ being silently covered (`DoorCoverageScenarioTest`, `110e797`).
 | `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations |
 | `context` | context view, publish merge/revision, derive order, merges |
 | `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity |
-| `engine` | §3 scenarios and the §3.1 stress batch, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection |
+| `engine` | §3 scenarios and the §3.1/§3.2 stress batches, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection |
 | `remedy` | provider order/cap, edit/overlay values |
 | `spi` | builtins, host empty, facade paths, two-kernel isolation |
 
@@ -238,8 +275,11 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
   parse/write fixed point and equal compile runs, `ServerStateDocumentSourceTest`/
   `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing, `LevelWatchTest`
-  for the mark counter's refcounts and lazy fingerprints, and `CaptureReportsTest` for the report
-  site. **What remains:** the performance/cost pass (block-entity-lazy and entity sweep) and fresh
+  for the mark counter's refcounts and lazy fingerprints, `CaptureReportsTest` for the report
+  site, and the batch-2 persistence/policy units `EntityWindowPolicyTest` (D4 local-window
+  characterization), `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row
+  collapse) and `SavedContextsLifecycleTest` (merge/reload, instance isolation, D5 growth, unknown
+  type). **What remains:** the performance/cost pass (block-entity-lazy and entity sweep) and fresh
   visual review screenshots. There is no regeneration milestone.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.

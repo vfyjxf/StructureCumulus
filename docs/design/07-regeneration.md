@@ -25,8 +25,11 @@ event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright o
 `ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. The sited-root
 descriptor projection (S6, D-29) is implemented and closes the siting-aware `property` expectation gap
 (`SitedDescriptorGameTest`). Kernel stress batch 1 (`kernel-stress-batch-1`, `110e797`) adds 44
-characterization scenarios in 12 `engine` classes (`06-verification.md` §3.1), taking the kernel suite
-to 169 tests; it changes no type and no decision. M3 persistence is compatible with Model C. Pending only: the
+characterization scenarios in 12 `engine` classes (`06-verification.md` §3.1) and batch 2
+(`kernel-stress-batch-2`, `3e60ed4`) adds 17 kernel scenarios plus 11 adapter unit tests (§3.2),
+taking the kernel suite to 186 tests in 33 containers and the adapter suite to 141; batch 2's one
+code change is the `NestedFocus` non-binding fix. Neither batch changes a type or a decision. M3
+persistence is compatible with Model C. Pending only: the
 performance/cost pass (block-entity-lazy
 and entity sweep) and fresh visual review screenshots. There is no regeneration milestone.
 

@@ -79,14 +79,14 @@ export const ZH_GROUPS: Record<string, string> = {
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
   Compile: { label: '编译', note: 'javac 21 · gradlew check 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 29 个容器；adapter 130 · GameTests 66/66' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 33 个容器；adapter 141 · GameTests 66/66' },
   'Spec index': { label: '规范索引', note: 'spec-check.py · 56 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 130 · GameTests 66/66' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 141 · GameTests 66/66' },
   codes: { label: '代码', note: '12 个 kernel family + MC' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
   decisions: { label: '决策', note: 'ruling，不是偏好' },

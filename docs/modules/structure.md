@@ -446,7 +446,8 @@ Combinators evaluate every child (diagnostics matter more than a short-circuit) 
 
 A focus binds a subject or says why not. `staticCells` is the build-time decision set; it is empty
 for dynamic focuses (`context`, `entity`) and non-empty for static ones (`occupant`, `bay`,
-`allCells`, `door`, `nested`). `bindsSubjects` is false only for `context`. `reads` defaults to the
+`allCells`, `door`, `nested`). `bindsSubjects` is false for `context` and `nested`: a nested take
+yields the child view as its subject but never a claim subject. `reads` defaults to the
 static cells; an entity focus adds a window and the `entity` kind; a nested focus adds the `nested`
 kind and one level of depth; a trait expectation adds its trait id. An expectation that reads outside
 its cells declares it through `Expectation.reads()`.
@@ -457,7 +458,9 @@ through the trust guard (`world` §4.1) and uses the focus's own locus. `Focuses
 include air; subjects exclude air. `allCells` stops at the first `Unreadable` and reports it; a
 `bay` query returns only readable occupants, so a caller that needs totality reads `BayView.read`
 per cell. Neither treats a refused cell as empty. `Focuses.door(origin)` reads `origin` and
-`origin + (0,1,0)` and requires both to be readable and non-air; otherwise `Unavailable`.
+`origin + (0,1,0)` and requires both to be readable and non-air; otherwise `Unavailable`. Its
+`staticCells` are exactly those two cells, so a coverage rule is decided over them: a third cell in
+an `everyCell` bay leaves the bay undecided (`SC-BPT-0005`).
 `Focuses.entity(type)` requires exactly one entity of that type in the bay; zero or many is
 `Unavailable` (`SC-OCC-0001` for zero, an ambiguity finding for many); it reads the bay cells, the
 entity window and the `entity` kind. `Focuses.context(key)` is `context().require(key)`; absent is
@@ -467,7 +470,10 @@ entity window and the `entity` kind. `Focuses.context(key)` is `context().requir
 require `occupant(cell)` to narrow to the nested body, so an entity or block over the anchor does not
 hide the child. A `null` child is a cut: `Unavailable(SC-OCC-0003)` with a local/world label. A
 successful take is `Taken(child, List.of(), notes)`: the child view is the subject, but the focus
-produces **no claim subject**. A nested body is still an ordinary occupant of the parent frame; a
+produces **no claim subject** and `bindsSubjects` is false, so `Coverage.oneSubject` with a nested
+focus is a build error (`SC-BPT-0005`). `Coverage.anySubject + Footprint.bound` still builds a nested
+body and rejects it at check (`SC-CLM-0004`) — a known gap characterized in `06-verification.md`
+§3.2. A nested body is still an ordinary occupant of the parent frame; a
 check that binds it through `Focuses.occupant` fails at claim prediction with `SC-CLM-0004` before an
 `Admitted` exists, and `settle` revalidates the same rule (`engine` §7.5).
 

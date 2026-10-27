@@ -18,7 +18,7 @@ command slice (settle at `4899d86`, plus compile, explain, claims) is green. M5a
 complete; the determinism gate (`DeterminismTest`) covers canonical bytes, the
 parse/write fixed point, equal compile runs and stable finding order, and capture-revision lease
 invalidation landed at `0f0bf25`. Pending only a performance/cost pass and fresh review screenshots.
-169 kernel tests (29 containers), 130 adapter unit tests and 66/66 GameTests are green. The first kernel stress batch (12 scenario classes at `110e797`) is on the tree. The UI opens in **中文**; the
+186 kernel tests (33 containers), 141 adapter unit tests and 66/66 GameTests are green. The second kernel stress batch (17 kernel + 11 adapter tests at `3e60ed4`) is on the tree. The UI opens in **中文**; the
 **EN** button in the top bar switches to the English reading layer. Technical identifiers, code,
 JSON, Java and finding codes stay in their original form in both languages.
 
@@ -37,7 +37,7 @@ network request.
 
 ## What is inside
 
-169 kernel tests, 130 adapter unit tests, 66 GameTests, 56 codes, 29 decisions and 11 ranked kernel
+186 kernel tests, 141 adapter unit tests, 66 GameTests, 56 codes, 29 decisions and 11 ranked kernel
 packages. One complete document and a Java builder excerpt target the same IR.
 
 | Chapter | What you can do |
@@ -72,5 +72,5 @@ history; this app documents design v1.2 and is the one to run.
 
 ## Caveat
 
-The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check`, the adapter’s 130 unit
+The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check`, the adapter’s 141 unit
 tests and its 66 GameTests (`runGameTestServer` 66/66) are green.
