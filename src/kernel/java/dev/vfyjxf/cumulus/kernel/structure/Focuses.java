@@ -293,7 +293,11 @@ public final class Focuses {
 
         @Override
         public CuboidSet staticCells(CuboidSet bayCells) {
-            return bayCells;
+            LatticePoint upper = origin.offset(0, 1, 0);
+            if (upper == null) {
+                return CuboidSet.of(Cuboid.of(origin));
+            }
+            return CuboidSet.of(Cuboid.of(origin), Cuboid.of(upper));
         }
     }
 
