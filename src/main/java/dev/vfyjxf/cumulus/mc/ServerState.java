@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 
-/** The M1 server-side owner of the kernel and the per-level capture cache. */
+/** The server-side owner of the kernel and the per-level capture and persistence state. */
 @NullMarked
 public final class ServerState {
 
@@ -27,12 +27,15 @@ public final class ServerState {
 
     private static @Nullable ServerState current;
 
+    private final Catalogs catalogs;
     private final StructureKernel kernel;
+    private final Map<ServerLevel, LevelStore> levels = new HashMap<>();
     private final Map<ServerLevel, LevelCapture> captures = new HashMap<>();
-    private long nextInstance = 1;
 
     private ServerState() {
-        this.kernel = StructureKernel.create(Catalogs.builtin(), host());
+        this.catalogs = Catalogs.builtin();
+        this.kernel = StructureKernel
+                .create(catalogs, new Host(BuiltinDocuments.source(), null, ContextStore.inMemory(), Map.of()));
     }
 
     public static void open(ServerAboutToStartEvent event) {
@@ -44,6 +47,7 @@ public final class ServerState {
         current = null;
         if (state != null) {
             state.captures.clear();
+            state.levels.clear();
         }
     }
 
@@ -51,6 +55,7 @@ public final class ServerState {
         ServerState state = current;
         if (state != null && event.getLevel() instanceof ServerLevel level) {
             state.captures.remove(level);
+            state.levels.remove(level);
         }
     }
 
@@ -62,24 +67,46 @@ public final class ServerState {
         return kernel;
     }
 
+    StructureKernel kernel(ServerLevel level) {
+        return store(level).kernel();
+    }
+
+    SavedClaims claims(ServerLevel level) {
+        return store(level).claims();
+    }
+
+    SavedContexts contexts(ServerLevel level) {
+        return store(level).contexts();
+    }
+
     LevelCapture capture(ServerLevel level) {
         return captures.computeIfAbsent(level, LevelCapture::new);
     }
 
     InstanceId instance(ServerLevel level) {
-        return new InstanceId(World.of(world(level)), nextInstance++);
+        return new InstanceId(World.of(world(level)), contexts(level).allocateSerial());
     }
 
     OwnerId owner() {
         return serverOwner;
     }
 
-    private static Host host() {
-        return new Host(BuiltinDocuments.source(), null, ContextStore.inMemory(), Map.of());
+    private LevelStore store(ServerLevel level) {
+        return levels.computeIfAbsent(level, attached -> {
+            World world = World.of(world(attached));
+            SavedClaims claims = attached.getDataStorage()
+                    .computeIfAbsent(SavedClaims.factory(world), SavedClaims.dataName);
+            SavedContexts contexts = attached.getDataStorage()
+                    .computeIfAbsent(SavedContexts.factory(world), SavedContexts.dataName);
+            Host host = new Host(BuiltinDocuments.source(), claims, contexts, Map.of());
+            return new LevelStore(claims, contexts, StructureKernel.create(catalogs, host));
+        });
     }
 
     private static NamespacedId world(ServerLevel level) {
         var location = level.dimension().location();
         return NamespacedId.of(location.getNamespace(), location.getPath());
     }
+
+    private record LevelStore(SavedClaims claims, SavedContexts contexts, StructureKernel kernel) {}
 }
