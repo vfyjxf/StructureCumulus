@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.mc;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
@@ -20,6 +21,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The command surface: {@code check}, {@code compile}, {@code settle}, {@code explain} and {@code claims}.
@@ -87,11 +89,24 @@ public final class CumulusCommand {
             return 0;
         }
         ServerLevel level = source.getLevel();
-        CommandSupport.Attempt attempt = CommandSupport.attempt(state, source, state.kernel(), id, blueprint, point);
+        MatchResult checked = check(source, state, level, blueprint, point);
+        return checked == null ? 0 : 1;
+    }
+
+    static @Nullable MatchResult check(
+        CommandSourceStack source,
+        ServerState state,
+        ServerLevel level,
+        Blueprint blueprint,
+        LatticePoint origin
+    ) {
+        CommandSupport.Attempt attempt = CommandSupport
+                .attempt(state, source, state.kernel(), blueprint.id(), blueprint, origin);
         if (attempt == null) {
-            return 0;
+            return null;
         }
         try (CommandSupport.Attempt prepared = attempt) {
+            ClaimView claims = state.claims(level).read(prepared.bounds());
             MatchRequest request = MatchRequest.of(
                 blueprint,
                 prepared.siting(),
@@ -99,11 +114,11 @@ public final class CumulusCommand {
                 state.instance(level),
                 state.owner(),
                 Budget.unbounded(),
-                null
+                claims
             );
             MatchResult checked = state.kernel().check(request);
-            print(source, summary(id, point, checked), checked.findings());
-            return 1;
+            print(source, summary(blueprint.id(), origin, checked), checked.findings());
+            return checked;
         }
     }
 

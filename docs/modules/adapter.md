@@ -322,7 +322,8 @@ definition origin's anchor property is read from the `BlockState` properties, no
 
 All five subcommands run on the server thread. `check` returns 1 whenever it reaches a result (including a reported failed/undecided/dropped check) and 0 only on an argument/document/capture/siting failure; the mutating `settle` returns 1 only for `Formed`; `compile`, `explain` and `claims` return 1 on a produced result and 0 on a reported failure.
 
-- `/cumulus check <id> <origin>` — capture, siting, `check`; print the result and findings.
+- `/cumulus check <id> <origin>` — capture, siting, read the per-level claims view for the captured
+  bounds, then `check`; print the result and findings. The claims read and the check write nothing.
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
   findings.
 - `/cumulus settle <id> <origin>` — capture once, `check`, then `settle` with the same request; print
@@ -334,8 +335,8 @@ All five subcommands run on the server thread. `check` returns 1 whenever it rea
   is normalized to the kernel's half-open `Cuboid`; a box that leaves the lattice is a reported
   failure. Rows print in claim order and the read never writes.
 - `ServerAboutToStartEvent` opens `ServerState`; `ServerStoppingEvent` closes it; `LevelEvent.Unload`
-  closes that world's capture (invalidating its leases) and removes its per-level store. Claims rows
-  are not released on unload yet.
+  closes that world's capture (invalidating its leases) and drops its per-level store. Persisted claims
+  rows are not released; the next access reloads them from the world's saved data.
 
 ## 12. Codes
 

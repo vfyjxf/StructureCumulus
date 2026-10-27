@@ -1,8 +1,16 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
+import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
+import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
+import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.space.Orientation;
+import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
@@ -107,6 +115,20 @@ public final class LeaseLifecycleGameTest {
         }
         ServerLevel level = helper.getLevel();
         Cuboid bounds = cell(helper);
+        SavedClaims ledger = state.claims(level);
+        BlockPos claimOrigin = helper.absolutePos(BlockPos.ZERO).offset(2, 0, 0);
+        LatticePoint claimPoint = LatticePoint.of(claimOrigin.getX(), claimOrigin.getY(), claimOrigin.getZ());
+        Siting claimSiting = Siting.of(claimPoint, Orientation.identity);
+        OwnerId claimOwner = OwnerId.of(NamespacedId.of(Constants.modId, "unload_claims_owner"));
+        ClaimRow claim = new ClaimRow(
+            LatticeKey.of(claimPoint),
+            Sharing.exclusive,
+            claimOwner,
+            claimSiting,
+            NamespacedId.of(Constants.modId, "unload_claims_bay")
+        );
+        ledger.settle(new SettleRequest(claimOwner, claimSiting, List.of(claim), ledger.revision()));
+        long claimRevision = ledger.revision();
         LevelCapture managed = state.capture(level);
         CaptureResult.Captured managedLease = captured(managed, bounds);
         LevelCapture standalone = new LevelCapture(level);
@@ -117,6 +139,16 @@ public final class LeaseLifecycleGameTest {
             helper.assertFalse(managedLease.lease().isCurrent(), "unload closes the managed capture's leases");
             helper.assertTrue(standaloneLease.lease().isCurrent(), "unload does not touch another capture");
             helper.assertTrue(state.capture(level) != managed, "unload drops the cached capture");
+            helper.assertValueEqual(
+                1,
+                state.claims(level).read(Cuboid.of(claimPoint)).rows().size(),
+                "claims rows survive a level unload"
+            );
+            helper.assertValueEqual(
+                claimRevision,
+                state.claims(level).revision(),
+                "unload does not release or bump claims"
+            );
 
             LevelCapture beforeClose = state.capture(level);
             CaptureResult.Captured closeLease = captured(beforeClose, bounds);
@@ -130,6 +162,7 @@ public final class LeaseLifecycleGameTest {
             standaloneLease.lease().close();
         } finally {
             standalone.close();
+            state.claims(level).release(claimOwner, claimSiting);
         }
         helper.succeed();
     }
