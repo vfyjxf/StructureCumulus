@@ -57,11 +57,6 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 
 ## 3. Signatures
 
-> **Pending implementation (Model C).** The four-part `ReadScope` (`traits`/`kinds`/`depth`), total
-> `FocusContext`/`SectionContext`/`BayView` reads, `SectionContext.unreadable()`/`phase()`,
-> `Blueprint.reads()` and the `traitAbsent` expectation are approved; the committed kernel still has
-> the three-component read scope and the section-only refusal model.
-
 ```java
 package dev.vfyjxf.cumulus.kernel.structure;
 
@@ -473,8 +468,8 @@ require `occupant(cell)` to narrow to the nested body, so an entity or block ove
 hide the child. A `null` child is a cut: `Unavailable(SC-OCC-0003)` with a local/world label. A
 successful take is `Taken(child, List.of(), notes)`: the child view is the subject, but the focus
 produces **no claim subject**. A nested body is still an ordinary occupant of the parent frame; a
-check that binds it through `Focuses.occupant` reaches settle, where `OccupantKind.nested` is rejected
-as a claim binding (`engine` §7.5).
+check that binds it through `Focuses.occupant` fails at claim prediction with `SC-CLM-0004` before an
+`Admitted` exists, and `settle` revalidates the same rule (`engine` §7.5).
 
 ### 4.5 Read scope
 

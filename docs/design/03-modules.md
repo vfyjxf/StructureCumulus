@@ -64,15 +64,15 @@ Notes:
   `StructureKernel`.
 - `mc` is a separate Gradle source set (`main`), not a kernel package. The M1 slice (host +
   `/cumulus check` + capture-check: capture, root snapshot, lease, block/block-entity descriptors,
-  `ServerState`, in-memory documents, two GameTests) is implemented; M2a adds loaded-entity capture
-  with policy windows, full footprint indexing and entity-vs-block precedence (`world.md` §4.3); M2b
-  adds upright orientation mapping; M3 adds `SavedClaims`/`SavedContexts` with CAS/release/reload at
-  `d4b6d82`. Model C (body identity, total refusal read, four-state traits) and the nested capability
-  (`mc.capability.NestedExtent`/`NestedExtents`, one `LevelSnapshot` with `FrameData`) are **specified
-  and not implemented**. Still pending: non-upright pitch/roll state mapping, `SC-MC-0004`/`0005`
-  emission, window/mark-counter lease invalidation, JSON/datapack, the rest of the command surface and
-  the M3 rebase. `mc.capability` is a subpackage of `mc`; it adds no kernel edge. The main source set
-  also compiles the mod entry.
+  `ServerState`, in-memory documents) is implemented; M2a adds loaded-entity capture with policy
+  windows, full footprint indexing and entity-vs-block precedence (`world.md` §4.3); M2b adds upright
+  orientation mapping; M2c implements Model C, body identity and trait capture; M2d implements the
+  nested capability (`mc.capability.NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
+  `FrameData`); M3 adds `SavedClaims`/`SavedContexts` with CAS/release/reload at `d4b6d82` and is
+  compatible with Model C. Still pending: non-upright pitch/roll state mapping, `SC-MC-0004`/`0005`
+  emission, window/mark-counter lease invalidation, the settle/compile/explain/claims commands and
+  JSON/datapack (M4). `mc.capability` is a subpackage of `mc`; it adds no kernel edge. The main source
+  set also compiles the mod entry.
 
 ## 2. Ownership
 
@@ -143,9 +143,5 @@ Every module file has exactly these sections:
 8. **Dependencies** — the exact edges, and what is deliberately not imported.
 
 A signature in section 3 that is absent from code is a regeneration defect; a public member in code
-that is absent from section 3 is a design defect. The one exception is an explicitly marked
-**Pending implementation** block in section 3: it is the approved target for a named milestone, is
-absent from code until that milestone, and `tools/spec-check.py` reports it as a
-documented-but-not-in-code red (`06-verification.md` §1). The marker is a status, not a suppression;
-every pending type is named in the gate's red list, and a pending method is still reviewed against
-its law.
+that is absent from section 3 is a design defect. There is no pending signature block in v1.2; the
+spec index is green (`06-verification.md` §1).

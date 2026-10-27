@@ -18,27 +18,19 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current evidence (2026-10-27): M1, M2a and M2b are committed; M3 is committed at `d4b6d82` and will
-be rebased. `./gradlew test` is green: 97 kernel tests and 43 adapter unit tests, 0 failures,
-0 skipped. The last recorded `runGameTestServer` run passes 4/4 (capture-only; capture → compile → check;
-capture entity over block; claims). Model C and the nested capability are **specified, not
-implemented**; their new names are the only expected spec-index red. The spec index is the only gate
-this round turns red; no Java changed, so compile, purity, tests and no-stubs are unchanged.
+Current evidence (2026-10-27): M1, M2a, M2b, M2c and M2d are committed; M3 is committed at
+`d4b6d82` and compatible with Model C. `./gradlew check` is green: 116 kernel tests and 56 adapter
+unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 22/22. `tools/spec-check.py` is clean.
+Model C, body identity, trait capture and the nested capability are implemented, not pending.
 
-**Spec index red (expected).** `tools/spec-check.py` reports the approved-but-unimplemented names
-as documented-but-not-in-code, exactly:
-`world: Absent, CellRead, Found, Partial, ReadRefusal, TraitSlot, Unreadable`. The seven are
-`ReadRefusal`, `CellRead` (with `Found`/`Unreadable`), `TraitSlot` (with `Absent`) and
-`SectionSlot.Partial`; there is no other mismatch. The red is the honest gap described in
-`05-decisions.md` D-24 and the module §3 notes; it must not be suppressed, and it clears when M2c
-implements the read model. `SC-OCC-0004` is a docs-only code until M2c as well; the code table is
-allowed to lead the tree because the producer row is the contract.
+**Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
+in code documented; it is green. There is no documented-but-not-in-code list and no suppression.
 
 ## 2. Requirement → module → test
 
 | Requirement | Modules | Test |
 | --- | --- | --- |
-| F-01 occupants are not blocks | world, structure | entity pen; nested (pending M2d) |
+| F-01 occupants are not blocks | world, structure | entity pen; nested |
 | F-02 purity | all | purity gate |
 | F-03 typed context | context, structure | furnace capacity, iron count |
 | F-04 anchor/no controller | structure, space | anchor read; orientation policy |
@@ -80,13 +72,13 @@ They are the acceptance suite; a module test that does not feed one of them is o
     `match` output is rejected, a stale context is not possible by contract.
 12. **Document parity** — the campfire/furnace as a `Document` and as a builder produce equal
     blueprints; a bad schema field/kind/placement produces the documented code and no blueprint.
-13. **Refusal (specified, pending M2c)** — a `Partial` section: a `count`/`air` computation returns
-    `Missing` and reports the refusal, never a short sum; a check over the refused cell is
-    `Unreadable`; a host code is relayed, and a relayed kernel code becomes `SC-OCC-0004` with a
-    note; `not(trait(...))` stays `Unreadable`; missing-slot traits are never `Mismatch`.
-14. **Nested (specified, pending M2d)** — one snapshot with a child frame: distinct frame/depth/
-    parent, local bounds and `world = origin + local`; `nested(cell)` anchor-only; a cut child keeps
-    the body and yields `SC-OCC-0003`; a nested body bound as a claim is `Failed(SC-CLM-0004)`; a
+13. **Refusal** — a `Partial` section: a `count`/`air` computation returns `Missing` and reports the
+    refusal, never a short sum; a check over the refused cell is `Unreadable`; a host code is relayed,
+    and a relayed kernel code becomes `SC-OCC-0004` with a note; `not(trait(...))` stays `Unreadable`;
+    missing-slot traits are never `Mismatch`.
+14. **Nested** — one snapshot with a child frame: distinct frame/depth/parent, local bounds and
+    `world = origin + local`; `nested(cell)` anchor-only; a cut child keeps the body and yields
+    `SC-OCC-0003`; a nested body bound as a claim is `Failed(SC-CLM-0004)` at claim prediction; a
     child build-height section is refused, not air; two same-type/same-anchor entities are distinct.
 
 ## 4. Module tests
@@ -107,8 +99,8 @@ They are the acceptance suite; a module test that does not feed one of them is o
 
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. `Codes.all` has 56 entries in v1.1; the committed
-registry has 55 until M2c adds `SC-OCC-0004`. A test reads `Codes.all` and asserts:
+The authoritative table is `finding.md` §6. `Codes.all` has 56 entries in v1.2, matching the
+registry. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
 - every code appears exactly once in the producer table (a hand-maintained `Map<FindingCode,String>`
@@ -151,20 +143,14 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. M1 is executed by `runGameTestServer`: capture,
-  snapshot and lease, block/block-entity descriptors, `ServerState`, in-memory `BuiltinDocuments` and
-  `/cumulus check <id> <origin>`, with the capture-only and capture → compile → check GameTests. M2a
-  is executed by `runGameTestServer` (capture entity over block) and by the `LevelSnapshotTest`
-  precedence cases. M2b is executed by `OrientationMappingTest`: upright heading/turn/flip mapping
-  and a mirror-then-rotate state transform; non-level tilts return `UnsupportedTilt`. M3 is executed
-  by `SavedClaimsTest`/`SavedContextsTest` and the claims GameTest (CAS/release/reload), but its
-  rebase onto Model C is not done. **Specified, not executed:** Model C (body identity,
-  `ReadRefusal`/`CellRead`/`Partial`/`TraitSlot`, trait four states, `SC-OCC-0004`, host-code relay,
-  policy ids), the nested capability (`NestedExtent`/`NestedExtents`, frames, cuts, child entities),
-  non-upright pitch/roll state mapping, `SC-MC-0004`/`0005` emission, window/mark-counter lease
-  invalidation, and M4 JSON/datapack and the remaining commands. The spec index is red only for the
-  four pending world names; that is the expected gap, not a pass. The orientation, door and furnace
-  GameTests are also reviewed, not executed.
+- The rest of the NeoForge adapter and its GameTests. All 22 GameTests are executed by
+  `runGameTestServer`: M1 capture/host, M2a entity precedence, M2b orientation, M3 claims, M2c traits
+  and M2d nested frames/cuts. Unit evidence: `LevelSnapshotTest` for body/precedence/partial reads,
+  `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for the capability declaration,
+  `SavedClaimsTest`/`SavedContextsTest` for persistence, `OrientationMappingTest` for upright mapping.
+  **Still pending:** M4 JSON/datapack and the remaining commands (`compile`, `settle`, `explain`,
+  `claims`), non-upright pitch/roll state mapping (the 40 orientations), `SC-MC-0004`/`0005` emission,
+  window/mark-counter lease invalidation, and the deferred `SC-MC-0003` capture-finding channel.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.

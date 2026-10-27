@@ -16,10 +16,9 @@ project (`Data/StructureCumulus/baseline-2026-10-26.tar.gz`).
 **Consequence:** no compatibility shims, no migration ledger, no "the design is ahead of the code"
 section. The acceptance gate is the regenerated kernel.
 
-**Amendment (v1.1).** A named, approved pending block is not the banned "design is ahead of the
-code" section: it is a milestone with a decision ID and a gate red. Model C and the nested capability
-are tracked by D-24–D-27, `06-verification.md` §1 and `07-regeneration.md` §7; the ban remains on an
-untracked gap or a silent suppression.
+**Amendment (v1.2).** The v1.1 pending block is implemented: Model C and body identity in
+`cb06aa8`/`64d04ce`, the nested capability in `f3e0338`/`d6aefc2`. The banned "design is ahead of
+the code" section remains banned; a future pending block needs the same decision ID and gate record.
 
 ### D-02 — Scope of v1
 
@@ -27,19 +26,17 @@ Core kernel + document compiler + thin remedy SPI. The v1 round scoped the NeoFo
 `modules/adapter.md` and left it unimplemented at the time; no scheduler, no dirty index, no overlay
 renderer, no schematic importer, no client code. This kept the first regeneration small enough to
 prove, while the ports make the adapter a later, independent exercise. Current status (2026-10-27):
-M1 (host + command + capture-check), M2a (loaded-entity capture) and M2b (upright orientation) are
-committed. M3 is committed at `d4b6d82` — `SavedClaims`, `SavedContexts`, CAS settle/release and
-reload codecs — and will be rebased onto Model C. Model C (body identity, the narrowest-read refusal,
-four-state traits) and the nested capability are **specified in this revision and not implemented**;
-`occupant body`, `ReadRefusal`/`CellRead`, `SectionSlot.Partial`, `TraitSlot`,
-`SnapshotPolicy.traits` by id, `NestedExtent`/`NestedExtents` and the frame/cut rules are the target,
-not a claim about the tree. M4 (JSON/datapack, the remaining commands), `SC-MC-0004`/`0005` emission,
-non-upright pitch/roll state mapping and window/mark-counter lease invalidation remain pending.
+M1 (host + command + capture-check), M2a (loaded-entity capture), M2b (upright orientation), M2c
+(Model C, body identity, total read, four-state traits and the five adapter trait keys) and M2d
+(nested extents, frames, cuts, child entities) are committed. M3 is committed at `d4b6d82` —
+`SavedClaims`, `SavedContexts`, CAS settle/release and reload codecs — and is compatible with Model C;
+its settle command and lease invalidation are still missing. M4 (JSON/datapack, the remaining
+commands), `SC-MC-0004`/`0005` emission, non-upright pitch/roll state mapping, window/mark-counter
+lease invalidation and the deferred `SC-MC-0003` channel remain pending.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is a committed M1–M3 slice plus a specified M2c/M2d. The spec index is expected to be red for
-the approved-but-unimplemented names until the rebase lands; that red is the honest gap, not a
-regression (`06-verification.md` §1).
+adapter is implemented through M2d, with M4 still missing. The spec index is green; no pending
+signature is documented as implemented (`06-verification.md` §1).
 
 ### D-03 — English only
 
@@ -347,19 +344,21 @@ reconstruct a refusal the host already knew. A trait absent is not a trait unrea
 is not air. The body is part of identity for the same reason: an identity that omits it is not an
 identity of the body.
 
-**Consequence:** `tools/spec-check.py` is red for the approved but unimplemented names until the
-rebase lands (this is the intended gap, not a suppressed one). A computation that sums over a
-`Partial` slice must consult `SectionContext.unreadable()` or return `Missing`; a returned `Found`
-over refused cells is a short sum and a review defect.
+**Consequence:** a computation that sums over a `Partial` slice must consult
+`SectionContext.unreadable()` or return `Missing`; a returned `Found` over refused cells is a short
+sum and a review defect. **Status (v1.2):** implemented in `cb06aa8`/`64d04ce`; the spec index is
+green.
 
 ### D-25 — A nested body is checkable, never claimable
 
 A nested extent becomes a parent-frame occupant of kind `nested` with a footprint translated into
 the parent, but it is not a claim subject. `Focuses.nested(cell)` returns the child view with an
-empty subject list; a check that binds a nested body through `Focuses.occupant` reaches settle, where
-`engine.settle` fails `SC-CLM-0004`; `ClaimPlanner.derive` throws the same code if a nested or
-non-root subject reaches it (a proof failure, because settle validates first). A nested child
-subject (frame `!= 0`) is invalid for a claimable bay for the same reason.
+empty subject list; a check that binds a nested body through `Focuses.occupant` fails at claim
+prediction with `SC-CLM-0004`, before an `Admitted` exists; `settle` revalidates the binding, and
+`ClaimPlanner.derive` throws the same code if a nested or non-root subject reaches it (a proof
+failure, because check and settle validate first). A nested child subject (frame `!= 0`) is invalid
+for a claimable bay for the same reason. **Status (v1.2):** implemented in `cb06aa8`; the check-time
+rejection is covered by `ReadModelTest`/`StructureValidationTest`.
 
 **Why:** a claim row is a world cell of the root instance. A child frame's local cells are not the
 parent's cells, and claiming the extent would let a child structure's internals — or a template that
@@ -396,19 +395,22 @@ adapter, not `kernel.world`.
 structure block stays metadata. A template-backed extents provider (`TemplateNestedExtent`) is a
 future, separate feature. The adapter's fake-provider seam is package-private
 (`LevelCapture(ServerLevel, NestedExtentLookup)`), because a real registration cannot be made after
-the MOD bus event.
+the MOD bus event. **Status (v1.2):** implemented in `f3e0338`/`d6aefc2`; the nested query remains
+the four-argument block overload, while the separate trait capability queries use the five-argument
+`Void`-context form.
 
 ### D-27 — A cut child is absent, not a refused child
 
-A child frame that cannot be built — depth `> maxDepth`, element budget, a source already on the
-open frame stack (cycle), or an unloaded chunk — is **cut**: the nested body stays in the parent,
-no child exists, `nested(cell)` returns `null`, and the consumer reports `SC-OCC-0003`. The adapter
-does not fabricate a refused child or an empty child view. `SC-MC-0003` is reserved/deferred: this
-round has no capture-finding channel, so the adapter does not produce it and it never enters
-`Codes.all`. A child whose bounds leave the build height is not cut: the child exists, its
-out-of-range local sections are `Refused`/`Partial` (never air), and each refused cell is visible
-through the read. There is no partial child: a child either exists with its sections answered
-(readable or refused) or is cut entirely.
+A child frame that cannot be built — depth `> maxDepth`, element budget, a repeated
+`(type, origin)` on the open frame stack (cycle), or an unloaded chunk — is **cut**: the nested body
+stays in the parent, no child exists, `nested(cell)` returns `null`, and the consumer reports
+`SC-OCC-0003`. The adapter does not fabricate a refused child or an empty child view. `SC-MC-0003` is
+reserved/deferred: this round has no capture-finding channel, so the adapter does not produce it and
+it never enters `Codes.all`. A child whose bounds leave the build height is not cut: the child
+exists, its out-of-range local sections are `Refused`/`Partial` (never air), and each refused cell is
+visible through the read. There is no partial child: a child either exists with its sections answered
+(readable or refused) or is cut entirely. **Status (v1.2):** implemented in
+`f3e0338`/`d6aefc2`; `SC-MC-0003` remains deferred.
 
 **Why:** a refused child is a second structure that checks could walk and pass; the honest fact is
 that the child is not available. Keeping the body and returning `null` preserves the parent-frame
@@ -438,9 +440,9 @@ not a cut. `SC-MC-0004` is outside this decision: it remains an orientation mism
 - The nested source is a third-party capability; the adapter's block-over-entity precedence and
   first-provider-wins rule are policy, not a merge. A mod that wants two nested bodies at one cell
   cannot express it (D-26).
-- The approved Model C/nested declarations are ahead of the tree; `tools/spec-check.py` is red for
-  those names until the rebase lands. This is tracked as the intended gap, not fixed by suppressing
-  the gate (D-02).
+- Model C and the nested capability are implemented and the spec index is green; the remaining gaps
+  are M4, non-upright tilt, `SC-MC-0004`/`0005`, lease invalidation and the deferred `SC-MC-0003`
+  channel (D-02).
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates

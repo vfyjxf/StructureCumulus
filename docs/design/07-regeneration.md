@@ -13,15 +13,14 @@ idea, not an API.
 context,document,engine,remedy,spi}`, `src/kernelTest/java`, and the `src/main/java` mod entry with
 the adapter. Committed: M1 (host + `/cumulus check` + capture-check: `LevelCapture`,
 `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState` lifecycle, in-memory
-`BuiltinDocuments`, two GameTests), M2a (loaded-entity capture, policy windows, footprint indexing,
-entity-vs-block precedence, a third GameTest), M2b (upright orientation mapping) and M3 at `d4b6d82`
-(`SavedClaims`, `SavedContexts`, CAS/release/reload, a claims GameTest). **Specified, not
-implemented:** Model C (body identity, `ReadRefusal`/`CellRead`/`SectionSlot.Partial`/`TraitSlot`,
-trait four states, `SC-OCC-0004`, host-code relay, `SnapshotPolicy.traits` by id, `Blueprint.reads`)
-and the nested capability (`NestedExtent`/`NestedExtents`, one `LevelSnapshot` + `FrameData`, child
-frames, cuts, child entities). Still pending: non-upright pitch/roll state mapping,
-`SC-MC-0004`/`0005` emission, window/mark-counter lease invalidation, the M3 rebase, JSON/datapack
-and the remaining commands.
+`BuiltinDocuments`), M2a (loaded-entity capture, policy windows, footprint indexing, entity-vs-block
+precedence), M2b (upright orientation mapping), M3 at `d4b6d82` (`SavedClaims`, `SavedContexts`,
+CAS/release/reload), M2c at `cb06aa8`/`64d04ce` (Model C, body identity, total read, four-state
+traits, the five adapter trait keys) and M2d at `f3e0338`/`d6aefc2` (nested extents, one
+`LevelSnapshot` + `FrameData`, child frames, cuts, child entities). M3 persistence is compatible with
+Model C; only its settle command and lease invalidation are missing. Still pending: M4 JSON/datapack
+and the remaining commands, non-upright pitch/roll state mapping, `SC-MC-0004`/`0005` emission,
+window/mark-counter lease invalidation and the deferred `SC-MC-0003` channel.
 
 ## 2. The order
 
@@ -60,7 +59,7 @@ module file.
 | 1 | `javac --release 21` over `src/kernel/java`, JSpecify only | exit 0, zero errors |
 | 2 | no Minecraft/NeoForge/Mojang name under `kernel.**` | purity scan; compile classpath |
 | 3 | `src/kernelTest/java` compiles and all tests pass | JUnit launcher; 0 failures, 0 skipped |
-| 4 | the twelve committed scenarios in `06-verification.md` §3 pass, and the two pending ones are named | named test classes |
+| 4 | the fourteen scenarios in `06-verification.md` §3 pass | named test classes |
 | 5 | every public type in code is in a module file, and vice versa | `tools/spec-check.py` |
 | 6 | every `SC-` code in code is in `Codes.all`, and every `Codes.all` entry is in a producer row | registry test |
 | 7 | no `TODO`/`FIXME`/`UnsupportedOperationException`/empty public body | grep |
@@ -69,11 +68,9 @@ module file.
 | 10 | the old `docs/spec`, `docs/design-notes`, `docs/guide.zh.md`, `docs/README.zh.md` and the old
     kernel sources are gone | `git status`; only the new set remains |
 
-While Model C and the nested capability are **specified, not implemented**, gate 5 is red for the
-seven approved world names (`CellRead`, `Found`, `Unreadable`, `ReadRefusal`, `TraitSlot`, `Absent`,
-`SectionSlot.Partial`) and for nothing else. That red is recorded, not suppressed
-(`06-verification.md` §1). The gate becomes a pass when M2c lands; it is not a definition-of-done
-waiver for an unrelated public type.
+The spec index is green in v1.2: every documented type is implemented, every `SC-` code in code is
+in `Codes.all`, and every `Codes.all` entry has a producer row. There is no pending signature block
+and no suppressed gate (`06-verification.md` §1).
 
 ## 5. Regeneration is not a one-way door
 
@@ -92,19 +89,17 @@ the exact failure this set exists to prevent.
 
 ## 7. What the next round owes
 
-- **M2c — Model C.** Implement the approved `world`/`structure`/`engine` shape: `OccupantRef.body`,
-  `ReadStatus.failed`, `ReadRefusal`, `CellRead`, `SectionSlot.Partial`, `TraitSlot`, the total
-  `WorldView.read` and derived accessors, `FocusContext`/`SectionContext`/`BayView` reads,
-  `ReadScope` traits/kinds/depth, `Blueprint.reads`, `SnapshotPolicy.traits` by id, `SC-OCC-0004`
-  and host-code relay. Re-run the kernel suite and the adapter tests; spec-check becomes clean.
-- **M2d — nested capability.** Implement `mc.capability.NestedExtent`/`NestedExtents`, one
-  `LevelSnapshot` + `FrameData`, root/child origins and local bounds, the nested body, cut rules,
-  child build-height partial sections, child entities and the fake-provider seam. No built-in
-  Structure Block provider.
-- **M3 rebase.** Re-run `SavedClaimsTest`/`SavedContextsTest`/the claims GameTest after M2c/M2d;
-  ensure a persisted `SC-OCC-0004` and a relayed host code round-trip.
 - **M4.** JSON reader/writer, datapack reload and the remaining commands (`compile`, `settle`,
-  `explain`, `claims`).
+  `explain`, `claims`), including the settle command on top of the committed `SavedClaims`/
+  `SavedContexts` stores.
+- **M5.** The remaining host gates: determinism golden test, lease invalidation by epoch/mark
+  counter, and the command/GameTest coverage that M4 adds. The kernel and adapter suites are already
+  green (116 kernel, 56 adapter, 22 GameTests).
+- **Non-upright tilt.** The 40 pitch/roll/inverted orientations, capability-aware state remapping
+  and `SC-MC-0004` emission.
+- **`SC-MC-0005`** capture-over-cap emission at the host boundary, and the deferred `SC-MC-0003`
+  capture-finding channel for a cut child; the adapter currently returns `CaptureResult.TooLarge`
+  and the consumer reports `SC-OCC-0003`.
 - A host scheduler with coalescing, dirty windows and a per-world ledger, outside the kernel.
 - A performance pass: claim-row volume for large structures, the per-cell `read`/`statusOf` cost, the
   section pass and the nested-frame budget. If a row form other than per-cell is needed, it is a

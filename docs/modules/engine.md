@@ -4,10 +4,8 @@
 > pipeline; it owns the request, the outcome, the result arms, the gate, the row planner and the
 > two entry points. It schedules nothing, stores nothing and renders nothing.
 >
-> **Pending implementation (Model C / nested capability).** Partial sections, refused-cell
-> computations, host-code relay and nested claim rejection are approved; the committed engine still
-> has the section-only refusal model and accepts a nested subject until settle. `Blueprint.reads()`
-> is the host's policy source.
+> `Blueprint.reads()` is the host's policy source; partial sections, host-code relay and nested
+> claim rejection are implemented.
 
 ## 1. Scope
 
@@ -230,17 +228,19 @@ version. A stale snapshot never publishes a claim or a context value.
 `Declared` are local sets translated by the siting; `Bound` is the union of the subjects' world
 footprints; a subject from a nested frame (`frame != 0`) or of kind `OccupantKind.nested` is invalid
 for a claimable bay. A nested structure is checkable but never claimable: a nested focus returns no
-subject, and a check that binds a nested body through `Focuses.occupant` is rejected before rows are
-minted. Rows are one per cell per bay; a cell may carry two rows only when both bays are `shared`
-(the blueprint refuses an exclusive overlap). `rows` is sorted by `(cell, owner, bay)`.
+subject, and a check that binds a nested body through `Focuses.occupant` fails at claim prediction
+with `SC-CLM-0004` before an `Admitted` exists. Rows are one per cell per bay; a cell may carry two
+rows only when both bays are `shared` (the blueprint refuses an exclusive overlap). `rows` is sorted
+by `(cell, owner, bay)`.
 
-`settle` validates before deriving: each bay is this blueprint's; each subject's ref belongs to this
-snapshot and the root frame; no subject has kind `nested`; every subject footprint lies inside the
-bay's world cells; for `oneSubject` the union equals the bay; for `exclusive + Bound` at least one
-non-air subject exists. A failure is `Failed(SC-CLM-0004)`/`SC-CLM-0005` and nothing is written.
-`ClaimPlanner.derive` throws `IllegalArgumentException` carrying `SC-CLM-0004` if a nested or
-non-root subject reaches it; that is a proof failure, because `settle` already validated the
-bindings.
+`check` rejects a nested or non-root binding while folding the verdict; it never returns an
+`Admitted` that carries one. `settle` revalidates before deriving: each bay is this blueprint's; each
+subject's ref belongs to this snapshot and the root frame; no subject has kind `nested`; every subject
+footprint lies inside the bay's world cells; for `oneSubject` the union equals the bay; for
+`exclusive + Bound` at least one non-air subject exists. A failure is
+`Failed(SC-CLM-0004)`/`SC-CLM-0005` and nothing is written. `ClaimPlanner.derive` throws
+`IllegalArgumentException` carrying `SC-CLM-0004` if a nested or non-root subject reaches it; that is
+a proof failure, because check and settle already validated the bindings.
 
 ### 7.6 Budget and determinism
 

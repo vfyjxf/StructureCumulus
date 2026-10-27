@@ -357,11 +357,10 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
 | `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; a host code may be relayed from a `ReadRefusal` | adapter |
 
-`Codes.all` has 56 entries in this revision. `SC-OCC-0004` is specified with Model C; the committed
-`Codes` still has 55 entries until M2c, and the extra entry is the documented pending code, not a
-silent omission. `SC-MC-0003` is reserved/deferred: the adapter has no capture-finding channel in
-this round, so it is not produced and not listed in `Codes.all`; a cut child is reported by the
-consumer as `SC-OCC-0003`, never fabricated as a refused child (`adapter.md` §7).
+`Codes.all` has 56 entries in this revision, matching the registry. `SC-MC-0003` is
+reserved/deferred: the adapter has no capture-finding channel in this round, so it is not produced
+and not listed in `Codes.all`; a cut child is reported by the consumer as `SC-OCC-0003`, never
+fabricated as a refused child (`adapter.md` §8).
 
 ## 7. Tests
 

@@ -45,12 +45,6 @@ capture implementation (`mc`), dirty tracking or scheduling (host).
 
 ## 3. Signatures
 
-> **Pending implementation (Model C).** `ReadStatus.failed`, `ReadRefusal`, `CellRead`,
-> `SectionSlot.Partial`, `TraitSlot`, the `body` component of `OccupantRef`, and the new
-> `WorldView`/`SnapshotPolicy` members are the approved shape. The committed kernel still has the
-> section-only refusal model and a `Set<TraitKey<?>>` policy; until the rebase lands,
-> `tools/spec-check.py` reports the new names as documented-but-not-in-code.
-
 ```java
 package dev.vfyjxf.cumulus.kernel.world;
 
@@ -311,8 +305,9 @@ never name an occupant in the snapshot. `Refused` carries a status and a code; e
 section is unreadable. `readable()` is true for `Air`, `Present` and `Partial`; `status()` is the
 status of a `Refused` slot, else `readable`.
 
-`contentDigest(key)` is the host's stable digest of the frozen readable content; it is `0` for `Air`
-and `Refused` and the readable content's digest for `Present` and `Partial`. A view answers a key of
+`contentDigest(key)` is the host's stable digest of the frozen content; it is `0` for `Air` and
+`Refused`, the readable content digest for `Present`, and a digest that folds in the refused cells
+and their statuses for `Partial`, so a changed refusal changes the digest. A view answers a key of
 another frame or world with `Refused(outOfBounds, SC-OCC-0004)`.
 
 ### 4.6 Capture and lease
@@ -386,12 +381,12 @@ the extent origin and the translated local bounds. A nested body is indexed in t
 with kind `nested`, anchor at the capability cell and footprint = the extent's bounds translated into
 that parent's frame; it is not in any `SectionSnapshot` and does not enter a section digest.
 
-A child that cannot be built (depth, element budget, cycle, unloaded chunk) is cut: the nested body
-stays, no child exists, `nested(cell)` returns `null`, and the consumer reports `SC-OCC-0003`. A cut
-is never a partial child and never air. A child whose bounds leave the level's build height keeps the
-child but its outside sections are `Refused`/`Partial`; those cells are never air. The nested body and
-child view are host-capture facts; the kernel treats a `null` `nested(cell)` as "not available here",
-not as an empty structure.
+A child that cannot be built (depth ceiling, element budget, a repeated `(type, origin)` on the open
+frame path, unloaded chunk) is cut: the nested body stays, no child exists, `nested(cell)` returns
+`null`, and the consumer reports `SC-OCC-0003`. A cut is never a partial child and never air. A child
+whose bounds leave the level's build height keeps the child but its outside sections are
+`Refused`/`Partial`; those cells are never air. The nested body and child view are host-capture
+facts; the kernel treats a `null` `nested(cell)` as "not available here", not as an empty structure.
 
 ## 5. Pipeline role
 

@@ -21,7 +21,7 @@ table defines who may emit each finding code.
 7. [design/06-verification.md](design/06-verification.md) — gates, scenario tests, code producers.
 8. [design/07-regeneration.md](design/07-regeneration.md) — how the kernel is rebuilt from this set.
 
-There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated after the Model C/nested implementation lands; until then it still shows the v1.0 code and decision counts.
+There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately; until then it still shows the v1.0 code and decision counts.
 
 Then the module files, in dependency order:
 
@@ -42,36 +42,31 @@ Then the module files, in dependency order:
 
 ## Status
 
-- Design revision: **v1.1**, 2026-10-27. The v1.1 round specifies Model C (body identity, the
-  narrowest-read refusal, four-state traits) and the nested capability; neither is implemented yet.
+- Design revision: **v1.2**, 2026-10-27. The v1.1 round specified Model C (body identity, the
+  narrowest-read refusal, four-state traits) and the nested capability; v1.2 records them as
+  implemented.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
   lifecycle, in-memory `BuiltinDocuments` (`structurecumulus:air_cell`) and
-  `/cumulus check <id> <origin>` (identity siting for anchorless blueprints), with two GameTests
-  (capture-only; capture → compile → check). M2a adds loaded-entity capture with policy windows, full
-  footprint indexing and entity-vs-block precedence (`world.md` §4.3), plus the
-  capture-entity-over-block GameTest. M2b adds `Heading`/`Direction`, `Turn`/`Rotation`,
-  `Flip`/`Mirror` and an upright mirror-then-rotate `BlockState` transform that returns
-  `UnsupportedTilt` for non-level tilts. M3 is committed at `d4b6d82`: `SavedClaims`, `SavedContexts`,
-  their NBT codecs and the per-level `ServerState` stores, with CAS/release/reload tests; it will be
-  rebased onto Model C. **Specified now, implementation pending:** `OccupantRef.body`,
-  `ReadStatus.failed`, `ReadRefusal`/`CellRead`, `SectionSlot.Partial`, `TraitSlot`, the total
-  `WorldView.read`/`FocusContext.read`/`SectionContext.read`, `ReadScope` traits/kinds/depth,
-  `Blueprint.reads`, `SC-OCC-0004`, `SC-MC-0002` relay, and the nested capability
-  (`NestedExtent`/`NestedExtents`, frames, cuts, child entities). Non-upright pitch/roll state
-  mapping, `SC-MC-0004`/`0005` emission, window/mark-counter lease invalidation, M4 JSON/datapack
-  and the remaining commands are still pending.
+  `/cumulus check <id> <origin>` (identity siting for anchorless blueprints). M2a adds loaded-entity
+  capture with policy windows, full footprint indexing and entity-vs-block precedence (`world.md`
+  §4.3). M2b adds `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror` and an upright
+  mirror-then-rotate `BlockState` transform that returns `UnsupportedTilt` for non-level tilts.
+  M2c implements Model C, body identity, the total read and trait capture at `cb06aa8`/`64d04ce`.
+  M2d implements nested extents, frames, cuts and child entities at `f3e0338`/`d6aefc2`. M3 is
+  committed at `d4b6d82`; its `SavedClaims`/`SavedContexts` persistence is compatible with Model C and
+  its CAS/release/reload tests are green, but the settle command and lease invalidation are still
+  missing. M4 is next: JSON/datapack and the remaining commands. Non-upright pitch/roll state mapping,
+  `SC-MC-0004`/`0005` emission, window/mark-counter lease invalidation and the deferred `SC-MC-0003`
+  remain pending.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 97
-  kernel JUnit 5 tests and 43 adapter unit tests pass; the last recorded GameTest run is 4/4 (capture-only;
-  capture → compile → check; capture entity over block; claims). `./gradlew test` is green. The spec
-  index is **red only** for the approved-but-unimplemented Model C names — `CellRead` (`Found`,
-  `Unreadable`), `ReadRefusal`, `TraitSlot` (`Absent`) and `SectionSlot.Partial`; see
-  `06-verification.md` §1. That red is the tracked gap, not a suppressed gate.
+- Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 116
+  kernel JUnit 5 tests and 56 adapter unit tests pass; `runGameTestServer` passes 22/22; `./gradlew
+  check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean.
 
 ## The one rule
 
