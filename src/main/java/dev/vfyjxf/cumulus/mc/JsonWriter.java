@@ -64,6 +64,9 @@ public final class JsonWriter implements DocumentWriter {
         out.addProperty("schemaVersion", document.schemaVersion());
         out.addProperty("id", JsonVocabulary.idText(root.id()));
         out.add("bounds", box(root.bounds()));
+        if (root.envelope()) {
+            out.addProperty("envelope", true);
+        }
         if (!document.definitions().isEmpty()) {
             JsonObject definitions = new JsonObject();
             for (Map.Entry<NamespacedId, BlueprintSpec> entry : document.definitions().entrySet()) {
@@ -101,6 +104,9 @@ public final class JsonWriter implements DocumentWriter {
     }
 
     private static JsonObject definition(BlueprintSpec spec) {
+        if (spec.envelope()) {
+            throw new IllegalStateException("a definition may not declare an envelope");
+        }
         JsonObject out = new JsonObject();
         out.add("bounds", box(spec.bounds()));
         addArguments(out, spec.arguments());

@@ -102,6 +102,16 @@ public final class Codes {
                 + "implementation and the document arguments."
     );
 
+    public static final CodeEntry envelopeOpen = entry(
+        FindingCode.Family.exp,
+        6,
+        Severity.error,
+        "The envelope is not closed.",
+        "A cell inside the blueprint bounds but outside every bay and declared footprint holds a "
+                + "non-air occupant. The derived envelope is the closed world: declare a bay for a port "
+                + "or any cell, or remove the occupant. A refused read stays SC-OCC-0004."
+    );
+
     public static final CodeEntry claimConflict = entry(
         FindingCode.Family.clm,
         1,
@@ -479,6 +489,7 @@ public final class Codes {
         thresholdImpossible,
         factoryUnknown,
         factoryBad,
+        envelopeOpen,
         claimConflict,
         ledgerUnavailable,
         ledgerMoved,

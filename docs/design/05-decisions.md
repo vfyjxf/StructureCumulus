@@ -454,8 +454,8 @@ The four rulings this record fixes:
   `TooLarge` carry entries, `Unavailable` normally none because its own code already is its finding.
 - **Adapter-only codes are catalog codes.** The adapter registers `SC-MC-0001`…`0005` in its own code
   catalog through `Catalogs.Builder.codes`, so each carries a canonical severity and an explanation
-  and `/cumulus explain` resolves it. `Codes.all` stays at 56; the kernel registry is not a host
-  registry, and a host code never enters it.
+  and `/cumulus explain` resolves it. `Codes.all` stays kernel-only (57 entries after D-30); the
+  kernel registry is not a host registry, and a host code never enters it.
 - **The severities are the host's.** `SC-MC-0005` (refused root) is an ERROR; `SC-MC-0003` (cut) and
   `SC-MC-0004` (orientation mismatch) are WARNINGs, because a check can still pass over both, and a
   warning printed before a `Formed` summary is honest while an error would not be.
@@ -536,6 +536,43 @@ unrepresentable state keeps the raw descriptor with the warning. **Status (v1.2)
 `LevelCapture` (inverse-orientation projection before `OccupantDescriptors`) with
 `SitedDescriptorGameTest`; no kernel type was added.
 
+### D-30 — The envelope is derived from the bounds, not declared cell by cell
+
+A blueprint can ask for a closed world with `BlueprintBuilder.envelope()` (or the root document
+member `"envelope": true`). The build derives
+`E = bounds.asSet − (union bay.cells ∪ union Footprint.Declared cells)` from its local declaration
+lists and appends one reserved `structurecumulus:envelope` bay (`everyCell` / `Footprint.none` /
+`shared`) plus its `Focuses.bay()` + `eachCell(envelopeAir())` check last. An empty `E` is a no-op.
+The cell set is never an API argument, and the flag is root-only; a definition that carries it is
+`SC-DOC-0002`.
+
+The alternatives were rejected:
+
+- **An explicit `envelope(CuboidSet)` or an allow-list of ignored cells** would let an author hide a
+  cell from the closed world without a check, and would make two sources of truth (the set and the
+  bays) disagree. Declaring a bay is the existing opt-out, and it carries a check and a footprint.
+- **A new `Plan`/kernel `Envelope` type** would duplicate the bay/check pipeline and force budget,
+  read-scope, refusal and siting rules to be written twice. The synthetic pair uses the ordinary
+  path and owns no claim row.
+- **A schema version bump** is unnecessary: an unknown root member is already an error, and a
+  missing boolean is off. A reader that does not know `envelope` rejects it rather than silently
+  closing the world.
+- **Reusing `SC-EXP-0001` for a foreign occupant** would fold "this leaf did not match" and "the
+  closed world is not closed" into one code. `SC-EXP-0006` names the envelope; a refused read stays
+  `SC-OCC-0004` and never becomes a mismatch.
+
+**Why:** `bounds` is the only closed world the author already declares, and the envelope is the set
+difference between it and the declarations. It reuses `Bay`, `Check`, `Focuses`, `Expectations`,
+siting, read scope, budget, refusal and the claim planner; `Footprint.none` keeps the envelope
+unclaimable, and a second `build()` of one builder is equal.
+
+**Consequence:** a block outside `bounds` stays invisible; a block inside `bounds` and outside every
+bay or declared footprint fails at its cell; permissive cells (ports, ignored cells, any-occupant
+cells) must be declared as bays; the reserved id collides as `SC-BPT-0004`; `envelope: true` on a
+definition is `SC-DOC-0002`; an empty `E` changes nothing. **Status:** implemented in
+`BlueprintBuilder`, `Expectations.envelopeAir`, `BlueprintSpec`/`DocumentCompiler`,
+`JsonReader`/`JsonWriter`, `Codes.envelopeOpen` and the envelope tests.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -562,9 +599,12 @@ unrepresentable state keeps the raw descriptor with the warning. **Status (v1.2)
 - The nested source is a third-party capability; the adapter's block-over-entity precedence and
   first-provider-wins rule are policy, not a merge. A mod that wants two nested bodies at one cell
   cannot express it (D-26).
-- Model C, the nested capability, the capture report and the root descriptor projection (D-29) are
-  implemented, and the spec index is green; what remains is the performance/cost pass and
-  fresh visual review screenshots (D-02, `07-regeneration.md` §7).
+- A cell outside every bay is ignored unless the blueprint opts into `envelope` (D-30). Then every
+  cell inside `bounds` is judged: a port or an "any occupant" cell has to be a declared bay, and only
+  cells outside `bounds` stay invisible.
+- Model C, the nested capability, the capture report, the root descriptor projection (D-29) and the
+  derived envelope (D-30) are implemented, and the spec index is green; what remains is the
+  performance/cost pass and fresh visual review screenshots (D-02, `07-regeneration.md` §7).
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates

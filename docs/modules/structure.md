@@ -45,7 +45,7 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `Anchors` | final class | the one anchor read |
 | `DerivationSpec` | record | deriver id + args + output key id + order |
 | `Blueprint` | final class | immutable compiled template with a cached plan |
-| `BlueprintBuilder` | final class | fluent construction; validates at `build()` |
+| `BlueprintBuilder` | final class | fluent construction; validates at `build()`; `.envelope()` derives the closed-world air pair |
 | `Plan` | record | section units, aggregate units, checks |
 | `Computation<T>` | interface | id + output + inputs + region |
 | `SectionComputation<T>` | interface | `compute(SectionContext)` |
@@ -198,6 +198,7 @@ public final class Focuses {
 public final class Expectations {
     public static Expectation<OccupantSnapshot> block(NamespacedId type);
     public static Expectation<OccupantSnapshot> air();
+    public static Expectation<OccupantSnapshot> envelopeAir();
     public static Expectation<OccupantSnapshot> property(String key, String value);
     public static Expectation<OccupantSnapshot> trait(TraitKey<?> key);
     public static <T> Expectation<OccupantSnapshot> trait(TraitKey<T> key,
@@ -364,6 +365,7 @@ public final class Blueprint {
 
 public final class BlueprintBuilder {
     public BlueprintBuilder bounds(Cuboid bounds);
+    public BlueprintBuilder envelope();
     public BlueprintBuilder check(Check<?> check);
     public BlueprintBuilder check(java.util.List<? extends Check<?>> checks);
     public BlueprintBuilder checks(java.util.Collection<? extends Check<?>> checks);
@@ -605,6 +607,29 @@ ignores `unreadable()` is a review defect, not a different verdict. An occupant 
 boundary belongs to the section of its anchor, so a fold never counts it twice. All three are section
 computations; folding is the key's `Merge`.
 
+### 4.11 Envelope
+
+`BlueprintBuilder.envelope()` is the only way to ask for a closed world. The build computes
+`E = bounds.asSet − (union of bay.cells ∪ union of Footprint.Declared cells)` from the local
+declaration lists before the "at least one check" rule. An empty `E` is a silent no-op: no bay, no
+check, no extra read, no charge, and the blueprint is structurally equal to the same build without
+`.envelope()`. A non-empty `E` appends one reserved bay and one reserved check, both id
+`structurecumulus:envelope`, **last** in the declared order: the bay is `E` with
+`Coverage.everyCell`, `Footprint.none`, `Sharing.shared`; the check is `Focuses.bay()` with
+`Expectations.eachCell(Expectations.envelopeAir())`. A declared bay or check already using the
+reserved id is `SC-BPT-0004`. There is no new plan or kernel type: the synthetic pair is an ordinary
+bay and check, so budget, read-scope, siting, refusal and finding paths are unchanged, and
+`Footprint.none` keeps the envelope out of the claim ledger.
+
+The envelope is the bounds, not the declared bays. A block outside `bounds` is invisible, while a
+block inside `bounds` and outside every bay or declared footprint is foreign. A port, an ignored cell
+or an "any occupant" cell therefore has to be declared as a bay (for example an `everyCell` bay with
+`anyOccupant`); there is no allow-list API and no `envelope(CuboidSet)` overload. Air is strict: only
+`OccupantSnapshot.isAir()` passes; a fluid, an entity, a nested source or any other occupant is
+`SC-EXP-0006` located at the occupant's cell. An unreadable envelope cell is the ordinary
+`SC-OCC-0004` relay and leaves the check `Unreadable`, never a mismatch. `BlueprintBuilder.build()`
+does not mutate the builder's lists, so it can be called twice with equal results.
+
 ## 5. Pipeline role
 
 - `compile`: the builder validates; the document compiler builds the same value.
@@ -614,7 +639,7 @@ computations; folding is the key's `Merge`.
 
 ## 6. Codes
 
-`SC-BPT-0001`…`0010`, `SC-CHK-0001`…`0003`, `SC-EXP-0001`…`0005`, `SC-SPC-0001`/`0002` (via
+`SC-BPT-0001`…`0010`, `SC-CHK-0001`…`0003`, `SC-EXP-0001`…`0006`, `SC-SPC-0001`/`0002` (via
 `LocusMap`/`Siting`), `SC-CTX-0007` (focus), `SC-OCC-0001`/`0002`/`0003`/`0004` (focus and relay).
 The producer table in `finding.md` is authoritative. A focus relay of a host `ReadRefusal` code is
 not a kernel producer row: the kernel only guarantees the `SC-OCC-0004` substitute for a code already
@@ -636,6 +661,10 @@ in `Codes.all`.
 - Anchors: one-cell read; missing/air/bad heading; upright policy; identity for no anchor.
 - Computations: section/aggregate split; count/volume/air; `Missing` → absent key; a partial section
   makes `count`/`air` Missing, never a short sum; `volume` stays total.
+- Envelope: empty `E` no-op and equality with the plain build; uncovered cells and declared
+  footprints; envelope-only blueprint; reserved id collision; two builds; `SC-EXP-0006` metadata;
+  fusion void, AE2 empty envelope, PNC port, GT widened ring, unreadable, budget and outside-bounds
+  scenarios.
 
 ## 8. Dependencies
 

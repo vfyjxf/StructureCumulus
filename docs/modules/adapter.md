@@ -387,11 +387,14 @@ API and is not on the kernel classpath.
 
 ## 9. Documents
 
-`JsonReader` parses a JSON object into `Document`: `schemaVersion`, `id`, `bounds`, `definitions`,
-`placements`, `bays` (`box`/`boxes`/`minus`), `checks` (focus/expectation trees), `computations`,
-`keys`, `derivations`, `anchors`, `orientation`, `arguments`, `extensions`. Unknown members are
-`SC-DOC-0002`; spans are attached when the parser records offsets. `JsonWriter` writes the schema in
-canonical order, with `bounds` as origin+size and object members ascending. LowerCamel enum constants
+`JsonReader` parses a JSON object into `Document`: `schemaVersion`, `id`, `bounds`, `envelope`,
+`definitions`, `placements`, `bays` (`box`/`boxes`/`minus`), `checks` (focus/expectation trees),
+`computations`, `keys`, `derivations`, `anchors`, `orientation`, `arguments`, `extensions`. Unknown
+members are `SC-DOC-0002`; spans are attached when the parser records offsets. `envelope` is a root
+boolean only; the same member inside a definition is an unknown member and `SC-DOC-0002`.
+`JsonWriter` writes the schema in canonical order, emits `"envelope": true` only when set and
+immediately after `bounds`, and refuses a definition that carries it. `bounds` is origin+size and
+object members ascend. LowerCamel enum constants
 never change a serialized tag: finding JSON takes `severity`/`phase`/`role`/`frame`/`applicability`
 from `wireName()`, `SC-*` codes take their family tag from the explicit table, and both stay
 uppercase, while the document shape keeps its separate lowercase vocabulary (`every_cell`,

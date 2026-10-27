@@ -28,6 +28,7 @@ class CodesTest {
             SC-EXP-0003 ERROR
             SC-EXP-0004 ERROR
             SC-EXP-0005 ERROR
+            SC-EXP-0006 ERROR
             SC-CLM-0001 ERROR
             SC-CLM-0002 WARNING
             SC-CLM-0003 ERROR
@@ -92,7 +93,7 @@ class CodesTest {
                 rows.add(line);
             }
         }
-        assertEquals(56, rows.size());
+        assertEquals(57, rows.size());
         assertEquals(rows.size(), Codes.all.size());
 
         Set<FindingCode> seen = new HashSet<>();

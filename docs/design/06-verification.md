@@ -33,8 +33,15 @@ kernel tests (33 test containers), 141 adapter unit tests, 0 failures, 0 skipped
 mark counter, the capture-report channel and the definition-frame descriptor projection are
 implemented, not pending. The determinism gate is
 implemented (`DeterminismTest`): canonical bytes across member order, the parse/write fixed point,
-equal compile runs and stable finding order. `Codes.all` has 56 entries and the decision record has 29
-decisions (D-29).
+equal compile runs and stable finding order. `Codes.all` has 57 entries and the decision record has 30
+decisions (D-30).
+
+The envelope batch (uncommitted, based on `1bf0cef`) adds `EnvelopeTest` (7 tests),
+`EnvelopeScenarioTest` (12 tests) and three `DocumentCompilerTest` cases in the kernel, plus four
+`JsonDocumentTest` cases in the adapter. Its focused runs are green: `compileKernelTestJava`,
+`compileTestJava`, `kernelTest --tests '*Envelope*' --tests '*CodesTest' --tests
+'*DocumentCompilerTest'` and `test --tests '*JsonDocumentTest'`; no full-suite run is claimed for
+that batch.
 
 **What remains.** Two items only: the performance/cost pass over the block-entity-lazy and entity
 sweep, and fresh visual review screenshots. There is no regeneration milestone. The former
@@ -114,6 +121,16 @@ They are the acceptance suite; a module test that does not feed one of them is o
     (severity, trust guard, world label, notes), `NestedCaptureGameTest` (over-cap and cut entries),
     `CaptureAuditGameTest` (the orientation audit) and `CommandCaptureReportGameTest` (print order and
     command surfacing).
+16. **Envelope** — a 5×5×5 fusion torus declares only its 32-cell ring and `.envelope()`: clean air
+    forms with 32 claims, a crystal in the void is `Failed(SC-EXP-0006)` at that cell and writes no
+    row; an AE2 2×2×2 CPU has an empty `E`, so `.envelope()` equals the plain build and adds no
+    check; a declared PNC port or GT EBF ring bay accepts a foreign block while an undeclared cell
+    in `E` fails; an envelope-only blueprint is `Admitted` with zero rows and fails on one block;
+    an unreadable cell is `Undecided(SC-OCC-0004)`, a tiny budget is `Undecided(SC-ENG-0001)`, and a
+    block outside the bounds is invisible; the reserved id collides as `SC-BPT-0004`; `build()` is
+    idempotent. The document member is root-only, is rejected on a definition, and compiles to the
+    same `Blueprint`, `Plan` and `ReadScope` as `.envelope()`. Covered by `EnvelopeTest`,
+    `EnvelopeScenarioTest`, `DocumentCompilerTest`, `JsonDocumentTest` and `CodesTest`.
 
 ### 3.1 Stress batch `kernel-stress-batch-1`
 
@@ -148,7 +165,7 @@ they are not owed work and not a pending list:
 | A check cannot read instance context already published in `ContextStore` (it stays `SC-CTX-0007`) | `ContextInstanceScenarioTest.checkCannotReadPersistedInstanceContext` |
 | An entity read-scope window is published in the blueprint-local frame, not the world frame | `EntityWindowScenarioTest.sitedEntityWindowIsPublishedInTheLocalFrame` |
 | `anyOccupant` has no fluid predicate, so water satisfies a NOTAIR slot | `BloodAltarScenarioTest.waterInANotAirSlotIsAdmittedAsAKnownFalsePositive` |
-| A cell outside every bay is never read or judged, so a closed-world "no extra blocks" check is not expressible | `Ae2CpuScenarioTest.anExtraBlockJustOutsideTheBayIsAdmitted`, `GtEbfScenarioTest.anExtraHatchOutsideTheBayIsNotEvidence`, `PncRefineryScenarioTest.aFifthOutputOutsideTheBayIsAdmitted`, `TerraPlateScenarioTest.anExtraBlockAboveThePlateIsIgnored` |
+| A cell outside every bay is ignored unless the blueprint asks for `envelope`; with `"envelope": true` the bounds are closed (a non-air occupant inside is `SC-EXP-0006`) and only cells outside `bounds` stay invisible | Without the flag: `Ae2CpuScenarioTest.anExtraBlockJustOutsideTheBayIsAdmitted`, `GtEbfScenarioTest.anExtraHatchOutsideTheBayIsNotEvidence`, `PncRefineryScenarioTest.aFifthOutputOutsideTheBayIsAdmitted`, `TerraPlateScenarioTest.anExtraBlockAboveThePlateIsIgnored`. With the flag: `EnvelopeScenarioTest.fusionTorusEnvelopeIsCleanAtAHalfTurn`, `EnvelopeScenarioTest.aCrystalInTheVoidFailsAtItsCell`, `EnvelopeScenarioTest.envelopeOnlyBlueprintIsAdmittedWithNoRows` |
 | Per-cell checks cannot express "exactly one controller" or a mixed coil count; a host `Computation`/aggregate must | `PncRefineryScenarioTest.twoControllersAreAdmittedByPerCellChecks`, `PncRefineryScenarioTest.aHostCountRejectsTwoControllers`, `GtEbfScenarioTest.mixedCoilCountNeedsAHostAggregate` |
 | A seam is inert: it declares a connectable edge, never feeds the engine and never owns a cell | `SeamScenarioTest.aDeclaredSeamOverAirPassesAndDoesNotChangeTheResult` |
 
@@ -200,16 +217,16 @@ The `anySubject + Bound` acceptance above remains the open half and is character
 | `finding` | code parse, `Codes.all` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
 | `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors, descriptor frame (the property leaf compares the published string and never transforms it) |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |
-| `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations |
+| `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations, derived envelope (empty no-op, reserved id, idempotent build) |
 | `context` | context view, publish merge/revision, derive order, merges |
-| `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity |
-| `engine` | §3 scenarios and the §3.1/§3.2 stress batches, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection |
+| `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity, root-only envelope and definition rejection |
+| `engine` | §3 scenarios and the §3.1/§3.2 stress batches, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection, envelope strict air, unreadable and budget paths |
 | `remedy` | provider order/cap, edit/overlay values |
 | `spi` | builtins, host empty, facade paths, two-kernel isolation |
 
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. `Codes.all` has 56 entries in v1.2, matching the
+The authoritative table is `finding.md` §6. `Codes.all` has 57 entries in this revision, matching the
 registry. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
@@ -256,6 +273,9 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
     codes never enter `Codes.all`)
 20. Can a cut be reported twice in one bundle, or by two codes for one fact? (adapter: the capture
     entry and `SC-OCC-0003` live in two channels; neither is translated into the other)
+21. Can a cell inside `bounds` escape the envelope, or a cell outside it become evidence? (structure:
+    `E` is the bounds minus every bay and declared footprint; engine: only `E` is read, and a siting
+    maps it)
 
 ## 7. What is not verified in this round
 

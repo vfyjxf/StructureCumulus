@@ -70,9 +70,13 @@ Then the module files, in dependency order:
   descriptors, an unrepresentable state keeps the raw one and still reports `SC-MC-0004`. Kernel
   stress batch 1 (tag `kernel-stress-batch-1`, `110e797`) adds 44 characterization scenarios across
   12 `engine` classes, and batch 2 (tag `kernel-stress-batch-2`, `3e60ed4`) adds 17 kernel scenarios
-  plus 11 adapter unit tests and fixes `NestedFocus` to bind no subject; the suite is 186 kernel
-  tests in 33 containers and 141 adapter unit tests, and the documented gaps are in
-  `design/06-verification.md` §3.1/§3.2. Pending
+  plus 11 adapter unit tests and fixes `NestedFocus` to bind no subject; the pre-envelope suite is 186
+  kernel tests in 33 containers and 141 adapter unit tests, and the documented gaps are in
+  `design/06-verification.md` §3.1/§3.2. D-30 adds the derived envelope: `BlueprintBuilder.envelope()`
+  / the root `"envelope": true` member closes the bounds with a reserved
+  `structurecumulus:envelope` bay and check, a foreign occupant is `SC-EXP-0006`, and an empty
+  uncovered set is a no-op. Its batch adds 22 kernel tests (19 in two new containers plus three
+  `DocumentCompilerTest` cases) and four `JsonDocumentTest` cases. Pending
   only: the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review
   screenshots. There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
@@ -83,7 +87,9 @@ Then the module files, in dependency order:
   only; 186 kernel JUnit 5 tests (33 test containers) and 141 adapter unit tests pass;
   `runGameTestServer` passes 66/66;
   `./gradlew check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean. `Codes.all`
-  has 56 entries and the decision record has 29 decisions (D-29).
+  has 57 entries and the decision record has 30 decisions (D-30). The envelope batch is uncommitted
+  from `1bf0cef`: its focused `compileKernelTestJava`, `compileTestJava`, `kernelTest` and `test`
+  selections are green; no full-suite result is claimed for it.
 
 ## The one rule
 

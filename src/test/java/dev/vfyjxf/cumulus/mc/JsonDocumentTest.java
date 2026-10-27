@@ -21,9 +21,15 @@ import dev.vfyjxf.cumulus.kernel.document.SeamSpec;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
+import dev.vfyjxf.cumulus.kernel.structure.Bay;
+import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
+import dev.vfyjxf.cumulus.kernel.structure.Expectations;
+import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.structure.SeamId;
 import dev.vfyjxf.cumulus.kernel.structure.SeamKind;
@@ -39,6 +45,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -424,6 +431,7 @@ class JsonDocumentTest {
             new BlueprintSpec(
                 root.id(),
                 root.bounds(),
+                root.envelope(),
                 root.arguments(),
                 root.bays(),
                 List.of(
@@ -456,6 +464,122 @@ class JsonDocumentTest {
         Document document = read(richDocument);
         assertTrue(document.root().extensions().isEmpty(), "the v1 envelope extensions are document-level");
         assertEquals(Map.of("test:vendor", document.extensions().get("test:vendor")), document.extensions());
+    }
+
+    @Test
+    void rootEnvelopeIsReadWrittenAndCompiled() {
+        String text = """
+                {"schemaVersion":1,"id":"test:envelope","bounds":[0,0,0,2,1,1],
+                 "envelope":true,"bays":[],"checks":[]}
+                """;
+        Document document = read(text);
+        assertTrue(document.root().envelope(), "the reader carries the root flag");
+        String written = new JsonWriter().write(document);
+        assertTrue(written.contains("\"envelope\": true"));
+        int bounds = written.indexOf("\"bounds\"");
+        int envelope = written.indexOf("\"envelope\"");
+        int bays = written.indexOf("\"bays\"");
+        assertTrue(bounds >= 0 && bounds < envelope && envelope < bays, "envelope follows bounds");
+        Document back = read(written);
+        assertEquals(withoutSpans(document), withoutSpans(back));
+        assertEquals(written, new JsonWriter().write(back), "the written form is a fixed point");
+
+        CompileResult result = DocumentCompiler.compile(back, context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        Blueprint blueprint = result.blueprint();
+        assertNotNull(blueprint);
+        assertEquals(1, blueprint.bays().size(), "an envelope-only root gets one synthetic bay");
+        assertEquals(1, blueprint.checks().size(), "an envelope-only root gets one synthetic check");
+        assertEquals(NamespacedId.of("structurecumulus", "envelope"), blueprint.bays().get(0).id());
+    }
+
+    @Test
+    void absentAndFalseEnvelopeStayOff() {
+        String absent = """
+                {"schemaVersion":1,"id":"test:envelope_off","bounds":[0,0,0,1,1,1],
+                 "bays":[],"checks":[]}
+                """;
+        String off = """
+                {"schemaVersion":1,"id":"test:envelope_off","bounds":[0,0,0,1,1,1],
+                 "envelope":false,"bays":[],"checks":[]}
+                """;
+        Document absentDocument = read(absent);
+        Document offDocument = read(off);
+        assertFalse(absentDocument.root().envelope());
+        assertFalse(offDocument.root().envelope());
+        assertEquals(withoutSpans(absentDocument), withoutSpans(offDocument));
+        assertFalse(new JsonWriter().write(offDocument).contains("\"envelope\""));
+    }
+
+    @Test
+    void definitionEnvelopeAndNonBooleanAreRejected() {
+        String definition = """
+                {"schemaVersion":1,"id":"test:definition_envelope","bounds":[0,0,0,1,1,1],
+                 "definitions":{"test:unit":{"bounds":[0,0,0,1,1,1],"envelope":true}},
+                 "bays":[],"checks":[]}
+                """;
+        List<Finding> definitionErrors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, definition, definitionErrors));
+        assertEquals(
+            FindingCode.of(FindingCode.Family.doc, 2),
+            Objects.requireNonNull(definitionErrors.get(0), "finding").code()
+        );
+        assertTrue(definitionErrors.get(0).message().contains("unknown member 'envelope'"));
+
+        String nonBoolean = """
+                {"schemaVersion":1,"id":"test:non_boolean","bounds":[0,0,0,1,1,1],
+                 "envelope":1,"bays":[],"checks":[]}
+                """;
+        List<Finding> typeErrors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, nonBoolean, typeErrors));
+        assertEquals(
+            FindingCode.of(FindingCode.Family.doc, 2),
+            Objects.requireNonNull(typeErrors.get(0), "finding").code()
+        );
+        assertTrue(typeErrors.get(0).message().contains("expected a boolean"));
+    }
+
+    @Test
+    void jsonEnvelopeCompilesToTheJavaBlueprint() {
+        String text = """
+                {"schemaVersion":1,"id":"test:envelope_parity","bounds":[0,0,0,3,1,1],
+                 "envelope":true,
+                 "bays":[{"id":"test:wall","box":[0,0,0,1,1,1],"coverage":"every_cell",
+                          "footprint":"box","sharing":"exclusive"}],
+                 "checks":[{"id":"test:wall_air","bay":"test:wall",
+                            "focus":{"kind":"occupant","cell":[0,0,0]},
+                            "expect":{"kind":"air"}}]}
+                """;
+        CompileResult result = DocumentCompiler.compile(read(text), context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        Blueprint compiled = result.blueprint();
+        assertNotNull(compiled);
+        Bay wall = Bay.of(
+            NamespacedId.of("test", "wall"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
+        );
+        Blueprint javaBlueprint = Blueprint.builder(NamespacedId.of("test", "envelope_parity"))
+                .bounds(Cuboid.of(0, 0, 0, 3, 1, 1))
+                .check(
+                    Check.of(
+                        NamespacedId.of("test", "wall_air"),
+                        wall,
+                        Focuses.occupant(LatticePoint.origin),
+                        Expectations.air()
+                    )
+                ).envelope().build();
+        assertEquals(javaBlueprint.id(), compiled.id());
+        assertEquals(javaBlueprint.bounds(), compiled.bounds());
+        assertEquals(javaBlueprint.bays(), compiled.bays());
+        assertEquals(javaBlueprint.checks(), compiled.checks());
+        assertEquals(javaBlueprint.computations(), compiled.computations());
+        assertEquals(javaBlueprint.arguments(), compiled.arguments());
+        assertEquals(javaBlueprint, compiled);
+        assertEquals(javaBlueprint.plan(), compiled.plan());
+        assertEquals(javaBlueprint.reads(), compiled.reads());
     }
 
     @Test
@@ -539,6 +663,7 @@ class JsonDocumentTest {
         BlueprintSpec root = new BlueprintSpec(
             NamespacedId.of("test", "orientations"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -769,6 +894,7 @@ class JsonDocumentTest {
         return new BlueprintSpec(
             spec.id(),
             spec.bounds(),
+            spec.envelope(),
             spec.arguments(),
             bays,
             seams,

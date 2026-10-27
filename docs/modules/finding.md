@@ -170,6 +170,7 @@ public final class Codes {
     public static final CodeEntry thresholdImpossible = ...;       // SC-EXP-0003
     public static final CodeEntry factoryUnknown = ...;            // SC-EXP-0004
     public static final CodeEntry factoryBad = ...;                // SC-EXP-0005
+    public static final CodeEntry envelopeOpen = ...;              // SC-EXP-0006
     public static final CodeEntry claimConflict = ...;             // SC-CLM-0001
     public static final CodeEntry ledgerUnavailable = ...;         // SC-CLM-0002
     public static final CodeEntry ledgerMoved = ...;               // SC-CLM-0003
@@ -315,6 +316,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-EXP-0003` | ERROR | ✓ | a threshold cannot be met | `Expectations.atLeast/atMost/exactly` |
 | `SC-EXP-0004` | ERROR | ✓ | a factory kind is unknown | `DocumentCompiler` |
 | `SC-EXP-0005` | ERROR | ✓ | a factory returned null or bad args | `DocumentCompiler` |
+| `SC-EXP-0006` | ERROR | ✓ | a cell in the derived envelope holds a non-air occupant | `Expectations.envelopeAir` (the synthetic envelope check) |
 | `SC-CLM-0001` | ERROR | ✓ | two claims conflict | `engine.check`/`settle` |
 | `SC-CLM-0002` | WARNING | – | the ledger cannot answer | `engine.check` |
 | `SC-CLM-0003` | ERROR | – | the revision moved twice | `engine.settle` |
@@ -362,7 +364,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
 | `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; a host code may be relayed from a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10) | adapter |
 
-`Codes.all` has 56 entries in this revision, matching the registry; the capture-report channel adds
+`Codes.all` has 57 entries in this revision, matching the registry; the capture-report channel adds
 none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot express the siting
 orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by the adapter in a
 `CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries, and the
@@ -372,7 +374,7 @@ entry explains the cut, the check finding judges it, and neither channel suppres
 
 ## 7. Tests
 
-- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 56 entries, one per code,
+- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 57 entries, one per code,
   every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-*` are
   absent from `all`.
 - Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`

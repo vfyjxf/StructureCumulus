@@ -19,6 +19,7 @@ import java.util.TreeMap;
 public record BlueprintSpec(
     NamespacedId id,
     Cuboid bounds,
+    boolean envelope,
     Value arguments,
     List<BaySpec> bays,
     List<SeamSpec> seams,

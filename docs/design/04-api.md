@@ -177,9 +177,9 @@ The same campfire as data. A document is the authoring form; the compiler lowers
 }
 ```
 
-The keys of the schema are fixed: `schemaVersion`, `id`, `bounds`, `definitions`, `placements`,
-`bays`, `checks`, `computations`, `keys`, `derivations`, `anchors`, `orientation`, `arguments`,
-`extensions`. A member outside that set is an error, never ignored. Boxes are
+The keys of the schema are fixed: `schemaVersion`, `id`, `bounds`, `envelope`, `definitions`,
+`placements`, `bays`, `checks`, `computations`, `keys`, `derivations`, `anchors`, `orientation`,
+`arguments`, `extensions`. A member outside that set is an error, never ignored. Boxes are
 `[x, y, z, sizeX, sizeY, sizeZ]`; a `boxes` array is a `CuboidSet`; `minus` subtracts boxes. The
 Java DSL and the JSON compiler produce the same `Blueprint` (I-13).
 
@@ -259,6 +259,55 @@ example is one line. `Bound` owns the four pipe cells; the four air cells are as
 Two blueprints, one hatch bay with `Footprint.bound()` and `Sharing.shared`. Owner A settles; owner
 B checks and settles; both rows coexist. An `exclusive` owner C then checks: `Failed(SC-CLM-0001)`
 with the incumbent rows. `claim` owns the matrix; the kernel never invents a second predicate.
+
+### 6.5 Closed-world envelope (fusion torus)
+
+`BlueprintBuilder.envelope()` closes the declared bounds: every cell that no bay or declared
+footprint covers must be strict air. It is one call on the same builder, not a second blueprint.
+
+```java
+CuboidSet torus = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5))
+        .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 4, 2, 4)));   // the 18-cell hollow
+Bay ring = Bay.of(id("ring"), torus, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+
+Blueprint reactor = Blueprint.builder(id("fusion"))
+        .bounds(Cuboid.of(0, 0, 0, 5, 5, 5))
+        .check(Check.of(id("ring"), ring, Focuses.bay(),
+                Expectations.eachCell(Expectations.block(mc("fusion_torus")))))
+        .envelope()
+        .build();
+```
+
+The builder derives `E = bounds − (bays ∪ declared footprints)`, so `E` is the 93 cells of the
+torus void and the empty rest of the 5×5×5 frame. A crystal in the void is
+`Failed(SC-EXP-0006)` at its cell; clean air is `Formed` with only the 32 ring cells claimed. A port
+is not a hole in `E`; it is a declared bay, which is also how an "any occupant" or ignored cell is
+expressed:
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "mymod:fusion",
+  "bounds": [0, 0, 0, 5, 5, 5],
+  "envelope": true,
+  "bays": [
+    {"id": "ring", "boxes": [[0,0,0,5,2,5]], "minus": [[1,0,1,4,2,4]],
+     "coverage": "every_cell", "footprint": "bound", "sharing": "exclusive"},
+    {"id": "port", "box": [2,2,2,3,3,3], "coverage": "every_cell",
+     "footprint": "none", "sharing": "shared"}
+  ],
+  "checks": [
+    {"id": "ring", "bay": "ring", "focus": {"kind": "bay"},
+     "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "mymod:fusion_torus"}}},
+    {"id": "port", "bay": "port", "focus": {"kind": "bay"},
+     "expect": {"kind": "each_cell", "element": {"kind": "any_occupant"}}}
+  ]
+}
+```
+
+`envelope` is root-only and absent means off; a definition that carries it is `SC-DOC-0002`. A block
+outside `bounds` stays invisible, and an unreadable envelope cell is `Undecided(SC-OCC-0004)`, never
+a mismatch. The flag moves no schema version.
 
 ## 7. What the user never writes
 

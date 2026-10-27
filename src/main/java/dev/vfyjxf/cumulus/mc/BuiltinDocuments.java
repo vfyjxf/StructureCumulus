@@ -33,6 +33,7 @@ final class BuiltinDocuments {
         new BlueprintSpec(
             airCell,
             bounds,
+            false,
             Value.object(),
             List.of(
                 new BaySpec(

@@ -114,6 +114,9 @@ public final class DocumentCompiler {
         BlueprintBuilder builder = Blueprint.builder(document.root().id()).bounds(flat.bounds).checks(checks)
                 .computations(computations).seams(seams).anchors(flat.anchors).derivations(derivations)
                 .arguments(document.root().arguments());
+        if (document.root().envelope()) {
+            builder.envelope();
+        }
         if (flat.orientation != null) {
             builder.orientation(flat.orientation);
         }
@@ -175,7 +178,8 @@ public final class DocumentCompiler {
                     || !spec.keys().isEmpty()
                     || !spec.derivations().isEmpty()
                     || !spec.anchors().isEmpty()
-                    || spec.orientation() != null) {
+                    || spec.orientation() != null
+                    || spec.envelope()) {
                 error(
                     findings,
                     Codes.documentField,

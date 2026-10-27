@@ -37,7 +37,11 @@ public final class Expectations {
     }
 
     public static Expectation<OccupantSnapshot> air() {
-        return new Air();
+        return new Air(code(1), id("air"));
+    }
+
+    public static Expectation<OccupantSnapshot> envelopeAir() {
+        return new Air(code(6), id("envelope_air"));
     }
 
     public static Expectation<OccupantSnapshot> property(String key, String value) {
@@ -120,8 +124,17 @@ public final class Expectations {
     }
 
     private static Finding problem(FocusContext ctx, OccupantSnapshot occupant, String message) {
+        return problem(ctx, occupant, code(1), message);
+    }
+
+    private static Finding problem(
+        FocusContext ctx,
+        OccupantSnapshot occupant,
+        FindingCode mismatchCode,
+        String message
+    ) {
         Locus locus = locusOf(ctx, occupant);
-        return Finding.builder(code(1), Severity.error).phase(ctx.phase()).message(message)
+        return Finding.builder(mismatchCode, Severity.error).phase(ctx.phase()).message(message)
                 .label(Label.primary(locus, message)).build();
     }
 
@@ -164,14 +177,16 @@ public final class Expectations {
         }
     }
 
-    private record Air() implements Expectation<OccupantSnapshot> {
+    private record Air(FindingCode mismatchCode, NamespacedId metaId) implements Expectation<OccupantSnapshot> {
 
         @Override
         public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
             if (ctx.subject().isAir()) {
                 return Reply.match();
             }
-            return mismatch(problem(ctx, ctx.subject(), "expected air, found " + ctx.subject().descriptor().type()));
+            return mismatch(
+                problem(ctx, ctx.subject(), mismatchCode, "expected air, found " + ctx.subject().descriptor().type())
+            );
         }
 
         @Override
@@ -181,7 +196,7 @@ public final class Expectations {
 
         @Override
         public ExpectationMeta meta() {
-            return ExpectationMeta.of(id("air"), 10, code(1));
+            return ExpectationMeta.of(metaId, 10, mismatchCode);
         }
     }
 
@@ -658,7 +673,7 @@ public final class Expectations {
                 id("each_cell"),
                 element.meta().specificity(),
                 element.meta().requires(),
-                code(1)
+                element.meta().mismatchCode()
             );
         }
 

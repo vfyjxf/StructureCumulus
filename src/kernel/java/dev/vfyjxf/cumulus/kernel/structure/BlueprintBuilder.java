@@ -23,6 +23,9 @@ import java.util.Set;
 /** Fluent construction; every rule is checked once in {@link #build()}. */
 public final class BlueprintBuilder {
 
+    private static final NamespacedId envelopeId = NamespacedId.of("structurecumulus", "envelope");
+    private static final String envelopeDescription = "the derived envelope: every bounds cell that no bay or declared footprint covers";
+
     private final NamespacedId id;
     private @Nullable Cuboid bounds;
     private final List<Check<?>> checks = new ArrayList<>();
@@ -33,6 +36,7 @@ public final class BlueprintBuilder {
     private @Nullable OrientationPolicy orientation;
     private Value arguments = Value.object();
     private @Nullable SourceSpan source;
+    private boolean envelope;
 
     BlueprintBuilder(NamespacedId id) {
         this.id = Objects.requireNonNull(id, "id");
@@ -40,6 +44,12 @@ public final class BlueprintBuilder {
 
     public BlueprintBuilder bounds(Cuboid bounds) {
         this.bounds = Objects.requireNonNull(bounds, "bounds");
+        return this;
+    }
+
+    /** Requires every bounds cell no bay or declared footprint covers to hold strict air. */
+    public BlueprintBuilder envelope() {
+        this.envelope = true;
         return this;
     }
 
@@ -133,12 +143,48 @@ public final class BlueprintBuilder {
         if (declaredBounds.isEmpty()) {
             fail("SC-BPT-0001", "bounds must not be empty");
         }
-        if (checks.isEmpty()) {
+        List<Check<?>> declaredChecks = new ArrayList<>(checks);
+        if (envelope) {
+            CuboidSet declaredCells = CuboidSet.empty();
+            for (Check<?> check : declaredChecks) {
+                Bay bay = check.bay();
+                declaredCells = declaredCells.union(bay.cells());
+                if (bay.footprint() instanceof Footprint.Declared footprint) {
+                    declaredCells = declaredCells.union(footprint.cells());
+                }
+            }
+            CuboidSet envelopeCells = declaredBounds.asSet().subtract(declaredCells);
+            if (!envelopeCells.isEmpty()) {
+                for (Check<?> check : declaredChecks) {
+                    if (check.id().equals(envelopeId) || check.bay().id().equals(envelopeId)) {
+                        fail("SC-BPT-0004", "the reserved id " + envelopeId + " is already used");
+                    }
+                }
+                Bay bay = Bay.of(
+                    envelopeId,
+                    envelopeCells,
+                    Coverage.everyCell,
+                    Footprint.none(),
+                    Sharing.shared,
+                    envelopeDescription
+                );
+                declaredChecks.add(
+                    Check.of(
+                        envelopeId,
+                        bay,
+                        Focuses.bay(),
+                        Expectations.eachCell(Expectations.envelopeAir()),
+                        envelopeDescription
+                    )
+                );
+            }
+        }
+        if (declaredChecks.isEmpty()) {
             fail("SC-BPT-0001", "a blueprint needs at least one check");
         }
 
         Map<NamespacedId, Bay> bays = new LinkedHashMap<>();
-        for (Check<?> check : checks) {
+        for (Check<?> check : declaredChecks) {
             Bay bay = check.bay();
             Bay previous = bays.putIfAbsent(bay.id(), bay);
             if (previous != null && !previous.equals(bay)) {
@@ -146,7 +192,7 @@ public final class BlueprintBuilder {
             }
         }
         Set<NamespacedId> checkIds = new HashSet<>();
-        for (Check<?> check : checks) {
+        for (Check<?> check : declaredChecks) {
             if (!checkIds.add(check.id())) {
                 fail("SC-BPT-0004", "duplicate check id " + check.id());
             }
@@ -163,7 +209,7 @@ public final class BlueprintBuilder {
         }
 
         Map<NamespacedId, List<Check<?>>> checksByBay = new HashMap<>();
-        for (Check<?> check : checks) {
+        for (Check<?> check : declaredChecks) {
             checksByBay.computeIfAbsent(check.bay().id(), ignored -> new ArrayList<>()).add(check);
         }
         for (Bay bay : bays.values()) {
@@ -291,7 +337,7 @@ public final class BlueprintBuilder {
         for (Computation<?> computation : computations) {
             produced.add(computation.output());
         }
-        for (Check<?> check : checks) {
+        for (Check<?> check : declaredChecks) {
             for (ContextKey<?> required : check.expectation().meta().requires()) {
                 if (!produced.contains(required)) {
                     fail(
@@ -328,7 +374,7 @@ public final class BlueprintBuilder {
             }
         }
         List<AggregateComputation<?>> orderedAggregates = orderAggregates(aggregateList, byOutput);
-        List<Check<?>> checkList = List.copyOf(checks);
+        List<Check<?>> checkList = List.copyOf(declaredChecks);
         return new Blueprint(
             id,
             declaredBounds,

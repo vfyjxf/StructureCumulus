@@ -47,7 +47,7 @@ public record Document(int schemaVersion, BlueprintSpec root,
     public Document { /* version >= 1; maps immutable and ordered */ }
 }
 
-public record BlueprintSpec(NamespacedId id, Cuboid bounds, Value arguments,
+public record BlueprintSpec(NamespacedId id, Cuboid bounds, boolean envelope, Value arguments,
                             java.util.List<BaySpec> bays,
                             java.util.List<SeamSpec> seams,
                             java.util.List<CheckSpec> checks,
@@ -123,6 +123,7 @@ public interface DocumentWriter {
 | `schemaVersion` | int | yes | exactly `1` |
 | `id` | id | yes | the root blueprint id |
 | `bounds` | box | yes | the root local frame; every compiled cell is inside |
+| `envelope` | boolean | no | `true` derives the closed-world air pair over cells no bay or declared footprint covers; absent or `false` is off; root-only |
 | `definitions` | object id → spec | no | reusable specs, compiled on placement |
 | `placements` | placement[] | no | definitions placed into the root |
 | `bays` | bay[] | yes* | the root's own bays |
@@ -136,7 +137,10 @@ public interface DocumentWriter {
 | `extensions` | object | no | opaque vendor data; never interpreted |
 
 \* A root may be empty and get all bays/checks from placements. A root with no checks after
-merging is an error (`SC-BPT-0001`).
+merging is an error (`SC-BPT-0001`), unless `envelope` is `true` and the uncovered set is non-empty:
+the compiler passes the flag to `BlueprintBuilder.envelope()` and the builder appends the synthetic
+check before the "at least one check" rule (`structure` §4.11). An envelope-only root with
+`"bays": []` and `"checks": []` is therefore legal.
 
 A box is `[x, y, z, sizeX, sizeY, sizeZ]` (origin + size). A bay has `box` or `boxes` plus optional
 `minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a normalized set; the compiler
@@ -173,11 +177,11 @@ single-writer. `whenAbsent` is decoded to the key type; a wrong kind is `SC-DOC-
 ### 4.2 Definitions in v1
 
 A `definitions` entry contributes **bays, seams and placements** only. Checks, computations, keys,
-derivations, anchors and the orientation policy are root-only; a definition that declares one is
-`SC-DOC-0002`. This keeps a placed definition a pure geometry unit: its bays and seams are qualified
-with the alias path (`alias.path + "/" + local`) and translated by the placement offset, while every
-check and computation is written once in the root against the merged ids. Nested placements are
-allowed; a cycle is `SC-DOC-0009`.
+derivations, anchors, the orientation policy and `envelope` are root-only; a definition that
+declares one is `SC-DOC-0002`. This keeps a placed definition a pure geometry unit: its bays and
+seams are qualified with the alias path (`alias.path + "/" + local`) and translated by the placement
+offset, while every check and computation is written once in the root against the merged ids. Nested
+placements are allowed; a cycle is `SC-DOC-0009`.
 
 ### 4.3 Lowering
 
@@ -191,8 +195,9 @@ allowed; a cycle is `SC-DOC-0009`.
    (factory + key + region), derivations, anchors and the orientation policy.
 5. Build checks: resolve the focus factory and the expectation factory, check
    `focus.subject() == expectation.subject()`, then `Check.of`.
-6. Call `Blueprint.builder(...).build()`. A build exception is caught and reported as
-   `SC-BPT-0001` with a note; a clean compile never reaches that path.
+6. Call `Blueprint.builder(...)`; when the root carries `envelope`, call `.envelope()` before
+   `build()`. A build exception is caught and reported as its own code (for example `SC-BPT-0004`
+   for a reserved envelope id); a clean compile never reaches that path.
 7. Return `CompileResult(bundle, blueprint)`; `findings` may contain warnings even when the
    blueprint is non-null.
 
@@ -237,6 +242,10 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
 - Determinism: reordered object members and definition order produce equal blueprints.
 - Reader/writer round-trip: a `Document` written by a test writer reads back equal (content, not
   spans).
+- Envelope: `"envelope": true` is read, written after `bounds`, and round-trips as a fixed point;
+  absent and `false` stay off; a definition-level member and a non-boolean value are `SC-DOC-0002`;
+  an envelope root compiles to the same `Blueprint`, `Plan` and `ReadScope` as the Java `.envelope()`;
+  an envelope-only root (`"bays": []`, `"checks": []`) yields one synthetic bay/check.
 
 ## 7. Dependencies
 
@@ -248,6 +257,8 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
 - One schema version. A reader that sees anything else emits `SC-DOC-0001`; it never guesses.
 - A definition is geometry: bays, seams and placements only. Every check, computation, key and
   derivation is written once in the root.
+- `envelope` is a root boolean. A definition cannot declare it, and an absent member is off; the
+  schema version does not move for it.
 - Kind ids are lowercase snake_case. Built-in structural forms are grammar, not catalog entries;
   an unqualified kind resolves in `structurecumulus`.
 - The declared output key is authoritative. A factory that returns a different output key is
