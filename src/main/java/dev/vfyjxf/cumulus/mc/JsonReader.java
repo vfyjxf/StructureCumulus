@@ -168,22 +168,24 @@ public final class JsonReader implements DocumentReader {
         }
         int currentLine = 1;
         int currentColumn = 1;
-        for (int index = 0; index < text.length(); index++) {
+        int offset = 0;
+        while (offset < text.length()) {
             if (currentLine == targetLine && currentColumn == targetColumn) {
-                return index;
+                return offset;
             }
-            char current = text.charAt(index);
+            char current = text.charAt(offset);
             if (current == '\n') {
                 currentLine++;
                 currentColumn = 1;
+                offset++;
             } else if (current == '\r') {
-                if (index + 1 < text.length() && text.charAt(index + 1) == '\n') {
-                    index++;
-                }
+                boolean crlf = offset + 1 < text.length() && text.charAt(offset + 1) == '\n';
                 currentLine++;
                 currentColumn = 1;
+                offset += crlf ? 2 : 1;
             } else {
                 currentColumn++;
+                offset++;
             }
         }
         return currentLine == targetLine && currentColumn == targetColumn ? text.length() : -1;
