@@ -31,12 +31,16 @@ M1 (host + command + capture-check), M2a (loaded-entity capture), M2b (upright o
 extents, frames, cuts, child entities) and M3 (`d4b6d82`: `SavedClaims`, `SavedContexts`, CAS
 settle/release and reload codecs) are committed. M4a/M4b and the command slice (`settle` at
 `4899d86`, plus `compile`, `explain`, `claims`) are implemented, and capture-revision lease
-invalidation landed at `0f0bf25`. `SC-MC-0004`/`0005` emission, non-upright pitch/roll state mapping,
-watched-region mark-counter lease invalidation and the deferred `SC-MC-0003` channel remain pending.
+invalidation landed at `0f0bf25`. Non-upright pitch/roll state mapping is implemented at `ac11d0c`.
+The capture report (D-28), which closes the `SC-MC-0003` channel and emits `SC-MC-0004`/`0005`, is
+the M5e slice and is in flight; the watched-region mark-counter lease invalidation remains pending.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is implemented through M4. The spec index is green; no pending signature is documented as
-implemented (`06-verification.md` §1).
+adapter is implemented through M4/M5e. The spec index is green at v1.2 and green again once the M5e
+two halves are on the tree: the docs-first half (`world` §4.10, D-28) is written before its code
+because a public shape is amended in the module file first (`07-regeneration.md` §5), and the index is
+red only while a slice is split that way; no pending signature is ever documented as implemented
+(`06-verification.md` §1).
 
 ### D-03 — English only
 
@@ -403,26 +407,75 @@ the four-argument block overload, while the separate trait capability queries us
 ### D-27 — A cut child is absent, not a refused child
 
 A child frame that cannot be built — depth `> maxDepth`, element budget, a repeated
-`(type, origin)` on the open frame stack (cycle), or an unloaded chunk — is **cut**: the nested body
-stays in the parent, no child exists, `nested(cell)` returns `null`, and the consumer reports
-`SC-OCC-0003`. The adapter does not fabricate a refused child or an empty child view. `SC-MC-0003` is
-reserved/deferred: this round has no capture-finding channel, so the adapter does not produce it and
-it never enters `Codes.all`. A child whose bounds leave the build height is not cut: the child
-exists, its out-of-range local sections are `Refused`/`Partial` (never air), and each refused cell is
-visible through the read. There is no partial child: a child either exists with its sections answered
-(readable or refused) or is cut entirely. **Status (v1.2):** implemented in
-`f3e0338`/`d6aefc2`; `SC-MC-0003` remains deferred.
+`(type, origin)` on the open frame stack (cycle), an unloaded chunk, or a declaration that cannot be
+translated into its parent frame — is **cut**: the nested body stays in the parent, no child exists,
+`nested(cell)` returns `null`, and the consumer reports `SC-OCC-0003`. The adapter does not fabricate
+a refused child or an empty child view. A child whose bounds leave the build height is not cut: the
+child exists, its out-of-range local sections are `Refused`/`Partial` (never air), and each refused
+cell is visible through the read. There is no partial child: a child either exists with its sections
+answered (readable or refused) or is cut entirely. **Status (v1.2):** implemented in
+`f3e0338`/`d6aefc2`. **Amendment (M5e):** the cut reason now travels as one `SC-MC-0003` entry in
+the capture report (D-28), a WARNING; `SC-OCC-0003` remains the check's finding, so the capture entry
+explains the cut and the check finding judges it.
 
 **Why:** a refused child is a second structure that checks could walk and pass; the honest fact is
 that the child is not available. Keeping the body and returning `null` preserves the parent-frame
-occupant while forcing every consumer onto `SC-OCC-0003`. Reporting the cut through a code the
-adapter cannot actually emit would be a fabricated finding.
+occupant while forcing every consumer onto `SC-OCC-0003`. The cut itself is a host fact, so its
+reason belongs in the host's report channel, not in a refused child and not in the kernel's bundle.
 
-**Consequence:** the cut reason is host-side state, not a finding payload; a future capture-finding
-channel can promote `SC-MC-0003` without changing the kernel. A consumer that treats `null`
-`nested(cell)` as an empty structure is wrong, and a child build-height refusal is a read refusal,
-not a cut. `SC-MC-0004` is outside this decision: it remains an orientation mismatch, not a
-`ReadRefusal`.
+**Consequence:** the cut reason is a finding value in the capture report (D-28); it never enters
+`Codes.all` and never changes the child or the body. A consumer that treats `null` `nested(cell)` as
+an empty structure is wrong, and a child build-height refusal is a read refusal, not a cut.
+`SC-MC-0004` is outside this decision: it remains an orientation mismatch, not a `ReadRefusal`.
+
+### D-28 — A capture reports its own findings, opaquely
+
+The capture port answered with a verdict and nothing else. `TooLarge` carried a volume, `Captured`
+carried a view, and neither could say why: a cut child had no channel (D-27), an over-cap root had no
+code, and a block state that cannot express the siting orientation had no producer. `SC-MC-0003` was
+reserved and `SC-MC-0004`/`0005` had no producer at all.
+
+The replacement is one value: `world.CaptureReport`, an ordered immutable list of
+`Entry(FindingCode code, String message, List<String> notes, @Nullable CuboidSet cells)`, carried by
+every arm. An entry is a host code (never minted by the kernel, never in `Codes.all`), prose that is
+never parsed, ordered facts and an optional world region. `Captured`, `TooLarge` and `Unavailable`
+each gain the component behind a two-argument compatibility constructor that answers `empty()`; the
+`WorldCapture` port itself is unchanged. The kernel carries the report and never reads it: the arm is
+the verdict, the report is the finding. A report site relays each entry as a `Finding` with its own
+phase, the code's severity (the host's own catalog entry) and `Locus.world(cells)`, and applies the
+unchanged §4.1 trust guard — a code already in `Codes.all` becomes `SC-OCC-0004` plus a note.
+
+The four rulings this record fixes:
+
+- **The arms carry the report**, not a wrapper. A value on the answer keeps `world` the only owner,
+  keeps the port source-compatible for every host, and lets each arm say what it can: `Captured` and
+  `TooLarge` carry entries, `Unavailable` normally none because its own code already is its finding.
+- **Adapter-only codes are catalog codes.** The adapter registers `SC-MC-0001`…`0005` in its own code
+  catalog through `Catalogs.Builder.codes`, so each carries a canonical severity and an explanation
+  and `/cumulus explain` resolves it. `Codes.all` stays at 56; the kernel registry is not a host
+  registry, and a host code never enters it.
+- **The severities are the host's.** `SC-MC-0005` (refused root) is an ERROR; `SC-MC-0003` (cut) and
+  `SC-MC-0004` (orientation mismatch) are WARNINGs, because a check can still pass over both, and a
+  warning printed before a `Formed` summary is honest while an error would not be.
+- **A cut is one fact per channel.** `SC-MC-0003` in the capture report explains the cut with its
+  reason; `SC-OCC-0003` in the check bundle judges that the check needed the child. No channel
+  translates into the other, neither suppresses the other, and a declaration that cannot be
+  translated into its parent frame is cut and reported instead of dropped silently.
+
+**Why:** the finding layer cannot move down — `world` may import only `core`/`space` (`03-modules.md`)
+and severity lives on the finding (Law 7), so a severity in the payload would be a second vocabulary
+and a constitution violation. The report cannot move into the match bundle — a match's findings must
+be a function of the match tuple, and host capture state is not part of it (Law 11). The kernel
+already carries opaque host codes for refusals (§4.1 of `world`); this is the same rule applied to the
+capture answer, with the same trust guard.
+
+**Consequence:** the cut reason is a finding value and the D-27 deferred channel is closed. A host
+code's severity comes from the host catalog, so a misleading host code is possible; the guard only
+prevents impersonation of a kernel code, and that stays a host review issue. A capture report never
+fails a check, never enters a `MatchResult` and never changes a command's exit code. The evidence is
+the capture-report kernel test, the report-site unit test and the capture GameTests
+(`06-verification.md` §3). **Status:** accepted; M5e implementation in flight — S0 docs and the S1
+`world` carrier landed, the adapter emission/surfacing (S2–S4) follows.
 
 ## 3. Consequences a reviewer should attack
 
@@ -435,15 +488,23 @@ not a cut. `SC-MC-0004` is outside this decision: it remains an orientation mism
 - A `Partial` section gives the computation a per-cell refusal map; the engine cannot prove that a
   custom computation consulted it. A `Found` returned over refused cells is a short sum and a review
   defect (D-24), not an engine catch.
-- A relayed host code has no `CodeEntry`, so its severity is the finding's, not the registry's; the
-  trust guard only prevents impersonation of a kernel code, not a misleading host code. A report
-  site should keep the refusal's status in the note.
+- A relayed host code has no kernel `CodeEntry`, so its severity is the finding's, not the kernel
+  registry's; the trust guard only prevents impersonation of a kernel code, not a misleading host
+  code. A report site should keep the refusal's status in the note, and the shipped adapter registers
+  its own `CodeEntry`s so its codes have a canonical severity (D-28).
+- A capture report is host state, not match state (D-28): the same `(blueprint, snapshotId, siting,
+  owner, budget, claims revision, catalog snapshot)` tuple can be printed with a different capture
+  warning by a different host. That is the price of the host owning the reason; the match result
+  stays deterministic (Law 11).
+- The orientation audit reads only observed blocks: a `SC-MC-0004` says the pose is not realisable
+  for those blocks, not that a declaration is wrong, and the kernel's `property` expectation is not
+  siting-aware, so capability and value findings can co-occur.
 - The nested source is a third-party capability; the adapter's block-over-entity precedence and
   first-provider-wins rule are policy, not a merge. A mod that wants two nested bodies at one cell
   cannot express it (D-26).
 - Model C and the nested capability are implemented and the spec index is green; the remaining gaps
-  are non-upright tilt, `SC-MC-0004`/`0005`, watched-region mark-counter invalidation and the deferred
-  `SC-MC-0003` channel (D-02).
+  are the M5e capture report in flight (D-28) and the watched-region mark-counter invalidation
+  (D-02).
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates

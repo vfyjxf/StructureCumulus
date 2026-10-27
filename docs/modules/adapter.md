@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5e)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -6,14 +6,16 @@
 > `/cumulus check <id> <origin>` (identity siting for anchorless blueprints). M2a adds loaded-entity
 > capture with policy windows, full footprint indexing and entity-vs-block precedence (`world.md`
 > §4.3). M2b adds `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror` and an upright
-> mirror-then-rotate `BlockState` transform; non-level tilts return `MappingResult.UnsupportedTilt`.
+> mirror-then-rotate `BlockState` transform.
 > M2c (`cb06aa8`/`64d04ce`) implements Model C, body identity, the total read and the five trait
 > keys. M2d (`f3e0338`/`d6aefc2`) implements `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
 > package-private `FrameData`, child frames and cuts. M3 is committed at `d4b6d82`; `SavedClaims`/
 > `SavedContexts` are compatible with Model C. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
 > (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
 > implemented; capture-revision lease invalidation landed at `0f0bf25`, and the watched-region mark
-> counter remains pending.
+> counter remains pending. M5e adds the non-upright orientation remap (`ac11d0c`) and the capture
+> report the adapter answers with (`SC-MC-0003`/`0004`/`0005`) plus the report site the commands
+> print.
 
 ## 1. Position
 
@@ -31,9 +33,12 @@
   the datapack source, the merged document source and the five `/cumulus` subcommands. M5: the
   determinism gate (`DeterminismTest`) covers canonical bytes across member order, the parse/write
   fixed point, equal compile runs and stable finding order; capture-revision lease invalidation is
-  in place.
-- **Pending.** Watched-region mark-counter lease invalidation, `SC-MC-0004`/`0005` emission,
-  non-upright pitch/roll state mapping and the deferred `SC-MC-0003` capture-finding channel.
+  in place. M5e: the non-upright orientation remap with `MappingResult.Unrepresentable` (`ac11d0c`).
+- **Pending (M5e).** The adapter half of the capture report: the `SC-MC-0003` cut entry, the
+  `SC-MC-0004` orientation audit, the `SC-MC-0005` over-cap entry, the host code catalog and the
+  command surfacing. The kernel carrier (`world` §4.10) landed with the slice's first half. The
+  watched-region mark-counter lease invalidation also remains pending.
+- Non-upright pitch/roll state mapping is implemented at `ac11d0c`; it is no longer pending.
 - No kernel type names a Minecraft type; the adapter may name every kernel type.
 
 ## 2. Types
@@ -52,12 +57,14 @@
 | `NestedExtents` | final class (capability) | the `BLOCK` and `ENTITY` capabilities |
 | `NestedExtentLookup` | interface, package-private | test seam for fake nested providers |
 | `CapabilityLookup` | enum, package-private | production nested lookup (four-argument block / context-null entity) |
-| `OrientationMapping` | — | `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror`; upright state transform, non-upright tilt rejected |
+| `OrientationMapping` | — | `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror`; upright mirror-then-rotate transform and the non-upright capability remap, with `MappingResult.Unrepresentable` as the `SC-MC-0004` payload |
+| `AdapterCodes` | final class, package-private | the adapter's `SC-MC-*` codes, their catalog `CodeEntry`s and the severity each finding carries |
+| `CaptureReports` | final class, package-private | the report site: one `CaptureReport` entry → one `Finding` (severity, world label, trust guard) |
 | `SavedClaims` | `ClaimLedger` | per-world `SavedData`, CAS on the server thread (M3) |
 | `SavedContexts` | `ContextStore` | per-instance values in `SavedData` (M3) |
 | `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
 | `DatapackBlueprints` | `DocumentSource` | reload listener; ids under `data/<ns>/cumulus/structure/` (M4b); wins over `BuiltinDocuments` on an id collision |
-| `ServerState` | — | catalogs, server-level and per-level kernels, per-level ledger/contexts and capture cache |
+| `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/contexts and capture cache |
 | `CumulusCommand` | — | the five `/cumulus` subcommands (`check`, `compile`, `settle`, `explain`, `claims`) |
 | `FindingOutput` | — | human/JSON to chat, log or a file (pending) |
 | `MatchScheduler` | — | optional host execution: submit, coalesce, markDirty, tick (absent) |
@@ -65,7 +72,8 @@
 ## 3. Capture
 
 M1 copies blocks and block entities. M2a adds loaded entities, M2c adds trait slots and per-read
-refusal, and M2d adds nested frames. The rules below are implemented.
+refusal, M2d adds nested frames, and M5e adds the capture report and, with it, the orientation audit.
+The rules below are implemented, except the two capture-report bullets, which M5e lands (S2-S4).
 
 - One server-thread call. `ServerChunkCache.getChunkNow`; never `Level.getChunk`, never a chunk load.
   A nested child uses the same rule: an unloaded chunk is a cut, never a load.
@@ -91,7 +99,18 @@ refusal, and M2d adds nested frames. The rules below are implemented.
 - `SnapshotId` is stamped last from the per-world counter; a content-equal refresh may return the
   same view object (no new id).
 - Caps: `maxElements` bounds the root plus every child frame. A root volume over the ceiling returns
-  `CaptureResult.TooLarge`, never a partial root. A child over budget is cut, not partial (§8).
+  `CaptureResult.TooLarge`, never a partial root, with one `SC-MC-0005` entry (ERROR) in its report;
+  a child over budget is cut, not partial (§8).
+- Every capture answers with a `CaptureReport` (`world` §4.10). The arm is the verdict and the report
+  is the finding: a cut child stays `nested(cell) == null` and leaves the arm `Captured`; the report
+  carries one `SC-MC-0003` entry per cut and one `SC-MC-0004` entry per unrepresentable state group
+  (§10). An empty report is the normal case and `Unavailable` carries one only when the host has
+  extra detail; its own `SC-MC-0001` code already is its finding.
+- The orientation audit runs inside the sited capture, in the same loop that already read each
+  `BlockState`, so it needs no chunk load and no second traversal. Its orientation comes from the
+  two-phase command path (`siting.placement().orientation()`, §11); the anchor-cell phase passes
+  none and only the root frame is audited. A nested child is an absolute extent and is not rotated
+  by the parent's siting.
 
 ## 4. Lease and gate
 
@@ -262,9 +281,14 @@ no-chunk reads, cycle detection, budget, refusal and the child view:
   refused), or the child is cut.
 - A child is **cut** when `depth + 1 > policy.maxDepth()`, when its volume would exceed the shared
   `maxElements` budget, when its `(type, origin)` already appears on the open frame path (a cycle),
-  or when a chunk it needs is unloaded. A cut rolls back the budget and the reserved frame, keeps the
+  or when a chunk it needs is unloaded; a declaration that cannot be translated into its parent frame
+  is cut too, never dropped silently. A cut rolls back the budget and the reserved frame, keeps the
   nested body, creates no child, makes `nested(cell)` return `null`, and the consumer reports
-  `SC-OCC-0003`. A cut is never a refused child and never air.
+  `SC-OCC-0003`. A cut is never a refused child and never air. The adapter also reports the cut in
+  the capture report as one `SC-MC-0003` entry (WARNING) with the reason and, when the cut happens in
+  the root frame, the extent's world footprint as the entry's cells; a deeper cut carries no cells
+  and names its frame and anchor in a note (`world` §4.10). The capture entry explains the cut, the
+  check finding judges it, and neither suppresses the other.
 - Child entities: the same policy and the same footprint rule as the root; `body` is the
   UUID-derived id, so two same-type entities at one anchor no longer collapse. Entity-hosted nested
   extents are supported by `NestedExtents.ENTITY`; the nested scan queries a loaded entity even when
@@ -309,14 +333,30 @@ an id collision, and the built-in `structurecumulus:air_cell` remains the fallba
 ## 10. Orientation
 
 M2b implements `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror` and an upright
-`BlockState` transform that applies the mirror and then the rotation; a non-level tilt returns
-`MappingResult.UnsupportedTilt`. The normative rule remains: `Tilt.pitchUp`/`Tilt.pitchDown` and
-`Tilt.rollLeft`/`Tilt.rollRight` are legal for blocks that support six-way facing; a block whose
-state cannot express the chosen orientation is a capture-time mismatch (`SC-MC-0004`), never a silent
-identity. Non-level tilt (pitch/roll/inverted, the 40 Minecraft orientations, every 90° axis
-permutation), capability-aware state remapping and `SC-MC-0004` emission remain pending. The
-definition origin's anchor property is read from the `BlockState` properties, not from NBT.
-`SC-MC-0004` is an orientation mismatch, not a read refusal; it never becomes a `ReadRefusal`.
+`BlockState` transform that applies the mirror and then the rotation. `ac11d0c` adds the non-upright
+remap: `OrientationMapping.transform(Orientation, BlockState)` maps six-value `Direction`, all-three
+`Direction.Axis` and `FrontAndTop` properties through `Orientation.apply`, copies neutral properties,
+and answers `MappingResult.Unrepresentable(orientation, property, value)` for the first property that
+cannot express the pose — the payload `SC-MC-0004` reports. The normative rule remains:
+`Tilt.pitchUp`/`Tilt.pitchDown` and `Tilt.rollLeft`/`Tilt.rollRight` are legal for blocks that
+support six-way facing; a block whose state cannot express the chosen orientation is a capture-time
+mismatch (`SC-MC-0004`), never a silent identity.
+
+The **orientation audit** runs in the sited (phase-2) capture: for every captured non-air block of
+the root frame the adapter applies the siting orientation to the live `BlockState` it already read
+and, when the result is `Unrepresentable`, groups the cell by `(block type, property, value)`. One
+`SC-MC-0004` entry (WARNING) per group carries the code, the message, notes (`block`, `property`,
+`value`, `cells`, `orientation`) and the union of the group's world cells as its region. An upright
+siting is not audited (an upright pose is always expressible), and the audit never reads the world
+again: no chunk load, no second traversal, no `ReadRefusal`. The orientation comes from the
+two-phase command path (§11); a capture taken without a siting orientation reports none.
+
+`SC-MC-0004` is a capability fact about the observed blocks, not a value fact about the check. The
+kernel's built-in `property` expectation compares the raw descriptor value and is not siting-aware,
+so a rotated siting with a property expectation can also produce a `SC-EXP-0001` mismatch:
+capability and value, two findings, not a contradiction. A siting-aware property expectation is not
+part of this round. The definition origin's anchor property is read from the `BlockState` properties,
+and `SC-MC-0004` never becomes a `ReadRefusal`.
 
 ## 11. Commands and lifecycle
 
@@ -324,13 +364,17 @@ All five subcommands run on the server thread. `check` returns 1 whenever it rea
 
 - `/cumulus check <id> <origin>` — capture, siting, read the per-level claims view for the captured
   bounds, then `check`; print the result and findings. The claims read and the check write nothing.
+  An anchored blueprint captures twice: the anchor cell resolves the siting, and the sited bounds are
+  the capture the orientation audit runs on.
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
   findings.
 - `/cumulus settle <id> <origin>` — capture once, `check`, then `settle` with the same request; print
   `Formed` (rows, ledger revision, context revision) or the check/settle failure. A failed check
   writes nothing.
 - `/cumulus explain <code>` — `FindingCode.parse` + code lookup; print the registered explanation, or
-  the fallback explanation and 0 for an unregistered code; a malformed code is 0.
+  the fallback explanation and 0 for an unregistered code; a malformed code is 0. The adapter
+  registers its `SC-MC-*` entries in its kernel's code catalog, so its codes are explainable and
+  carry their canonical severity.
 - `/cumulus claims <from> <to>` — the ledger's rows in the box between two inclusive corners. The box
   is normalized to the kernel's half-open `Cuboid`; a box that leaves the lattice is a reported
   failure. Rows print in claim order and the read never writes.
@@ -338,21 +382,36 @@ All five subcommands run on the server thread. `check` returns 1 whenever it rea
   closes that world's capture (invalidating its leases) and drops its per-level store. Persisted claims
   rows are not released; the next access reloads them from the world's saved data.
 
+A capture report is printed as its own block, `capture <id>: findings`, before the check/settle
+findings: a capture failure prints its failure line and then the report, a successful capture prints
+it only when it is non-empty. Capture findings are stamped `Phase.check`, relayed by `CaptureReports`
+(`world` §4.10) and never merged into a `MatchResult` bundle — so a `SC-MC-0003` cut warning can
+precede a `Formed` summary without contradiction. `/cumulus check` still returns 1 on a reached
+result and 0 only on an argument/document/capture/siting failure; a report never changes the exit
+code.
+
 ## 12. Codes
 
 `SC-MC-0001` unloaded chunk/not captured: implemented as `CaptureResult.Unavailable` or a refused
-section/`ReadRefusal`; `SC-MC-0002` unreadable trait or block-entity read: carried in a
-`TraitSlot.Refused` and relayed by the consumer, not a capture finding; `SC-MC-0003` nested
-cycle/depth/cap cut: **reserved/deferred** — this round has no capture-finding channel, so the
-adapter does not produce it and does not fabricate a refused child; the consumer reports
-`SC-OCC-0003`; `SC-MC-0004` block state cannot express the chosen orientation: pending, and never a
-refusal; `SC-MC-0005` capture over cap: pending, the root returns `CaptureResult.TooLarge` rather
-than a finding. These are adapter-only; the kernel never mints `SC-MC` and none is in `Codes.all`,
-though it may relay one carried by a `ReadRefusal`.
+section/`ReadRefusal`. `SC-MC-0002` unreadable trait or block-entity read: carried in a
+`TraitSlot.Refused` and relayed by the consumer, not a capture finding. `SC-MC-0003` a nested extent
+the adapter cut (depth, budget, cycle, unloaded chunk, or a declaration that does not fit its parent
+frame): a WARNING entry in the `CaptureResult.Captured` report, one per cut, with the reason; the
+check still reports `SC-OCC-0003` when it needs the child and the adapter never fabricates a refused
+child. `SC-MC-0004` a captured block state cannot express the siting orientation: a WARNING entry,
+one per `(block type, property, value)` group, never a `ReadRefusal` (§10). `SC-MC-0005` the root is
+over the element ceiling: an ERROR entry on `CaptureResult.TooLarge`, which stays the refusal.
+`SC-MC-0001`…`0005` are adapter-only: the kernel never mints `SC-MC`, and none enters `Codes.all`.
 
-M1/M2a/M2b emit `SC-MC-0001`; M2c adds `SC-MC-0002` in trait refusals. A host code carried by a
-`ReadRefusal` is relayed unless it is already in `Codes.all`, in which case the kernel substitutes
-`SC-OCC-0004` plus a note (`world.md` §4.1).
+The adapter registers those codes in its own code catalog through `Catalogs.Builder.codes`
+(`AdapterCodes` holds the five codes and their entries), so each carries the canonical severity
+above and an explanation, and `/cumulus explain` resolves it. The catalog is the host's, not
+`Codes.all`: `Codes.all` stays at 56 entries, and a capture entry's code is never a kernel registry
+entry. `CaptureReports` is the only report site: it reads the code's `CodeEntry` (or answers `error`
+when the host registered none), relays the entry as a finding, and applies the kernel's trust guard —
+a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (`world` §4.1, §4.10).
+The capture report never enters a `MatchResult` bundle; the commands print it as their own block
+before the attempt's findings (§11).
 
 ## 13. What is deliberately absent
 

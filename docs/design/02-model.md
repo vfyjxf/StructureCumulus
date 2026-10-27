@@ -24,6 +24,7 @@
 | trait slot | `TraitSlot` | world | one trait id: present (possibly null), absent, or refused |
 | view | `WorldView` | world | an immutable, section-based snapshot read face |
 | lease | `SnapshotLease` | world | a view plus `isCurrent()` |
+| capture report | `CaptureReport` | world | the capture's own findings, an opaque host payload; each `CaptureResult` arm carries one |
 | expectation | `Expectation<T>` | structure | a test over one typed subject |
 | focus | `Focus<T>` | structure | how a check binds its subject |
 | check | `Check<T>` | structure | one focus + one expectation over one bay |
@@ -131,6 +132,9 @@ not a scheduling unit and not declared by a blueprint.
 - `SectionSlot` = `Air` | `Present` | `Partial(section, unreadable)` | `Refused(status, code)`: a
   section answer.
 - `TraitSlot` = `Present(trait)` | `Absent(id)` | `Refused(id, refusal)`: one trait id's answer.
+- `CaptureReport` = an ordered list of `Entry(code, message, notes, cells)`: an opaque host payload
+  carried by a `CaptureResult` arm; it is relayed to findings at the host's report site, never read by
+  the kernel.
 - `MatchResult` = `Admitted` | `Formed` | `Failed` | `Undecided` | `Dropped`: an attempt.
 - `ClaimVerdict` = `Settled` | `Conflict` | `RevisionMoved`: a ledger answer.
 

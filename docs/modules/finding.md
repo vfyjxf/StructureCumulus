@@ -233,11 +233,13 @@ severity and explanation live in its `CodeEntry`; a producer copies the severity
 well-formed code still constructs, orders and renders; the registry has no entry, so `explain`
 returns `null` and `explainOrFallback` synthesises the family text.
 
-`Codes.all` is the kernel's table. An adapter or addon code is a `FindingCode` with no `CodeEntry`
-and never enters `Codes.all`; `SC-MC-*` is the adapter family. A `ReadRefusal` may carry such an
-opaque host code; the kernel relays it at the report site (it never branches on it, mints it or
-allocates it) unless the code is already in `Codes.all`, in which case the site substitutes
-`SC-OCC-0004` and adds a note (`world` §4.1).
+`Codes.all` is the kernel's table. An adapter or addon code is a `FindingCode` outside it and never
+enters `Codes.all`; `SC-MC-*` is the adapter family. A host may give such a code a `CodeEntry` in
+its own code catalog (§4.5), which is where its severity and explanation live; the kernel's table is
+untouched. A `ReadRefusal` or a `CaptureReport` entry may carry an opaque host code; the kernel
+relays it at the report site (it never branches on it, mints it or allocates it) unless the code is
+already in `Codes.all`, in which case the site substitutes `SC-OCC-0004` and adds a note (`world`
+§4.1, §4.10).
 
 ### 4.2 Finding validation
 
@@ -283,9 +285,12 @@ constant names. Both are pure functions of `(bundle, context)`; they never reord
 
 `CodeEntry.explanation` is one `Explanation` per shipped code: a one-sentence summary, a body that
 says what triggers the code and what to check, and `seeAlso` topic ids (never code text). The
-registry is `Codes.all`; `Catalogs.codes()` is its frozen catalog; `StructureKernel.explain` looks
-up by code. A missing entry is legal for an addon code; `explainOrFallback` synthesises
-`no explanation is registered for SC-…` plus the family subject.
+kernel registry is `Codes.all`; `Catalogs.codes()` is its frozen built-in projection, and a host may
+merge its own entries into its own catalog through `Catalogs.Builder.codes` — that is how a host code
+(for example `SC-MC-0003`) gets a canonical severity and an explanation without entering `Codes.all`.
+`StructureKernel.explain` looks up by code, so a registered host code is explainable. A missing entry
+is legal for an addon code; `explainOrFallback` synthesises `no explanation is registered for SC-…`
+plus the family subject.
 
 ## 5. Pipeline role
 
@@ -355,22 +360,28 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-RMD-0002` | ERROR | ✓ | a provider returned a malformed remedy | `StructureKernel.solve` |
 | `SC-SPI-0001` | ERROR | ✓ | an extension threw or returned a malformed finding | `engine` guard |
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
-| `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; a host code may be relayed from a `ReadRefusal` | adapter |
+| `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; a host code may be relayed from a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10) | adapter |
 
-`Codes.all` has 56 entries in this revision, matching the registry. `SC-MC-0003` is
-reserved/deferred: the adapter has no capture-finding channel in this round, so it is not produced
-and not listed in `Codes.all`; a cut child is reported by the consumer as `SC-OCC-0003`, never
-fabricated as a refused child (`adapter.md` §8).
+`Codes.all` has 56 entries in this revision, matching the registry; the capture-report channel adds
+none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot express the siting
+orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by the adapter in a
+`CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries, and the
+adapter's own catalog gives them their severity (`0005` ERROR, `0003`/`0004` WARNING) and their
+explanation. A cut child is still reported by the check as `SC-OCC-0003` (`adapter` §8); the capture
+entry explains the cut, the check finding judges it, and neither channel suppresses the other.
 
 ## 7. Tests
 
 - Code parse/text round-trip; malformed parse returns null; `Codes.all` has 56 entries, one per code,
-  every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-0003` is
+  every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-*` are
   absent from `all`.
 - Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`
   round-trip `SC-<TAG>-<NNNN>`, and the JSON renderer emits tags rather than constant names.
 - Host code: an opaque `SC-MC-*` refusal renders and orders without a `CodeEntry`; it never enters
   `Codes.all`; a relayed code already in `Codes.all` is replaced by `SC-OCC-0004` with a note.
+- Host catalog: a host's own `CodeEntry` carries that code's severity and makes it explainable
+  through `StructureKernel.explain`, and the code still never enters `Codes.all`; a `CaptureReport`
+  entry relays under the same trust guard as a `ReadRefusal`.
 - Finding builder: primary label requirement, message defaulting, label sort, blank rejection.
 - Bundle: dedup, order, caps (errors uncapped), truncation note, idempotent build, filter prefixes.
 - Renderers: golden human text for a door/finding; JSON schema fields; no fabricated source line.

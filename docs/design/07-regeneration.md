@@ -21,8 +21,9 @@ traits, the five adapter trait keys) and M2d at `f3e0338`/`d6aefc2` (nested exte
 reader/writer), M4b at `76a8e5c` (datapack reload) and the command slice at `4899d86` (settle, plus
 compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25` and the determinism
 gate landed with `DeterminismTest`. M3 persistence is
-compatible with Model C. Still pending: non-upright pitch/roll state mapping, `SC-MC-0004`/`0005`
-emission, watched-region mark-counter lease invalidation and the deferred `SC-MC-0003` channel.
+compatible with Model C. Non-upright pitch/roll state mapping (the 40 orientations) landed at
+`ac11d0c`. The M5e capture report (D-28, `SC-MC-0003`/`0004`/`0005`) and the watched-region
+mark-counter lease invalidation are still pending.
 
 ## 2. The order
 
@@ -61,7 +62,7 @@ module file.
 | 1 | `javac --release 21` over `src/kernel/java`, JSpecify only | exit 0, zero errors |
 | 2 | no Minecraft/NeoForge/Mojang name under `kernel.**` | purity scan; compile classpath |
 | 3 | `src/kernelTest/java` compiles and all tests pass | JUnit launcher; 0 failures, 0 skipped |
-| 4 | the fourteen scenarios in `06-verification.md` §3 pass | named test classes |
+| 4 | the fifteen scenarios in `06-verification.md` §3 pass | named test classes |
 | 5 | every public type in code is in a module file, and vice versa | `tools/spec-check.py` |
 | 6 | every `SC-` code in code is in `Codes.all`, and every `Codes.all` entry is in a producer row | registry test |
 | 7 | no `TODO`/`FIXME`/`UnsupportedOperationException`/empty public body | grep |
@@ -70,9 +71,10 @@ module file.
 | 10 | the old `docs/spec`, `docs/design-notes`, `docs/guide.zh.md`, `docs/README.zh.md` and the old
     kernel sources are gone | `git status`; only the new set remains |
 
-The spec index is green in v1.2: every documented type is implemented, every `SC-` code in code is
-in `Codes.all`, and every `Codes.all` entry has a producer row. There is no pending signature block
-and no suppressed gate (`06-verification.md` §1).
+The spec index is green at v1.2: every documented type is implemented, every `SC-` code in code is
+in `Codes.all`, and every `Codes.all` entry has a producer row. The M5e capture-report amendment is
+docs-first, so the index is red between the two halves of that slice and green again when its
+carrier lands; there is no pending signature block and no suppressed gate (`06-verification.md` §1).
 
 ## 5. Regeneration is not a one-way door
 
@@ -95,13 +97,16 @@ the exact failure this set exists to prevent.
   `explain`, `claims`) on top of the committed `SavedClaims`/`SavedContexts` stores.
 - **M5.** The determinism gate is implemented (`DeterminismTest`: canonical bytes, the parse/write
   fixed point, equal compile runs and stable finding order). The remaining host gate is the
-  watched-region mark-counter lease invalidation. The kernel and adapter suites are green (116 kernel,
-  106 adapter, 32 GameTests).
-- **Non-upright tilt.** The 40 pitch/roll/inverted orientations, capability-aware state remapping
-  and `SC-MC-0004` emission.
-- **`SC-MC-0005`** capture-over-cap emission at the host boundary, and the deferred `SC-MC-0003`
-  capture-finding channel for a cut child; the adapter currently returns `CaptureResult.TooLarge`
-  and the consumer reports `SC-OCC-0003`.
+  watched-region mark-counter lease invalidation. The kernel and adapter suites were green at the
+  last measurement (116 kernel, 106 adapter, 32 GameTests); the counts are re-measured with M5e.
+- **Non-upright tilt.** Implemented at `ac11d0c`: the 40 pitch/roll/inverted orientations remap
+  their six-way `Direction`, `Direction.Axis` and `FrontAndTop` properties, and the first property
+  that cannot express the pose is `MappingResult.Unrepresentable` — the `SC-MC-0004` payload.
+- **M5e capture report.** `world.CaptureReport` carried by every `CaptureResult` arm, the
+  `SC-MC-0005` over-cap entry, the `SC-MC-0003` cut entry, the sited-capture orientation audit
+  (`SC-MC-0004`, grouped by block type/property/value), the host code catalog and the command report
+  block (D-28). `CaptureResult.TooLarge` stays the refused root and the check keeps reporting
+  `SC-OCC-0003` for a cut child.
 - A host scheduler with coalescing, dirty windows and a per-world ledger, outside the kernel.
 - A performance pass: claim-row volume for large structures, the per-cell `read`/`statusOf` cost, the
   section pass and the nested-frame budget. If a row form other than per-cell is needed, it is a

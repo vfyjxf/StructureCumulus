@@ -9,7 +9,8 @@
 **Owns:** `OccupantKind`, `OccupantRef`, `OccupantDescriptor`, `TraitKey<T>`, `Trait<T>`,
 `TraitSlot`, `OccupantSnapshot`, `OccupantFilter`, `ReadStatus`, `ReadRefusal`, `CellRead`,
 `SectionSlot`, `SectionSnapshot`, `WorldView`, `SnapshotPolicy`, `CaptureRequest`, `CaptureResult`,
-`WorldCapture`, `SnapshotLease`, `OccupantResolver<R>`, `ResolveContext`, `EntityWindow`.
+`CaptureReport`, `CaptureReport.Entry`, `WorldCapture`, `SnapshotLease`, `OccupantResolver<R>`,
+`ResolveContext`, `EntityWindow`.
 
 **Does not own:** geometry (`space`), claims (`claim`), what an expectation says (`structure`), the
 capture implementation (`mc`), dirty tracking or scheduling (host).
@@ -36,7 +37,9 @@ capture implementation (`mc`), dirty tracking or scheduling (host).
 | `WorldView` | interface | recursive, section-based, immutable read face; `read` is the primitive |
 | `SnapshotPolicy` | record | capture ceiling and required content; `traits` is a set of trait ids |
 | `CaptureRequest` | record | bounds + policy |
-| `CaptureResult` | sealed | `Captured(view, lease)`, `TooLarge`, `Unavailable` |
+| `CaptureResult` | sealed | `Captured(view, lease, report)`, `TooLarge(bounds, elements, report)`, `Unavailable(status, code, report)`; a two-argument compatibility constructor answers `CaptureReport.empty()` |
+| `CaptureReport` | record | the capture's own findings: an ordered, immutable list of entries; `empty()` is the normal answer |
+| `CaptureReport.Entry` | record | `(code, message, notes, @Nullable CuboidSet cells)`; an opaque host code, prose, ordered facts and an optional world region |
 | `WorldCapture` | interface | host capture port, one per world |
 | `SnapshotLease` | interface | view + `isCurrent()`; host-owned resource |
 | `OccupantResolver<R>` | interface | raw host value → occupant snapshot, or decline |
@@ -170,10 +173,32 @@ public record SnapshotPolicy(int maxElements, int maxDepth,
 
 public record CaptureRequest(Cuboid bounds, SnapshotPolicy policy) { }
 
+public record CaptureReport(java.util.List<CaptureReport.Entry> entries) {
+    public CaptureReport { /* copies; every entry non-null; insertion order */ }
+    public static CaptureReport empty();
+    public static CaptureReport of(java.util.List<Entry> entries);
+    public boolean isEmpty();
+    public int size();
+
+    public record Entry(FindingCode code, String message, java.util.List<String> notes,
+                        @Nullable CuboidSet cells) {
+        public Entry(FindingCode code, String message);                  // no notes, no cells
+        public static Entry at(FindingCode code, String message, CuboidSet cells);
+    }
+}
+
 public sealed interface CaptureResult {
-    record Captured(WorldView view, SnapshotLease lease) implements CaptureResult { }
-    record TooLarge(Cuboid bounds, int elements) implements CaptureResult { }
-    record Unavailable(ReadStatus status, FindingCode code) implements CaptureResult { }
+    record Captured(WorldView view, SnapshotLease lease, CaptureReport report)
+            implements CaptureResult {
+        public Captured(WorldView view, SnapshotLease lease);            // empty report
+    }
+    record TooLarge(Cuboid bounds, int elements, CaptureReport report) implements CaptureResult {
+        public TooLarge(Cuboid bounds, int elements);                    // empty report
+    }
+    record Unavailable(ReadStatus status, FindingCode code, CaptureReport report)
+            implements CaptureResult {
+        public Unavailable(ReadStatus status, FindingCode code);         // empty report
+    }
 }
 
 public interface WorldCapture {
@@ -238,9 +263,9 @@ answer; it carries one. `readable` is the only status a `ReadRefusal` may not ha
 
 The kernel's default refusal code is `SC-OCC-0004` (required read unavailable). A host may put its
 own code in a `ReadRefusal` (for example `SC-MC-0002`); the kernel never branches on it, never mints
-it and never allocates it in `Codes.all`. A report site relays the host code, except that a code
-already present in `Codes.all` is replaced by `SC-OCC-0004` plus a note: a host cannot impersonate a
-kernel code. §6 owns the producer table.
+it and never allocates it in `Codes.all`. The same rule covers a `CaptureReport` entry (§4.10). A
+report site relays the host code, except that a code already present in `Codes.all` is replaced by
+`SC-OCC-0004` plus a note: a host cannot impersonate a kernel code. §6 owns the producer table.
 
 ### 4.2 A footprint is evidence, not a permission
 
@@ -312,11 +337,13 @@ another frame or world with `Refused(outOfBounds, SC-OCC-0004)`.
 
 ### 4.6 Capture and lease
 
-`WorldCapture` is a host port. It returns `Captured(view, lease)`, `TooLarge` or `Unavailable`; it
-never returns a partial root view treated as complete. `SnapshotLease.isCurrent()` is the single gate:
-true only while the view is a faithful capture of a live world at its revision and the handle is
-open. `close()` releases the host's resource; the kernel never closes a lease. `currentRevision()` is
-the host's monotonic per-world counter; `SnapshotId.revision` is stamped from it.
+`WorldCapture` is a host port. It returns `Captured(view, lease, report)`, `TooLarge` or
+`Unavailable`; it never returns a partial root view treated as complete. Every answer carries a
+`CaptureReport`, and an empty report is the normal case (§4.10). `SnapshotLease.isCurrent()` is the
+single gate: true only while the view is a faithful capture of a live world at its revision and the
+handle is open. `close()` releases the host's resource; the kernel never closes a lease.
+`currentRevision()` is the host's monotonic per-world counter; `SnapshotId.revision` is stamped from
+it.
 
 `SnapshotPolicy` is a ceiling, not a request to over-read: `maxElements` bounds the total captured
 elements (root plus every child frame); `maxDepth` bounds the nested frames below the root; `kinds`
@@ -388,6 +415,36 @@ whose bounds leave the level's build height keeps the child but its outside sect
 `Refused`/`Partial`; those cells are never air. The nested body and child view are host-capture
 facts; the kernel treats a `null` `nested(cell)` as "not available here", not as an empty structure.
 
+### 4.10 The capture report
+
+Every `CaptureResult` arm carries a `CaptureReport`: the host's own findings about the capture it
+just took (or refused). The kernel carries the report and never interprets it.
+
+- **The arm is the verdict, the report is the finding.** `Captured` still means "the root view is
+  complete for the policy" — a cut child is reported, never fabricated, and `nested(cell)` stays
+  `null` (§4.9). `TooLarge` still means "no root view was built". `Unavailable` still means "the root
+  could not be captured". A non-empty report never changes what an arm means.
+- **An entry is opaque.** `CaptureReport.Entry` is `(code, message, notes, cells)`: a host
+  `FindingCode`, prose that is never parsed, ordered facts, and an optional region. The kernel never
+  branches on the code, never mints an adapter code and never allocates one in `Codes.all`.
+- **A region is a world region or absent.** `cells` names world cells (the root frame's origin is
+  `(0,0,0)`, §4.4), so a `world` locus is always correct. A producer whose cells are frame-local
+  omits them and names the frame in a note instead.
+- **A report site relays an entry as a finding.** The site supplies the phase and the severity (the
+  registry entry, else `error` for an unregistered host code), turns `cells` into the primary
+  `world` label (a label-less entry is legal when it sets a message), copies the notes verbatim and
+  applies the §4.1 trust guard. The kernel supplies the fact; the site supplies the finding.
+- **Order is canonical.** Entries are in the host's order (the shipped adapter: audit groups sorted
+  by `(type, property, value)`, then cuts in anchor order); the relayed `FindingBundle` re-orders
+  them canonically anyway (`finding` §4.3).
+- **Empty is normal**, including on `Unavailable`, whose own code already is its finding. No arm may
+  carry two entries for one fact, and a capture report is never merged into a `MatchResult` bundle:
+  a match's findings must be a function of the match tuple, not of host capture state (`finding`
+  §4.3, `01-constitution.md` Law 11).
+
+A capture report is the host's, so its codes are the host's: none is a kernel code, and the kernel's
+producer table (`finding` §6) lists the `SC-MC-*` family as adapter-only.
+
 ## 5. Pipeline role
 
 - `compile`: a document names occupant kinds/traits; no view.
@@ -396,6 +453,8 @@ facts; the kernel treats a `null` `nested(cell)` as "not available here", not as
 - `settle`: the lease gate is the only world fact; claim rows come from the check's bindings; a
   nested subject is never a claim binding.
 - `derive`: no view; only `StructureContext`.
+- In every phase the kernel carries a `CaptureReport` and never reads it: a host report site relays
+  its entries before the attempt's own findings are rendered (§4.10).
 
 ## 6. Codes
 
@@ -408,8 +467,10 @@ primary): a required read is unavailable; the kernel's default `ReadRefusal` cod
 for a relayed code that is already a kernel code. Producer: `WorldView.read`, `Focuses`,
 `SectionContext`/`StructureContext` consumers.
 
-A host code in a `ReadRefusal` is relayed by the report site and is not part of `Codes.all`; the
-kernel never branches on it. §4.1 owns the trust guard.
+A host code in a `ReadRefusal` or in a `CaptureReport` entry is relayed by the report site and is not
+part of `Codes.all`; the kernel never branches on it and never mints an adapter code (§4.1, §4.10).
+The kernel produces no `SC-MC` code: a cut child, an over-cap root and an orientation mismatch are
+the host's findings (`adapter` §12).
 
 ## 7. Tests
 
@@ -433,9 +494,15 @@ kernel never branches on it. §4.1 owns the trust guard.
 - `EntityWindow.of` inflation and lattice clamp; `maxEntitySpan` rejection.
 - `SnapshotPolicy`: `traits` is a set of ids; a non-empty set stays non-empty; duplicate ids collapse
   to one entry; `maxDepth` is the child ceiling.
+- Capture report: `empty()` is the compatibility answer and every two-argument constructor equals its
+  three-argument form with `empty()`; `of` copies its entries and keeps insertion order; a null code,
+  a blank message or a blank note is rejected; `cells` may be absent; equality includes the report; a
+  report entry's code is a host code with no `Codes.all` entry; a report never changes an arm's
+  meaning.
 
 ## 8. Dependencies
 
 `core` (`NamespacedId`, `World`, `InstanceId`, `SnapshotId`, `SourceSpan`, `FindingCode`,
-`@Nullable`) and `space` (`LatticePoint`, `Cuboid`, `CuboidSet`, `SectionKey`). It never imports
-`finding`, `claim`, `structure`, `context`, `engine` or `spi`.
+`@Nullable`) and `space` (`LatticePoint`, `Cuboid`, `CuboidSet`, `SectionKey`). `CaptureReport`
+carries a code, prose and a region and nothing else; it never imports `finding`. The package never
+imports `claim`, `structure`, `context`, `engine` or `spi`.

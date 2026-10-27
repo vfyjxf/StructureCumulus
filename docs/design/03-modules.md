@@ -70,9 +70,11 @@ Notes:
   nested capability (`mc.capability.NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
   `FrameData`); M3 adds `SavedClaims`/`SavedContexts` with CAS/release/reload at `d4b6d82` and is
   compatible with Model C; M4 adds the JSON reader/writer, the datapack source, the merged document
-  source and the five `/cumulus` subcommands. Still pending: non-upright pitch/roll state mapping,
-  `SC-MC-0004`/`0005` emission and watched-region mark-counter lease invalidation. `mc.capability` is
-  a subpackage of `mc`; it adds no kernel edge. The main source set also compiles the mod entry.
+  source and the five `/cumulus` subcommands; M5e adds the non-upright orientation remap (`ac11d0c`)
+  and the capture report the adapter answers with (`world.CaptureReport`, `SC-MC-0003`/`0004`/`0005`).
+  Still pending: the M5e capture-report emission and surfacing, and watched-region mark-counter lease
+  invalidation. `mc.capability` is a subpackage of `mc`; it adds no kernel edge. The main source set
+  also compiles the mod entry.
 
 ## 2. Ownership
 
@@ -81,7 +83,7 @@ Notes:
 | `core` | ids, world/instance/snapshot/owner, phase, source spans, budgets, typed keys, `Outcome`, `FindingCode`, `Catalog<T>`, `Value`, `CancelToken` | any geometry, any report, any traversal |
 | `space` | lattice, boxes, orientations, sitings, loci | what is in a cell, what a bay expects |
 | `finding` | finding values, bundles, renderers, explanations, the code table | which unit emits which code |
-| `world` | occupants, trait slots, total reads/refusals, sections, views, capture SPI, lease | claims, expectations, the engine |
+| `world` | occupants, trait slots, total reads/refusals, sections, views, capture SPI and report, lease | claims, expectations, the engine |
 | `claim` | rows, sharing, footprint, ledger SPI, conflict matrix | how rows are derived (engine), how a bay is checked (structure) |
 | `structure` | bay, focus, expectation, check, blueprint, anchors, plan, read scope | context values, claims rows, the engine loop |
 | `context` | keys' semantics, computations, derivers, fold, store, structure context | blueprint shape, matching |
@@ -144,4 +146,7 @@ Every module file has exactly these sections:
 
 A signature in section 3 that is absent from code is a regeneration defect; a public member in code
 that is absent from section 3 is a design defect. There is no pending signature block in v1.2; the
-spec index is green (`06-verification.md` §1).
+spec index is green (`06-verification.md` §1). A slice is nonetheless amended docs-first
+(`07-regeneration.md` §5): the M5e capture report (D-28) is written into `world` §3/§4.10 before its
+carrier lands, so the index is red between the two halves and green again when S1 completes it — the
+module file is never split across two public shapes.

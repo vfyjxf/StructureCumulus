@@ -26,8 +26,16 @@ Model C, body identity, trait capture and the nested capability are implemented,
 determinism gate is implemented (`DeterminismTest`): canonical bytes across member order, the
 parse/write fixed point, equal compile runs and stable finding order.
 
+**M5e in flight.** The capture report (D-28) is the one open slice and it is docs-first: `world` §4.10
+and its §3 signatures were amended before the carrier landed, so the spec index was red between the
+two halves and is green again now that both are on the tree; the adapter half (S2–S4) is still
+pending. The test counts above are the last measured snapshot; they are re-measured when the slice
+lands (kernel `CaptureReportTest`, the adapter report-site unit test and the capture GameTests), and
+this paragraph is deleted with the measurement.
+
 **Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
-in code documented; it is green. There is no documented-but-not-in-code list and no suppression.
+in code documented; it is green (red only for the docs-first half described above, never for a
+suppressed name). There is no documented-but-not-in-code list and no suppression.
 
 ## 2. Requirement → module → test
 
@@ -82,7 +90,19 @@ They are the acceptance suite; a module test that does not feed one of them is o
 14. **Nested** — one snapshot with a child frame: distinct frame/depth/parent, local bounds and
     `world = origin + local`; `nested(cell)` anchor-only; a cut child keeps the body and yields
     `SC-OCC-0003`; a nested body bound as a claim is `Failed(SC-CLM-0004)` at claim prediction; a
-    child build-height section is refused, not air; two same-type/same-anchor entities are distinct.
+    child build-height section is refused, not air; two same-type/same-anchor entities are distinct;
+    every cut also answers one `SC-MC-0003` (WARNING) capture entry with its reason, and the check
+    still reports `SC-OCC-0003` when it needs the child (no suppression, no translation).
+15. **Capture report** — a capture answers with a `CaptureReport` on every arm: a root over the
+    element ceiling is `TooLarge` plus one `SC-MC-0005` (ERROR) entry in its report; a cut child is
+    `Captured` plus one `SC-MC-0003` (WARNING) entry; a sited capture with a non-upright orientation
+    answers one `SC-MC-0004` (WARNING) entry per `(block type, property, value)` group and none for
+    an upright siting; each two-argument compatibility constructor equals its three-argument form
+    with `empty()`. The entries are host codes: none enters `Codes.all`, none changes an arm's
+    meaning, none enters a `MatchResult` bundle, and the adapter's own catalog supplies their
+    severity and explanation. The payload half is a `world` module test (`CaptureReportTest`); the
+    emitted entries are adapter unit tests and GameTests, because only the host can cut a nested
+    extent or read a block state.
 
 ## 4. Module tests
 
@@ -91,7 +111,7 @@ They are the acceptance suite; a module test that does not feed one of them is o
 | `core` | id grammar, catalog freeze, Value content equality, budget, key equality |
 | `space` | packing bijection, cuboid edges, CuboidSet normalization and semantic-equality laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
 | `finding` | code parse, `Codes.all` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
-| `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window |
+| `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |
 | `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations |
 | `context` | context view, publish merge/revision, derive order, merges |
@@ -109,10 +129,11 @@ registry. A test reads `Codes.all` and asserts:
 - every code appears exactly once in the producer table (a hand-maintained `Map<FindingCode,String>`
   in the test, checked against `Codes.all`; the `SC-MC-*` wildcard row is excluded from the map);
 - no producer row names a code absent from `Codes.all`;
-- `SC-MC-*` are absent from `Codes.all` (adapter-only); `SC-MC-0003` is reserved/deferred and not a
-  producer row;
+- `SC-MC-*` are absent from `Codes.all` (adapter-only), including the capture-report codes
+  `SC-MC-0003`/`0004`/`0005` that M5e produces (D-28); a host may register them in its own code
+  catalog, which is not the kernel registry;
 - a relayed host code is not allocated by the kernel, and a relayed code already in `Codes.all` is
-  replaced by `SC-OCC-0004` with a note.
+  replaced by `SC-OCC-0004` with a note — the same guard covers a `CaptureReport` entry.
 
 A code with no producer is deleted, not reserved. An unknown addon code is legal; it is not in
 `Codes.all`.
@@ -143,21 +164,28 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 17. Can a cut child appear as a refused or empty child? (adapter: `null` + `SC-OCC-0003`)
 18. Can a non-empty `SnapshotPolicy.traits` become empty in the constructor? (world: copy by id, no
     silent drop)
+19. Can a capture report change an arm's meaning, a `MatchResult` bundle, a command exit code or a
+    code's registry membership? (world §4.10: the arm is the verdict, the report is the finding, host
+    codes never enter `Codes.all`)
+20. Can a cut be reported twice in one bundle, or by two codes for one fact? (adapter: the capture
+    entry and `SC-OCC-0003` live in two channels; neither is translated into the other)
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. All 32 GameTests are executed by
+- The rest of the NeoForge adapter and its GameTests. All GameTests are executed by
   `runGameTestServer`: M1 capture/host, M2a entity precedence, M2b orientation, M3 claims, M2c traits,
-  M2d nested frames/cuts, capture-revision lease invalidation (`LeaseLifecycleGameTest`) and the M4
-  command surface (`SettleCommandGameTest`, `CommandGameTest`). Unit evidence: `LevelSnapshotTest` for
+  M2d nested frames/cuts, capture-revision lease invalidation (`LeaseLifecycleGameTest`), the M4
+  command surface (`SettleCommandGameTest`, `CommandGameTest`) and (M5e) the capture-report GameTests.
+  Unit evidence: `LevelSnapshotTest` for
   body/precedence/partial reads, `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for
   the capability declaration, `SavedClaimsTest`/`SavedContextsTest` for persistence,
-  `OrientationMappingTest` for upright mapping, `DeterminismTest` for canonical bytes, the
+  `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
   parse/write fixed point and equal compile runs, and `ServerStateDocumentSourceTest`/
-  `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing. **Still pending:**
-  non-upright pitch/roll state mapping (the 40 orientations), `SC-MC-0004`/`0005`
-  emission, watched-region mark-counter lease invalidation, and the deferred `SC-MC-0003`
-  capture-finding channel.
+  `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing; (M5e) the
+  capture-report kernel test and the adapter report-site unit test. **Still pending:**
+  the M5e capture report (kernel carrier, `SC-MC-0003`/`0004`/`0005` emission and command surfacing,
+  D-28) and the watched-region mark-counter lease invalidation. Non-upright pitch/roll state mapping
+  (the 40 orientations) and its `MappingResult.Unrepresentable` remap landed at `ac11d0c`.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.
