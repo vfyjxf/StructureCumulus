@@ -25,6 +25,8 @@ import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldCapture;
 import dev.vfyjxf.cumulus.mc.LevelWatch.WatchHandle;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
+import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
@@ -63,22 +65,37 @@ public final class LevelCapture implements WorldCapture {
     private final World world;
     private final NestedExtentLookup nestedLookup;
     private final TraitLookup traitLookup;
+    private final TraitCaptureContext traitCapture;
     private final AtomicLong revisions = new AtomicLong();
     private volatile boolean closed;
     private @Nullable WatchHandle watch;
 
     public LevelCapture(ServerLevel level) {
-        this(level, NestedExtentLookup.capabilities());
+        this(level, NestedExtentLookup.capabilities(), TraitLookup.builtin(), TraitCaptureContext.empty());
+    }
+
+    public LevelCapture(ServerLevel level, TraitLookup traitLookup, TraitCaptureContext traitCapture) {
+        this(level, NestedExtentLookup.capabilities(), traitLookup, traitCapture);
     }
 
     LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup) {
-        this(level, nestedLookup, TraitLookup.capabilities());
+        this(level, nestedLookup, TraitLookup.builtin(), TraitCaptureContext.empty());
     }
 
     LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup, TraitLookup traitLookup) {
+        this(level, nestedLookup, traitLookup, TraitCaptureContext.empty());
+    }
+
+    LevelCapture(
+        ServerLevel level,
+        NestedExtentLookup nestedLookup,
+        TraitLookup traitLookup,
+        TraitCaptureContext traitCapture
+    ) {
         this.level = Objects.requireNonNull(level, "level");
         this.nestedLookup = Objects.requireNonNull(nestedLookup, "nestedLookup");
         this.traitLookup = Objects.requireNonNull(traitLookup, "traitLookup");
+        this.traitCapture = Objects.requireNonNull(traitCapture, "traitCapture");
         var location = level.dimension().location();
         this.world = World.of(NamespacedId.of(location.getNamespace(), location.getPath()));
     }
@@ -418,8 +435,15 @@ public final class LevelCapture implements WorldCapture {
                         BlockState descriptorState = root ? context.project(state, cell) : state;
                         BlockPos worldPos = new BlockPos(worldX, worldY, worldZ);
                         BlockEntity blockEntity = state.hasBlockEntity() ? chunk.getBlockEntity(worldPos) : null;
-                        List<TraitSlot> traits = OccupantTraits
-                                .block(context.policy(), traitLookup, level, worldPos, state, blockEntity);
+                        List<TraitSlot> traits = OccupantTraits.block(
+                            context.policy(),
+                            traitLookup,
+                            traitCapture,
+                            level,
+                            worldPos,
+                            state,
+                            blockEntity
+                        );
                         OccupantSnapshot occupant = blockEntity == null
                                 ? OccupantDescriptors.block(context.snapshot(), frame, cell, descriptorState, traits)
                                 : OccupantDescriptors.blockEntity(
@@ -471,7 +495,7 @@ public final class LevelCapture implements WorldCapture {
                         candidate.type(),
                         candidate.id(),
                         footprint,
-                        OccupantTraits.entity(context.policy(), traitLookup, candidate.entity())
+                        OccupantTraits.entity(context.policy(), traitLookup, traitCapture, candidate.entity())
                     )
                 );
             }

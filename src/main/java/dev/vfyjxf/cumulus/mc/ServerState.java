@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -11,6 +12,8 @@ import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
+import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
@@ -33,6 +36,7 @@ public final class ServerState {
     private final StructureKernel kernel;
     private final DatapackBlueprints blueprints;
     private final DocumentSource documents;
+    private final TraitLookup traitLookup;
     private final Map<ServerLevel, LevelStore> levels = new HashMap<>();
     private final Map<ServerLevel, LevelCapture> captures = new HashMap<>();
 
@@ -46,6 +50,7 @@ public final class ServerState {
             return document != null ? document : builtin.find(id);
         };
         this.kernel = StructureKernel.create(catalogs, new Host(documents, null, ContextStore.inMemory(), Map.of()));
+        this.traitLookup = TraitLookup.load(StructureCumulus.logger);
     }
 
     public static void open(ServerAboutToStartEvent event) {
@@ -108,7 +113,10 @@ public final class ServerState {
     }
 
     LevelCapture capture(ServerLevel level) {
-        return captures.computeIfAbsent(level, LevelCapture::new);
+        return captures.computeIfAbsent(
+            level,
+            attached -> new LevelCapture(attached, traitLookup, TraitCaptureContext.empty())
+        );
     }
 
     void closeCaptures() {

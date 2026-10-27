@@ -13,9 +13,13 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
+import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
+import dev.vfyjxf.cumulus.mc.trait.BlockTraitContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
+import dev.vfyjxf.cumulus.mc.trait.TraitProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
@@ -32,11 +36,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
-import net.neoforged.neoforge.items.IItemHandler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -244,7 +245,7 @@ public final class TraitCaptureGameTest {
             new LevelCapture(
                 helper.getLevel(),
                 NestedExtentLookup.capabilities(),
-                new FakeTraitLookup(malformed, throwing)
+                fakeTraitLookup(malformed, throwing)
             ),
             bounds,
             policy(Set.of(OccupantTraits.inventory.id()))
@@ -397,98 +398,23 @@ public final class TraitCaptureGameTest {
         }
     }
 
-    private static final class FakeTraitLookup implements TraitLookup {
-
-        private final BlockPos malformed;
-        private final BlockPos throwing;
-
-        private FakeTraitLookup(BlockPos malformed, BlockPos throwing) {
-            this.malformed = malformed;
-            this.throwing = throwing;
-        }
-
-        @Override
-        public @Nullable IItemHandler itemBlock(
-            ServerLevel level,
-            BlockPos pos,
-            BlockState state,
-            @Nullable BlockEntity blockEntity
-        ) {
-            if (pos.equals(throwing)) {
-                throw new IllegalStateException("fake trait capability");
+    private static TraitLookup fakeTraitLookup(BlockPos malformed, BlockPos throwing) {
+        return TraitLookup.builder().add(new TraitProvider<List<ItemStack>>() {
+            @Override
+            public TraitKey<List<ItemStack>> key() {
+                return OccupantTraits.inventory;
             }
-            if (pos.equals(malformed)) {
-                return new MalformedItemHandler();
+
+            @Override
+            public TraitSlot readBlock(BlockTraitContext context) {
+                if (context.pos().equals(throwing)) {
+                    throw new IllegalStateException("fake trait capability");
+                }
+                if (context.pos().equals(malformed)) {
+                    throw new IllegalStateException("malformed fake trait capability");
+                }
+                return new TraitSlot.Absent(OccupantTraits.inventory.id());
             }
-            return null;
-        }
-
-        @Override
-        public @Nullable IEnergyStorage energyBlock(
-            ServerLevel level,
-            BlockPos pos,
-            BlockState state,
-            @Nullable BlockEntity blockEntity
-        ) {
-            return null;
-        }
-
-        @Override
-        public @Nullable IFluidHandler fluidBlock(
-            ServerLevel level,
-            BlockPos pos,
-            BlockState state,
-            @Nullable BlockEntity blockEntity
-        ) {
-            return null;
-        }
-
-        @Override
-        public @Nullable IItemHandler itemEntity(Entity entity) {
-            return null;
-        }
-
-        @Override
-        public @Nullable IEnergyStorage energyEntity(Entity entity) {
-            return null;
-        }
-
-        @Override
-        public @Nullable IFluidHandler fluidEntity(Entity entity) {
-            return null;
-        }
-    }
-
-    private static final class MalformedItemHandler implements IItemHandler {
-
-        @Override
-        public int getSlots() {
-            return -1;
-        }
-
-        @Override
-        public ItemStack getStackInSlot(int slot) {
-            return ItemStack.EMPTY;
-        }
-
-        @Override
-        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            return stack;
-        }
-
-        @Override
-        public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            return ItemStack.EMPTY;
-        }
-
-        @Override
-        public int getSlotLimit(int slot) {
-            return 64;
-        }
-
-        @Override
-        public boolean isItemValid(int slot, ItemStack stack) {
-            return true;
-        }
+        }).build();
     }
 }

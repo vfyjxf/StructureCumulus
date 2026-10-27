@@ -6,9 +6,13 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
 import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
-import dev.vfyjxf.cumulus.kernel.world.Trait;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
+import dev.vfyjxf.cumulus.mc.trait.BlockTraitContext;
+import dev.vfyjxf.cumulus.mc.trait.EntityTraitContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
+import dev.vfyjxf.cumulus.mc.trait.TraitProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -16,17 +20,14 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.items.IItemHandler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** The adapter's stable trait keys and the four-state slots one capture policy requests. */
+/** The adapter's stable trait keys and the generic provider dispatch one capture policy uses. */
 @NullMarked
 public final class OccupantTraits {
 
@@ -44,6 +45,7 @@ public final class OccupantTraits {
     static List<TraitSlot> block(
         SnapshotPolicy policy,
         TraitLookup lookup,
+        TraitCaptureContext capture,
         ServerLevel level,
         BlockPos pos,
         BlockState state,
@@ -54,18 +56,23 @@ public final class OccupantTraits {
         }
         List<TraitSlot> slots = new ArrayList<>(policy.traits().size());
         for (NamespacedId id : policy.traits()) {
-            slots.add(blockSlot(id, lookup, level, pos, state, blockEntity));
+            slots.add(blockSlot(id, lookup, capture, level, pos, state, blockEntity));
         }
         return List.copyOf(slots);
     }
 
-    static List<TraitSlot> entity(SnapshotPolicy policy, TraitLookup lookup, Entity entity) {
+    static List<TraitSlot> entity(
+        SnapshotPolicy policy,
+        TraitLookup lookup,
+        TraitCaptureContext capture,
+        Entity entity
+    ) {
         if (policy.traits().isEmpty()) {
             return List.of();
         }
         List<TraitSlot> slots = new ArrayList<>(policy.traits().size());
         for (NamespacedId id : policy.traits()) {
-            slots.add(entitySlot(id, lookup, entity));
+            slots.add(entitySlot(id, lookup, capture, entity));
         }
         return List.copyOf(slots);
     }
@@ -73,115 +80,40 @@ public final class OccupantTraits {
     private static TraitSlot blockSlot(
         NamespacedId id,
         TraitLookup lookup,
+        TraitCaptureContext capture,
         ServerLevel level,
         BlockPos pos,
         BlockState state,
         @Nullable BlockEntity blockEntity
     ) {
-        try {
-            if (entityNbt.id().equals(id)) {
-                return new TraitSlot.Absent(id);
-            }
-            if (blockEntityNbt.id().equals(id)) {
-                return blockEntitySlot(id, level, state, blockEntity);
-            }
-            if (!isCapabilityTrait(id)) {
-                return refused(id, ReadStatus.denied);
-            }
-            if (state.hasBlockEntity() && blockEntity == null) {
-                return refused(id, ReadStatus.notCaptured);
-            }
-            if (inventory.id().equals(id)) {
-                IItemHandler handler = lookup.itemBlock(level, pos, state, blockEntity);
-                return handler == null ? new TraitSlot.Absent(id) : present(inventory, inventoryValue(handler));
-            }
-            if (energy.id().equals(id)) {
-                IEnergyStorage storage = lookup.energyBlock(level, pos, state, blockEntity);
-                return storage == null ? new TraitSlot.Absent(id) : present(energy, storage.getEnergyStored());
-            }
-            IFluidHandler handler = lookup.fluidBlock(level, pos, state, blockEntity);
-            return handler == null ? new TraitSlot.Absent(id) : present(fluid, fluidValue(handler));
-        } catch (RuntimeException failure) {
-            return refused(id, ReadStatus.failed);
-        }
-    }
-
-    private static TraitSlot entitySlot(NamespacedId id, TraitLookup lookup, Entity entity) {
-        try {
-            if (entityNbt.id().equals(id)) {
-                return present(entityNbt, entity.saveWithoutId(new CompoundTag()).copy());
-            }
-            if (blockEntityNbt.id().equals(id)) {
-                return new TraitSlot.Absent(id);
-            }
-            if (inventory.id().equals(id)) {
-                IItemHandler handler = lookup.itemEntity(entity);
-                return handler == null ? new TraitSlot.Absent(id) : present(inventory, inventoryValue(handler));
-            }
-            if (energy.id().equals(id)) {
-                IEnergyStorage storage = lookup.energyEntity(entity);
-                return storage == null ? new TraitSlot.Absent(id) : present(energy, storage.getEnergyStored());
-            }
-            if (fluid.id().equals(id)) {
-                IFluidHandler handler = lookup.fluidEntity(entity);
-                return handler == null ? new TraitSlot.Absent(id) : present(fluid, fluidValue(handler));
-            }
+        TraitProvider<?> provider = lookup.provider(id);
+        if (provider == null) {
             return refused(id, ReadStatus.denied);
+        }
+        try {
+            TraitSlot slot = provider.readBlock(new BlockTraitContext(level, pos, state, blockEntity, capture));
+            return slot == null || !slot.id().equals(id) ? refused(id, ReadStatus.failed) : slot;
         } catch (RuntimeException failure) {
             return refused(id, ReadStatus.failed);
         }
     }
 
-    private static TraitSlot blockEntitySlot(
+    private static TraitSlot entitySlot(
         NamespacedId id,
-        ServerLevel level,
-        BlockState state,
-        @Nullable BlockEntity blockEntity
+        TraitLookup lookup,
+        TraitCaptureContext capture,
+        Entity entity
     ) {
-        if (blockEntity != null) {
-            return present(blockEntityNbt, blockEntity.saveWithoutMetadata(level.registryAccess()).copy());
+        TraitProvider<?> provider = lookup.provider(id);
+        if (provider == null) {
+            return refused(id, ReadStatus.denied);
         }
-        return state.hasBlockEntity() ? refused(id, ReadStatus.notCaptured) : new TraitSlot.Absent(id);
-    }
-
-    private static boolean isCapabilityTrait(NamespacedId id) {
-        return inventory.id().equals(id) || energy.id().equals(id) || fluid.id().equals(id);
-    }
-
-    private static List<ItemStack> inventoryValue(IItemHandler handler) {
-        int slots = handler.getSlots();
-        if (slots < 0) {
-            throw new IllegalStateException("negative slot count " + slots);
+        try {
+            TraitSlot slot = provider.readEntity(new EntityTraitContext(entity, capture));
+            return slot == null || !slot.id().equals(id) ? refused(id, ReadStatus.failed) : slot;
+        } catch (RuntimeException failure) {
+            return refused(id, ReadStatus.failed);
         }
-        List<ItemStack> stacks = new ArrayList<>(slots);
-        for (int slot = 0; slot < slots; slot++) {
-            ItemStack stack = handler.getStackInSlot(slot);
-            if (stack == null) {
-                throw new IllegalStateException("null stack in slot " + slot);
-            }
-            stacks.add(stack.copy());
-        }
-        return List.copyOf(stacks);
-    }
-
-    private static List<FluidStack> fluidValue(IFluidHandler handler) {
-        int tanks = handler.getTanks();
-        if (tanks < 0) {
-            throw new IllegalStateException("negative tank count " + tanks);
-        }
-        List<FluidStack> stacks = new ArrayList<>(tanks);
-        for (int tank = 0; tank < tanks; tank++) {
-            FluidStack stack = handler.getFluidInTank(tank);
-            if (stack == null) {
-                throw new IllegalStateException("null fluid in tank " + tank);
-            }
-            stacks.add(stack.copy());
-        }
-        return List.copyOf(stacks);
-    }
-
-    private static <T> TraitSlot present(TraitKey<T> key, T value) {
-        return new TraitSlot.Present(Trait.of(key, value));
     }
 
     private static TraitSlot refused(NamespacedId id, ReadStatus status) {

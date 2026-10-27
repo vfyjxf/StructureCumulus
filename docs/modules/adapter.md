@@ -58,9 +58,19 @@
 | `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value ↔ `OccupantDescriptor`; entity body identity; nested body |
-| `OccupantTraits` | — | the five stable trait keys and the four-state slots one policy requests |
-| `TraitLookup` | interface, package-private | the trait-capability seam: fake in tests, capabilities in production |
-| `CapabilityTraits` | enum, package-private | production trait lookup over NeoForge capabilities |
+| `OccupantTraits` | — | the five stable trait keys and generic provider dispatch into four-state slots |
+| `TraitLookup` | final class (`trait`) | immutable registry; `builtin()` and sequential plugin-loaded `load(Logger)`; `provider(id)` |
+| `TraitProvider<T>` | interface (`trait`) | one typed provider: `key()`, block/entity reads defaulting to `Absent` |
+| `TraitPlugin` / `BuiltinTraitPlugin` | interface / final class (`trait`) | plugin contribution point; the built-in plugin registers the five standard providers |
+| `TraitRegister` | interface (`trait`) | the typed registration face a plugin receives |
+| `TraitContextKey<T>` / `TraitContext` | record / final class (`trait`) | typed immutable host context with duplicate-id and wrong-type rejection |
+| `TraitCaptureContext` | record (`trait`) | capture-wide nullable `Direction` capability context plus the typed host context (`empty()`) |
+| `BlockTraitContext` / `EntityTraitContext` | records (`trait`) | immutable provider inputs: level/pos/state/block entity or entity, plus the capture context |
+| `StandardTraitProviders` | final class (`trait`) | inventory/energy/fluid/blockEntityNbt/entityNbt providers preserving M2c semantics |
+| `ModPlugin` / `PluginDependency` | interface / record (`plugin`) | plugin id, `before`/`after`/`none` order and `required`/`optional`/`optionalRequired` constraints |
+| `PluginLookup<T>` / `AnnotationPluginLookup<T>` / `SpiPluginLookup<T>` | interface / final classes (`plugin`) | plugin discovery; NeoForge annotation scan and Java SPI |
+| `PluginLoader` / `PluginLoadingException` | final class / exception (`plugin`) | deterministic Kahn loading; fatal missing/duplicate/cycle and warning/skip failures |
+| `PluginMarker` | annotation (`plugin`) | marks a plugin class for annotation discovery |
 | `NestedExtent` | record (capability) | one provider declaration: type, absolute bounds, world origin |
 | `NestedExtents` | final class (capability) | the `BLOCK` and `ENTITY` capabilities |
 | `NestedExtentLookup` | interface, package-private | test seam for fake nested providers |
@@ -215,18 +225,50 @@ containing section `Partial` and never refuses the cell: `SectionSlot.Partial` i
 reads (build-height/unloaded-cell cases), not for traits. The four-state expectation rules are in
 `structure.md` §4.6; `not(trait(...))` leaves a refused slot `Unreadable`.
 
-### 7.3 Seam and relay
+### 7.3 Providers and relay
 
-The production path is the package-private `TraitLookup` interface, implemented by the package-private
-`CapabilityTraits` enum; tests use a fake `TraitLookup`. Block traits query the five-argument
-capability form with a `null` context
-(`level.getCapability(Capabilities.ItemHandler.BLOCK, pos, state, blockEntity, null)`); entity traits
-query `entity.getCapability(Capabilities.ItemHandler.ENTITY, null)` and its energy/fluid siblings.
-The nested capability's four-argument `Void`-context query is separate (§8.3).
+The production path is the public `dev.vfyjxf.cumulus.mc.trait.TraitLookup` registry. `OccupantTraits`
+keeps the five keys and dispatches every requested id through `TraitLookup.provider(id)` into a
+`TraitProvider<T>`: a missing provider is `Refused(denied)`, and a provider that throws, returns
+`null` or answers a different trait id is `Refused(failed)`. Each standard provider implements both
+`readBlock`/`readEntity`; the opposite kind defaults to `Absent`. The five standard providers are
+registered by `BuiltinTraitPlugin` through `TraitRegister`: inventory, energy and fluid query the
+five-argument block capability with `context.capture().capabilityContext()` (the nullable `Direction`
+capability context) and entity capabilities with `null`; the two NBT providers copy
+`saveWithoutMetadata`/`saveWithoutId`. The `state.hasBlockEntity()` + `null` block entity case stays
+`Refused(notCaptured)`, a null capability stays `Absent`, and malformed handler slot/tank counts stay
+`Refused(failed)`.
 
 The `SC-MC-0002` code is not in `Codes.all`; the kernel's `Check.relay` therefore keeps it and emits
 an `Unreadable` finding with the host code plus a `refusal: <status>` note. If a host code were
 already a kernel code, the kernel substitutes `SC-OCC-0004` and adds a note (`world.md` §4.1).
+
+### 7.4 Plugin loading and capture context
+
+The plugin core is a package-preserving adaption of CloudLib's `api/plugin` into
+`dev.vfyjxf.cumulus.mc.plugin`: `ModPlugin`, `PluginDependency`, `PluginMarker`, `PluginLookup`,
+`AnnotationPluginLookup`, `SpiPluginLookup`, `PluginLoader` and `PluginLoadingException`. There is no
+dispatcher, progress tracker or dispatch queue; registration is sequential and deterministic.
+`PluginLoader` validates duplicate ids (fatal), missing `required` dependencies (fatal, plugin
+excluded), missing `optional` dependencies (warning, plugin loaded), missing `optionalRequired`
+dependencies (warning, plugin skipped) and cycles (fatal), and orders the remainder with Kahn's
+algorithm using `NamespacedId` order.
+
+`TraitPlugin` extends `ModPlugin` with the `builtin` id and the `afterBuiltin` dependency; the built-in
+plugin overrides its dependencies to empty. `TraitLookup.builtin()` registers the built-in providers
+directly; `TraitLookup.load(StructureCumulus.logger)` discovers `TraitPlugin`s with
+`AnnotationPluginLookup.of(TraitPlugin.class)`, ensures the built-in plugin is present, runs
+`PluginLoader.loadPlugin`, and calls each `registerTraits` once against the immutable builder; a
+duplicate trait id is fatal.
+
+`TraitCaptureContext(capabilityContext, hostContext)` is the approved A+B context: the nullable
+`Direction` capability context is passed to standard block capability queries, while the typed
+`TraitContext` host context is available to every provider. `TraitContext` is built with typed
+`TraitContextKey<T>` entries; a duplicate id, null key/value are rejected at build time and a
+wrong-type `get` throws `IllegalArgumentException`. `LevelCapture` defaults to
+`TraitLookup.builtin()` with `TraitCaptureContext.empty()`; the public
+`LevelCapture(ServerLevel, TraitLookup, TraitCaptureContext)` injects both, and the existing
+constructors are preserved.
 
 ## 8. Nested capability
 
