@@ -12,6 +12,7 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 
 import java.util.ArrayList;
@@ -30,6 +31,11 @@ public final class ClaimPlanner {
         Objects.requireNonNull(bindings, "bindings");
         Map<NamespacedId, List<OccupantSnapshot>> subjectsByBay = new LinkedHashMap<>();
         for (BayBinding binding : bindings) {
+            for (OccupantSnapshot subject : binding.subjects()) {
+                if (subject.ref().frame() != 0 || subject.ref().kind().equals(OccupantKind.nested)) {
+                    throw new IllegalArgumentException("SC-CLM-0004: a nested or non-root subject cannot back a claim");
+                }
+            }
             subjectsByBay.put(binding.bay().id(), binding.subjects());
         }
         List<ClaimRow> rows = new ArrayList<>();
@@ -54,9 +60,6 @@ public final class ClaimPlanner {
                 case Footprint.Bound ignored -> {
                     CuboidSet union = CuboidSet.empty();
                     for (OccupantSnapshot subject : subjects) {
-                        if (subject.ref().frame() != 0) {
-                            throw new IllegalArgumentException("SC-CLM-0004: a nested subject cannot back a claim");
-                        }
                         union = union.union(subject.footprint().asSet());
                     }
                     yield union;

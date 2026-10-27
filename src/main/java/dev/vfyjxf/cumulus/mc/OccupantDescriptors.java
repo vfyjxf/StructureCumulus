@@ -18,6 +18,7 @@ import org.jspecify.annotations.NullMarked;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 
 /** Block, block-entity and entity descriptor mapping. */
 @NullMarked
@@ -53,10 +54,12 @@ public final class OccupantDescriptors {
         int frame,
         LatticePoint anchor,
         NamespacedId type,
+        UUID uuid,
         Cuboid footprint
     ) {
+        NamespacedId body = NamespacedId.of(type.namespace(), uuid.toString());
         OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity, Map.of(), List.of());
-        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.entity, anchor);
+        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.entity, anchor, body);
         return new OccupantSnapshot(ref, descriptor, footprint, List.of());
     }
 

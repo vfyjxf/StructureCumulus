@@ -477,7 +477,7 @@ class ScenarioTest {
         assertEquals(UndecidedReason.unreadable, undecided.reason());
         assertTrue(
             undecided.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.unreadableCell.code()))
+                    .anyMatch(finding -> finding.code().equals(Codes.unreadableRead.code()))
         );
     }
 

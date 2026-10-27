@@ -52,6 +52,15 @@ public final class Codes {
                 + "depth and element ceiling."
     );
 
+    public static final CodeEntry unreadableRead = entry(
+        FindingCode.Family.occ,
+        4,
+        Severity.error,
+        "A required read is unavailable.",
+        "A cell, section or trait a check required could not be read. Check the capture bounds, "
+                + "depth and host permission, then retry with the required reads declared."
+    );
+
     public static final CodeEntry expected = entry(
         FindingCode.Family.exp,
         1,
@@ -464,6 +473,7 @@ public final class Codes {
         unreadableCell,
         footprintClipped,
         nestedCut,
+        unreadableRead,
         expected,
         negationMatched,
         thresholdImpossible,

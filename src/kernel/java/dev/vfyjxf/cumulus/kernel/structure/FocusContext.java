@@ -10,7 +10,9 @@ import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
@@ -39,8 +41,15 @@ public interface FocusContext {
 
     CancelToken cancel();
 
-    @Nullable
-    OccupantSnapshot occupantAt(LatticePoint cell);
+    CellRead read(LatticePoint cell);
+
+    default @Nullable OccupantSnapshot occupantAt(LatticePoint cell) {
+        return read(cell) instanceof CellRead.Found found ? found.occupant() : null;
+    }
+
+    default @Nullable ReadRefusal refusalAt(LatticePoint cell) {
+        return read(cell) instanceof CellRead.Unreadable unreadable ? unreadable.refusal() : null;
+    }
 
     List<ClaimRow> claimsAt(LatticePoint cell);
 }

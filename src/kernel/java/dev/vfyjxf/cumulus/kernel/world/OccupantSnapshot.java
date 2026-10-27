@@ -17,12 +17,12 @@ public record OccupantSnapshot(
     OccupantRef ref,
     OccupantDescriptor descriptor,
     Cuboid footprint,
-    List<Trait<?>> traits
+    List<TraitSlot> traits
 ) {
 
     public static final NamespacedId air = NamespacedId.of("air");
 
-    private static final Comparator<Trait<?>> traitOrder = Comparator.comparing(trait -> trait.key().id());
+    private static final Comparator<TraitSlot> traitOrder = Comparator.comparing(TraitSlot::id);
 
     public OccupantSnapshot {
         Objects.requireNonNull(ref, "ref");
@@ -35,12 +35,14 @@ public record OccupantSnapshot(
         if (footprint.isEmpty()) {
             throw new IllegalArgumentException("an occupant needs a footprint");
         }
-        List<Trait<?>> sorted = new ArrayList<>(traits);
+        List<TraitSlot> sorted = new ArrayList<>(traits);
+        for (TraitSlot slot : sorted) {
+            Objects.requireNonNull(slot, "trait slot");
+        }
         sorted.sort(traitOrder);
-        for (int i = 0; i < sorted.size(); i++) {
-            Objects.requireNonNull(sorted.get(i), "trait");
-            if (i > 0 && sorted.get(i - 1).key().id().equals(sorted.get(i).key().id())) {
-                throw new IllegalArgumentException("duplicate trait " + sorted.get(i).key().id());
+        for (int i = 1; i < sorted.size(); i++) {
+            if (sorted.get(i - 1).id().equals(sorted.get(i).id())) {
+                throw new IllegalArgumentException("duplicate trait " + sorted.get(i).id());
             }
         }
         traits = List.copyOf(sorted);
@@ -60,15 +62,29 @@ public record OccupantSnapshot(
         return descriptor.type().equals(air);
     }
 
-    public <T> @Nullable Trait<T> find(TraitKey<T> key) {
-        for (Trait<?> trait : traits) {
-            if (trait.key().equals(key)) {
-                @SuppressWarnings("unchecked")
-                Trait<T> found = (Trait<T>) trait;
-                return found;
+    public @Nullable TraitSlot slot(NamespacedId id) {
+        Objects.requireNonNull(id, "id");
+        for (TraitSlot slot : traits) {
+            if (slot.id().equals(id)) {
+                return slot;
             }
         }
         return null;
+    }
+
+    public <T> @Nullable Trait<T> find(TraitKey<T> key) {
+        Objects.requireNonNull(key, "key");
+        TraitSlot slot = slot(key.id());
+        if (!(slot instanceof TraitSlot.Present present)) {
+            return null;
+        }
+        Object value = present.trait().value();
+        if (value != null && !key.type().isInstance(value)) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        T typed = (T) value;
+        return new Trait<>(key, typed);
     }
 
     public <T> @Nullable T trait(TraitKey<T> key) {
@@ -77,11 +93,7 @@ public record OccupantSnapshot(
     }
 
     public boolean has(TraitKey<?> key) {
-        for (Trait<?> trait : traits) {
-            if (trait.key().id().equals(key.id())) {
-                return true;
-            }
-        }
-        return false;
+        Objects.requireNonNull(key, "key");
+        return slot(key.id()) instanceof TraitSlot.Present;
     }
 }

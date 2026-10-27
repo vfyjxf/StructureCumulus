@@ -13,12 +13,13 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.EntityWindow;
 import dev.vfyjxf.cumulus.kernel.world.OccupantFilter;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
-import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
+import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /** The shipped focus kinds. */
 public final class Focuses {
@@ -63,10 +65,17 @@ public final class Focuses {
 
         @Override
         public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
-            OccupantSnapshot occupant = ctx.occupantAt(cell);
-            if (occupant == null) {
-                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: unreadable cell " + cell));
+            CellRead read = ctx.read(cell);
+            if (read instanceof CellRead.Unreadable unreadable) {
+                return new FocusResult.Unavailable<>(
+                    FindingBundle.of(
+                        List.of(
+                            Check.relay(ctx.phase(), unreadable.refusal(), ctx.locus(), "required read unavailable")
+                        )
+                    )
+                );
             }
+            OccupantSnapshot occupant = ((CellRead.Found) read).occupant();
             List<OccupantSnapshot> subjects = occupant.isAir() ? List.of() : List.of(occupant);
             return new FocusResult.Taken<>(occupant, subjects, FindingBundle.empty());
         }
@@ -107,15 +116,23 @@ public final class Focuses {
         public FocusResult<List<OccupantSnapshot>> take(FocusContext ctx) {
             List<OccupantSnapshot> occupants = new ArrayList<>();
             List<OccupantSnapshot> subjects = new ArrayList<>();
+            Map<LatticePoint, ReadRefusal> unreadable = new TreeMap<>();
             for (LatticePoint cell : cellsOf(ctx.cells())) {
-                OccupantSnapshot occupant = ctx.occupantAt(cell);
-                if (occupant == null) {
-                    return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: unreadable cell " + cell));
+                CellRead read = ctx.read(cell);
+                if (read instanceof CellRead.Unreadable refused) {
+                    unreadable.put(cell, refused.refusal());
+                    continue;
                 }
+                OccupantSnapshot occupant = ((CellRead.Found) read).occupant();
                 occupants.add(occupant);
                 if (!occupant.isAir()) {
                     subjects.add(occupant);
                 }
+            }
+            if (!unreadable.isEmpty()) {
+                return new FocusResult.Unavailable<>(
+                    Check.relayAll(ctx.phase(), unreadable, Locus::local, "required read unavailable")
+                );
             }
             return new FocusResult.Taken<>(List.copyOf(occupants), List.copyOf(subjects), FindingBundle.empty());
         }
@@ -163,9 +180,9 @@ public final class Focuses {
                 );
             }
             OccupantSnapshot entity = entities.get(0);
-            FindingBundle warning = footprintWarning(ctx, entity);
-            if (!warning.isEmpty()) {
-                return new FocusResult.Unavailable<>(warning);
+            FindingBundle gap = footprintGap(ctx, entity);
+            if (!gap.isEmpty()) {
+                return new FocusResult.Unavailable<>(gap);
             }
             return new FocusResult.Taken<>(entity, List.of(entity), FindingBundle.empty());
         }
@@ -182,12 +199,13 @@ public final class Focuses {
 
         @Override
         public ReadScope reads(CuboidSet bayCells) {
+            ReadScope scope = ReadScope.cells(bayCells).withKinds(Set.of(OccupantKind.entity));
             Cuboid bounds = bayCells.bounds();
             if (bounds == null) {
-                return ReadScope.none();
+                return scope;
             }
             EntityWindow window = EntityWindow.of(bounds, type);
-            return window == null ? ReadScope.none() : ReadScope.none().withWindows(List.of(window));
+            return window == null ? scope : scope.withWindows(List.of(window));
         }
     }
 
@@ -195,10 +213,6 @@ public final class Focuses {
 
         @Override
         public FocusResult<WorldView> take(FocusContext ctx) {
-            OccupantSnapshot occupant = ctx.occupantAt(cell);
-            if (occupant == null) {
-                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: no nested structure at " + cell));
-            }
             LatticePoint world = ctx.siting().toWorld(cell);
             WorldView child = world == null ? null : ctx.view().nested(world);
             if (child == null) {
@@ -206,11 +220,11 @@ public final class Focuses {
                         ? Locus.local(CuboidSet.of(Cuboid.of(cell)))
                         : Locus.world(CuboidSet.of(Cuboid.of(world)));
                 Finding finding = Finding.builder(Codes.nestedCut).phase(ctx.phase())
-                        .message("the nested view at " + cell + " was cut by depth")
+                        .message("the nested view at " + cell + " was cut")
                         .label(Label.primary(locus, "nested view cut")).build();
                 return new FocusResult.Unavailable<>(FindingBundle.of(List.of(finding)));
             }
-            return new FocusResult.Taken<>(child, List.of(occupant), FindingBundle.empty());
+            return new FocusResult.Taken<>(child, List.of(), FindingBundle.empty());
         }
 
         @Override
@@ -222,15 +236,47 @@ public final class Focuses {
         public CuboidSet staticCells(CuboidSet bayCells) {
             return CuboidSet.of(Cuboid.of(cell));
         }
+
+        @Override
+        public ReadScope reads(CuboidSet bayCells) {
+            return ReadScope.cells(staticCells(bayCells)).withKinds(Set.of(OccupantKind.nested)).withDepth(1);
+        }
     }
 
     private record DoorFocus(LatticePoint origin) implements Focus<DoorView> {
 
         @Override
         public FocusResult<DoorView> take(FocusContext ctx) {
-            OccupantSnapshot first = ctx.occupantAt(origin);
             LatticePoint upper = origin.offset(0, 1, 0);
-            OccupantSnapshot second = upper == null ? null : ctx.occupantAt(upper);
+            if (upper == null) {
+                return new FocusResult.Unavailable<>(
+                    FindingBundle.of(
+                        List.of(
+                            Check.unreadable(ctx.phase(), ctx.locus(), "the door's upper half leaves the lattice", null)
+                        )
+                    )
+                );
+            }
+            Map<LatticePoint, ReadRefusal> unreadable = new TreeMap<>();
+            CellRead firstRead = ctx.read(origin);
+            CellRead secondRead = ctx.read(upper);
+            OccupantSnapshot first = null;
+            OccupantSnapshot second = null;
+            if (firstRead instanceof CellRead.Found found) {
+                first = found.occupant();
+            } else {
+                unreadable.put(origin, ((CellRead.Unreadable) firstRead).refusal());
+            }
+            if (secondRead instanceof CellRead.Found found) {
+                second = found.occupant();
+            } else {
+                unreadable.put(upper, ((CellRead.Unreadable) secondRead).refusal());
+            }
+            if (!unreadable.isEmpty()) {
+                return new FocusResult.Unavailable<>(
+                    Check.relayAll(ctx.phase(), unreadable, Locus::local, "required read unavailable")
+                );
+            }
             if (first == null || second == null || first.isAir() || second.isAir()) {
                 return new FocusResult.Unavailable<>(
                     missing(ctx, "SC-OCC-0001: a door needs two readable non-air halves")
@@ -291,27 +337,33 @@ public final class Focuses {
         return Check.missing(ctx, message);
     }
 
-    private static FindingBundle footprintWarning(FocusContext ctx, OccupantSnapshot occupant) {
+    private static FindingBundle footprintGap(FocusContext ctx, OccupantSnapshot occupant) {
+        Map<ReadRefusal, CuboidSet> groups = new LinkedHashMap<>();
         for (Cuboid box : occupant.footprint().asSet().boxes()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {
-                        if (ctx.view().statusOf(LatticePoint.of(x, y, z)) != ReadStatus.readable) {
-                            Finding warning = Finding.builder(Codes.footprintClipped).phase(ctx.phase())
-                                    .message("the subject footprint leaves the snapshot")
-                                    .label(
-                                        Label.primary(
-                                            Locus.world(occupant.footprint().asSet()),
-                                            "only the readable part was compared"
-                                        )
-                                    ).build();
-                            return FindingBundle.of(List.of(warning));
+                        LatticePoint cell = LatticePoint.of(x, y, z);
+                        CellRead read = ctx.view().read(cell);
+                        if (read instanceof CellRead.Unreadable refused) {
+                            groups.merge(refused.refusal(), Cuboid.of(cell).asSet(), CuboidSet::union);
                         }
                     }
                 }
             }
         }
-        return FindingBundle.empty();
+        if (groups.isEmpty()) {
+            return FindingBundle.empty();
+        }
+        List<Finding> findings = new ArrayList<>();
+        for (Map.Entry<ReadRefusal, CuboidSet> group : groups.entrySet()) {
+            Finding.Builder builder = Finding.builder(Codes.footprintClipped).phase(ctx.phase())
+                    .message("the subject footprint leaves the snapshot")
+                    .label(Label.primary(Locus.world(group.getValue()), "only the readable part was compared"))
+                    .note("refusal: " + group.getKey().status() + " (" + group.getKey().code().text() + ")");
+            findings.add(builder.build());
+        }
+        return FindingBundle.of(findings);
     }
 
     static List<LatticePoint> cellsOf(CuboidSet cells) {

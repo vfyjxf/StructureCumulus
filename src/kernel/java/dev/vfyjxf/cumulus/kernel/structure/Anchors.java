@@ -14,6 +14,7 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
@@ -33,10 +34,13 @@ public final class Anchors {
         if (spec == null) {
             return failure(origin, Codes.anchorInvalid, "the primary role has no anchor");
         }
-        OccupantSnapshot occupant = view.occupant(origin);
-        if (occupant == null) {
-            return failure(origin, Codes.unreadableCell, "the anchor cell is unreadable");
+        CellRead read = view.read(origin);
+        if (read instanceof CellRead.Unreadable unreadable) {
+            Locus locus = Locus.world(CuboidSet.of(Cuboid.of(origin)));
+            Finding finding = Check.relay(Phase.compile, unreadable.refusal(), locus, "the anchor cell is unreadable");
+            return new SitingResult(Outcome.missing(), FindingBundle.of(List.of(finding)));
         }
+        OccupantSnapshot occupant = ((CellRead.Found) read).occupant();
         if (occupant.isAir()) {
             return failure(origin, Codes.anchorInvalid, "the anchor cell is air");
         }

@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.world;
 
-import java.util.Comparator;
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -11,7 +12,7 @@ public record SnapshotPolicy(
     int maxElements,
     int maxDepth,
     Set<OccupantKind> kinds,
-    Set<TraitKey<?>> traits,
+    Set<NamespacedId> traits,
     List<EntityWindow> windows
 ) {
 
@@ -23,7 +24,11 @@ public record SnapshotPolicy(
         Objects.requireNonNull(traits, "traits");
         Objects.requireNonNull(windows, "windows");
         kinds = Set.copyOf(new TreeSet<>(kinds));
-        traits = Set.copyOf(new TreeSet<>(Comparator.comparing((TraitKey<?> key) -> key.id())));
+        TreeSet<NamespacedId> traitIds = new TreeSet<>();
+        for (NamespacedId trait : traits) {
+            traitIds.add(Objects.requireNonNull(trait, "trait"));
+        }
+        traits = Set.copyOf(traitIds);
         windows = List.copyOf(windows);
     }
 

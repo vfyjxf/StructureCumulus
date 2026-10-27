@@ -1,13 +1,17 @@
 package dev.vfyjxf.cumulus.kernel.structure;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantFilter;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
+import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
@@ -28,9 +32,17 @@ public record BayView(NamespacedId id, CuboidSet cells, WorldView view, Siting s
         Objects.requireNonNull(siting, "siting");
     }
 
-    public @Nullable OccupantSnapshot occupantAt(LatticePoint local) {
+    public CellRead read(LatticePoint local) {
+        Objects.requireNonNull(local, "local");
         LatticePoint world = siting.toWorld(local);
-        return world == null ? null : view.occupant(world);
+        if (world == null) {
+            return new CellRead.Unreadable(new ReadRefusal(ReadStatus.outOfBounds, Codes.unreadableRead.code()));
+        }
+        return view.read(world);
+    }
+
+    public @Nullable OccupantSnapshot occupantAt(LatticePoint local) {
+        return read(local) instanceof CellRead.Found found ? found.occupant() : null;
     }
 
     public List<OccupantSnapshot> occupants() {

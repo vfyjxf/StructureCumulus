@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.core.World;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -13,12 +14,16 @@ import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.space.Turn;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantDescriptor;
 import dev.vfyjxf.cumulus.kernel.world.OccupantFilter;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
+import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
+import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -113,6 +118,16 @@ class AnchorsTest {
         }
 
         @Override
+        public Cuboid bounds() {
+            return Cuboid.of(origin);
+        }
+
+        @Override
+        public SnapshotPolicy policy() {
+            return SnapshotPolicy.minimal();
+        }
+
+        @Override
         public SectionKey sectionOf(LatticePoint cell) {
             return SectionKey.of(snapshot.world(), frame(), cell, cellSize());
         }
@@ -123,13 +138,16 @@ class AnchorsTest {
         }
 
         @Override
-        public @Nullable OccupantSnapshot occupant(LatticePoint cell) {
-            return origin.equals(cell) ? occupant : null;
+        public CellRead read(LatticePoint cell) {
+            if (!bounds().contains(cell)) {
+                return new CellRead.Unreadable(new ReadRefusal(ReadStatus.outOfBounds, Codes.unreadableRead.code()));
+            }
+            return new CellRead.Found(occupant);
         }
 
         @Override
         public @Nullable OccupantSnapshot occupant(OccupantRef ref) {
-            return ref.snapshot().equals(snapshot) && ref.anchor().equals(origin) ? occupant : null;
+            return ref.snapshot().equals(snapshot) && ref.frame() == 0 && ref.equals(occupant.ref()) ? occupant : null;
         }
 
         @Override

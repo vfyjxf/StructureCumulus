@@ -40,8 +40,8 @@ public record OccupantFilter(
             return false;
         }
         if (trait != null) {
-            for (Trait<?> present : occupant.traits()) {
-                if (trait.test(present.key().id())) {
+            for (TraitSlot slot : occupant.traits()) {
+                if (slot instanceof TraitSlot.Present present && trait.test(present.trait().key().id())) {
                     return true;
                 }
             }

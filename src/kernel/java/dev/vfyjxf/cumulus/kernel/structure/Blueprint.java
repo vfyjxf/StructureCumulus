@@ -27,6 +27,7 @@ public final class Blueprint {
     private final @Nullable SourceSpan source;
     private final Plan plan;
     private final CuboidSet bayCells;
+    private final ReadScope reads;
 
     Blueprint(
         NamespacedId id,
@@ -56,6 +57,7 @@ public final class Blueprint {
         this.source = source;
         this.plan = plan;
         this.bayCells = bayCells;
+        this.reads = computeReads(this.checks, this.computations);
     }
 
     public static BlueprintBuilder builder(NamespacedId id) {
@@ -112,6 +114,10 @@ public final class Blueprint {
 
     public CuboidSet bayCells() {
         return bayCells;
+    }
+
+    public ReadScope reads() {
+        return reads;
     }
 
     public @Nullable Bay bay(NamespacedId id) {
@@ -188,5 +194,16 @@ public final class Blueprint {
             boxes.addAll(bay.cells().boxes());
         }
         return CuboidSet.of(boxes);
+    }
+
+    private static ReadScope computeReads(List<Check<?>> checks, List<Computation<?>> computations) {
+        ReadScope scope = ReadScope.none();
+        for (Check<?> check : checks) {
+            scope = scope.union(check.reads());
+        }
+        for (Computation<?> computation : computations) {
+            scope = scope.union(ReadScope.cells(computation.region()));
+        }
+        return scope;
     }
 }

@@ -3,13 +3,19 @@ package dev.vfyjxf.cumulus.kernel.world;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
 /** A snapshot-scoped handle minted in one frame. */
-public record OccupantRef(SnapshotId snapshot, int frame, NamespacedId type, OccupantKind kind, LatticePoint anchor)
-        implements
-            Comparable<OccupantRef> {
+public record OccupantRef(
+    SnapshotId snapshot,
+    int frame,
+    NamespacedId type,
+    OccupantKind kind,
+    LatticePoint anchor,
+    @Nullable NamespacedId body
+) implements Comparable<OccupantRef> {
 
     public OccupantRef {
         Objects.requireNonNull(snapshot, "snapshot");
@@ -19,6 +25,10 @@ public record OccupantRef(SnapshotId snapshot, int frame, NamespacedId type, Occ
         if (frame < 0) {
             throw new IllegalArgumentException("frame >= 0");
         }
+    }
+
+    public OccupantRef(SnapshotId snapshot, int frame, NamespacedId type, OccupantKind kind, LatticePoint anchor) {
+        this(snapshot, frame, type, kind, anchor, null);
     }
 
     public boolean from(SnapshotId snapshot) {
@@ -40,6 +50,16 @@ public record OccupantRef(SnapshotId snapshot, int frame, NamespacedId type, Occ
             return byKind;
         }
         int byType = type.compareTo(other.type);
-        return byType != 0 ? byType : anchor.compareTo(other.anchor);
+        if (byType != 0) {
+            return byType;
+        }
+        int byAnchor = anchor.compareTo(other.anchor);
+        if (byAnchor != 0) {
+            return byAnchor;
+        }
+        if (body == null) {
+            return other.body == null ? 0 : -1;
+        }
+        return other.body == null ? 1 : body.compareTo(other.body);
     }
 }

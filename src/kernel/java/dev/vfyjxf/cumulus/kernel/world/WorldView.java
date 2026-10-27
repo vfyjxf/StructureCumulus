@@ -24,12 +24,29 @@ public interface WorldView {
 
     int cellSize();
 
+    Cuboid bounds();
+
+    SnapshotPolicy policy();
+
     SectionKey sectionOf(LatticePoint cell);
 
     SectionSlot slot(SectionKey key);
 
-    @Nullable
-    OccupantSnapshot occupant(LatticePoint cell);
+    CellRead read(LatticePoint cell);
+
+    default @Nullable OccupantSnapshot occupant(LatticePoint cell) {
+        return read(cell) instanceof CellRead.Found found ? found.occupant() : null;
+    }
+
+    default @Nullable ReadRefusal refusalAt(LatticePoint cell) {
+        return read(cell) instanceof CellRead.Unreadable unreadable ? unreadable.refusal() : null;
+    }
+
+    default ReadStatus statusOf(LatticePoint cell) {
+        return read(cell) instanceof CellRead.Unreadable unreadable
+                ? unreadable.refusal().status()
+                : ReadStatus.readable;
+    }
 
     @Nullable
     OccupantSnapshot occupant(OccupantRef ref);
@@ -40,8 +57,4 @@ public interface WorldView {
     WorldView nested(LatticePoint cell);
 
     long contentDigest(SectionKey key);
-
-    default ReadStatus statusOf(LatticePoint cell) {
-        return slot(sectionOf(cell)).status();
-    }
 }

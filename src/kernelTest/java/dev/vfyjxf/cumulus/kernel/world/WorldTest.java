@@ -9,14 +9,20 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorldTest {
@@ -45,7 +51,7 @@ class WorldTest {
                 List.of(NamespacedId.of("tag"))
             ),
             Cuboid.of(LatticePoint.origin),
-            List.of(Trait.of(energy, 7L))
+            List.of(new TraitSlot.Present(Trait.of(energy, 7L)))
         );
         assertEquals(7L, occupant.trait(energy));
         assertTrue(occupant.has(energy));
@@ -87,6 +93,167 @@ class WorldTest {
         assertFalse(refused.readable());
         assertEquals(ReadStatus.denied, refused.status());
         assertTrue(new SectionSlot.Air(0).readable());
+        assertTrue(
+            new SectionSlot.Partial(
+                SectionSnapshot.of(sectionKey(), Map.of(), 0),
+                Map.of(
+                    LatticePoint.origin,
+                    new ReadRefusal(ReadStatus.notCaptured, FindingCode.of(FindingCode.Family.occ, 4))
+                )
+            ).readable()
+        );
+    }
+
+    @Test
+    void partialSectionRejectsEmptyAndOccupiedRefusals() {
+        SectionKey key = sectionKey();
+        OccupantSnapshot block = occupantWith(List.of());
+        SectionSnapshot section = SectionSnapshot.of(key, Map.of(LatticePoint.origin, block), 0);
+        ReadRefusal refusal = new ReadRefusal(ReadStatus.denied, FindingCode.of(FindingCode.Family.occ, 4));
+        assertThrows(IllegalArgumentException.class, () -> new SectionSlot.Partial(section, Map.of()));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new SectionSlot.Partial(section, Map.of(LatticePoint.origin, refusal))
+        );
+        SectionSlot.Partial valid = new SectionSlot.Partial(section, Map.of(LatticePoint.of(1, 0, 0), refusal));
+        assertEquals(Set.of(LatticePoint.of(1, 0, 0)), valid.unreadable().keySet());
+    }
+
+    @Test
+    void bodyIsPartOfIdentityAndNullOrdersFirst() {
+        NamespacedId type = NamespacedId.of("m", "cow");
+        OccupantRef plain = new OccupantRef(snapshot, 0, type, OccupantKind.entity, LatticePoint.origin);
+        OccupantRef explicit = new OccupantRef(snapshot, 0, type, OccupantKind.entity, LatticePoint.origin, null);
+        OccupantRef first = new OccupantRef(
+            snapshot,
+            0,
+            type,
+            OccupantKind.entity,
+            LatticePoint.origin,
+            NamespacedId.of("u", "1")
+        );
+        OccupantRef second = new OccupantRef(
+            snapshot,
+            0,
+            type,
+            OccupantKind.entity,
+            LatticePoint.origin,
+            NamespacedId.of("u", "2")
+        );
+        assertEquals(plain, explicit);
+        assertEquals(plain.hashCode(), explicit.hashCode());
+        assertNotEquals(first, second);
+        assertEquals(2, Set.of(first, second).size());
+        assertTrue(plain.compareTo(first) < 0);
+        assertTrue(first.compareTo(second) < 0);
+        assertTrue(plain.from(snapshot));
+        assertFalse(plain.from(new SnapshotId(World.of(NamespacedId.of("w")), 2)));
+        assertEquals(NamespacedId.of("u", "2"), second.body());
+        assertNull(plain.body());
+    }
+
+    @Test
+    void traitSlotsHaveFourStates() {
+        NamespacedId id = NamespacedId.of("m", "energy");
+        TraitKey<Long> typed = new TraitKey<>(id, Long.class);
+        TraitKey<Object> json = new TraitKey<>(id, Object.class);
+
+        OccupantSnapshot present = occupantWith(List.of(new TraitSlot.Present(Trait.of(typed, 7L))));
+        assertInstanceOf(TraitSlot.Present.class, present.slot(id));
+        assertEquals(7L, present.trait(typed));
+        assertTrue(present.has(typed));
+        Trait<Object> asObject = present.find(json);
+        assertNotNull(asObject);
+        assertEquals(7L, asObject.value());
+
+        OccupantSnapshot presentNull = occupantWith(List.of(new TraitSlot.Present(Trait.absent(typed))));
+        assertInstanceOf(TraitSlot.Present.class, presentNull.slot(id));
+        assertNull(presentNull.trait(typed));
+        assertTrue(presentNull.has(typed));
+        Trait<Long> nullTrait = presentNull.find(typed);
+        assertNotNull(nullTrait);
+        assertNull(nullTrait.value());
+        assertNotNull(presentNull.find(json));
+
+        OccupantSnapshot absent = occupantWith(List.of(new TraitSlot.Absent(id)));
+        assertInstanceOf(TraitSlot.Absent.class, absent.slot(id));
+        assertNull(absent.find(typed));
+        assertNull(absent.trait(typed));
+        assertFalse(absent.has(typed));
+
+        OccupantSnapshot refused = occupantWith(
+            List.of(
+                new TraitSlot.Refused(id, new ReadRefusal(ReadStatus.failed, FindingCode.of(FindingCode.Family.occ, 4)))
+            )
+        );
+        assertInstanceOf(TraitSlot.Refused.class, refused.slot(id));
+        assertNull(refused.find(typed));
+        assertFalse(refused.has(typed));
+
+        OccupantSnapshot unasked = occupantWith(List.of());
+        assertNull(unasked.slot(id));
+        assertNull(unasked.find(typed));
+        assertFalse(unasked.has(typed));
+
+        OccupantSnapshot wrongType = occupantWith(
+            List.of(new TraitSlot.Present(Trait.of(new TraitKey<>(id, String.class), "x")))
+        );
+        assertNotNull(wrongType.slot(id));
+        assertNull(wrongType.find(typed));
+
+        assertTrue(OccupantFilter.ofTrait(id).matches(present));
+        assertTrue(OccupantFilter.ofTrait(id).matches(presentNull));
+        assertFalse(OccupantFilter.ofTrait(id).matches(absent));
+        assertFalse(OccupantFilter.ofTrait(id).matches(refused));
+        assertFalse(OccupantFilter.ofTrait(id).matches(unasked));
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> occupantWith(
+                List.of(new TraitSlot.Present(Trait.of(typed, 1L)), new TraitSlot.Present(Trait.of(json, 2L)))
+            )
+        );
+    }
+
+    @Test
+    void snapshotPolicyCopiesTraitIds() {
+        NamespacedId energy = NamespacedId.of("m", "energy");
+        NamespacedId lit = NamespacedId.of("m", "lit");
+        LinkedHashSet<NamespacedId> traits = new LinkedHashSet<>(List.of(energy, lit, energy));
+        SnapshotPolicy policy = new SnapshotPolicy(10, 2, Set.of(OccupantKind.entity), traits, List.of());
+        assertEquals(Set.of(energy, lit), policy.traits());
+        assertEquals(2, policy.traits().size());
+        assertEquals(2, policy.maxDepth());
+        assertTrue(SnapshotPolicy.minimal().traits().isEmpty());
+    }
+
+    @Test
+    void readableIsTheOnlyNonRefusalStatus() {
+        assertFalse(ReadStatus.failed.readable());
+        assertFalse(ReadStatus.denied.readable());
+        assertFalse(ReadStatus.notCaptured.readable());
+        assertFalse(ReadStatus.outOfBounds.readable());
+        assertTrue(ReadStatus.readable.readable());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new ReadRefusal(ReadStatus.readable, FindingCode.of(FindingCode.Family.occ, 4))
+        );
+        ReadRefusal refusal = new ReadRefusal(ReadStatus.failed, FindingCode.of(FindingCode.Family.occ, 4));
+        assertEquals(ReadStatus.failed, refusal.status());
+    }
+
+    private static SectionKey sectionKey() {
+        return SectionKey.of(World.of(NamespacedId.of("w")), 0, LatticePoint.origin, 16);
+    }
+
+    private static OccupantSnapshot occupantWith(List<TraitSlot> traits) {
+        OccupantRef ref = new OccupantRef(snapshot, 0, NamespacedId.of("m"), OccupantKind.block, LatticePoint.origin);
+        return new OccupantSnapshot(
+            ref,
+            new OccupantDescriptor(NamespacedId.of("m"), OccupantKind.block, Map.of(), List.of()),
+            Cuboid.of(LatticePoint.origin),
+            traits
+        );
     }
 
     private static final class TestBlocks {

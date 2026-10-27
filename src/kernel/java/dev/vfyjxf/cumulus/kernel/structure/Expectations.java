@@ -11,14 +11,20 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
+import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -44,6 +50,10 @@ public final class Expectations {
 
     public static <T> Expectation<OccupantSnapshot> trait(TraitKey<T> key, Predicate<T> test) {
         return new TraitValue<>(key, test);
+    }
+
+    public static Expectation<OccupantSnapshot> traitAbsent(TraitKey<?> key) {
+        return new TraitAbsent(key);
     }
 
     public static Expectation<OccupantSnapshot> anyOccupant() {
@@ -117,6 +127,19 @@ public final class Expectations {
 
     private static Reply mismatch(Finding finding) {
         return Reply.mismatch(FindingBundle.of(List.of(finding)));
+    }
+
+    private static Reply traitUnreadable(
+        FocusContext ctx,
+        TraitKey<?> key,
+        @Nullable ReadRefusal refusal,
+        @Nullable String note
+    ) {
+        String message = "trait " + key.id() + " is unreadable";
+        Finding finding = refusal == null
+                ? Check.unreadable(ctx.phase(), ctx.locus(), message, note)
+                : Check.relay(ctx.phase(), refusal, ctx.locus(), message);
+        return Reply.unreadable(FindingBundle.of(List.of(finding)));
     }
 
     private record Block(NamespacedId type) implements Expectation<OccupantSnapshot> {
@@ -194,10 +217,17 @@ public final class Expectations {
 
         @Override
         public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
-            if (ctx.subject().has(key)) {
+            TraitSlot slot = ctx.subject().slot(key.id());
+            if (slot instanceof TraitSlot.Present) {
                 return Reply.match();
             }
-            return mismatch(problem(ctx, ctx.subject(), "expected trait " + key.id()));
+            if (slot instanceof TraitSlot.Absent) {
+                return mismatch(problem(ctx, ctx.subject(), "expected trait " + key.id()));
+            }
+            if (slot instanceof TraitSlot.Refused refused) {
+                return traitUnreadable(ctx, key, refused.refusal(), null);
+            }
+            return traitUnreadable(ctx, key, null, "the trait was not captured");
         }
 
         @Override
@@ -208,18 +238,46 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             return ExpectationMeta.of(id("trait"), 10, code(1));
+        }
+
+        @Override
+        public ReadScope reads() {
+            return ReadScope.none().withTraits(Set.of(key.id()));
         }
     }
 
     private record TraitValue<T>(TraitKey<T> key, Predicate<T> test) implements Expectation<OccupantSnapshot> {
 
+        private TraitValue {
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(test, "test");
+        }
+
         @Override
         public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
-            T value = ctx.subject().trait(key);
-            if (value != null && test.test(value)) {
-                return Reply.match();
+            TraitSlot slot = ctx.subject().slot(key.id());
+            if (slot instanceof TraitSlot.Present present) {
+                Object value = present.trait().value();
+                if (value == null) {
+                    return Reply.match();
+                }
+                if (!key.type().isInstance(value)) {
+                    return traitUnreadable(ctx, key, null, "the captured value is not a " + key.type().getName());
+                }
+                @SuppressWarnings("unchecked")
+                T typed = (T) value;
+                if (test.test(typed)) {
+                    return Reply.match();
+                }
+                return mismatch(problem(ctx, ctx.subject(), "trait " + key.id() + " did not satisfy"));
             }
-            return mismatch(problem(ctx, ctx.subject(), "trait " + key.id() + " did not satisfy"));
+            if (slot instanceof TraitSlot.Absent) {
+                return mismatch(problem(ctx, ctx.subject(), "expected trait " + key.id()));
+            }
+            if (slot instanceof TraitSlot.Refused refused) {
+                return traitUnreadable(ctx, key, refused.refusal(), null);
+            }
+            return traitUnreadable(ctx, key, null, "the trait was not captured");
         }
 
         @Override
@@ -230,6 +288,48 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             return ExpectationMeta.of(id("trait"), 10, code(1));
+        }
+
+        @Override
+        public ReadScope reads() {
+            return ReadScope.none().withTraits(Set.of(key.id()));
+        }
+    }
+
+    private record TraitAbsent(TraitKey<?> key) implements Expectation<OccupantSnapshot> {
+
+        private TraitAbsent {
+            Objects.requireNonNull(key, "key");
+        }
+
+        @Override
+        public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
+            TraitSlot slot = ctx.subject().slot(key.id());
+            if (slot instanceof TraitSlot.Absent) {
+                return Reply.match();
+            }
+            if (slot instanceof TraitSlot.Present) {
+                return mismatch(problem(ctx, ctx.subject(), "expected no trait " + key.id()));
+            }
+            if (slot instanceof TraitSlot.Refused refused) {
+                return traitUnreadable(ctx, key, refused.refusal(), null);
+            }
+            return traitUnreadable(ctx, key, null, "the trait was not captured");
+        }
+
+        @Override
+        public Class<OccupantSnapshot> subject() {
+            return OccupantSnapshot.class;
+        }
+
+        @Override
+        public ExpectationMeta meta() {
+            return ExpectationMeta.of(id("trait_absent"), 10, code(1));
+        }
+
+        @Override
+        public ReadScope reads() {
+            return ReadScope.none().withTraits(Set.of(key.id()));
         }
     }
 
@@ -495,6 +595,7 @@ public final class Expectations {
         @Override
         public Reply test(ExpectationContext<BayView> ctx) {
             List<Finding> findings = new ArrayList<>();
+            Map<LatticePoint, ReadRefusal> unreadableCells = new TreeMap<>();
             boolean mismatched = false;
             boolean unreadable = false;
             boolean abstained = false;
@@ -503,16 +604,13 @@ public final class Expectations {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
                             LatticePoint cell = LatticePoint.of(x, y, z);
-                            OccupantSnapshot occupant = ctx.occupantAt(cell);
-                            if (occupant == null) {
+                            CellRead read = ctx.read(cell);
+                            if (read instanceof CellRead.Unreadable refused) {
                                 unreadable = true;
-                                findings.add(
-                                    Finding.builder(FindingCode.of(FindingCode.Family.occ, 1), Severity.error)
-                                            .phase(ctx.phase()).message("unreadable cell " + cell)
-                                            .label(Label.primary(ctx.locus(), "unreadable cell " + cell)).build()
-                                );
+                                unreadableCells.put(cell, refused.refusal());
                                 continue;
                             }
+                            OccupantSnapshot occupant = ((CellRead.Found) read).occupant();
                             ExpectationContext<OccupantSnapshot> sub = ctx
                                     .withSubject(occupant, occupant.isAir() ? List.of() : List.of(occupant));
                             Reply reply = element.test(sub);
@@ -531,6 +629,11 @@ public final class Expectations {
                         }
                     }
                 }
+            }
+            if (!unreadableCells.isEmpty()) {
+                findings.addAll(
+                    Check.relayAll(ctx.phase(), unreadableCells, Locus::local, "required read unavailable").findings()
+                );
             }
             if (mismatched) {
                 return Reply.mismatch(FindingBundle.of(findings));

@@ -137,10 +137,17 @@ public final class LevelCapture implements WorldCapture {
         List<OccupantSnapshot> entities = new ArrayList<>(candidates.size());
         for (EntityCandidate candidate : candidates) {
             entities.add(
-                OccupantDescriptors.entity(snapshot, 0, candidate.anchor(), candidate.type(), candidate.footprint())
+                OccupantDescriptors.entity(
+                    snapshot,
+                    0,
+                    candidate.anchor(),
+                    candidate.type(),
+                    candidate.id(),
+                    candidate.footprint()
+                )
             );
         }
-        LevelSnapshot view = new LevelSnapshot(snapshot, bounds, sections, entities);
+        LevelSnapshot view = new LevelSnapshot(snapshot, bounds, sections, entities, policy);
         LevelLease lease = new LevelLease(snapshot, view, () -> true);
         return new CaptureResult.Captured(view, lease);
     }

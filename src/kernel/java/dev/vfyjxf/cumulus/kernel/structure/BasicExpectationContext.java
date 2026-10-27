@@ -10,6 +10,7 @@ import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
@@ -92,6 +93,11 @@ final class BasicExpectationContext<T> implements ExpectationContext<T> {
     @Override
     public CancelToken cancel() {
         return base.cancel();
+    }
+
+    @Override
+    public CellRead read(LatticePoint cell) {
+        return base.read(cell);
     }
 
     @Override

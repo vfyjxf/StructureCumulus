@@ -336,4 +336,44 @@ class DocumentCompilerTest {
             Objects.requireNonNull(result.findings().primary(), "primary").code()
         );
     }
+
+    @Test
+    void traitAbsentContributesItsTraitIdToReads() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        NamespacedId energy = id("energy");
+        Value cell = Value
+                .object(Map.of("cell", Value.array(List.of(Value.number(0), Value.number(0), Value.number(0)))));
+        BlueprintSpec root = new BlueprintSpec(
+            id("trait_absent"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            Value.object(),
+            List.of(new BaySpec(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(),
+            List.of(
+                new CheckSpec(
+                    id("absent"),
+                    id("bay"),
+                    id("occupant"),
+                    cell,
+                    id("trait_absent"),
+                    Value.object(Map.of("id", Value.string("test:energy"))),
+                    null,
+                    null
+                )
+            ),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        Blueprint blueprint = result.blueprint();
+        assertNotNull(blueprint);
+        assertEquals(Set.of(energy), blueprint.reads().traits());
+    }
 }

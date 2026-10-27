@@ -51,9 +51,13 @@ import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
 import dev.vfyjxf.cumulus.kernel.structure.Reply;
 import dev.vfyjxf.cumulus.kernel.structure.SectionComputation;
 import dev.vfyjxf.cumulus.kernel.structure.SectionContext;
+import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantFilter;
+import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
+import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
@@ -292,6 +296,11 @@ public final class MatchEngine {
         boolean needsLedger = false;
         for (Bay bay : request.blueprint().bays()) {
             needsLedger |= !(bay.footprint() instanceof Footprint.None);
+        }
+        Finding nested = nestedSubject(outcome.bindings(), phase);
+        if (nested != null) {
+            session.findings.add(nested);
+            return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
         }
         if (!needsLedger) {
             return new MatchResult.Admitted(
@@ -589,6 +598,22 @@ public final class MatchEngine {
         return contexts.publish(request.instance(), published, FindingBundle.of(findings), outcome.spend());
     }
 
+    private static @Nullable Finding nestedSubject(List<BayBinding> bindings, Phase phase) {
+        for (BayBinding binding : bindings) {
+            for (OccupantSnapshot subject : binding.subjects()) {
+                if (subject.ref().frame() != 0 || subject.ref().kind().equals(OccupantKind.nested)) {
+                    return code(
+                        Codes.bindingInvalid,
+                        phase,
+                        "a nested or non-root subject cannot back a claim",
+                        Locus.local(binding.bay().cells())
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
     private static @Nullable Finding validateBindings(MatchRequest request, Phase phase, List<BayBinding> bindings) {
         Map<NamespacedId, BayBinding> byBay = new LinkedHashMap<>();
         for (BayBinding binding : bindings) {
@@ -624,6 +649,14 @@ public final class MatchEngine {
                         Codes.bindingInvalid,
                         phase,
                         "a subject is not from this capture's root frame",
+                        Locus.local(bay.cells())
+                    );
+                }
+                if (subject.ref().kind().equals(OccupantKind.nested)) {
+                    return code(
+                        Codes.bindingInvalid,
+                        phase,
+                        "a nested subject cannot back a claim",
                         Locus.local(bay.cells())
                     );
                 }
@@ -793,7 +826,7 @@ public final class MatchEngine {
         private final Map<ContextKey<?>, Object> values = new LinkedHashMap<>();
         private final List<Finding> findings = new ArrayList<>();
         private final Map<NamespacedId, LinkedHashMap<OccupantRef, OccupantSnapshot>> subjects = new LinkedHashMap<>();
-        private ReadScope reads = ReadScope.none();
+        private ReadScope reads;
         private Spend spend = Spend.zero;
 
         private Session(MatchRequest request) {
@@ -801,10 +834,7 @@ public final class MatchEngine {
             for (Bay bay : request.blueprint().bays()) {
                 subjects.put(bay.id(), new LinkedHashMap<>());
             }
-            for (Computation<?> computation : request.blueprint().computations()) {
-                reads = reads.union(ReadScope.cells(computation.region()));
-                reads = reads.withKeys(computation.inputs());
-            }
+            reads = request.blueprint().reads();
         }
 
         private boolean cancelled() {
@@ -822,7 +852,6 @@ public final class MatchEngine {
         }
 
         private boolean chargeScope(ReadScope scope, WorldView view) {
-            reads = reads.union(scope);
             int sections = sectionsOf(scope.cells(), view).size();
             for (var window : scope.windows()) {
                 sections += sectionsOf(window.cells().asSet(), view).size();
@@ -1012,9 +1041,33 @@ public final class MatchEngine {
         }
 
         @Override
-        public @Nullable OccupantSnapshot occupantAt(LatticePoint local) {
+        public Phase phase() {
+            return Phase.check;
+        }
+
+        @Override
+        public CellRead read(LatticePoint local) {
             LatticePoint world = request.siting().toWorld(local);
-            return world == null ? null : request.lease().view().occupant(world);
+            if (world == null) {
+                return new CellRead.Unreadable(new ReadRefusal(ReadStatus.outOfBounds, Codes.unreadableRead.code()));
+            }
+            return request.lease().view().read(world);
+        }
+
+        @Override
+        public Map<LatticePoint, ReadRefusal> unreadable() {
+            SectionSlot slot = request.lease().view().slot(section);
+            if (!(slot instanceof SectionSlot.Partial partial)) {
+                return Map.of();
+            }
+            TreeMap<LatticePoint, ReadRefusal> local = new TreeMap<>();
+            for (Map.Entry<LatticePoint, ReadRefusal> entry : partial.unreadable().entrySet()) {
+                LatticePoint cell = request.siting().toLocal(entry.getKey());
+                if (cell != null && cells.contains(cell)) {
+                    local.put(cell, entry.getValue());
+                }
+            }
+            return Collections.unmodifiableMap(local);
         }
 
         @Override
@@ -1158,8 +1211,16 @@ public final class MatchEngine {
 
         @Override
         public @Nullable OccupantSnapshot occupantAt(LatticePoint local) {
+            return read(local) instanceof CellRead.Found found ? found.occupant() : null;
+        }
+
+        @Override
+        public CellRead read(LatticePoint local) {
             LatticePoint world = request.siting().toWorld(local);
-            return world == null ? null : request.lease().view().occupant(world);
+            if (world == null) {
+                return new CellRead.Unreadable(new ReadRefusal(ReadStatus.outOfBounds, Codes.unreadableRead.code()));
+            }
+            return request.lease().view().read(world);
         }
 
         @Override

@@ -3,16 +3,27 @@ package dev.vfyjxf.cumulus.kernel.structure;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.Phase;
+import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.finding.Label;
 import dev.vfyjxf.cumulus.kernel.finding.Severity;
+import dev.vfyjxf.cumulus.kernel.space.Cuboid;
+import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.space.Locus;
+import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 
 /** One focus paired with one expectation over one bay. */
 public record Check<T>(
@@ -68,5 +79,67 @@ public record Check<T>(
         List<Finding> findings = new ArrayList<>();
         findings.add(finding);
         return FindingBundle.of(findings);
+    }
+
+    static Finding unreadable(Phase phase, Locus locus, String message, @Nullable String note) {
+        Objects.requireNonNull(phase, "phase");
+        Objects.requireNonNull(locus, "locus");
+        Finding.Builder builder = Finding.builder(Codes.unreadableRead).phase(phase).message(message)
+                .label(Label.primary(locus, message));
+        if (note != null) {
+            builder.note(note);
+        }
+        return builder.build();
+    }
+
+    static Finding relay(Phase phase, ReadRefusal refusal, Locus locus, String message) {
+        Objects.requireNonNull(phase, "phase");
+        Objects.requireNonNull(refusal, "refusal");
+        Objects.requireNonNull(locus, "locus");
+        FindingCode code = refusal.code();
+        CodeEntry kernel = kernelEntry(code);
+        Finding.Builder builder = kernel == null
+                ? Finding.builder(code, Severity.error)
+                : Finding.builder(Codes.unreadableRead);
+        builder.phase(phase).message(message).label(Label.primary(locus, message)).note("refusal: " + refusal.status());
+        if (kernel != null && !code.equals(Codes.unreadableRead.code())) {
+            builder.note(
+                "the host code " + code.text() + " is a kernel code; " + Codes.unreadableRead.code().text()
+                        + " substituted"
+            );
+        }
+        return builder.build();
+    }
+
+    static FindingBundle relayAll(
+        Phase phase,
+        Map<LatticePoint, ReadRefusal> unreadable,
+        Function<CuboidSet, Locus> locus,
+        String message
+    ) {
+        Objects.requireNonNull(unreadable, "unreadable");
+        Map<ReadRefusal, CuboidSet> groups = new LinkedHashMap<>();
+        for (Map.Entry<LatticePoint, ReadRefusal> entry : unreadable.entrySet()) {
+            groups.merge(
+                Objects.requireNonNull(entry.getValue(), "refusal"),
+                CuboidSet.of(Cuboid.of(entry.getKey())),
+                CuboidSet::union
+            );
+        }
+        List<Finding> findings = new ArrayList<>();
+        for (Map.Entry<ReadRefusal, CuboidSet> group : groups.entrySet()) {
+            String grouped = message + " (" + group.getValue().volume() + " cell(s))";
+            findings.add(relay(phase, group.getKey(), locus.apply(group.getValue()), grouped));
+        }
+        return FindingBundle.of(findings);
+    }
+
+    private static @Nullable CodeEntry kernelEntry(FindingCode code) {
+        for (CodeEntry entry : Codes.all) {
+            if (entry.code().equals(code)) {
+                return entry;
+            }
+        }
+        return null;
     }
 }

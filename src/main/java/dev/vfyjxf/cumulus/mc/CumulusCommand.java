@@ -16,6 +16,7 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
 import dev.vfyjxf.cumulus.kernel.structure.SitingResult;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
@@ -35,6 +36,8 @@ import org.jspecify.annotations.NullMarked;
 /** The M1 command surface: {@code /cumulus check <id> <origin>}. */
 @NullMarked
 public final class CumulusCommand {
+
+    private static final int maxElements = 1_000_000;
 
     public static void register(RegisterCommandsEvent event) {
         event.getDispatcher()
@@ -78,7 +81,7 @@ public final class CumulusCommand {
             source.sendFailure(Component.literal("the blueprint bounds leave the world at " + point));
             return 0;
         }
-        CaptureResult captured = state.capture(level).capture(new CaptureRequest(bounds, SnapshotPolicy.minimal()));
+        CaptureResult captured = state.capture(level).capture(new CaptureRequest(bounds, capturePolicy(blueprint)));
         if (!(captured instanceof CaptureResult.Captured success)) {
             return captureFailure(source, id, captured);
         }
@@ -100,6 +103,11 @@ public final class CumulusCommand {
             print(source, summary(id, point, checked), checked.findings());
             return 1;
         }
+    }
+
+    private static SnapshotPolicy capturePolicy(Blueprint blueprint) {
+        ReadScope reads = blueprint.reads();
+        return new SnapshotPolicy(maxElements, reads.depth(), reads.kinds(), reads.traits(), reads.windows());
     }
 
     private static int captureFailure(CommandSourceStack source, NamespacedId id, CaptureResult result) {

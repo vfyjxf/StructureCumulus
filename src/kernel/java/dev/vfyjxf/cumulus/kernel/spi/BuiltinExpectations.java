@@ -46,6 +46,10 @@ final class BuiltinExpectations {
             NamespacedId type = BuiltinSupport.id(args, "id", ctx);
             return type == null ? null : Expectations.trait(new TraitKey<Object>(type, Object.class));
         }));
+        builder.put(id("trait_absent"), new Factory(id("trait_absent"), (args, ctx) -> {
+            NamespacedId type = BuiltinSupport.id(args, "id", ctx);
+            return type == null ? null : Expectations.traitAbsent(new TraitKey<Object>(type, Object.class));
+        }));
         builder.put(id("any_occupant"), new Factory(id("any_occupant"), (args, ctx) -> Expectations.anyOccupant()));
         return builder.build();
     }
