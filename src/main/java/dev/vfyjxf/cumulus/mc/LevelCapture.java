@@ -60,6 +60,7 @@ public final class LevelCapture implements WorldCapture {
     private final NestedExtentLookup nestedLookup;
     private final TraitLookup traitLookup;
     private final AtomicLong revisions = new AtomicLong();
+    private volatile boolean closed;
 
     public LevelCapture(ServerLevel level) {
         this(level, NestedExtentLookup.capabilities());
@@ -79,6 +80,9 @@ public final class LevelCapture implements WorldCapture {
 
     @Override
     public CaptureResult capture(CaptureRequest request) {
+        if (closed) {
+            throw new IllegalStateException("capture is closed");
+        }
         Cuboid bounds = request.bounds();
         SnapshotPolicy policy = request.policy();
         long volume = bounds.volume();
@@ -86,21 +90,33 @@ public final class LevelCapture implements WorldCapture {
             return new CaptureResult.TooLarge(bounds, (int) Math.min(Integer.MAX_VALUE, volume));
         }
         long revision = revisions.incrementAndGet();
-        SnapshotId snapshot = new SnapshotId(world, revision);
-        CaptureContext context = new CaptureContext(snapshot, policy, volume);
-        FrameData root = new FrameCapture(context, 0, 0, bounds, LatticePoint.origin, true).build(List.of());
-        if (root == null) {
-            revisions.decrementAndGet();
-            return new CaptureResult.Unavailable(ReadStatus.notCaptured, notCaptured);
+        boolean captured = false;
+        try {
+            SnapshotId snapshot = new SnapshotId(world, revision);
+            CaptureContext context = new CaptureContext(snapshot, policy, volume);
+            FrameData root = new FrameCapture(context, 0, 0, bounds, LatticePoint.origin, true).build(List.of());
+            if (root == null) {
+                return new CaptureResult.Unavailable(ReadStatus.notCaptured, notCaptured);
+            }
+            LevelSnapshot view = new LevelSnapshot(snapshot, policy, root);
+            LevelLease lease = new LevelLease(snapshot, view, () -> !closed && revisions.get() == revision);
+            captured = true;
+            return new CaptureResult.Captured(view, lease);
+        } finally {
+            if (!captured) {
+                revisions.decrementAndGet();
+            }
         }
-        LevelSnapshot view = new LevelSnapshot(snapshot, policy, root);
-        LevelLease lease = new LevelLease(snapshot, view, () -> true);
-        return new CaptureResult.Captured(view, lease);
     }
 
     @Override
     public long currentRevision() {
         return revisions.get();
+    }
+
+    /** Invalidates every lease handed out by this capture; idempotent. */
+    void close() {
+        closed = true;
     }
 
     private final class FrameCapture {

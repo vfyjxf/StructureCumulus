@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 
-/** M1 lease: host-owned liveness, closed by the caller. */
+/** Host-owned lease: current while its capture is the level's latest and the handle is open. */
 @NullMarked
 public final class LevelLease implements SnapshotLease {
 

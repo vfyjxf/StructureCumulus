@@ -49,16 +49,18 @@ public final class ServerState {
     }
 
     public static void open(ServerAboutToStartEvent event) {
+        ServerState previous = current;
         current = new ServerState();
+        if (previous != null) {
+            closeState(previous);
+        }
     }
 
     public static void close(ServerStoppingEvent event) {
         ServerState state = current;
         current = null;
         if (state != null) {
-            state.blueprints.close();
-            state.captures.clear();
-            state.levels.clear();
+            closeState(state);
         }
         DatapackBlueprints.clearPending();
     }
@@ -66,9 +68,18 @@ public final class ServerState {
     public static void unload(LevelEvent.Unload event) {
         ServerState state = current;
         if (state != null && event.getLevel() instanceof ServerLevel level) {
-            state.captures.remove(level);
+            LevelCapture capture = state.captures.remove(level);
+            if (capture != null) {
+                capture.close();
+            }
             state.levels.remove(level);
         }
+    }
+
+    private static void closeState(ServerState state) {
+        state.blueprints.close();
+        state.closeCaptures();
+        state.levels.clear();
     }
 
     public static @Nullable ServerState current() {
@@ -97,6 +108,11 @@ public final class ServerState {
 
     LevelCapture capture(ServerLevel level) {
         return captures.computeIfAbsent(level, LevelCapture::new);
+    }
+
+    void closeCaptures() {
+        captures.values().forEach(LevelCapture::close);
+        captures.clear();
     }
 
     InstanceId instance(ServerLevel level) {
