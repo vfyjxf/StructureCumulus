@@ -57,6 +57,7 @@ final class SettleCommand {
             return null;
         }
         try (CommandSupport.Attempt prepared = attempt) {
+            CommandSupport.printCaptureFindings(source, blueprint.id(), prepared.report(), kernel);
             ClaimView claims = state.claims(level).read(prepared.bounds());
             MatchRequest request = MatchRequest.of(
                 blueprint,

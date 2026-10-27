@@ -443,6 +443,98 @@ public final class NestedCaptureGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void overCapCarriesOne0005Entry(GameTestHelper helper) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        Cuboid bounds = Cuboid.of(
+            origin.getX(),
+            origin.getY(),
+            origin.getZ(),
+            origin.getX() + 2,
+            origin.getY() + 2,
+            origin.getZ() + 2
+        );
+        SnapshotPolicy tiny = new SnapshotPolicy(7, 0, Set.of(), Set.of(), List.of());
+        CaptureResult result = new LevelCapture(helper.getLevel(), new FakeLookup())
+                .capture(new CaptureRequest(bounds, tiny));
+        if (!(result instanceof CaptureResult.TooLarge tooLarge)) {
+            helper.fail("the tiny ceiling did not refuse the root: " + result);
+            return;
+        }
+        helper.assertValueEqual(1, tooLarge.report().size(), "one over-cap entry");
+        var entry = tooLarge.report().entries().get(0);
+        helper.assertValueEqual(AdapterCodes.overCap, entry.code(), "the over-cap code");
+        helper.assertValueEqual(bounds.asSet(), entry.cells(), "the root bounds are the report region");
+        helper.assertTrue(
+            entry.notes().stream().anyMatch(note -> note.contains("ceiling")),
+            "the entry names the ceiling"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void rootFrameCutCarriesOne0003EntryWithWorldCells(GameTestHelper helper) {
+        BlockPos anchor = new BlockPos(0, 1, 0);
+        helper.setBlock(anchor, Blocks.STONE);
+        BlockPos worldAnchor = helper.absolutePos(anchor);
+        LatticePoint localAnchor = LatticePoint.of(worldAnchor.getX(), worldAnchor.getY(), worldAnchor.getZ());
+        BlockPos far = new BlockPos(worldAnchor.getX() + 1_000_000, worldAnchor.getY(), worldAnchor.getZ());
+        FakeLookup lookup = new FakeLookup();
+        NestedExtent extent = extent("test:report_cut", far, 1, 1, 1, far);
+        lookup.blocks.put(worldAnchor, extent);
+        Cuboid bounds = Cuboid.of(
+            worldAnchor.getX(),
+            worldAnchor.getY(),
+            worldAnchor.getZ(),
+            worldAnchor.getX() + 1,
+            worldAnchor.getY() + 1,
+            worldAnchor.getZ() + 1
+        );
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+                .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the cut capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            helper.assertTrue(lease.view().nested(localAnchor) == null, "the cut child answers null");
+        }
+        helper.assertValueEqual(1, captured.report().size(), "one cut entry");
+        var entry = captured.report().entries().get(0);
+        helper.assertValueEqual(AdapterCodes.cut, entry.code(), "the cut code");
+        helper.assertValueEqual(extent.bounds().asSet(), entry.cells(), "a root-frame cut carries world cells");
+        helper.assertTrue(
+            entry.notes().stream().anyMatch(note -> note.equals("reason: unloaded")),
+            "the entry names the cut reason"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aPlainCaptureHasAnEmptyReport(GameTestHelper helper) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        Cuboid bounds = Cuboid.of(
+            origin.getX(),
+            origin.getY(),
+            origin.getZ(),
+            origin.getX() + 1,
+            origin.getY() + 1,
+            origin.getZ() + 1
+        );
+        CaptureResult result = new LevelCapture(helper.getLevel(), new FakeLookup())
+                .capture(new CaptureRequest(bounds, policy(maxElements, 0, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the plain capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            helper.assertTrue(lease.isCurrent(), "the plain capture is leased");
+        }
+        helper.assertTrue(captured.report().isEmpty(), "a clean capture has an empty report");
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void providerExceptionsAreSkipped(GameTestHelper helper) {
         BlockPos anchor = new BlockPos(0, 1, 0);
         helper.setBlock(anchor, Blocks.STONE);

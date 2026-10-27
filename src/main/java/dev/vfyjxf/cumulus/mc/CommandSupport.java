@@ -16,6 +16,7 @@ import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
 import dev.vfyjxf.cumulus.kernel.structure.SitingResult;
+import dev.vfyjxf.cumulus.kernel.world.CaptureReport;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
@@ -82,16 +83,17 @@ final class CommandSupport {
         return new SnapshotPolicy(maxElements, reads.depth(), reads.kinds(), reads.traits(), reads.windows());
     }
 
-    static @Nullable SnapshotLease capture(
+    static @Nullable Captured capture(
         ServerState state,
         CommandSourceStack source,
         NamespacedId id,
         Cuboid bounds,
-        SnapshotPolicy policy
+        SnapshotPolicy policy,
+        @Nullable Orientation audit
     ) {
-        CaptureResult result = state.capture(source.getLevel()).capture(new CaptureRequest(bounds, policy));
+        CaptureResult result = state.capture(source.getLevel()).capture(new CaptureRequest(bounds, policy), audit);
         if (result instanceof CaptureResult.Captured captured) {
-            return captured.lease();
+            return new Captured(captured.lease(), captured.report());
         }
         String reason = switch (result) {
             case CaptureResult.TooLarge tooLarge -> "too large (" + tooLarge.elements() + " elements)";
@@ -99,7 +101,26 @@ final class CommandSupport {
             case CaptureResult.Captured ignored -> "captured";
         };
         source.sendFailure(Component.literal("capture " + id.text() + ": " + reason));
+        CaptureReport report = switch (result) {
+            case CaptureResult.TooLarge tooLarge -> tooLarge.report();
+            case CaptureResult.Unavailable unavailable -> unavailable.report();
+            case CaptureResult.Captured captured -> captured.report();
+        };
+        printCaptureFindings(source, id, report, state.kernel());
         return null;
+    }
+
+    static void printCaptureFindings(
+        CommandSourceStack source,
+        NamespacedId id,
+        CaptureReport report,
+        StructureKernel kernel
+    ) {
+        if (report.isEmpty()) {
+            return;
+        }
+        FindingBundle findings = CaptureReports.relay(report, kernel.catalogs().codes());
+        printFindings(source, "capture " + id.text() + ": findings", findings);
     }
 
     static @Nullable Siting siting(
@@ -147,19 +168,21 @@ final class CommandSupport {
             if (bounds == null) {
                 return null;
             }
-            SnapshotLease lease = capture(state, source, id, bounds, policy(blueprint));
-            return lease == null ? null : new Attempt(bounds, Siting.of(origin, Orientation.identity), lease);
+            Captured captured = capture(state, source, id, bounds, policy(blueprint), null);
+            return captured == null
+                    ? null
+                    : new Attempt(bounds, Siting.of(origin, Orientation.identity), captured.lease(), captured.report());
         }
         Cuboid anchorCell = anchorCell(origin, source);
         if (anchorCell == null) {
             return null;
         }
-        SnapshotLease anchorLease = capture(state, source, id, anchorCell, SnapshotPolicy.minimal());
-        if (anchorLease == null) {
+        Captured anchorCaptured = capture(state, source, id, anchorCell, SnapshotPolicy.minimal(), null);
+        if (anchorCaptured == null) {
             return null;
         }
         Siting siting;
-        try (SnapshotLease phase1 = anchorLease) {
+        try (SnapshotLease phase1 = anchorCaptured.lease()) {
             siting = siting(kernel, source, id, blueprint, origin, phase1.view());
             if (siting == null) {
                 return null;
@@ -170,8 +193,8 @@ final class CommandSupport {
             source.sendFailure(Component.literal("the sited blueprint bounds leave the world at " + origin));
             return null;
         }
-        SnapshotLease lease = capture(state, source, id, bounds, policy(blueprint));
-        return lease == null ? null : new Attempt(bounds, siting, lease);
+        Captured captured = capture(state, source, id, bounds, policy(blueprint), siting.placement().orientation());
+        return captured == null ? null : new Attempt(bounds, siting, captured.lease(), captured.report());
     }
 
     static @Nullable Cuboid box(BlockPos from, BlockPos to) {
@@ -199,14 +222,16 @@ final class CommandSupport {
         source.sendSuccess(() -> Component.literal(FindingRenderer.human(findings, RenderContext.plain())), false);
     }
 
-    /** One prepared capture: the world bounds, the resolved siting and the lease the caller must close. */
-    record Attempt(Cuboid bounds, Siting siting, SnapshotLease lease) implements AutoCloseable {
+    /** One prepared capture: the world bounds, the resolved siting, the lease and the host report. */
+    record Attempt(Cuboid bounds, Siting siting, SnapshotLease lease, CaptureReport report) implements AutoCloseable {
 
         @Override
         public void close() {
             lease.close();
         }
     }
+
+    record Captured(SnapshotLease lease, CaptureReport report) {}
 
     private CommandSupport() {}
 }

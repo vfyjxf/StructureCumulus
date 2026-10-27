@@ -6,8 +6,12 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
+import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
+import dev.vfyjxf.cumulus.kernel.world.CaptureReport;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.EntityWindow;
@@ -51,7 +55,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class LevelCapture implements WorldCapture {
 
     static final int cellSize = 16;
-    private static final FindingCode notCaptured = FindingCode.of(FindingCode.Family.mc, 1);
+    private static final FindingCode notCaptured = AdapterCodes.notCaptured;
     private static final Comparator<EntityCandidate> entityOrder = Comparator.comparing(EntityCandidate::type)
             .thenComparing(EntityCandidate::anchor).thenComparing(EntityCandidate::footprint)
             .thenComparing(EntityCandidate::id);
@@ -82,6 +86,11 @@ public final class LevelCapture implements WorldCapture {
 
     @Override
     public CaptureResult capture(CaptureRequest request) {
+        return capture(request, null);
+    }
+
+    /** Adapter-only: capture with an optional siting orientation for the root-frame capability audit. */
+    public CaptureResult capture(CaptureRequest request, @Nullable Orientation audit) {
         if (closed) {
             throw new IllegalStateException("capture is closed");
         }
@@ -89,13 +98,24 @@ public final class LevelCapture implements WorldCapture {
         SnapshotPolicy policy = request.policy();
         long volume = bounds.volume();
         if (volume > policy.maxElements()) {
-            return new CaptureResult.TooLarge(bounds, (int) Math.min(Integer.MAX_VALUE, volume));
+            int elements = (int) Math.min(Integer.MAX_VALUE, volume);
+            CaptureReport report = CaptureReport.of(
+                List.of(
+                    new CaptureReport.Entry(
+                        AdapterCodes.overCap,
+                        "the root capture is over the element ceiling",
+                        List.of("bounds cells: " + volume, "elements: " + elements, "ceiling: " + policy.maxElements()),
+                        bounds.asSet()
+                    )
+                )
+            );
+            return new CaptureResult.TooLarge(bounds, elements, report);
         }
         long revision = revisions.incrementAndGet();
         boolean captured = false;
         try {
             SnapshotId snapshot = new SnapshotId(world, revision);
-            CaptureContext context = new CaptureContext(snapshot, policy, volume);
+            CaptureContext context = new CaptureContext(snapshot, policy, volume, audit);
             FrameCapture rootCapture = new FrameCapture(context, 0, 0, bounds, LatticePoint.origin, true);
             FrameData root = rootCapture.build(List.of());
             if (root == null) {
@@ -110,7 +130,7 @@ public final class LevelCapture implements WorldCapture {
                 handle::release
             );
             captured = true;
-            return new CaptureResult.Captured(view, lease);
+            return new CaptureResult.Captured(view, lease, context.report());
         } finally {
             if (!captured) {
                 revisions.decrementAndGet();
@@ -196,12 +216,13 @@ public final class LevelCapture implements WorldCapture {
                 Cuboid footprint = extent.bounds().translate(-origin.x(), -origin.y(), -origin.z());
                 if (footprint == null) {
                     StructureCumulus.logger.warn("nested extent {} leaves the parent frame", extent);
+                    cut("parent-frame", extent, worldAnchor(entry.getKey()));
                     continue;
                 }
                 nestedBodies.add(
                     OccupantDescriptors.nested(context.snapshot(), frame, entry.getKey(), extent.type(), footprint)
                 );
-                FrameData child = child(extent, path);
+                FrameData child = child(extent, entry.getKey(), path);
                 if (child != null) {
                     children.put(entry.getKey(), child);
                 }
@@ -219,25 +240,31 @@ public final class LevelCapture implements WorldCapture {
             );
         }
 
-        private @Nullable FrameData child(NestedExtent extent, List<NestedKey> path) {
+        private @Nullable FrameData child(NestedExtent extent, LatticePoint localAnchor, List<NestedKey> path) {
+            LatticePoint anchor = worldAnchor(localAnchor);
             if (depth + 1 > context.policy().maxDepth()) {
+                cut("depth", extent, anchor);
                 return null;
             }
             NestedKey key = new NestedKey(extent.type(), extent.origin());
             if (path.contains(key)) {
+                cut("cycle", extent, anchor);
                 return null;
             }
             Cuboid childBounds = extent.bounds()
                     .translate(-extent.origin().x(), -extent.origin().y(), -extent.origin().z());
             if (childBounds == null) {
                 StructureCumulus.logger.warn("nested extent {} leaves the lattice", extent);
+                cut("parent-frame", extent, anchor);
                 return null;
             }
             long childVolume = childBounds.volume();
             if (childVolume > context.policy().maxElements() - context.spent()) {
+                cut("budget", extent, anchor);
                 return null;
             }
             if (!chunksLoaded(childBounds, extent.origin())) {
+                cut("unloaded", extent, anchor);
                 return null;
             }
             long spentBefore = context.spent();
@@ -257,10 +284,20 @@ public final class LevelCapture implements WorldCapture {
             FrameData result = childCapture.build(childPath);
             if (result == null) {
                 context.restore(spentBefore, frameBefore);
+                cut("unloaded", extent, anchor);
                 return null;
             }
             watch.merge(childCapture.watch);
             return result;
+        }
+
+        private void cut(String reason, NestedExtent extent, LatticePoint anchor) {
+            context.cut(reason, extent, anchor, frame, root);
+        }
+
+        private LatticePoint worldAnchor(LatticePoint localAnchor) {
+            LatticePoint world = origin.offset(localAnchor.x(), localAnchor.y(), localAnchor.z());
+            return world == null ? localAnchor : world;
         }
 
         private boolean captureSections() {
@@ -375,6 +412,9 @@ public final class LevelCapture implements WorldCapture {
                             continue;
                         }
                         LatticePoint cell = LatticePoint.of(x, y, z);
+                        if (root) {
+                            context.audit(state, cell);
+                        }
                         BlockPos worldPos = new BlockPos(worldX, worldY, worldZ);
                         BlockEntity blockEntity = state.hasBlockEntity() ? chunk.getBlockEntity(worldPos) : null;
                         List<TraitSlot> traits = OccupantTraits
@@ -550,6 +590,11 @@ public final class LevelCapture implements WorldCapture {
         found.putIfAbsent(candidate.id(), candidate);
     }
 
+    private static NamespacedId blockType(BlockState state) {
+        var key = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        return NamespacedId.of(key.getNamespace(), key.getPath());
+    }
+
     static NamespacedId entityType(Entity entity) {
         var location = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         return NamespacedId.of(location.getNamespace(), location.getPath());
@@ -594,17 +639,91 @@ public final class LevelCapture implements WorldCapture {
 
     private record NestedKey(NamespacedId type, LatticePoint origin) {}
 
+    private record AuditKey(NamespacedId block, String property, String value) implements Comparable<AuditKey> {
+
+        @Override
+        public int compareTo(AuditKey other) {
+            int byBlock = block.compareTo(other.block);
+            if (byBlock != 0) {
+                return byBlock;
+            }
+            int byProperty = property.compareTo(other.property);
+            return byProperty != 0 ? byProperty : value.compareTo(other.value);
+        }
+    }
+
+    private record Cut(String reason, NestedExtent extent, LatticePoint anchor, int frame, boolean root) {
+
+        private CaptureReport.Entry entry() {
+            return new CaptureReport.Entry(
+                AdapterCodes.cut,
+                "a nested extent was cut: " + reason,
+                List.of("reason: " + reason, "frame: " + frame, "anchor: " + anchor, "extent: " + extent.type().text()),
+                root ? extent.bounds().asSet() : null
+            );
+        }
+    }
+
     private static final class CaptureContext {
 
         private final SnapshotId snapshot;
         private final SnapshotPolicy policy;
+        private final @Nullable Orientation audit;
+        private final List<Cut> cuts = new ArrayList<>();
+        private final Map<AuditKey, CuboidSet> audits = new TreeMap<>();
         private long spent;
         private int nextFrame = 1;
 
-        private CaptureContext(SnapshotId snapshot, SnapshotPolicy policy, long spent) {
+        private CaptureContext(SnapshotId snapshot, SnapshotPolicy policy, long spent, @Nullable Orientation audit) {
             this.snapshot = snapshot;
             this.policy = policy;
             this.spent = spent;
+            this.audit = audit;
+        }
+
+        private void audit(BlockState state, LatticePoint cell) {
+            Orientation orientation = audit;
+            if (orientation == null || orientation.tilt() == Tilt.level) {
+                return;
+            }
+            if (OrientationMapping.transform(
+                orientation,
+                state
+            ) instanceof OrientationMapping.MappingResult.Unrepresentable unrepresentable) {
+                AuditKey key = new AuditKey(blockType(state), unrepresentable.property(), unrepresentable.value());
+                audits.merge(key, CuboidSet.of(Cuboid.of(cell)), CuboidSet::union);
+            }
+        }
+
+        private void cut(String reason, NestedExtent extent, LatticePoint anchor, int frame, boolean root) {
+            cuts.add(new Cut(reason, extent, anchor, frame, root));
+        }
+
+        private CaptureReport report() {
+            List<CaptureReport.Entry> entries = new ArrayList<>(audits.size() + cuts.size());
+            Orientation orientation = audit;
+            for (Map.Entry<AuditKey, CuboidSet> group : audits.entrySet()) {
+                AuditKey key = group.getKey();
+                CuboidSet cells = group.getValue();
+                entries.add(
+                    new CaptureReport.Entry(
+                        AdapterCodes.orientation,
+                        "a captured block state cannot express the siting orientation",
+                        List.of(
+                            "block: " + key.block().text(),
+                            "property: " + key.property(),
+                            "value: " + key.value(),
+                            "cells: " + cells.volume(),
+                            "orientation: " + (orientation == null ? 0 : orientation.ordinal())
+                        ),
+                        cells
+                    )
+                );
+            }
+            for (Cut cut : cuts) {
+                entries.add(cut.entry());
+            }
+            return CaptureReport.of(entries);
         }
 
         private SnapshotId snapshot() {
