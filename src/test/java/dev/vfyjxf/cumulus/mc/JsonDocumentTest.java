@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -672,6 +673,45 @@ class JsonDocumentTest {
         assertEquals(List.of("test:a", "test:z"), List.copyOf(document.extensions().keySet()));
         String text = new JsonWriter().write(document);
         assertTrue(text.indexOf("\"test:a\"") < text.indexOf("\"test:z\""), "definition keys ascend");
+    }
+
+    @Test
+    void crlfDocumentsKeepTheirOffsets() {
+        String text = "{\r\n  \"schemaVersion\": 1,\r\n  \"id\": \"test:crlf\",\r\n"
+                + "  \"bounds\": [0,0,0,1,1,1],\r\n  \"bays\": [],\r\n  \"checks\": [],\r\n" + "  \"seams\": []\r\n}";
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        Finding finding = errors.stream().filter(f -> f.code().equals(FindingCode.of(FindingCode.Family.doc, 2)))
+                .findFirst().orElseThrow();
+        var span = Objects.requireNonNull(Objects.requireNonNull(finding.primaryLabel()).locus().source());
+        assertEquals("\"seams\"", text.substring(span.start(), span.end()));
+
+        String truncated = "{\r\n  \"schemaVersion\": 1,\r\n  \"id\": \"test:crlf\"\r\n";
+        List<Finding> parseErrors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, truncated, parseErrors));
+        Finding parse = parseErrors.get(0);
+        assertEquals(FindingCode.of(FindingCode.Family.doc, 13), parse.code());
+        assertTrue(parse.hasPrimary(), "the CRLF parse failure is located");
+        var parseSpan = Objects.requireNonNull(Objects.requireNonNull(parse.primaryLabel()).locus().source());
+        assertTrue(parseSpan.start() >= 0 && parseSpan.start() <= truncated.length());
+    }
+
+    @Test
+    void everyTruncationOfTheRepresentativeDocumentIsSafe() {
+        JsonReader reader = new JsonReader();
+        for (int length = 0; length < richDocument.length(); length++) {
+            String prefix = richDocument.substring(0, length);
+            List<Finding> errors = new ArrayList<>();
+            assertDoesNotThrow(() -> reader.read(documentId, prefix, errors), () -> "length " + prefix.length());
+        }
+    }
+
+    @Test
+    void documentMapsStayImmutableAndOrdered() {
+        Document document = read(richDocument);
+        assertThrows(UnsupportedOperationException.class, () -> document.definitions().clear());
+        assertThrows(UnsupportedOperationException.class, () -> document.extensions().clear());
+        assertEquals(List.of(NamespacedId.of("test", "unit")), List.copyOf(document.definitions().keySet()));
     }
 
     private static void assertOrdered(String text, String anchor, String... members) {

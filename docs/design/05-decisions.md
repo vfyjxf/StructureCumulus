@@ -358,7 +358,7 @@ prediction with `SC-CLM-0004`, before an `Admitted` exists; `settle` revalidates
 `ClaimPlanner.derive` throws the same code if a nested or non-root subject reaches it (a proof
 failure, because check and settle validate first). A nested child subject (frame `!= 0`) is invalid
 for a claimable bay for the same reason. **Status (v1.2):** implemented in `cb06aa8`; the check-time
-rejection is covered by `ReadModelTest`/`StructureValidationTest`.
+rejection is covered by `ReadModelTest.nestedSubjectIsRejectedAtCheckAndPlanner`.
 
 **Why:** a claim row is a world cell of the root instance. A child frame's local cells are not the
 parent's cells, and claiming the extent would let a child structure's internals — or a template that
@@ -378,12 +378,13 @@ the public `dev.vfyjxf.cumulus.mc.capability` package, queried through
 `NestedExtents.BLOCK`/`NestedExtents.ENTITY` (both `createVoid`, id
 `structurecumulus:nested_extent`). Providers register on the MOD bus through
 `RegisterCapabilitiesEvent`. There is **no built-in provider** for the vanilla Structure Block, no
-`StructureBlockEntity` special case, no template read and no adapter-owned source registry. The
-adapter queries only the four-argument block overload with the already-read state/block entity,
-skips a block-entity state whose block entity is null, and queries an entity with
+`StructureBlockEntity` special case, no template read and no adapter-owned source registry. For this
+capability the adapter queries only the four-argument block overload with the already-read
+state/block entity, skips a block-entity state whose block entity is null, and queries an entity with
 `entity.getCapability(ENTITY, null)`; one result per cell, first provider wins, block source over
 entity source, no merge or conflict detection. A provider value is a declaration; the adapter owns
-validation, frames, depth, parent, no-chunk reads, cycles, budget, refusal and the child view.
+validation, frames, depth, parent, no-chunk reads, `(type, origin)` cycle detection, budget, refusal
+and the child view.
 
 **Why:** the vanilla structure block is an editor, not a stable composition source — reading its
 template would make capture depend on a file format and a block-entity special case. A capability is

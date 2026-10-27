@@ -149,8 +149,9 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for the capability declaration,
   `SavedClaimsTest`/`SavedContextsTest` for persistence, `OrientationMappingTest` for upright mapping.
   **Still pending:** M4 JSON/datapack and the remaining commands (`compile`, `settle`, `explain`,
-  `claims`), non-upright pitch/roll state mapping (the 40 orientations), `SC-MC-0004`/`0005` emission,
-  window/mark-counter lease invalidation, and the deferred `SC-MC-0003` capture-finding channel.
+  `claims`), M5 determinism/lease gate, non-upright pitch/roll state mapping (the 40 orientations),
+  `SC-MC-0004`/`0005` emission, window/mark-counter lease invalidation, and the deferred
+  `SC-MC-0003` capture-finding channel.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.
