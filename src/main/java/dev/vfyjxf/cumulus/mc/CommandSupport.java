@@ -121,6 +121,59 @@ final class CommandSupport {
         return null;
     }
 
+    static @Nullable Cuboid sitedBounds(Blueprint blueprint, Siting siting) {
+        return siting.toWorld(blueprint.bounds());
+    }
+
+    static @Nullable Cuboid anchorCell(LatticePoint origin, CommandSourceStack source) {
+        try {
+            return Cuboid.of(origin);
+        } catch (IllegalArgumentException failure) {
+            source.sendFailure(Component.literal("the anchor cell leaves the lattice at " + origin));
+            return null;
+        }
+    }
+
+    static @Nullable Attempt attempt(
+        ServerState state,
+        CommandSourceStack source,
+        StructureKernel kernel,
+        NamespacedId id,
+        Blueprint blueprint,
+        LatticePoint origin
+    ) {
+        if (blueprint.anchors().isEmpty()) {
+            Cuboid bounds = worldBounds(blueprint, origin, source);
+            if (bounds == null) {
+                return null;
+            }
+            SnapshotLease lease = capture(state, source, id, bounds, policy(blueprint));
+            return lease == null ? null : new Attempt(bounds, Siting.of(origin, Orientation.identity), lease);
+        }
+        Cuboid anchorCell = anchorCell(origin, source);
+        if (anchorCell == null) {
+            return null;
+        }
+        SnapshotLease anchorLease = capture(state, source, id, anchorCell, SnapshotPolicy.minimal());
+        if (anchorLease == null) {
+            return null;
+        }
+        Siting siting;
+        try (SnapshotLease phase1 = anchorLease) {
+            siting = siting(kernel, source, id, blueprint, origin, phase1.view());
+            if (siting == null) {
+                return null;
+            }
+        }
+        Cuboid bounds = sitedBounds(blueprint, siting);
+        if (bounds == null) {
+            source.sendFailure(Component.literal("the sited blueprint bounds leave the world at " + origin));
+            return null;
+        }
+        SnapshotLease lease = capture(state, source, id, bounds, policy(blueprint));
+        return lease == null ? null : new Attempt(bounds, siting, lease);
+    }
+
     static @Nullable Cuboid box(BlockPos from, BlockPos to) {
         int minX = Math.min(from.getX(), to.getX());
         int minY = Math.min(from.getY(), to.getY());
@@ -144,6 +197,15 @@ final class CommandSupport {
             return;
         }
         source.sendSuccess(() -> Component.literal(FindingRenderer.human(findings, RenderContext.plain())), false);
+    }
+
+    /** One prepared capture: the world bounds, the resolved siting and the lease the caller must close. */
+    record Attempt(Cuboid bounds, Siting siting, SnapshotLease lease) implements AutoCloseable {
+
+        @Override
+        public void close() {
+            lease.close();
+        }
     }
 
     private CommandSupport() {}

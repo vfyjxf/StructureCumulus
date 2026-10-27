@@ -6,12 +6,9 @@ import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
-import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
-import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
@@ -53,24 +50,23 @@ final class SettleCommand {
         Blueprint blueprint,
         LatticePoint origin
     ) {
-        Cuboid bounds = CommandSupport.worldBounds(blueprint, origin, source);
-        if (bounds == null) {
-            return null;
-        }
-        ClaimView claims = state.claims(level).read(bounds);
         StructureKernel kernel = state.kernel(level);
-        SnapshotLease captured = CommandSupport
-                .capture(state, source, blueprint.id(), bounds, CommandSupport.policy(blueprint));
-        if (captured == null) {
+        CommandSupport.Attempt attempt = CommandSupport
+                .attempt(state, source, kernel, blueprint.id(), blueprint, origin);
+        if (attempt == null) {
             return null;
         }
-        try (SnapshotLease lease = captured) {
-            Siting siting = CommandSupport.siting(kernel, source, blueprint.id(), blueprint, origin, lease.view());
-            if (siting == null) {
-                return null;
-            }
-            MatchRequest request = MatchRequest
-                    .of(blueprint, siting, lease, state.instance(level), state.owner(), Budget.unbounded(), claims);
+        try (CommandSupport.Attempt prepared = attempt) {
+            ClaimView claims = state.claims(level).read(prepared.bounds());
+            MatchRequest request = MatchRequest.of(
+                blueprint,
+                prepared.siting(),
+                prepared.lease(),
+                state.instance(level),
+                state.owner(),
+                Budget.unbounded(),
+                claims
+            );
             MatchResult checked = kernel.check(request);
             if (!(checked instanceof MatchResult.Admitted admitted)) {
                 CommandSupport
