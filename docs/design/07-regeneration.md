@@ -14,8 +14,11 @@ context,document,engine,remedy,spi}`, `src/kernelTest/java`, and the `src/main/j
 the M1 adapter (host + `/cumulus check` + capture-check): `LevelCapture`, `LevelSnapshot`,
 `LevelLease`, block/block-entity descriptors, the `ServerState` lifecycle, in-memory
 `BuiltinDocuments` (`structurecumulus:air_cell`) and `/cumulus check <id> <origin>`, plus two
-GameTests (capture-only; capture → compile → check). Claims/persistence, JSON/datapack, the rest of
-the command surface, entities, nested views, traits, orientation mapping and windows remain pending.
+GameTests (capture-only; capture → compile → check). M2 is partial: M2a adds loaded-entity capture,
+policy windows, full footprint indexing and entity-vs-block precedence (`world.md` §4.3), plus a
+third GameTest (capture entity over block); M2b adds upright orientation mapping. Traits, nested
+views, non-upright pitch/roll state mapping, `SC-MC-0002`–`0005` emission, window/mark-counter lease
+invalidation, claims/persistence, JSON/datapack and the rest of the command surface remain pending.
 
 ## 2. The order
 
@@ -80,11 +83,14 @@ the exact failure this set exists to prevent.
 
 ## 7. What the next round owes
 
-- The rest of the adapter (`modules/adapter.md`) against the four ports: M2 nested frames, entities,
-  traits, orientation mapping, windows and capture findings; M3 claims/context persistence with
-  CAS/release/reload; M4 JSON reader/writer, datapack reload and the remaining commands (`compile`,
-  `settle`, `explain`, `claims`). The orientation, door and furnace GameTests follow. M1's two
-  GameTests (capture-only; capture → compile → check) already run.
+- The rest of the adapter (`modules/adapter.md`) against the four ports: the rest of M2 — traits,
+  nested views/`NestedLevelSnapshot`, non-upright pitch/roll state mapping, `SC-MC-0002`–`0005`
+  emission, window/mark-counter lease invalidation and capture findings; M3 claims/context
+  persistence with CAS/release/reload; M4 JSON reader/writer, datapack reload and the remaining
+  commands (`compile`, `settle`, `explain`, `claims`). The orientation, door and furnace GameTests
+  follow. M1's two GameTests (capture-only; capture → compile → check) and M2a's
+  capture-entity-over-block GameTest already run; `OrientationMappingTest` covers M2b's upright
+  mapping.
 - A host scheduler with coalescing, dirty windows and a per-world ledger, outside the kernel.
 - A real JSON reader/writer and a datapack reload.
 - A performance pass: claim-row volume for large structures, `statusOf` cost, and the section pass.

@@ -25,12 +25,17 @@ prove, while the ports make the adapter a later, independent exercise. Current s
 command + capture-check slice is implemented — `LevelCapture`, `LevelSnapshot`, `LevelLease`,
 block/block-entity descriptors, the `ServerState` lifecycle, in-memory `BuiltinDocuments`
 (`structurecumulus:air_cell`) and `/cumulus check <id> <origin>` (identity siting for anchorless
-blueprints), with two GameTests (capture-only; capture → compile → check). Claims/context
-persistence, document I/O, the rest of the command surface, entities, nested views, traits,
-orientation mapping and windows remain pending.
+blueprints), with two GameTests (capture-only; capture → compile → check). M2 is partial: M2a adds
+loaded-entity capture with policy windows, full footprint indexing and entity-vs-block precedence
+(`world.md` §4.3), plus a third GameTest (capture entity over block); M2b adds
+`Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror` and an upright mirror-then-rotate
+`BlockState` transform that returns `UnsupportedTilt` for non-level tilts. Traits, nested
+views/`NestedLevelSnapshot`, non-upright pitch/roll state mapping, `SC-MC-0002`–`0005` emission,
+window/mark-counter lease invalidation, claims/context persistence, document I/O, the rest of the
+command surface and the rest of the adapter remain pending.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter beyond M1 remains the missing piece for a game.
+adapter beyond M2a/M2b remains the missing piece for a game.
 
 ### D-03 — English only
 

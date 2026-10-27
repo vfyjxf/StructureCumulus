@@ -85,7 +85,7 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、97 个 kernel 测试、55 个 code、23 条决策。五道 gate 通过；determinism 在沙箱里没有运行。adapter 处于 M1 —— host、<code>/cumulus check</code> 和两个 GameTest（capture-only；capture → compile → check）；其余刻意缺席，kernel 不是。</> : <>Six gates, 97 kernel tests, 55 codes and 23 decisions. Five gates are green; determinism was not run in this sandbox. The adapter is at M1 — host, <code>/cumulus check</code> and two GameTests (capture-only; capture → compile → check); the rest is deliberately absent, not the kernel.</>}
+        note={zh ? <>六道 gate、97 个 kernel 测试、18 个 adapter 单元测试、55 个 code、23 条决策。五道 gate 通过；determinism 在沙箱里没有运行。adapter 处于 M1（host + <code>/cumulus check</code>）+ 部分 M2：M2a 的 loaded-entity capture 和 M2b 的 upright orientation mapping，三个 GameTest（capture-only；capture → compile → check；capture entity over block）。M2 尚未完成 —— traits、nested views、非 upright pitch/roll、SC-MC-0002–0005、lease invalidation —— M3/M4 仍待完成。</> : <>Six gates, 97 kernel tests, 18 adapter unit tests, 55 codes and 23 decisions. Five gates are green; determinism was not run in this sandbox. The adapter is at M1 (host + <code>/cumulus check</code>) plus partial M2: M2a loaded-entity capture and M2b upright orientation mapping, with three GameTests (capture-only; capture → compile → check; capture entity over block). M2 is not complete — traits, nested views, non-upright pitch/roll, SC-MC-0002–0005, lease invalidation — and M3/M4 remain.</>}
       />
 
       <Reveal>
@@ -127,9 +127,9 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green; the transcript below is the direct javac/JUnit harness. M1 GameTests: runGameTestServer 2/2.</div>
+            <div className="warn">check: ./gradlew check is green; the transcript below is the direct javac/JUnit harness. GameTests: runGameTestServer 3/3 (capture-only; capture→compile→check; capture entity over block).</div>
             <div style={{ height: 14 }} />
-            <div className="cmd">{zh ? '下一个攻击点：M2–M4（nested frames、entities、traits、orientation、windows、claims/context persistence、JSON/datapack、剩余 commands），不是 kernel。' : 'Next attack: M2–M4 (nested frames, entities, traits, orientation, windows, claims/context persistence, JSON/datapack, the remaining commands), not the kernel.'}</div>
+            <div className="cmd">{zh ? '下一个攻击点：M2 剩余部分（traits、nested views、非 upright orientation、SC-MC-0002–0005、lease invalidation），然后是 M3/M4（claims/context persistence、JSON/datapack、剩余 commands），不是 kernel。' : 'Next attack: the rest of M2 (traits, nested views, non-upright orientation, SC-MC-0002–0005, lease invalidation), then M3/M4 (claims/context persistence, JSON/datapack, the remaining commands), not the kernel.'}</div>
           </div>
         </div>
       </Reveal>

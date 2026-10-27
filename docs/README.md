@@ -47,20 +47,27 @@ Then the module files, in dependency order:
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
   lifecycle, in-memory `BuiltinDocuments` (`structurecumulus:air_cell`) and
-  `/cumulus check <id> <origin>` (identity siting for anchorless blueprints), proven by two GameTests
-  (capture-only; capture → compile → check). Claims/persistence, JSON/datapack, the rest of the
-  command surface, entities, nested views, traits, orientation mapping and windows remain pending.
+  `/cumulus check <id> <origin>` (identity siting for anchorless blueprints), with two GameTests
+  (capture-only; capture → compile → check). M2 is partial: M2a adds loaded-entity capture with
+  policy windows, full footprint indexing and entity-vs-block precedence (`world.md` §4.3), plus the
+  capture-entity-over-block GameTest; M2b adds `Heading`/`Direction`, `Turn`/`Rotation`,
+  `Flip`/`Mirror` and an upright mirror-then-rotate `BlockState` transform that returns
+  `UnsupportedTilt` for non-level tilts. Traits, nested views/`NestedLevelSnapshot`, non-upright
+  pitch/roll state mapping, `SC-MC-0002`–`0005` emission, window/mark-counter lease invalidation,
+  claims/persistence, JSON/datapack and the remaining commands are still pending.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
-  the adapter. At M1 the adapter also owns the server state, the in-memory document source and
-  `/cumulus check`. The adapter is the only place allowed to name Minecraft.
+  the adapter. At M1 the adapter owns the server state, the in-memory document source and
+  `/cumulus check`; M2a adds loaded-entity capture and M2b adds upright orientation mapping. The
+  adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 97
-  kernel JUnit 5 tests and 2 adapter unit tests pass; `tools/spec-check.py` is clean;
-  `./gradlew check` is green; `runGameTestServer` passes 2/2 (capture-only; capture → compile →
-  check). The adapter is implemented to M1 only; claims/persistence, JSON/datapack, the remaining
-  commands, entities, nested views, traits, orientation mapping and windows remain pending. The two
-  GameTests are counted separately from the 97 kernel tests.
+  kernel JUnit 5 tests and 18 adapter unit tests pass; `tools/spec-check.py` is clean;
+  `./gradlew check` is green; `runGameTestServer` passes 3/3 (capture-only; capture → compile →
+  check; capture entity over block). The adapter is implemented to M1 + partial M2; traits, nested
+  views, non-upright state mapping, `SC-MC-0002`–`0005`, lease invalidation, claims/persistence,
+  JSON/datapack and the remaining commands remain pending. The three GameTests are counted
+  separately from the 97 kernel tests.
 
 ## The one rule
 

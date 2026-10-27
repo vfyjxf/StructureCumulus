@@ -18,10 +18,10 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current M1 evidence (2026-10-27): `./gradlew check` is green; `runGameTestServer` passes 2/2
-(capture-only; capture → compile → check); `kernelTest` is 97; the adapter `test` task is 2;
-`tools/spec-check.py` is clean; the visual build is green. The two GameTests are separate from the 97
-kernel tests.
+Current M1 + M2a/M2b evidence (2026-10-27): `./gradlew check` is green; `runGameTestServer` passes
+3/3 (capture-only; capture → compile → check; capture entity over block); `kernelTest` is 97; the
+adapter `test` task is 18; `tools/spec-check.py` is clean; the visual build is green. The three
+GameTests are separate from the 97 kernel tests.
 
 ## 2. Requirement → module → test
 
@@ -120,11 +120,17 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 - The rest of the NeoForge adapter and its GameTests. M1 is executed by `runGameTestServer`: capture,
   snapshot and lease, block/block-entity descriptors, `ServerState`, in-memory `BuiltinDocuments` and
-  `/cumulus check <id> <origin>`, with the capture-only and capture → compile → check GameTests (2/2).
-  Still reviewed, not executed: M2 nested frames, entities/traits, orientation mapping, windows and
-  capture findings; M3 claims/context persistence with CAS/release/reload; M4 JSON reader/writer,
-  datapack reload and the remaining commands (`compile`, `settle`, `explain`, `claims`). The
-  orientation, door and furnace GameTests are also still reviewed, not executed.
+  `/cumulus check <id> <origin>`, with the capture-only and capture → compile → check GameTests. M2a
+  is executed by `runGameTestServer` (capture entity over block) and by the `LevelSnapshotTest`
+  precedence cases: loaded-entity capture, policy windows, full footprint indexing and
+  entity-vs-block precedence (`world.md` §4.3). M2b is executed by `OrientationMappingTest`: upright
+  heading/turn/flip mapping and a mirror-then-rotate state transform; non-level tilts return
+  `UnsupportedTilt`. Still reviewed, not executed: the rest of M2 — traits/`OccupantTraits`, nested
+  views/`NestedLevelSnapshot`, non-upright pitch/roll state mapping, `SC-MC-0002`–`0005` emission,
+  window/mark-counter lease invalidation and capture findings; M3 claims/context persistence with
+  CAS/release/reload; M4 JSON reader/writer, datapack reload and the remaining commands (`compile`,
+  `settle`, `explain`, `claims`). The orientation, door and furnace GameTests are also still
+  reviewed, not executed.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.

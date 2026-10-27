@@ -65,9 +65,11 @@ Notes:
 - `mc` is a separate Gradle source set (`main`), not a kernel package. In v1 it was specified in
   `modules/adapter.md` only; the M1 slice (host + `/cumulus check` + capture-check: capture, root
   snapshot, lease, block/block-entity descriptors, `ServerState`, in-memory documents, two GameTests)
-  is now implemented, while claims/persistence, JSON/datapack, the rest of the command surface,
-  entities, nested views, traits, orientation mapping and windows remain pending. The main source set
-  also compiles the mod entry.
+  is now implemented, and M2 is partial: M2a adds loaded-entity capture with policy windows, full
+  footprint indexing and entity-vs-block precedence (`world.md` §4.3), plus a third GameTest; M2b
+  adds upright orientation mapping. Still pending: traits, nested views, non-upright pitch/roll state
+  mapping, `SC-MC-0002`–`0005` emission, window/mark-counter lease invalidation, claims/persistence,
+  JSON/datapack and the rest of the command surface. The main source set also compiles the mod entry.
 
 ## 2. Ownership
 

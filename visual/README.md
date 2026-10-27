@@ -3,14 +3,17 @@
 An interactive, adversarial review of the kernel design. Not a feature tour: each chapter is a claim
 the kernel must survive — a frame mapping, a write, a conflict, a missing value, a finding.
 
-The design of record is [`../docs/README.md`](../docs/README.md). The adapter is at M1: the host,
-`/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`, `LevelSnapshot`,
-`LevelLease`, block/block-entity descriptors, `ServerState`, in-memory `BuiltinDocuments`), proven by
-two GameTests (capture-only; capture → compile → check). Claims/persistence, JSON/datapack, the rest
-of the command surface, entities, nested views, traits, orientation mapping and windows are pending.
-The UI opens in **中文**; the **EN** button in the top bar switches to the English reading layer.
-Technical identifiers, code, JSON, Java and finding codes stay in their original form in both
-languages.
+The design of record is [`../docs/README.md`](../docs/README.md). The adapter is at M1 plus partial
+M2: M1 is the host, `/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`,
+`LevelSnapshot`, `LevelLease`, block/block-entity descriptors, `ServerState`, in-memory
+`BuiltinDocuments`); M2a adds loaded-entity capture with policy windows, full footprint indexing and
+entity-vs-block precedence; M2b adds upright orientation mapping (`Heading`/`Direction`,
+`Turn`/`Rotation`, `Flip`/`Mirror`, mirror-then-rotate; non-level tilts return `UnsupportedTilt`).
+M2 is not complete: traits, nested views, non-upright pitch/roll mapping, `SC-MC-0002`–`0005`,
+window/mark-counter lease invalidation, claims/persistence, JSON/datapack and the remaining commands
+are pending. Three GameTests and 18 adapter unit tests are green. The UI opens in **中文**; the **EN**
+button in the top bar switches to the English reading layer. Technical identifiers, code, JSON, Java
+and finding codes stay in their original form in both languages.
 
 ## Run
 
@@ -27,8 +30,8 @@ network request.
 
 ## What is inside
 
-97 kernel tests, 55 codes, 23 decisions, 11 ranked kernel packages, plus M1's two adapter GameTests.
-One complete document and a Java builder excerpt target the same IR.
+97 kernel tests, 18 adapter unit tests, three GameTests, 55 codes, 23 decisions and 11 ranked kernel
+packages. One complete document and a Java builder excerpt target the same IR.
 
 | Chapter | What you can do |
 | --- | --- |
@@ -62,5 +65,5 @@ history; this app documents v1.0 and is the one to run.
 
 ## Caveat
 
-The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check` and the adapter’s two M1
-GameTests (`runGameTestServer` 2/2) are green.
+The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check`, the adapter’s 18 unit
+tests and its three GameTests (`runGameTestServer` 3/3) are green.
