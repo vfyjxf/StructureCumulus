@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.SourceSpan;
 import dev.vfyjxf.cumulus.kernel.core.Value;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -339,7 +340,7 @@ public final class BlueprintBuilder {
         }
         for (Check<?> check : declaredChecks) {
             for (ContextKey<?> required : check.expectation().meta().requires()) {
-                if (!produced.contains(required)) {
+                if (!produced.contains(required) && required.retention() != Retention.instance) {
                     fail(
                         "SC-CHK-0002",
                         "check " + check.id() + " requires " + required.id() + ", which no computation produces"

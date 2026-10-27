@@ -64,6 +64,10 @@ public final class Expectations {
         return new AnyOccupant();
     }
 
+    public static <T> Expectation<T> context(ContextKey<T> key, Predicate<T> test) {
+        return new ContextValue<>(key, test);
+    }
+
     @SafeVarargs
     public static <T> Expectation<T> allOf(Expectation<T>... children) {
         return new Junction<>(Junction.Mode.all, List.of(children));
@@ -345,6 +349,36 @@ public final class Expectations {
         @Override
         public ReadScope reads() {
             return ReadScope.none().withTraits(Set.of(key.id()));
+        }
+    }
+
+    private record ContextValue<T>(ContextKey<T> key, Predicate<T> test) implements Expectation<T> {
+
+        private ContextValue {
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(test, "test");
+        }
+
+        @Override
+        public Reply test(ExpectationContext<T> ctx) {
+            if (test.test(ctx.subject())) {
+                return Reply.match();
+            }
+            Locus locus = Locus.key(ctx.instance(), key.id());
+            Finding finding = Finding.builder(code(1), Severity.error).phase(ctx.phase())
+                    .message("context key " + key.id() + " did not satisfy the test")
+                    .label(Label.primary(locus, "context " + key.id() + " did not satisfy")).build();
+            return mismatch(finding);
+        }
+
+        @Override
+        public Class<T> subject() {
+            return key.type();
+        }
+
+        @Override
+        public ExpectationMeta meta() {
+            return new ExpectationMeta(id("context"), 10, Set.of(key), code(1));
         }
     }
 

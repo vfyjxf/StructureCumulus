@@ -38,7 +38,7 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `BayView` | record | a bay's own read face; total `read` |
 | `DoorView` | record | the two halves of a door + its bay |
 | `Focuses` | final class | the shipped focus kinds |
-| `Expectations` | final class | the shipped expectation combinators and leaves |
+| `Expectations` | final class | the shipped expectation combinators, leaves and the typed context test |
 | `Seam` / `SeamId` / `SeamKind` | record / record / enum | a declared connectable edge |
 | `AnchorSpec` / `AnchorRoles` | record / final class | one property at the definition origin |
 | `OrientationPolicy` | record | allowed orientations + primary role + upright promise |
@@ -50,8 +50,8 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `Computation<T>` | interface | id + output + inputs + region |
 | `SectionComputation<T>` | interface | `compute(SectionContext)` |
 | `AggregateComputation<T>` | interface | `compute(AggregateContext)` |
-| `SectionContext` / `AggregateContext` | interfaces | what a computation sees; `SectionContext` has a total `read`, `unreadable()` and `phase()` |
-| `Computations` | final class | `count`, `volume`, `air` |
+| `SectionContext` / `AggregateContext` | interfaces | what a computation sees; both have a total `read` and `unreadable()`, `SectionContext` also has `phase()` |
+| `Computations` | final class | `count` (with an optional predicate), `volume`, `air` |
 | `FocusFactory` / `ExpectationFactory` / `ComputationFactory` | interfaces | data-driven constructors |
 | `FactoryContext` | record | document id, source, finding reporter |
 
@@ -205,6 +205,8 @@ public final class Expectations {
                                                           java.util.function.Predicate<T> test);
     public static Expectation<OccupantSnapshot> traitAbsent(TraitKey<?> key);
     public static Expectation<OccupantSnapshot> anyOccupant();
+    public static <T> Expectation<T> context(ContextKey<T> key,
+                                             java.util.function.Predicate<T> test);
     public static <T> Expectation<T> allOf(Expectation<T>... children);
     public static <T> Expectation<T> anyOf(Expectation<T>... children);
     public static <T> Expectation<T> sequence(Expectation<T>... children);
@@ -321,6 +323,11 @@ public interface AggregateContext {
     ContextView context();
     WorldView view();
     Siting siting();
+    CuboidSet cells();
+    CellRead read(LatticePoint cell);
+    default @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    default @Nullable ReadRefusal refusalAt(LatticePoint cell);
+    java.util.Map<LatticePoint, ReadRefusal> unreadable();
     java.util.List<OccupantSnapshot> occupants(Cuboid box);
     Budget remaining();
     CancelToken cancel();
@@ -329,6 +336,8 @@ public interface AggregateContext {
 
 public final class Computations {
     public static SectionComputation<Long> count(ContextKey<Long> output, CuboidSet region);
+    public static SectionComputation<Long> count(ContextKey<Long> output, CuboidSet region,
+                                                 java.util.function.Predicate<OccupantSnapshot> predicate);
     public static SectionComputation<Long> volume(ContextKey<Long> output, CuboidSet region);
     public static SectionComputation<Long> air(ContextKey<Long> output, CuboidSet region);
     private Computations() {}
@@ -530,6 +539,17 @@ could not answer.
 any is missing, the check is `Unreadable(SC-CTX-0007)` and `test` is not called. An expectation that
 uses `context().get(key)` for a key it did not declare is a review defect.
 
+`Expectations.context(key, test)` is the shipped pairing for `Focuses.context(key)`: its subject is
+`key.type()`, `meta.requires()` is exactly `Set.of(key)`, and a value
+for which `test` returns false is `Mismatch(SC-EXP-0001)` on a `key` locus. It never fabricates a
+value: an absent key is the engine's `SC-CTX-0007` gate (or `Focuses.context`'s `Unavailable`), so
+`test` runs only on a found value. The expectation is the only way to declare a whole-structure
+context read; a range test is a caller's `Predicate`, not a second API.
+The context view behind it is the attempt composite of `engine` §7.7: the attempt's own values shadow
+the cached instance values, and a cached key is composed only when the plan declares it as an
+instance dependency — in a check's `ExpectationMeta.requires()` or a computation's `inputs()`. The
+cache itself is the host `CachedContext` port, looked up by `(id, type)`.
+
 ### 4.7 Blueprint
 
 `Blueprint` is a final class with a package-private constructor. The builder is the only public
@@ -562,7 +582,14 @@ consequence of the blueprint, not a second declaration.
 | computation DAG cycle/missing input/duplicate output/empty region/section input | `SC-BPT-0007` |
 | derivation order negative/duplicate, output duplicate/also a computation output | `SC-BPT-0008` |
 | seam outside every bay | `SC-BPT-0009` |
-| a focus's static cells leave its bay, a check reads a derivation output, or a required key is produced by no computation | `SC-CHK-0002/0003` |
+| a focus's static cells leave its bay | `SC-CHK-0003` |
+| a required `match` key is produced by no computation | `SC-CHK-0002` |
+
+A required `instance` key needs no computation producer: the host may supply it from the instance's
+cached context, and a runtime absence is the engine's `SC-CTX-0007`, not a build error. A required
+`match` key is attempt-local and has no cache, so it must still be produced by a computation in the
+same blueprint. A derivation output is an `instance` key, not a computation producer; a check may
+require it and the value arrives only through the cached context (or it is absent).
 
 The document compiler runs the same table and reports findings with loci before calling `build()`;
 a `build()` throw after a clean compile is a kernel defect.
@@ -599,13 +626,28 @@ lists the slice's refused local cells with their refusals, in cell order. A sect
 `Refused` is never handed to `compute`; its key is absent and the engine records `SC-CTX-0006`. A
 `Partial` section is handed over with its refused cells visible. `SectionContext.occupants()` is
 readable-only: a computation that uses its size for a total must consult `unreadable()` first.
-`Computations.count` counts non-air occupants whose anchor is in the slice; `volume` counts cells;
-`air` counts air cells. `count`/`air` require a total slice: when `unreadable()` is non-empty they
-report each refusal (relaying the refusal's code through the trust guard) and return `Missing`, never
-a short sum. `volume` is geometry and stays total. A custom computation that sums over its slice and
-ignores `unreadable()` is a review defect, not a different verdict. An occupant spanning a section
-boundary belongs to the section of its anchor, so a fold never counts it twice. All three are section
-computations; folding is the key's `Merge`.
+`Computations.count` counts non-air occupants whose anchor is in the slice; the three-argument
+overload also requires `predicate.test(occupant)`, so a body is counted once, by the slice that
+holds its anchor, and never once per covered cell. Its output key must have a merge
+(`Merges.sum` is the whole-structure total) and its region must be non-empty; both are constructor
+errors. `volume` counts cells; `air` counts air cells. `count` (both forms) and `air` require a total
+slice: when `unreadable()` is non-empty they report each refusal (relaying the refusal's code through
+the trust guard) and return `Missing`, never a short sum and never zero. `volume` is geometry and
+stays total. A custom computation that sums over its slice and ignores `unreadable()` is a review
+defect, not a different verdict. An occupant spanning a section boundary belongs to the section of
+its anchor, so a fold never counts it twice. All three are section computations; folding is the
+key's `Merge`.
+
+`AggregateContext` has the same total read for the computation's whole local region, not one
+section: `cells()` is `computation.region()`, `read(cell)` maps the local cell through the siting and
+returns `CellRead.Unreadable` for a refused, out-of-bounds or unmapped cell, and `unreadable()` lists
+every refused local cell of the region in cell order (a refusal is never an absent occupant). An
+aggregate runs once after the fold. The engine charges the region's volume and the sections it
+touches once, before `compute`; an exhausted budget is `Undecided(budgetExhausted)` and the
+aggregate never runs. An aggregate that treats `unreadable()` as empty is a review defect, like its
+section twin; `volume`-style geometry is the caller's own choice, not a kernel guarantee. The
+aggregate's `context()` is the attempt composite, so an instance key the aggregate declares in
+`inputs()` but the current attempt did not produce may come from the host cache (`engine` §7.7).
 
 ### 4.11 Envelope
 
@@ -665,6 +707,19 @@ in `Codes.all`.
   footprints; envelope-only blueprint; reserved id collision; two builds; `SC-EXP-0006` metadata;
   fusion void, AE2 empty envelope, PNC port, GT widened ring, unreadable, budget and outside-bounds
   scenarios.
+- Content count: predicate match, non-air, multi-section sum, one multi-cell body counted once by its
+  anchor, a refused slice Missing with a relayed refusal and never a zero, a readable no-match slice
+  zero, merge/region constructor errors.
+- Aggregate context: `cells()` is the computation region; the total mapped `read`; a refused or
+  out-of-bounds region cell is `Unreadable`; the region is charged once by volume and sections; an
+  exhausted budget skips the aggregate and writes nothing.
+- Expectation context: `match`/`mismatch` (`SC-EXP-0001`)/missing (`SC-CTX-0007`), and
+  `meta.requires == Set.of(key)`.
+- Build: an `instance` requirement needs no producer; a `match` requirement without a producer is
+  `SC-CHK-0002`; a derivation output is a legal `instance` requirement. Cached composition: instance
+  keys only; eligible via check requires or computation inputs; `(id, type)` lookup answers a
+  host-decoded key with lost `merge`/`whenAbsent`; current values shadow; a `match` key is never read;
+  a wrong type or host exception is absent; an aggregate sees the composite.
 
 ## 8. Dependencies
 

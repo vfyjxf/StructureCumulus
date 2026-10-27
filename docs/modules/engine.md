@@ -21,7 +21,7 @@
 
 | Type | Kind | Contract |
 | --- | --- | --- |
-| `MatchRequest` | record | blueprint + siting + lease + instance + owner + budget + frozen claims + cancellation |
+| `MatchRequest` | record | blueprint + siting + lease + instance + owner + budget + frozen claims + cancellation + optional host `CachedContext` |
 | `MatchOutcome` | record | view, values, bindings, reads, spend |
 | `BayBinding` | record | a bay and the subjects its checks bound |
 | `MatchResult` | sealed | `Admitted`, `Formed`, `Failed`, `Undecided`, `Dropped` |
@@ -36,10 +36,19 @@ package dev.vfyjxf.cumulus.kernel.engine;
 
 public record MatchRequest(Blueprint blueprint, Siting siting, SnapshotLease lease,
                            InstanceId instance, OwnerId owner, Budget budget,
-                           @Nullable ClaimView claims, CancelToken cancel) {
+                           @Nullable ClaimView claims, CancelToken cancel,
+                           @Nullable CachedContext cachedContext) {
     public static MatchRequest of(Blueprint blueprint, Siting siting, SnapshotLease lease,
                                   InstanceId instance, OwnerId owner, Budget budget,
-                                  @Nullable ClaimView claims);
+                                  @Nullable ClaimView claims);                  // cachedContext = null
+    public static MatchRequest of(Blueprint blueprint, Siting siting, SnapshotLease lease,
+                                  InstanceId instance, OwnerId owner, Budget budget,
+                                  @Nullable ClaimView claims,
+                                  @Nullable CachedContext cachedContext);
+    public static MatchRequest of(Blueprint blueprint, Siting siting, SnapshotLease lease,
+                                  InstanceId instance, OwnerId owner, Budget budget,
+                                  @Nullable ClaimView claims, CancelToken cancel,
+                                  @Nullable CachedContext cachedContext);
 }
 
 public record MatchOutcome(WorldView view, java.util.Map<ContextKey<?>, Object> values,
@@ -110,12 +119,15 @@ check(request):
           else                                         -> compute; Found -> contribute
   fold contributions per key                           // SectionKey order
   for each aggregate computation in plan.aggregates(): // Kahn order
-      if budget exhausted / cancelled                  -> ...
-      result = compute(aggregate context)
+      if cancelled                                     -> Undecided(cancelled)
+      charge region().volume() + the region's sections  // once, before compute
+      if budget exhausted                              -> Undecided(budgetExhausted)
+      result = compute(aggregate context)              // total read over the region
       Found -> values.put; Missing -> absent + SC-CTX-0001 if none reported
   for each check in plan.checks():                     // declaration order
-      if budget exhausted / cancelled                  -> ...
+      if cancelled                                     -> Undecided(cancelled)
       charge check.reads()
+      if a required key is absent from the composite   -> Unreadable(SC-CTX-0007), test not called
       result = check.run(focus context)
       collect reply, subjects per bay, notes
   if !lease.isCurrent()                                -> Dropped(check) + SC-ENG-0002
@@ -130,9 +142,12 @@ check(request):
            else     -> Admitted(revision = claims.revision, ledgerAvailable = true)
 ```
 
-`check` never writes. It reads only the lease's view, the request's frozen claims and the blueprint.
-A `Partial` section is readable: its refused cells are exposed through `SectionContext.unreadable()`
-and are never silently counted as air. A wholly `Refused` section refuses the key before `compute`.
+`check` never writes. It reads only the lease's view, the request's frozen claims, the blueprint and
+the optional host cached-context port. A `Partial` section is readable: its refused cells are exposed
+through `SectionContext.unreadable()` and are never silently counted as air. A wholly `Refused`
+section refuses the key before `compute`. An aggregate sees the same total read over its region
+(`AggregateContext.cells()`/`read`/`unreadable`) and is charged before it runs; the composite context
+of §7.7 is what both aggregates and checks read.
 
 ## 5. The settle algorithm
 
@@ -190,10 +205,11 @@ A derive pass publishes one revision. A `match` key produced by a deriver is rej
 ### 7.1 Request
 
 `MatchRequest` is the determinism tuple: `(blueprint, siting, lease.view(), lease.id(), instance,
-owner, budget, claims, cancellation)`. It carries no stage, no policy, no ticket, no record, no pin
-budget. `instance` is allocated by the host before the check; `check` does not mint it. `claims` is
-the frozen ledger view the host read; `check` never reads a live ledger. `cancel` is checked at unit
-boundaries; a long extension checks its own token. `CancelToken.never()` is the default factory.
+owner, budget, claims, cancellation, cachedContext)`. It carries no stage, no policy, no ticket, no
+record, no pin budget. `instance` is allocated by the host before the check; `check` does not mint it.
+`claims` is the frozen ledger view the host read; `check` never reads a live ledger. `cancel` is
+checked at unit boundaries; a long extension checks its own token. `cachedContext` is optional
+host-owned state (§7.7); `null` is the default. `CancelToken.never()` is the default factory.
 
 ### 7.2 Outcome
 
@@ -246,11 +262,45 @@ a proof failure, because check and settle already validated the bindings.
 
 Charges: a section computation charges the slice volume plus one section per section run; a check
 charges its declared cells' volume plus the sections they touch, and a window charges its inflated
-volume plus its sections; an aggregate charges nothing. Charges happen before the unit runs; a
+volume plus its sections; an aggregate charges its region's volume plus the sections it touches,
+once, before `compute`. Charges happen before the unit runs; a
 refusal returns `Undecided(budgetExhausted)`. The budget is the request's; the engine does not reset
 it. A `Partial` section is charged as one section; its refused cells are not a second read. For a
 fixed tuple the result value, finding order and spend are identical; `Plan` order is fixed at build;
 the fold sorts by `SectionKey`; the finding bundle sorts.
+
+### 7.7 Cached context
+
+`cachedContext` is a host-owned `context.CachedContext` read port for one instance's previously
+published values, offered to one attempt; it answers `get(id, type)` and is not a `ContextView`. The
+kernel never validates, stamps, stores or persists it: there is no stamp, no definition digest and no
+serialization or `Retention` change. The host owns validation, invalidation, read, write and
+persistence, and may pass `null`.
+
+`check` composes it with the attempt's own values into one read-only `ContextView`. Lookup order:
+
+1. the current attempt value with the exact `ContextKey` wins (folded section values, aggregate
+   values and match values);
+2. otherwise a current attempt value with the same `(id, type, Retention.instance)` wins, so the
+   current attempt shadows the cache when its producer key object differs in `merge`/`whenAbsent`;
+3. otherwise, when the key is `Retention.instance` and its `(id, type)` is eligible, the value is
+   `cachedContext.get(key.id(), key.type())`;
+4. otherwise the key is absent.
+
+Eligibility is the attempt-level union of the plan's declared instance dependencies: every check
+`ExpectationMeta.requires()` entry and every section/aggregate `Computation.inputs()` entry whose
+`Retention` is `instance`. It is derived once from `Blueprint.plan()` before the section pass and does
+not grow or shrink during the attempt. `Retention.match` keys are never read from the cache. A
+wrong-typed cached value and a host exception from `get` are both treated as absent, never as a
+mismatch, a conversion or an attempt failure.
+
+`AggregateContext.context()` and every check's `FocusContext.context()` (including
+`Focuses.context`) see that same composite; an aggregate may therefore read a cached instance key it
+declares in `inputs()`. The composite is not used by `SectionContext`, `MatchOutcome.values`,
+`settle` publication or `derive`: those carry current attempt values or the host `ContextStore` only,
+so a cached value is never published. `keys()` enumerates current-attempt keys only; the get-only
+cache is never enumerated. A required key still absent after composition is the ordinary
+`SC-CTX-0007` gate: the check is `Unreadable` and its expectation is not called.
 
 ## 8. Codes
 
@@ -274,6 +324,15 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
 - Nested: a nested focus yields no subject; a nested body bound through an occupant focus is
   `Failed(SC-CLM-0004)` before rows; a child-frame subject is rejected the same way.
 - Budget: a too-small budget is `Undecided`; no claims.
+- Aggregate total read: `cells()` is the region; `read`/`unreadable` cover refused and out-of-bounds
+  region cells; the region is charged once by volume and sections; an exhausted budget skips the
+  aggregate and no claim or context write happens.
+- Context expectation: match/mismatch (`SC-EXP-0001`)/missing (`SC-CTX-0007`); the declared requires
+  gate the key. Cached composition: instance-only; eligible via check requires or computation
+  inputs; `(id, type)` lookup answers a host-decoded key with lost `merge`/`whenAbsent`; the current
+  value shadows the cached one; a `match` key is never read; a wrong type or host exception is
+  absent; an aggregate sees the same composite; a cached value is never published; the same request
+  and cache are deterministic.
 - Gate: an invalidated lease is `Dropped`; nothing written.
 - Ledger: revision moved once retries; twice is `Undecided`; conflict is `Failed`; no row on failure.
 - Bindings: another snapshot, a nested frame, a cell outside the bay, an empty exclusive bound.

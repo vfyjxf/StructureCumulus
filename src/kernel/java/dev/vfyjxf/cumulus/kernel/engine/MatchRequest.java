@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.context.CachedContext;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.CancelToken;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
@@ -21,7 +22,8 @@ public record MatchRequest(
     OwnerId owner,
     Budget budget,
     @Nullable ClaimView claims,
-    CancelToken cancel
+    CancelToken cancel,
+    @Nullable CachedContext cachedContext
 ) {
 
     public MatchRequest {
@@ -34,6 +36,19 @@ public record MatchRequest(
         Objects.requireNonNull(cancel, "cancel");
     }
 
+    public MatchRequest(
+        Blueprint blueprint,
+        Siting siting,
+        SnapshotLease lease,
+        InstanceId instance,
+        OwnerId owner,
+        Budget budget,
+        @Nullable ClaimView claims,
+        CancelToken cancel
+    ) {
+        this(blueprint, siting, lease, instance, owner, budget, claims, cancel, null);
+    }
+
     public static MatchRequest of(
         Blueprint blueprint,
         Siting siting,
@@ -43,6 +58,43 @@ public record MatchRequest(
         Budget budget,
         @Nullable ClaimView claims
     ) {
-        return new MatchRequest(blueprint, siting, lease, instance, owner, budget, claims, CancelToken.never());
+        return new MatchRequest(blueprint, siting, lease, instance, owner, budget, claims, CancelToken.never(), null);
+    }
+
+    public static MatchRequest of(
+        Blueprint blueprint,
+        Siting siting,
+        SnapshotLease lease,
+        InstanceId instance,
+        OwnerId owner,
+        Budget budget,
+        @Nullable ClaimView claims,
+        @Nullable CachedContext cachedContext
+    ) {
+        return new MatchRequest(
+            blueprint,
+            siting,
+            lease,
+            instance,
+            owner,
+            budget,
+            claims,
+            CancelToken.never(),
+            cachedContext
+        );
+    }
+
+    public static MatchRequest of(
+        Blueprint blueprint,
+        Siting siting,
+        SnapshotLease lease,
+        InstanceId instance,
+        OwnerId owner,
+        Budget budget,
+        @Nullable ClaimView claims,
+        CancelToken cancel,
+        @Nullable CachedContext cachedContext
+    ) {
+        return new MatchRequest(blueprint, siting, lease, instance, owner, budget, claims, cancel, cachedContext);
     }
 }

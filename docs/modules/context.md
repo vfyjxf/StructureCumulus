@@ -5,7 +5,7 @@
 
 ## 1. Scope
 
-**Owns:** `ContextStore`, `StructureContext`, `Deriver<T>`, `DeriveContext`, `Merges`.
+**Owns:** `ContextStore`, `StructureContext`, `CachedContext`, `Deriver<T>`, `DeriveContext`, `Merges`.
 
 **Does not own:** `ContextKey`/`ContextView`/`Outcome` (`core`), computations and their contexts
 (`structure`), match results (`engine`), persistence (`mc`).
@@ -18,6 +18,7 @@
 | --- | --- | --- |
 | `StructureContext` | record | `(instance, revision, values, findings, spend)`, a `ContextView` |
 | `ContextStore` | interface | per-instance publish/read; `inMemory()` for tests and hosts |
+| `CachedContext` | interface | host-owned read port: `<T> @Nullable T get(NamespacedId id, Class<T> type)` |
 | `Deriver<T>` | interface | context-only producer of one key |
 | `DeriveContext` | interface | what a deriver sees: base context, budget, findings |
 | `Merges` | final class | `sum`, `union`, `min`, `max`, `and`, `or` |
@@ -36,6 +37,10 @@ public record StructureContext(InstanceId instance, long revision,
     @Override public <T> Outcome<T> require(ContextKey<T> key);
     @Override public boolean has(ContextKey<?> key);
     @Override public java.util.Set<ContextKey<?>> keys();
+}
+
+public interface CachedContext {
+    <T> @Nullable T get(NamespacedId id, Class<T> type);
 }
 
 public interface ContextStore {
@@ -136,10 +141,33 @@ this list. The engine owns the fold; the merge only combines two values.
 There is no `ATTEMPT`, no `OUTCOME`, no tier and no frame. A value that is only needed for a
 diagnostic is a `match` value; a value the instance keeps is `instance`.
 
+### 4.6 Cached instance context (host contract)
+
+An `instance` value outlives an attempt only because the host persists it. For a later attempt the
+host may offer those values through `CachedContext`, a get-only port keyed by value identity
+`(id, type)`; `MatchRequest.cachedContext` carries it. It is a port, not a `ContextView`: a host
+that decodes a stored `StructureContext` answers by id and type and never has to reconstruct
+`merge`/`whenAbsent`, and the kernel never enumerates the cache.
+
+`check` composes the cache read-only with the attempt's own values (`engine` §7.7): only
+`Retention.instance` keys are eligible, and only keys the plan declares as instance dependencies — a
+check's `ExpectationMeta.requires()` or a section/aggregate `Computation.inputs()` — participate. A
+current attempt value shadows the cache, including when the producer's key object differs in
+`merge`/`whenAbsent`; a cached lookup answers by `(id, type)`; a wrong-typed value or a host
+exception is treated as absent. A required key still absent after composition is `SC-CTX-0007`.
+
+The host owns cache validation, read, write, invalidation and persistence. The kernel defines no
+cache format, no stamp, no definition digest and no stale-cache finding; whatever the host answers
+is the instance's truth for that tuple. A cached value never becomes a `MatchOutcome` value and
+`publish` never re-publishes it, so the cache cannot drift into the store through a settle or
+derive.
+
 ## 5. Pipeline role
 
 - `check`: the engine folds section contributions and runs aggregates into a local value map;
-  `Retention.match` values stay in the outcome; `instance` values are carried but not published.
+  `Retention.match` values stay in the outcome; `instance` values are carried but not published. A
+  supplied cached instance context is composed read-only for the declared instance dependencies
+  (check requires and computation inputs, `engine` §7.7).
 - `settle`: after `Settled`, publish the `instance` values once; `Formed.contextRevision` is the new
   revision.
 - `derive`: run derivers over the formed context; publish one batch; return the new
@@ -152,8 +180,8 @@ diagnostic is a `match` value; a value the instance keeps is `instance`.
 a missing deriver. Producer: `engine.derive`. `SC-CTX-0005` (ERROR, primary): a deriver failed.
 Producer: `engine.derive`. `SC-CTX-0006` (ERROR, primary): a fold has a refused section, or a
 section computation returned `Missing` for a `Partial` slice. Producer: `engine.check`.
-`SC-CTX-0007` (ERROR, primary): a required key is absent. Producer: `Focuses.context` and
-`engine.derive`.
+`SC-CTX-0007` (ERROR, primary): a required key is absent. Producer: `Focuses.context`,
+`engine.check` (a required key absent after cache composition) and `engine.derive`.
 
 ## 7. Tests
 
@@ -161,11 +189,15 @@ section computation returned `Missing` for a `Partial` slice. Producer: `engine.
 - Publish: merge semantics, revision growth, `match` rejection, cumulative spend, latest findings,
   one writer per instance.
 - Derive: order, requires, missing deriver, stale base, one batch, no partial publish.
+- Cached context: instance-only eligibility, the declared-dependency gate (check requires and
+  computation inputs), lookup by `(id, type)` for a host-decoded key, the attempt value shadows the
+  cached one, a missing key is `SC-CTX-0007`, a wrong type or host exception is absent, a `match` key
+  is never read from the cache, and a cached value is never published.
 - Merges: associativity for each built-in; `union` canonical.
 - In-memory store: concurrent publish one winner; two instances never collide.
 
 ## 8. Dependencies
 
 `core`, `space`, `finding`, `structure` (for `Computation`/`Plan` types used by the engine; this
-module itself uses only `ContextKey`/`ContextView`/`Outcome`/`Budget`/`CancelToken`). It does not
+module itself uses only `NamespacedId`/`ContextKey`/`ContextView`/`Outcome`/`Budget`/`CancelToken`). It does not
 import `engine`, `document`, `remedy` or `spi`.

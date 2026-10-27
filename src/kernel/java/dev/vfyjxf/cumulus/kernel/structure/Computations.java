@@ -11,30 +11,57 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
-/** The three shipped section computations. */
+/** The shipped section computations. */
 public final class Computations {
 
     public static SectionComputation<Long> count(ContextKey<Long> output, CuboidSet region) {
-        return new Builtin(output, region, Mode.count);
+        return new Builtin(output, region, Mode.count, null);
+    }
+
+    /**
+     * Counts non-air occupants matching {@code predicate} whose anchor is in the section region.
+     *
+     * @throws IllegalArgumentException when the output has no merge or the region is empty
+     */
+    public static SectionComputation<Long> count(
+        ContextKey<Long> output,
+        CuboidSet region,
+        Predicate<OccupantSnapshot> predicate
+    ) {
+        Objects.requireNonNull(predicate, "predicate");
+        if (output.merge() == null) {
+            throw new IllegalArgumentException("a count output needs a merge: " + output.id());
+        }
+        if (region.isEmpty()) {
+            throw new IllegalArgumentException("a count region must not be empty");
+        }
+        return new Builtin(output, region, Mode.count, predicate);
     }
 
     public static SectionComputation<Long> volume(ContextKey<Long> output, CuboidSet region) {
-        return new Builtin(output, region, Mode.volume);
+        return new Builtin(output, region, Mode.volume, null);
     }
 
     public static SectionComputation<Long> air(ContextKey<Long> output, CuboidSet region) {
-        return new Builtin(output, region, Mode.air);
+        return new Builtin(output, region, Mode.air, null);
     }
 
     private enum Mode {
         count, volume, air
     }
 
-    private record Builtin(ContextKey<Long> output, CuboidSet region, Mode mode) implements SectionComputation<Long> {
+    private record Builtin(
+        ContextKey<Long> output,
+        CuboidSet region,
+        Mode mode,
+        @Nullable Predicate<OccupantSnapshot> predicate
+    ) implements SectionComputation<Long> {
 
         private Builtin {
             Objects.requireNonNull(output, "output");
@@ -80,9 +107,13 @@ public final class Computations {
             }
             long occupants = 0;
             for (OccupantSnapshot occupant : ctx.occupants()) {
-                if (!occupant.isAir()) {
-                    occupants++;
+                if (occupant.isAir()) {
+                    continue;
                 }
+                if (predicate != null && !predicate.test(occupant)) {
+                    continue;
+                }
+                occupants++;
             }
             return Outcome.found(occupants);
         }

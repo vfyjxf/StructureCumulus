@@ -9,6 +9,7 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.CachedContext;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.context.DeriveContext;
 import dev.vfyjxf.cumulus.kernel.context.Deriver;
@@ -182,8 +183,31 @@ public final class MatchEngine {
                 session.findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
                 return undecided(phase, UndecidedReason.cancelled, session);
             }
+            CuboidSet worldRegion = request.siting().toWorld(computation.region());
+            if (worldRegion == null) {
+                session.report(
+                    code(
+                        Codes.locusUnmapped,
+                        phase,
+                        "computation " + computation.id() + " leaves the lattice",
+                        Locus.local(computation.region())
+                    )
+                );
+                continue;
+            }
+            if (!session.charge(worldRegion.volume(), sectionsOf(worldRegion, request.lease().view()).size())) {
+                session.findings.add(
+                    code(
+                        Codes.budgetExhausted,
+                        phase,
+                        "the budget ran out before aggregate " + computation.id(),
+                        Locus.local(computation.region())
+                    )
+                );
+                return undecided(phase, UndecidedReason.budgetExhausted, session);
+            }
             int before = session.findings.size();
-            AggregateContext ctx = new AggregateCtx(request, session);
+            AggregateContext ctx = new AggregateCtx(request, session, computation);
             try {
                 Outcome<?> result = computation.compute(ctx);
                 if (result instanceof Outcome.Found<?> found) {
@@ -695,7 +719,7 @@ public final class MatchEngine {
     private static FindingBundle missingKeys(MatchRequest request, Session session, Check<?> check) {
         List<Finding> missing = new ArrayList<>();
         for (ContextKey<?> key : check.expectation().meta().requires()) {
-            if (!session.values.containsKey(key)) {
+            if (!session.context.has(key)) {
                 missing.add(
                     Finding.builder(Codes.keyAbsent).phase(Phase.check)
                             .message("required context key " + key.id() + " is absent")
@@ -826,6 +850,7 @@ public final class MatchEngine {
         private final Map<ContextKey<?>, Object> values = new LinkedHashMap<>();
         private final List<Finding> findings = new ArrayList<>();
         private final Map<NamespacedId, LinkedHashMap<OccupantRef, OccupantSnapshot>> subjects = new LinkedHashMap<>();
+        private final ContextView context;
         private ReadScope reads;
         private Spend spend = Spend.zero;
 
@@ -835,6 +860,18 @@ public final class MatchEngine {
                 subjects.put(bay.id(), new LinkedHashMap<>());
             }
             reads = request.blueprint().reads();
+            Plan plan = request.blueprint().plan();
+            Set<KeyIdentity> eligible = new HashSet<>();
+            for (Check<?> check : plan.checks()) {
+                addInstanceIdentities(eligible, check.expectation().meta().requires());
+            }
+            for (SectionComputation<?> computation : plan.sections()) {
+                addInstanceIdentities(eligible, computation.inputs());
+            }
+            for (AggregateComputation<?> computation : plan.aggregates()) {
+                addInstanceIdentities(eligible, computation.inputs());
+            }
+            context = new CompositeContextView(values, request.cachedContext(), Set.copyOf(eligible));
         }
 
         private boolean cancelled() {
@@ -1006,6 +1043,20 @@ public final class MatchEngine {
         return List.copyOf(result);
     }
 
+    private static List<LatticePoint> pointsOf(CuboidSet cells) {
+        List<LatticePoint> points = new ArrayList<>();
+        for (Cuboid box : cells.boxes()) {
+            for (int x = box.min().x(); x < box.max().x(); x++) {
+                for (int y = box.min().y(); y < box.max().y(); y++) {
+                    for (int z = box.min().z(); z < box.max().z(); z++) {
+                        points.add(LatticePoint.of(x, y, z));
+                    }
+                }
+            }
+        }
+        return points;
+    }
+
     private static final class SectionCtx implements SectionContext {
 
         private final MatchRequest request;
@@ -1102,15 +1153,18 @@ public final class MatchEngine {
 
         private final MatchRequest request;
         private final Session session;
+        private final Computation<?> computation;
+        private @Nullable Map<LatticePoint, ReadRefusal> unreadable;
 
-        private AggregateCtx(MatchRequest request, Session session) {
+        private AggregateCtx(MatchRequest request, Session session, Computation<?> computation) {
             this.request = request;
             this.session = session;
+            this.computation = computation;
         }
 
         @Override
         public ContextView context() {
-            return new MapContextView(session.values);
+            return session.context;
         }
 
         @Override
@@ -1121,6 +1175,36 @@ public final class MatchEngine {
         @Override
         public Siting siting() {
             return request.siting();
+        }
+
+        @Override
+        public CuboidSet cells() {
+            return computation.region();
+        }
+
+        @Override
+        public CellRead read(LatticePoint local) {
+            LatticePoint world = request.siting().toWorld(local);
+            if (world == null) {
+                return new CellRead.Unreadable(new ReadRefusal(ReadStatus.outOfBounds, Codes.unreadableRead.code()));
+            }
+            return request.lease().view().read(world);
+        }
+
+        @Override
+        public Map<LatticePoint, ReadRefusal> unreadable() {
+            Map<LatticePoint, ReadRefusal> refused = unreadable;
+            if (refused == null) {
+                TreeMap<LatticePoint, ReadRefusal> found = new TreeMap<>();
+                for (LatticePoint cell : pointsOf(computation.region())) {
+                    if (read(cell) instanceof CellRead.Unreadable unavailable) {
+                        found.put(cell, unavailable.refusal());
+                    }
+                }
+                refused = Collections.unmodifiableMap(found);
+                unreadable = refused;
+            }
+            return refused;
         }
 
         @Override
@@ -1150,13 +1234,11 @@ public final class MatchEngine {
         private final MatchRequest request;
         private final Session session;
         private final Check<?> check;
-        private final MapContextView context;
 
         private EngineFocusContext(MatchRequest request, Session session, Check<?> check) {
             this.request = request;
             this.session = session;
             this.check = check;
-            this.context = new MapContextView(session.values);
         }
 
         @Override
@@ -1196,7 +1278,7 @@ public final class MatchEngine {
 
         @Override
         public ContextView context() {
-            return context;
+            return session.context;
         }
 
         @Override
@@ -1231,6 +1313,89 @@ public final class MatchEngine {
             }
             LatticePoint world = request.siting().toWorld(local);
             return world == null ? List.of() : claims.rowsIn(Cuboid.of(world));
+        }
+    }
+
+    private record KeyIdentity(NamespacedId id, Class<?> type) {}
+
+    private static void addInstanceIdentities(Set<KeyIdentity> target, Set<ContextKey<?>> keys) {
+        for (ContextKey<?> key : keys) {
+            if (key.retention() == Retention.instance) {
+                target.add(new KeyIdentity(key.id(), key.type()));
+            }
+        }
+    }
+
+    private static final class CompositeContextView implements ContextView {
+
+        private final Map<ContextKey<?>, Object> current;
+        private final @Nullable CachedContext cached;
+        private final Set<KeyIdentity> eligible;
+
+        private CompositeContextView(
+            Map<ContextKey<?>, Object> current,
+            @Nullable CachedContext cached,
+            Set<KeyIdentity> eligible
+        ) {
+            this.current = current;
+            this.cached = cached;
+            this.eligible = eligible;
+        }
+
+        @Override
+        public <T> @Nullable T get(ContextKey<T> key) {
+            Object value = current.get(key);
+            if (value != null) {
+                return key.type().cast(value);
+            }
+            Object shadow = currentInstanceValue(key.id(), key.type());
+            if (shadow != null) {
+                return key.type().cast(shadow);
+            }
+            if (cached == null
+                    || key.retention() != Retention.instance
+                    || !eligible.contains(new KeyIdentity(key.id(), key.type()))) {
+                return null;
+            }
+            Object cachedValue;
+            try {
+                cachedValue = cached.get(key.id(), key.type());
+            } catch (RuntimeException ignored) {
+                return null;
+            }
+            return cachedValue != null && key.type().isInstance(cachedValue) ? key.type().cast(cachedValue) : null;
+        }
+
+        private @Nullable Object currentInstanceValue(NamespacedId id, Class<?> type) {
+            for (Map.Entry<ContextKey<?>, Object> entry : current.entrySet()) {
+                ContextKey<?> candidate = entry.getKey();
+                if (candidate.retention() == Retention.instance
+                        && candidate.id().equals(id)
+                        && candidate.type().equals(type)) {
+                    return entry.getValue();
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public <T> Outcome<T> require(ContextKey<T> key) {
+            T value = get(key);
+            return value == null ? Outcome.missing() : Outcome.found(value);
+        }
+
+        @Override
+        public boolean has(ContextKey<?> key) {
+            return get(key) != null;
+        }
+
+        @Override
+        public Set<ContextKey<?>> keys() {
+            TreeSet<ContextKey<?>> sorted = new TreeSet<>(
+                Comparator.comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName())
+            );
+            sorted.addAll(current.keySet());
+            return Collections.unmodifiableSet(sorted);
         }
     }
 

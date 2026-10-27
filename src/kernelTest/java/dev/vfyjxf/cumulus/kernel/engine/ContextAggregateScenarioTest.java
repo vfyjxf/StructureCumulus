@@ -19,7 +19,6 @@ import dev.vfyjxf.cumulus.kernel.structure.AggregateComputation;
 import dev.vfyjxf.cumulus.kernel.structure.AggregateContext;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
-import dev.vfyjxf.cumulus.kernel.structure.BlueprintBuilder;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
@@ -33,12 +32,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Context aggregates: custom aggregate values, missing results, dead whenAbsent and derivation keys. */
@@ -70,41 +67,49 @@ class ContextAggregateScenarioTest {
     }
 
     @Test
-    @DisplayName("known gap: whenAbsent is unreachable through a check with no section computation")
-    void whenAbsentIsADeadPathForACheckOnlyKey() {
+    @DisplayName("an INSTANCE requirement without a producer builds and is SC-CTX-0007 at check")
+    void anInstanceRequirementWithoutAComputationIsMissingAtRuntime() {
         ContextKey<Long> key = ContextKeys
                 .of(MagicFixtures.id("context/when_absent"), Long.class, Retention.instance, null, 7L);
-        Bay bay = MagicFixtures.bay(
-            MagicFixtures.id("context/absent_bay"),
-            region,
-            Coverage.anySubject,
-            Footprint.box(),
-            Sharing.shared
+        Blueprint blueprint = requiringBlueprint("context/absent", key);
+        TestWorld.View view = MagicFixtures.view().air(LatticePoint.origin);
+        MatchResult result = MagicFixtures.check(blueprint, siting, view, new ClaimView(List.of(), 0, true));
+        MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, result);
+        assertEquals(UndecidedReason.unreadable, undecided.reason());
+        assertTrue(MagicFixtures.hasCode(undecided, Codes.keyAbsent), "the absent instance key is SC-CTX-0007");
+        assertTrue(
+            undecided.partial() != null && undecided.partial().value(key).fold(value -> false, () -> true),
+            "the whenAbsent value is never produced"
         );
-        BlueprintBuilder builder = Blueprint.builder(MagicFixtures.id("context/absent")).bounds(bounds)
-                .check(Check.of(MagicFixtures.id("context/absent_check"), bay, Focuses.context(key), expectation(key)));
-        IllegalArgumentException rejected = assertThrows(IllegalArgumentException.class, () -> builder.build());
-        String message = Objects.requireNonNull(rejected.getMessage(), "message");
-        assertTrue(message.contains("SC-CHK-0002"), "no computation produces the whenAbsent key: " + message);
     }
 
     @Test
-    void aDerivationOutputIsNotACheckComputation() {
+    @DisplayName("a derivation output is an INSTANCE requirement, not a computation producer")
+    void aDerivationOutputIsAnInstanceRequirement() {
         ContextKey<Long> derived = ContextKeys
                 .of(MagicFixtures.id("context/derived_key"), Long.class, Retention.instance);
         Bay bay = MagicFixtures.bay(
             MagicFixtures.id("context/derived_bay"),
             region,
             Coverage.anySubject,
-            Footprint.box(),
+            Footprint.none(),
             Sharing.shared
         );
-        BlueprintBuilder builder = Blueprint.builder(MagicFixtures.id("context/derived")).bounds(bounds).check(
+        Blueprint blueprint = Blueprint.builder(MagicFixtures.id("context/derived")).bounds(bounds).check(
             Check.of(MagicFixtures.id("context/derived_check"), bay, Focuses.context(derived), expectation(derived))
-        ).derive(new DerivationSpec(MagicFixtures.id("context/deriver"), Value.object(), derived.id(), 0));
-        IllegalArgumentException rejected = assertThrows(IllegalArgumentException.class, () -> builder.build());
-        String message = Objects.requireNonNull(rejected.getMessage(), "message");
-        assertTrue(message.contains("SC-CHK-0002"), "a derivation output is not a check computation: " + message);
+        ).derive(new DerivationSpec(MagicFixtures.id("context/deriver"), Value.object(), derived.id(), 0)).build();
+        TestWorld.View view = MagicFixtures.view().air(LatticePoint.origin);
+        MatchResult result = MagicFixtures.check(blueprint, siting, view, new ClaimView(List.of(), 0, true));
+        MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, result);
+        assertTrue(MagicFixtures.hasCode(undecided, Codes.keyAbsent), "a derivation output is not a check computation");
+    }
+
+    private static Blueprint requiringBlueprint(String path, ContextKey<Long> key) {
+        Bay bay = MagicFixtures
+                .bay(MagicFixtures.id(path + "_bay"), region, Coverage.anySubject, Footprint.none(), Sharing.shared);
+        return Blueprint.builder(MagicFixtures.id(path)).bounds(bounds)
+                .check(Check.of(MagicFixtures.id(path + "_check"), bay, Focuses.context(key), expectation(key)))
+                .build();
     }
 
     private static Blueprint aggregateBlueprint(String path, ContextKey<Long> key, Outcome<Long> result) {
