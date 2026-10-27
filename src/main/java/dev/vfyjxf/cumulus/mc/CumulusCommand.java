@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -33,7 +34,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.jspecify.annotations.NullMarked;
 
-/** The command surface: {@code /cumulus check <id> <origin>} and {@code /cumulus settle <id> <origin>}. */
+/**
+ * The command surface: {@code check}, {@code compile}, {@code settle}, {@code explain} and {@code claims}.
+ */
 @NullMarked
 public final class CumulusCommand {
 
@@ -57,6 +60,24 @@ public final class CumulusCommand {
                                     Commands.argument("id", ResourceLocationArgument.id()).then(
                                         Commands.argument("origin", BlockPosArgument.blockPos())
                                                 .executes(SettleCommand::run)
+                                    )
+                                )
+                            )
+                            .then(
+                                Commands.literal("compile").then(
+                                    Commands.argument("id", ResourceLocationArgument.id()).executes(CompileCommand::run)
+                                )
+                            )
+                            .then(
+                                Commands.literal("explain").then(
+                                    Commands.argument("code", StringArgumentType.word()).executes(ExplainCommand::run)
+                                )
+                            )
+                            .then(
+                                Commands.literal("claims").then(
+                                    Commands.argument("from", BlockPosArgument.blockPos()).then(
+                                        Commands.argument("to", BlockPosArgument.blockPos())
+                                                .executes(ClaimsCommand::run)
                                     )
                                 )
                             )

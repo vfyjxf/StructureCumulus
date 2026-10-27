@@ -18,9 +18,10 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current evidence (2026-10-27): M1, M2a, M2b, M2c and M2d are committed; M3 is committed at
-`d4b6d82` and compatible with Model C. `./gradlew check` is green: 116 kernel tests and 92 adapter
-unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 22/22. `tools/spec-check.py` is clean.
+Current evidence (2026-10-27): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are committed; M4a/M4b, the
+command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) and capture-revision lease
+invalidation (`0f0bf25`) are implemented. `./gradlew check` is green: 116 kernel tests and 101 adapter
+unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 32/32. `tools/spec-check.py` is clean.
 Model C, body identity, trait capture and the nested capability are implemented, not pending.
 
 **Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
@@ -143,15 +144,17 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. All 22 GameTests are executed by
-  `runGameTestServer`: M1 capture/host, M2a entity precedence, M2b orientation, M3 claims, M2c traits
-  and M2d nested frames/cuts. Unit evidence: `LevelSnapshotTest` for body/precedence/partial reads,
-  `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for the capability declaration,
-  `SavedClaimsTest`/`SavedContextsTest` for persistence, `OrientationMappingTest` for upright mapping.
-  **Still pending:** M4 JSON/datapack and the remaining commands (`compile`, `settle`, `explain`,
-  `claims`), M5 determinism/lease gate, non-upright pitch/roll state mapping (the 40 orientations),
-  `SC-MC-0004`/`0005` emission, window/mark-counter lease invalidation, and the deferred
-  `SC-MC-0003` capture-finding channel.
+- The rest of the NeoForge adapter and its GameTests. All 32 GameTests are executed by
+  `runGameTestServer`: M1 capture/host, M2a entity precedence, M2b orientation, M3 claims, M2c traits,
+  M2d nested frames/cuts, capture-revision lease invalidation (`LeaseLifecycleGameTest`) and the M4
+  command surface (`SettleCommandGameTest`, `CommandGameTest`). Unit evidence: `LevelSnapshotTest` for
+  body/precedence/partial reads, `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for
+  the capability declaration, `SavedClaimsTest`/`SavedContextsTest` for persistence,
+  `OrientationMappingTest` for upright mapping, and `ServerStateDocumentSourceTest`/
+  `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing. **Still pending:**
+  M5 determinism gate, non-upright pitch/roll state mapping (the 40 orientations), `SC-MC-0004`/`0005`
+  emission, watched-region mark-counter lease invalidation, and the deferred `SC-MC-0003`
+  capture-finding channel.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.

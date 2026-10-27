@@ -27,16 +27,16 @@ Core kernel + document compiler + thin remedy SPI. The v1 round scoped the NeoFo
 renderer, no schematic importer, no client code. This kept the first regeneration small enough to
 prove, while the ports make the adapter a later, independent exercise. Current status (2026-10-27):
 M1 (host + command + capture-check), M2a (loaded-entity capture), M2b (upright orientation), M2c
-(Model C, body identity, total read, four-state traits and the five adapter trait keys) and M2d
-(nested extents, frames, cuts, child entities) are committed. M3 is committed at `d4b6d82` —
-`SavedClaims`, `SavedContexts`, CAS settle/release and reload codecs — and is compatible with Model C;
-its settle command and lease invalidation are still missing. M4 (JSON/datapack, the remaining
-commands), `SC-MC-0004`/`0005` emission, non-upright pitch/roll state mapping, window/mark-counter
-lease invalidation and the deferred `SC-MC-0003` channel remain pending.
+(Model C, body identity, total read, four-state traits and the five adapter trait keys), M2d (nested
+extents, frames, cuts, child entities) and M3 (`d4b6d82`: `SavedClaims`, `SavedContexts`, CAS
+settle/release and reload codecs) are committed. M4a/M4b and the command slice (`settle` at
+`4899d86`, plus `compile`, `explain`, `claims`) are implemented, and capture-revision lease
+invalidation landed at `0f0bf25`. `SC-MC-0004`/`0005` emission, non-upright pitch/roll state mapping,
+watched-region mark-counter lease invalidation and the deferred `SC-MC-0003` channel remain pending.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is implemented through M2d, with M4 still missing. The spec index is green; no pending
-signature is documented as implemented (`06-verification.md` §1).
+adapter is implemented through M4. The spec index is green; no pending signature is documented as
+implemented (`06-verification.md` §1).
 
 ### D-03 — English only
 
@@ -442,8 +442,8 @@ not a cut. `SC-MC-0004` is outside this decision: it remains an orientation mism
   first-provider-wins rule are policy, not a merge. A mod that wants two nested bodies at one cell
   cannot express it (D-26).
 - Model C and the nested capability are implemented and the spec index is green; the remaining gaps
-  are M4, non-upright tilt, `SC-MC-0004`/`0005`, lease invalidation and the deferred `SC-MC-0003`
-  channel (D-02).
+  are non-upright tilt, `SC-MC-0004`/`0005`, watched-region mark-counter invalidation and the deferred
+  `SC-MC-0003` channel (D-02).
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates

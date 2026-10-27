@@ -69,10 +69,10 @@ Notes:
   orientation mapping; M2c implements Model C, body identity and trait capture; M2d implements the
   nested capability (`mc.capability.NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
   `FrameData`); M3 adds `SavedClaims`/`SavedContexts` with CAS/release/reload at `d4b6d82` and is
-  compatible with Model C. Still pending: non-upright pitch/roll state mapping, `SC-MC-0004`/`0005`
-  emission, window/mark-counter lease invalidation, the settle/compile/explain/claims commands and
-  JSON/datapack (M4). `mc.capability` is a subpackage of `mc`; it adds no kernel edge. The main source
-  set also compiles the mod entry.
+  compatible with Model C; M4 adds the JSON reader/writer, the datapack source, the merged document
+  source and the five `/cumulus` subcommands. Still pending: non-upright pitch/roll state mapping,
+  `SC-MC-0004`/`0005` emission and watched-region mark-counter lease invalidation. `mc.capability` is
+  a subpackage of `mc`; it adds no kernel edge. The main source set also compiles the mod entry.
 
 ## 2. Ownership
 

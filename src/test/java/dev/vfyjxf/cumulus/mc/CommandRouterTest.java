@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class CommandRouterTest {
 
     @Test
-    void registersCheckAndSettleUnderCumulus() {
+    void registersEverySubcommandUnderCumulus() {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         CumulusCommand.register(new RegisterCommandsEvent(dispatcher, Commands.CommandSelection.ALL, null));
         CommandNode<CommandSourceStack> cumulus = dispatcher.getRoot().getChild("cumulus");
@@ -22,5 +22,15 @@ class CommandRouterTest {
         assertNotNull(settle, "the settle subcommand");
         assertNotNull(settle.getChild("id"), "settle takes an id");
         assertNotNull(settle.getChild("id").getChild("origin"), "settle takes an origin");
+        CommandNode<CommandSourceStack> compile = cumulus.getChild("compile");
+        assertNotNull(compile, "the compile subcommand");
+        assertNotNull(compile.getChild("id"), "compile takes an id");
+        CommandNode<CommandSourceStack> explain = cumulus.getChild("explain");
+        assertNotNull(explain, "the explain subcommand");
+        assertNotNull(explain.getChild("code"), "explain takes a code");
+        CommandNode<CommandSourceStack> claims = cumulus.getChild("claims");
+        assertNotNull(claims, "the claims subcommand");
+        assertNotNull(claims.getChild("from"), "claims takes a from corner");
+        assertNotNull(claims.getChild("from").getChild("to"), "claims takes a to corner");
     }
 }

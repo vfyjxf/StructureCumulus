@@ -17,10 +17,11 @@ the adapter. Committed: M1 (host + `/cumulus check` + capture-check: `LevelCaptu
 precedence), M2b (upright orientation mapping), M3 at `d4b6d82` (`SavedClaims`, `SavedContexts`,
 CAS/release/reload), M2c at `cb06aa8`/`64d04ce` (Model C, body identity, total read, four-state
 traits, the five adapter trait keys) and M2d at `f3e0338`/`d6aefc2` (nested extents, one
-`LevelSnapshot` + `FrameData`, child frames, cuts, child entities). M3 persistence is compatible with
-Model C; only its settle command and lease invalidation are missing. Still pending: M4 JSON/datapack
-and the remaining commands, non-upright pitch/roll state mapping, `SC-MC-0004`/`0005` emission,
-window/mark-counter lease invalidation and the deferred `SC-MC-0003` channel.
+`LevelSnapshot` + `FrameData`, child frames, cuts, child entities), M4a at `f2659c7` (JSON
+reader/writer), M4b at `76a8e5c` (datapack reload) and the command slice at `4899d86` (settle, plus
+compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25`. M3 persistence is
+compatible with Model C. Still pending: non-upright pitch/roll state mapping, `SC-MC-0004`/`0005`
+emission, watched-region mark-counter lease invalidation and the deferred `SC-MC-0003` channel.
 
 ## 2. The order
 
@@ -89,12 +90,10 @@ the exact failure this set exists to prevent.
 
 ## 7. What the next round owes
 
-- **M4.** JSON reader/writer, datapack reload and the remaining commands (`compile`, `settle`,
-  `explain`, `claims`), including the settle command on top of the committed `SavedClaims`/
-  `SavedContexts` stores.
-- **M5.** The remaining host gates: determinism golden test, lease invalidation by epoch/mark
-  counter, and the command/GameTest coverage that M4 adds. The kernel and adapter suites are already
-  green (116 kernel, 92 adapter, 22 GameTests).
+- **M4.** Implemented: JSON reader/writer, datapack reload and the five commands (`compile`, `settle`,
+  `explain`, `claims`) on top of the committed `SavedClaims`/`SavedContexts` stores.
+- **M5.** The remaining host gates: determinism golden test and watched-region mark-counter lease
+  invalidation. The kernel and adapter suites are green (116 kernel, 101 adapter, 32 GameTests).
 - **Non-upright tilt.** The 40 pitch/roll/inverted orientations, capability-aware state remapping
   and `SC-MC-0004` emission.
 - **`SC-MC-0005`** capture-over-cap emission at the host boundary, and the deferred `SC-MC-0003`

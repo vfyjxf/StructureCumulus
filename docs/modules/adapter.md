@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3-compatible)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -10,8 +10,10 @@
 > M2c (`cb06aa8`/`64d04ce`) implements Model C, body identity, the total read and the five trait
 > keys. M2d (`f3e0338`/`d6aefc2`) implements `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
 > package-private `FrameData`, child frames and cuts. M3 is committed at `d4b6d82`; `SavedClaims`/
-> `SavedContexts` are compatible with Model C, but the settle command and lease invalidation are
-> still missing. M4 (JSON/datapack and the remaining commands) is next.
+> `SavedContexts` are compatible with Model C. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
+> (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
+> implemented; capture-revision lease invalidation landed at `0f0bf25`, and the watched-region mark
+> counter remains pending.
 
 ## 1. Position
 
@@ -25,11 +27,11 @@
   `SectionSlot.Partial`, four-state `TraitSlot`, `SnapshotPolicy.traits` by id, `OccupantTraits`,
   `SC-OCC-0004`, `SC-MC-0002` relay. M2d: `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
   `FrameData`, child frames, budgets/cuts, child entities and entity-hosted extents. M3: `SavedClaims`/
-  `SavedContexts`, CAS settle/release, reload codecs and per-level stores.
-- **Pending.** M4 JSON/datapack and the commands (`compile`, `settle`, `explain`, `claims`), the
-  settle command on top of the committed stores, lease invalidation by epoch/mark counter,
-  `SC-MC-0004`/`0005` emission, non-upright pitch/roll state mapping and the deferred `SC-MC-0003`
-  capture-finding channel. M5 is the determinism/host gate pass.
+  `SavedContexts`, CAS settle/release, reload codecs and per-level stores. M4: the JSON reader/writer,
+  the datapack source, the merged document source and the five `/cumulus` subcommands.
+- **Pending.** Watched-region mark-counter lease invalidation, `SC-MC-0004`/`0005` emission,
+  non-upright pitch/roll state mapping and the deferred `SC-MC-0003` capture-finding channel. M5 is
+  the determinism/host gate pass.
 - No kernel type names a Minecraft type; the adapter may name every kernel type.
 
 ## 2. Types
@@ -39,7 +41,7 @@
 | `LevelCapture` | `WorldCapture` | server-thread capture into a `LevelSnapshot`; nested extents as declarations only |
 | `LevelSnapshot` | `WorldView` | one immutable view over every frame; `read`, `bounds`, `policy`, `nested` |
 | `FrameData` | — | package-private per-frame sections, entities, nested bodies/extents and children |
-| `LevelLease` | `SnapshotLease` | `isCurrent` from a host liveness flag; epoch/mark counter pending |
+| `LevelLease` | `SnapshotLease` | `isCurrent` while open and its capture is the level's latest; world epoch/mark counter pending |
 | `OccupantDescriptors` | — | raw value ↔ `OccupantDescriptor`; entity body identity; nested body |
 | `OccupantTraits` | — | the five stable trait keys and the four-state slots one policy requests |
 | `TraitLookup` | interface, package-private | the trait-capability seam: fake in tests, capabilities in production |
@@ -51,10 +53,10 @@
 | `OrientationMapping` | — | `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror`; upright state transform, non-upright tilt rejected |
 | `SavedClaims` | `ClaimLedger` | per-world `SavedData`, CAS on the server thread (M3) |
 | `SavedContexts` | `ContextStore` | per-instance values in `SavedData` (M3) |
-| `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (pending M4) |
-| `DatapackBlueprints` | `DocumentSource` | reload listener; ids under `data/<ns>/cumulus/structure/` (pending M4) |
-| `ServerState` | — | catalogs, per-level kernel/ledger/contexts, capture cache |
-| `CumulusCommand` | — | `/cumulus check` only; the rest is M4 |
+| `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
+| `DatapackBlueprints` | `DocumentSource` | reload listener; ids under `data/<ns>/cumulus/structure/` (M4b); wins over `BuiltinDocuments` on an id collision |
+| `ServerState` | — | catalogs, server-level and per-level kernels, per-level ledger/contexts and capture cache |
+| `CumulusCommand` | — | the five `/cumulus` subcommands (`check`, `compile`, `settle`, `explain`, `claims`) |
 | `FindingOutput` | — | human/JSON to chat, log or a file (pending) |
 | `MatchScheduler` | — | optional host execution: submit, coalesce, markDirty, tick (absent) |
 
@@ -91,9 +93,11 @@ refusal, and M2d adds nested frames. The rules below are implemented.
 
 ## 4. Lease and gate
 
-M1's `LevelLease` is a host-owned liveness flag: `isCurrent()` is `!closed && current.getAsBoolean()`.
-The world epoch and watched-region mark counter below are the specification; window/mark-counter
-lease invalidation remains pending, and M3's per-level stores do not change it.
+`LevelLease` is host-owned: `isCurrent()` is `!closed && the capture that minted it is still the
+level's latest`. `LevelCapture` bumps its epoch on every capture and exposes `close()`; a later
+capture, `LevelCapture.close()`, `LevelEvent.Unload` and `ServerStoppingEvent` invalidate older
+leases. The world epoch and watched-region mark counter below are the full specification; the
+watched-region mark counter remains pending, and M3's per-level stores do not change it.
 
 `LevelLease` holds the `SnapshotId`, the root view and two facts: the world epoch it was captured
 under, and the watched-region mark counter since capture. `isCurrent()` is
@@ -110,7 +114,7 @@ and a failed check still writes nothing. The persisted row shape is unchanged. `
 server thread and is one atomic replacement of `(owner, siting)` after checking `expectedRevision`
 and the matrix; `release` removes the key and bumps the revision only when something was removed;
 `read` is a copy. A crash between the in-memory mutation and `setDirty` loses the revision; the host
-re-reads the store on load. The `/cumulus settle` command is still M4.
+re-reads the store on load. The `/cumulus settle` command drives this path on the server thread.
 
 ## 6. Context
 
@@ -295,8 +299,10 @@ uppercase, while the document shape keeps its separate lowercase vocabulary (`ev
 
 `DatapackBlueprints` scans `data/<ns>/cumulus/structure/*.json` on reload, stores `Document`s and
 serves them through `DocumentSource.find`. A duplicate id with different bytes is a reload finding;
-the first file in path order wins and the duplicate is reported. The reader/writer and datapack
-reload are M4, not committed.
+the first file in path order wins and the duplicate is reported. The reader/writer (M4a) and the
+datapack reload (M4b) are committed. `ServerState` installs one merged `DocumentSource` in both the
+server-level and the per-level host: a datapack document wins over a `BuiltinDocuments` document on
+an id collision, and the built-in `structurecumulus:air_cell` remains the fallback.
 
 ## 10. Orientation
 
@@ -312,16 +318,22 @@ definition origin's anchor property is read from the `BlockState` properties, no
 
 ## 11. Commands and lifecycle
 
-- `/cumulus check <id> <origin>` — the only command implemented (M1): capture, siting, `check`; print
-  the result and findings.
-- `/cumulus compile <id>` — host document → blueprint, print findings (M4).
-- `/cumulus settle <id> <origin>` — `check`, then `settle` on the server thread; print `Formed` or the
-  conflict (M4).
-- `/cumulus explain <code>` — code lookup; exit 1 when the code is unregistered (M4).
-- `/cumulus claims <box>` — the ledger's rows in a box (M4).
+All five subcommands run on the server thread and return 1 on success, 0 on a reported failure.
+
+- `/cumulus check <id> <origin>` — capture, siting, `check`; print the result and findings.
+- `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
+  findings.
+- `/cumulus settle <id> <origin>` — capture once, `check`, then `settle` with the same request; print
+  `Formed` (rows, ledger revision, context revision) or the check/settle failure. A failed check
+  writes nothing.
+- `/cumulus explain <code>` — `FindingCode.parse` + code lookup; print the registered explanation, or
+  the fallback explanation and 0 for an unregistered code; a malformed code is 0.
+- `/cumulus claims <from> <to>` — the ledger's rows in the box between two inclusive corners. The box
+  is normalized to the kernel's half-open `Cuboid`; a box that leaves the lattice is a reported
+  failure. Rows print in claim order and the read never writes.
 - `ServerAboutToStartEvent` opens `ServerState`; `ServerStoppingEvent` closes it; `LevelEvent.Unload`
-  releases that world's claims and closes its leases. M3 attaches the per-level `SavedClaims` and
-  `SavedContexts` here.
+  closes that world's capture (invalidating its leases) and removes its per-level store. Claims rows
+  are not released on unload yet.
 
 ## 12. Codes
 

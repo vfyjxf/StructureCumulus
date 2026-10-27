@@ -56,16 +56,17 @@ Then the module files, in dependency order:
   M2c implements Model C, body identity, the total read and trait capture at `cb06aa8`/`64d04ce`.
   M2d implements nested extents, frames, cuts and child entities at `f3e0338`/`d6aefc2`. M3 is
   committed at `d4b6d82`; its `SavedClaims`/`SavedContexts` persistence is compatible with Model C and
-  its CAS/release/reload tests are green, but the settle command and lease invalidation are still
-  missing. M4a JSON reader/writer (`f2659c7`) and M4b datapack reload (`76a8e5c`) are committed; the remaining commands are next. Non-upright pitch/roll state mapping,
-  `SC-MC-0004`/`0005` emission, window/mark-counter lease invalidation and the deferred `SC-MC-0003`
-  remain pending.
+  its CAS/release/reload tests are green. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
+  (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
+  implemented; capture-revision lease invalidation landed at `0f0bf25`. Non-upright pitch/roll state
+  mapping, `SC-MC-0004`/`0005` emission, watched-region mark-counter lease invalidation and the
+  deferred `SC-MC-0003` remain pending.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 116
-  kernel JUnit 5 tests and 92 adapter unit tests pass; `runGameTestServer` passes 22/22; `./gradlew
+  kernel JUnit 5 tests and 101 adapter unit tests pass; `runGameTestServer` passes 32/32; `./gradlew
   check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean.
 
 ## The one rule
