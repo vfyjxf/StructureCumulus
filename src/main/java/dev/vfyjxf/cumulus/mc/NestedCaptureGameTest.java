@@ -212,6 +212,81 @@ public final class NestedCaptureGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void rootOverTheCeilingIsTooLarge(GameTestHelper helper) {
+        BlockPos anchor = helper.absolutePos(new BlockPos(0, 1, 0));
+        Cuboid bounds = Cuboid.of(
+            anchor.getX(),
+            anchor.getY(),
+            anchor.getZ(),
+            anchor.getX() + 1,
+            anchor.getY() + 1,
+            anchor.getZ() + 1
+        );
+        LevelCapture capture = new LevelCapture(helper.getLevel(), new FakeLookup());
+        CaptureResult result = capture.capture(new CaptureRequest(bounds, policy(0, 1, true)));
+
+        if (!(result instanceof CaptureResult.TooLarge tooLarge)) {
+            helper.fail("the root over the ceiling was not rejected: " + result);
+            return;
+        }
+        helper.assertValueEqual(tooLarge.bounds(), bounds, "the rejected bounds");
+        helper.assertValueEqual(tooLarge.elements(), 1, "the root volume");
+        helper.assertValueEqual(capture.currentRevision(), 0L, "a rejected root stamps no revision");
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void siblingFramesFollowTheAnchorOrder(GameTestHelper helper) {
+        BlockPos first = new BlockPos(0, 1, 0);
+        BlockPos second = new BlockPos(1, 1, 0);
+        helper.setBlock(first, Blocks.STONE);
+        helper.setBlock(second, Blocks.DIRT);
+        BlockPos worldFirst = helper.absolutePos(first);
+        BlockPos worldSecond = helper.absolutePos(second);
+        FakeLookup lookup = new FakeLookup();
+        lookup.blocks.put(worldFirst, extent("test:first", worldFirst, 1, 1, 1, worldFirst));
+        lookup.blocks.put(worldSecond, extent("test:second", worldSecond, 1, 1, 1, worldSecond));
+        Cuboid bounds = Cuboid.of(
+            worldFirst.getX(),
+            worldFirst.getY(),
+            worldFirst.getZ(),
+            worldSecond.getX() + 1,
+            worldFirst.getY() + 1,
+            worldFirst.getZ() + 1
+        );
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+                .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("sibling capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView view = lease.view();
+            WorldView firstChild = view
+                    .nested(LatticePoint.of(worldFirst.getX(), worldFirst.getY(), worldFirst.getZ()));
+            WorldView secondChild = view
+                    .nested(LatticePoint.of(worldSecond.getX(), worldSecond.getY(), worldSecond.getZ()));
+            if (firstChild == null || secondChild == null) {
+                helper.fail("a sibling child is missing");
+                return;
+            }
+            helper.assertValueEqual(firstChild.frame(), 1, "the first anchor gets frame 1");
+            helper.assertValueEqual(secondChild.frame(), 2, "the second anchor gets frame 2");
+            helper.assertValueEqual(firstChild.depth(), 1, "the first sibling depth");
+            helper.assertValueEqual(secondChild.depth(), 1, "the second sibling depth");
+            helper.assertValueEqual(firstChild.parent(), view, "the first sibling parent");
+            helper.assertValueEqual(secondChild.parent(), view, "the second sibling parent");
+            helper.assertValueEqual(
+                view.occupants(bounds, OccupantFilter.ofKind(OccupantKind.nested)).size(),
+                2,
+                "both nested bodies are kept"
+            );
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void aCycleKeepsTheBodyAndCutsTheChild(GameTestHelper helper) {
         BlockPos anchor = new BlockPos(0, 1, 0);
         BlockPos inner = new BlockPos(1, 1, 0);
@@ -332,6 +407,42 @@ public final class NestedCaptureGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void unloadedChildChunkIsCutAndNeverLoaded(GameTestHelper helper) {
+        BlockPos anchor = new BlockPos(0, 1, 0);
+        helper.setBlock(anchor, Blocks.STONE);
+        BlockPos worldAnchor = helper.absolutePos(anchor);
+        LatticePoint localAnchor = LatticePoint.of(worldAnchor.getX(), worldAnchor.getY(), worldAnchor.getZ());
+        BlockPos far = new BlockPos(worldAnchor.getX() + 1_000_000, worldAnchor.getY(), worldAnchor.getZ());
+        FakeLookup lookup = new FakeLookup();
+        lookup.blocks.put(worldAnchor, extent("test:unloaded", far, 1, 1, 1, far));
+        Cuboid bounds = Cuboid.of(
+            worldAnchor.getX(),
+            worldAnchor.getY(),
+            worldAnchor.getZ(),
+            worldAnchor.getX() + 1,
+            worldAnchor.getY() + 1,
+            worldAnchor.getZ() + 1
+        );
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+                .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("unloaded capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            helper.assertTrue(lease.view().nested(localAnchor) == null, "the unloaded child is cut");
+        }
+        helper.assertTrue(lookup.blockQueries > 0, "the source was declared");
+        helper.assertTrue(
+            helper.getLevel().getChunkSource().getChunkNow(Math.floorDiv(far.getX(), 16), Math.floorDiv(far.getZ(), 16))
+                    == null,
+            "the cut child chunk was not loaded"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void providerExceptionsAreSkipped(GameTestHelper helper) {
         BlockPos anchor = new BlockPos(0, 1, 0);
         helper.setBlock(anchor, Blocks.STONE);
@@ -430,6 +541,49 @@ public final class NestedCaptureGameTest {
             );
         }
         helper.assertValueEqual(lookup.entityQueries, 0, "the entity source is not consulted over a block source");
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void anEntityDeclaresANestedExtentWithoutBeingAnOccupant(GameTestHelper helper) {
+        BlockPos anchor = new BlockPos(0, 1, 0);
+        BlockPos worldAnchor = helper.absolutePos(anchor);
+        LatticePoint localAnchor = LatticePoint.of(worldAnchor.getX(), worldAnchor.getY(), worldAnchor.getZ());
+        Entity chicken = helper.spawnWithNoFreeWill(EntityType.CHICKEN, new Vec3(0.5, 1.0, 0.5));
+        FakeLookup lookup = new FakeLookup();
+        lookup.entities.put(chicken.getUUID(), extent("test:entity_nested", worldAnchor, 2, 2, 2, worldAnchor));
+        Cuboid bounds = Cuboid.of(
+            worldAnchor.getX(),
+            worldAnchor.getY(),
+            worldAnchor.getZ(),
+            worldAnchor.getX() + 1,
+            worldAnchor.getY() + 1,
+            worldAnchor.getZ() + 1
+        );
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+                .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("entity source capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView view = lease.view();
+            helper.assertTrue(view.nested(localAnchor) != null, "the entity source built the child");
+            helper.assertValueEqual(
+                view.occupants(bounds, OccupantFilter.ofKind(OccupantKind.entity)).size(),
+                0,
+                "the entity is not an occupant under a nested-only policy"
+            );
+            List<OccupantSnapshot> bodies = view.occupants(bounds, OccupantFilter.ofKind(OccupantKind.nested));
+            helper.assertValueEqual(bodies.size(), 1, "one entity-hosted nested body");
+            helper.assertValueEqual(
+                bodies.get(0).descriptor().type(),
+                NamespacedId.of("test", "entity_nested"),
+                "the entity source type"
+            );
+        }
+        helper.assertTrue(lookup.entityQueries > 0, "the entity source was queried");
         helper.succeed();
     }
 

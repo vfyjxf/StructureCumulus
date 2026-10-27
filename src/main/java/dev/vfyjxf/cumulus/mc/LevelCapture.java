@@ -184,6 +184,8 @@ public final class LevelCapture implements WorldCapture {
             if (!chunksLoaded(childBounds, extent.origin())) {
                 return null;
             }
+            long spentBefore = context.spent();
+            int frameBefore = context.nextFrame();
             context.spend(childVolume);
             int childFrame = context.reserveFrame();
             List<NestedKey> childPath = new ArrayList<>(path);
@@ -191,8 +193,7 @@ public final class LevelCapture implements WorldCapture {
             FrameData result = new FrameCapture(context, childFrame, depth + 1, childBounds, extent.origin(), false)
                     .build(childPath);
             if (result == null) {
-                context.releaseFrame();
-                context.refund(childVolume);
+                context.restore(spentBefore, frameBefore);
                 return null;
             }
             return result;
@@ -541,16 +542,17 @@ public final class LevelCapture implements WorldCapture {
             spent += volume;
         }
 
-        private void refund(long volume) {
-            spent -= volume;
+        private void restore(long previousSpent, int previousNextFrame) {
+            spent = previousSpent;
+            nextFrame = previousNextFrame;
+        }
+
+        private int nextFrame() {
+            return nextFrame;
         }
 
         private int reserveFrame() {
             return nextFrame++;
-        }
-
-        private void releaseFrame() {
-            nextFrame--;
         }
     }
 }
