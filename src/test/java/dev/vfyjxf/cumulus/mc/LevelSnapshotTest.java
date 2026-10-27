@@ -19,6 +19,7 @@ import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.SectionSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
+import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -33,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LevelSnapshotTest {
@@ -311,6 +313,146 @@ class LevelSnapshotTest {
         );
     }
 
+    @Test
+    void nestedBodyLivesInTheParentAndTheChildKeepsItsOwnFrame() {
+        SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 11);
+        LatticePoint anchor = LatticePoint.origin;
+        NamespacedId nestedType = NamespacedId.of("test", "nested");
+        OccupantSnapshot stone = occupant(snapshot, anchor, "stone");
+        SectionKey rootKey = SectionKey.of(snapshot.world(), 0, anchor, 16);
+        SectionSnapshot rootSection = SectionSnapshot.of(rootKey, Map.of(anchor, stone), 7L);
+        Cuboid footprint = Cuboid.of(0, 0, 0, 2, 2, 2);
+        OccupantSnapshot nested = OccupantDescriptors.nested(snapshot, 0, anchor, nestedType, footprint);
+
+        LatticePoint childCell = LatticePoint.of(1, 0, 0);
+        SectionKey childKey = SectionKey.of(snapshot.world(), 1, childCell, 16);
+        OccupantSnapshot dirt = occupant(snapshot, 1, childCell, "dirt");
+        SectionSnapshot childSection = SectionSnapshot.of(childKey, Map.of(childCell, dirt), 9L);
+        FrameData childData = new FrameData(
+            snapshot,
+            1,
+            1,
+            LatticePoint.of(100, 200, 300),
+            Cuboid.of(0, 0, 0, 2, 2, 2),
+            Map.of(childKey, new SectionSlot.Present(childSection)),
+            List.of(),
+            List.of(),
+            Map.of()
+        );
+        FrameData rootData = new FrameData(
+            snapshot,
+            0,
+            0,
+            LatticePoint.origin,
+            Cuboid.of(0, 0, 0, 2, 2, 2),
+            Map.of(rootKey, new SectionSlot.Present(rootSection)),
+            List.of(),
+            List.of(nested),
+            Map.of(anchor, childData)
+        );
+        SnapshotPolicy policy = new SnapshotPolicy(64, 1, Set.of(OccupantKind.nested), Set.of(), List.of());
+        LevelSnapshot view = new LevelSnapshot(snapshot, policy, rootData);
+        WorldView child = Objects.requireNonNull(view.nested(anchor), "child view");
+
+        assertEquals(0, view.frame());
+        assertEquals(0, view.depth());
+        assertNull(view.parent());
+        assertEquals(LatticePoint.origin, view.origin());
+        assertEquals(1, child.frame());
+        assertEquals(1, child.depth());
+        assertSame(view, child.parent());
+        assertEquals(LatticePoint.of(100, 200, 300), child.origin());
+        assertEquals(Cuboid.of(0, 0, 0, 2, 2, 2), child.bounds());
+        assertEquals(Cuboid.of(100, 200, 300, 102, 202, 302), child.bounds().translate(100, 200, 300));
+        assertEquals(snapshot, child.snapshotId());
+        assertEquals(policy, child.policy());
+        assertNull(view.nested(childCell));
+        assertNull(child.nested(anchor));
+
+        assertSame(stone, view.occupant(anchor));
+        assertSame(nested, view.occupant(nested.ref()));
+        assertSame(dirt, child.occupant(childCell));
+        assertNull(child.occupant(nested.ref()));
+        assertNull(view.occupant(dirt.ref()));
+        assertNull(view.occupant(new OccupantRef(snapshot, 1, nestedType, OccupantKind.nested, anchor)));
+        assertEquals(ReadStatus.readable, child.statusOf(childCell));
+        assertEquals(ReadStatus.outOfBounds, child.statusOf(LatticePoint.of(2, 0, 0)));
+
+        assertEquals(
+            List.of(nested),
+            view.occupants(Cuboid.of(0, 0, 0, 2, 2, 2), OccupantFilter.ofKind(OccupantKind.nested))
+        );
+        assertEquals(List.of(nested), view.occupants(Cuboid.of(0, 0, 0, 2, 2, 2), OccupantFilter.ofType(nestedType)));
+        assertEquals(2, view.occupants(Cuboid.of(0, 0, 0, 2, 2, 2), OccupantFilter.any()).size());
+        assertTrue(view.occupants(Cuboid.of(10, 0, 0, 12, 2, 2), OccupantFilter.any()).isEmpty());
+    }
+
+    @Test
+    void aNestedBodyIsAnOccupantOverAir() {
+        SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 12);
+        NamespacedId nestedType = NamespacedId.of("test", "nested");
+        LatticePoint anchor = LatticePoint.origin;
+        OccupantSnapshot nested = OccupantDescriptors
+                .nested(snapshot, 0, anchor, nestedType, Cuboid.of(0, 0, 0, 2, 2, 2));
+        FrameData rootData = new FrameData(
+            snapshot,
+            0,
+            0,
+            LatticePoint.origin,
+            Cuboid.of(0, 0, 0, 2, 2, 2),
+            Map.of(),
+            List.of(),
+            List.of(nested),
+            Map.of()
+        );
+        LevelSnapshot view = new LevelSnapshot(snapshot, SnapshotPolicy.minimal(), rootData);
+
+        assertSame(nested, view.occupant(anchor));
+        assertEquals(OccupantKind.nested, Objects.requireNonNull(view.occupant(anchor), "nested").descriptor().kind());
+        assertEquals(nested.ref(), assertInstanceOf(CellRead.Found.class, view.read(anchor)).occupant().ref());
+        assertEquals(List.of(nested), view.occupants(Cuboid.of(0, 0, 0, 2, 2, 2), OccupantFilter.any()));
+    }
+
+    @Test
+    void framesAreUniqueAcrossTheWholeCapture() {
+        SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 13);
+        FrameData first = new FrameData(
+            snapshot,
+            1,
+            1,
+            LatticePoint.origin,
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            Map.of(),
+            List.of(),
+            List.of(),
+            Map.of()
+        );
+        FrameData second = new FrameData(
+            snapshot,
+            1,
+            1,
+            LatticePoint.origin,
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            Map.of(),
+            List.of(),
+            List.of(),
+            Map.of()
+        );
+        FrameData root = new FrameData(
+            snapshot,
+            0,
+            0,
+            LatticePoint.origin,
+            Cuboid.of(0, 0, 0, 2, 1, 1),
+            Map.of(),
+            List.of(),
+            List.of(),
+            Map.of(LatticePoint.origin, first, LatticePoint.of(1, 0, 0), second)
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> new LevelSnapshot(snapshot, SnapshotPolicy.minimal(), root));
+    }
+
     private static OccupantSnapshot entity(SnapshotId snapshot, LatticePoint anchor, String type, Cuboid footprint) {
         NamespacedId id = NamespacedId.of("test", type);
         OccupantRef ref = new OccupantRef(snapshot, 0, id, OccupantKind.entity, anchor);
@@ -323,8 +465,12 @@ class LevelSnapshotTest {
     }
 
     private static OccupantSnapshot occupant(SnapshotId snapshot, LatticePoint cell, String type) {
+        return occupant(snapshot, 0, cell, type);
+    }
+
+    private static OccupantSnapshot occupant(SnapshotId snapshot, int frame, LatticePoint cell, String type) {
         NamespacedId id = NamespacedId.of("test", type);
-        OccupantRef ref = new OccupantRef(snapshot, 0, id, OccupantKind.block, cell);
+        OccupantRef ref = new OccupantRef(snapshot, frame, id, OccupantKind.block, cell);
         return new OccupantSnapshot(
             ref,
             new OccupantDescriptor(id, OccupantKind.block, Map.of(), List.of()),

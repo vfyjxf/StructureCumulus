@@ -63,6 +63,18 @@ public final class OccupantDescriptors {
         return new OccupantSnapshot(ref, descriptor, footprint, List.of());
     }
 
+    public static OccupantSnapshot nested(
+        SnapshotId snapshot,
+        int frame,
+        LatticePoint anchor,
+        NamespacedId type,
+        Cuboid footprint
+    ) {
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.nested, Map.of(), List.of());
+        OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.nested, anchor);
+        return new OccupantSnapshot(ref, descriptor, footprint, List.of());
+    }
+
     public static OccupantSnapshot air(SnapshotId snapshot, int frame, LatticePoint cell) {
         return OccupantSnapshot.air(snapshot, frame, cell);
     }

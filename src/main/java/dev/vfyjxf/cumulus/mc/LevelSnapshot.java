@@ -23,20 +23,25 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
-/** Immutable root view over the captured sections and entity bodies. */
+/** One immutable public view over every captured frame. */
 @NullMarked
 public final class LevelSnapshot implements WorldView {
 
     private static final int cellSize = 16;
 
     private final SnapshotId snapshot;
-    private final Cuboid bounds;
     private final SnapshotPolicy policy;
-    private final Map<SectionKey, SectionSlot> sections;
+    private final FrameData data;
+    private final @Nullable LevelSnapshot parent;
+    private final Map<LatticePoint, LevelSnapshot> children;
     private final Map<OccupantRef, OccupantSnapshot> entitiesByRef;
     private final Map<LatticePoint, OccupantSnapshot> entitiesByCell;
+    private final Map<OccupantRef, OccupantSnapshot> nestedByRef;
+    private final Map<LatticePoint, OccupantSnapshot> nestedByCell;
 
     public LevelSnapshot(SnapshotId snapshot, Cuboid bounds, Map<SectionKey, SectionSlot> sections) {
         this(snapshot, bounds, sections, List.of(), SnapshotPolicy.minimal());
@@ -58,12 +63,50 @@ public final class LevelSnapshot implements WorldView {
         List<OccupantSnapshot> entities,
         SnapshotPolicy policy
     ) {
+        this(
+            snapshot,
+            policy,
+            new FrameData(snapshot, 0, 0, LatticePoint.origin, bounds, sections, entities, List.of(), Map.of())
+        );
+    }
+
+    LevelSnapshot(SnapshotId snapshot, SnapshotPolicy policy, FrameData data) {
+        this(snapshot, policy, data, null, new TreeSet<>());
+    }
+
+    private LevelSnapshot(
+        SnapshotId snapshot,
+        SnapshotPolicy policy,
+        FrameData data,
+        @Nullable LevelSnapshot parent,
+        Set<Integer> frames
+    ) {
         this.snapshot = Objects.requireNonNull(snapshot, "snapshot");
-        this.bounds = Objects.requireNonNull(bounds, "bounds");
         this.policy = Objects.requireNonNull(policy, "policy");
-        this.sections = Map.copyOf(new TreeMap<>(sections));
-        this.entitiesByRef = indexEntities(snapshot, bounds, entities);
-        this.entitiesByCell = indexEntityCells(bounds, entitiesByRef.values());
+        this.data = Objects.requireNonNull(data, "data");
+        this.parent = parent;
+        if (!data.snapshot().equals(snapshot)) {
+            throw new IllegalArgumentException("frame data belongs to another snapshot");
+        }
+        if (parent == null) {
+            if (data.frame() != 0 || data.depth() != 0 || !data.origin().equals(LatticePoint.origin)) {
+                throw new IllegalArgumentException("the root frame must be frame 0, depth 0, origin 0");
+            }
+        } else if (data.depth() != parent.depth() + 1) {
+            throw new IllegalArgumentException("a child frame must be one level deeper");
+        }
+        if (!frames.add(data.frame())) {
+            throw new IllegalArgumentException("duplicate frame " + data.frame());
+        }
+        this.entitiesByRef = indexBodies(snapshot, data.frame(), data.bounds(), data.entities(), OccupantKind.entity);
+        this.entitiesByCell = indexBodyCells(data.bounds(), entitiesByRef);
+        this.nestedByRef = indexBodies(snapshot, data.frame(), data.bounds(), data.nestedBodies(), OccupantKind.nested);
+        this.nestedByCell = indexBodyCells(data.bounds(), nestedByRef);
+        TreeMap<LatticePoint, LevelSnapshot> wrapped = new TreeMap<>();
+        for (Map.Entry<LatticePoint, FrameData> entry : data.children().entrySet()) {
+            wrapped.put(entry.getKey(), new LevelSnapshot(snapshot, policy, entry.getValue(), this, frames));
+        }
+        this.children = Collections.unmodifiableMap(wrapped);
     }
 
     @Override
@@ -73,22 +116,22 @@ public final class LevelSnapshot implements WorldView {
 
     @Override
     public int frame() {
-        return 0;
+        return data.frame();
     }
 
     @Override
     public int depth() {
-        return 0;
+        return data.depth();
     }
 
     @Override
     public LatticePoint origin() {
-        return LatticePoint.origin;
+        return data.origin();
     }
 
     @Override
     public @Nullable WorldView parent() {
-        return null;
+        return parent;
     }
 
     @Override
@@ -98,7 +141,7 @@ public final class LevelSnapshot implements WorldView {
 
     @Override
     public Cuboid bounds() {
-        return bounds;
+        return data.bounds();
     }
 
     @Override
@@ -116,18 +159,18 @@ public final class LevelSnapshot implements WorldView {
         if (!key.world().equals(snapshot.world()) || key.frame() != frame()) {
             return refused();
         }
-        SectionSlot slot = sections.get(key);
+        SectionSlot slot = data.sections().get(key);
         if (slot != null) {
             return slot;
         }
         LatticePoint min = LatticePoint.of(key.x() * cellSize, key.y() * cellSize, key.z() * cellSize);
         LatticePoint max = LatticePoint.of(min.x() + cellSize, min.y() + cellSize, min.z() + cellSize);
-        return intersects(bounds, Cuboid.of(min, max)) ? new SectionSlot.Air(0) : refused();
+        return intersects(data.bounds(), Cuboid.of(min, max)) ? new SectionSlot.Air(0) : refused();
     }
 
     @Override
     public CellRead read(LatticePoint cell) {
-        if (!bounds.contains(cell)) {
+        if (!data.bounds().contains(cell)) {
             return new CellRead.Unreadable(new ReadRefusal(ReadStatus.outOfBounds, Codes.unreadableRead.code()));
         }
         SectionSlot slot = slot(sectionOf(cell));
@@ -140,9 +183,16 @@ public final class LevelSnapshot implements WorldView {
                 return new CellRead.Unreadable(refusal);
             }
         }
-        OccupantSnapshot base = readableOccupant(cell, slot);
+        OccupantSnapshot result = readableOccupant(cell, slot);
         OccupantSnapshot entity = entitiesByCell.get(cell);
-        return new CellRead.Found(entity == null ? base : narrow(base, entity));
+        if (entity != null) {
+            result = narrow(result, entity);
+        }
+        OccupantSnapshot nested = nestedByCell.get(cell);
+        if (nested != null) {
+            result = narrow(result, nested);
+        }
+        return new CellRead.Found(result);
     }
 
     @Override
@@ -150,10 +200,13 @@ public final class LevelSnapshot implements WorldView {
         if (!ref.from(snapshot) || ref.frame() != frame()) {
             return null;
         }
+        if (ref.kind().equals(OccupantKind.nested)) {
+            return nestedByRef.get(ref);
+        }
         if (ref.kind().equals(OccupantKind.entity)) {
             return entitiesByRef.get(ref);
         }
-        if (!bounds.contains(ref.anchor())) {
+        if (!data.bounds().contains(ref.anchor())) {
             return null;
         }
         SectionSlot slot = slot(sectionOf(ref.anchor()));
@@ -169,12 +222,12 @@ public final class LevelSnapshot implements WorldView {
 
     @Override
     public List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter) {
-        Cuboid query = intersect(box, bounds);
+        Cuboid query = intersect(box, data.bounds());
         if (query == null) {
             return List.of();
         }
         TreeMap<OccupantRef, OccupantSnapshot> found = new TreeMap<>();
-        for (SectionSlot slot : sections.values()) {
+        for (SectionSlot slot : data.sections().values()) {
             @Nullable
             SectionSnapshot section = switch (slot) {
                 case SectionSlot.Present present -> present.section();
@@ -193,12 +246,17 @@ public final class LevelSnapshot implements WorldView {
                 found.putIfAbsent(entity.ref(), entity);
             }
         }
+        for (OccupantSnapshot nested : nestedByRef.values()) {
+            if (nested.footprint().intersects(query) && filter.matches(nested)) {
+                found.putIfAbsent(nested.ref(), nested);
+            }
+        }
         return List.copyOf(found.values());
     }
 
     @Override
     public @Nullable WorldView nested(LatticePoint cell) {
-        return null;
+        return children.get(cell);
     }
 
     @Override
@@ -232,34 +290,36 @@ public final class LevelSnapshot implements WorldView {
         return digest;
     }
 
-    private static Map<OccupantRef, OccupantSnapshot> indexEntities(
+    private static Map<OccupantRef, OccupantSnapshot> indexBodies(
         SnapshotId snapshot,
+        int frame,
         Cuboid bounds,
-        List<OccupantSnapshot> entities
+        List<OccupantSnapshot> bodies,
+        OccupantKind kind
     ) {
         TreeMap<OccupantRef, OccupantSnapshot> index = new TreeMap<>();
-        for (OccupantSnapshot entity : entities) {
-            Objects.requireNonNull(entity, "entity");
-            if (!entity.ref().from(snapshot) || entity.ref().frame() != 0) {
-                throw new IllegalArgumentException("entity occupant from another snapshot or frame");
+        for (OccupantSnapshot body : bodies) {
+            Objects.requireNonNull(body, "body");
+            if (!body.ref().from(snapshot) || body.ref().frame() != frame) {
+                throw new IllegalArgumentException("body occupant from another snapshot or frame");
             }
-            if (!entity.descriptor().kind().equals(OccupantKind.entity)) {
-                throw new IllegalArgumentException("not an entity occupant: " + entity.descriptor().type());
+            if (!body.descriptor().kind().equals(kind)) {
+                throw new IllegalArgumentException("not a " + kind.id() + " occupant: " + body.descriptor().type());
             }
-            if (entity.footprint().intersects(bounds)) {
-                index.putIfAbsent(entity.ref(), entity);
+            if (body.footprint().intersects(bounds)) {
+                index.putIfAbsent(body.ref(), body);
             }
         }
         return Collections.unmodifiableMap(index);
     }
 
-    private static Map<LatticePoint, OccupantSnapshot> indexEntityCells(
+    private static Map<LatticePoint, OccupantSnapshot> indexBodyCells(
         Cuboid bounds,
-        Iterable<OccupantSnapshot> entities
+        Map<OccupantRef, OccupantSnapshot> bodies
     ) {
         TreeMap<LatticePoint, OccupantSnapshot> index = new TreeMap<>();
-        for (OccupantSnapshot entity : entities) {
-            Cuboid covered = intersect(entity.footprint(), bounds);
+        for (OccupantSnapshot body : bodies.values()) {
+            Cuboid covered = intersect(body.footprint(), bounds);
             if (covered == null) {
                 continue;
             }
@@ -268,8 +328,8 @@ public final class LevelSnapshot implements WorldView {
                     for (int z = covered.min().z(); z < covered.max().z(); z++) {
                         LatticePoint cell = LatticePoint.of(x, y, z);
                         OccupantSnapshot current = index.get(cell);
-                        if (current == null || bodyOrder(entity, current) < 0) {
-                            index.put(cell, entity);
+                        if (current == null || bodyOrder(body, current) < 0) {
+                            index.put(cell, body);
                         }
                     }
                 }
