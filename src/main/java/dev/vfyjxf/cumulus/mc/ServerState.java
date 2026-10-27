@@ -79,6 +79,7 @@ public final class ServerState {
     private static void closeState(ServerState state) {
         state.blueprints.close();
         state.closeCaptures();
+        LevelWatch.clear();
         state.levels.clear();
     }
 

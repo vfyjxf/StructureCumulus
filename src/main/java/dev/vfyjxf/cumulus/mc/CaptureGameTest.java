@@ -70,16 +70,18 @@ public final class CaptureGameTest {
             helper.fail("capture did not succeed: " + result);
             return;
         }
-        OccupantSnapshot cell = captured.view().occupant(LatticePoint.of(origin.getX(), origin.getY(), origin.getZ()));
-        if (cell == null) {
-            helper.fail("captured cell is unreadable");
-            return;
+        try (SnapshotLease lease = captured.lease()) {
+            OccupantSnapshot cell = lease.view().occupant(LatticePoint.of(origin.getX(), origin.getY(), origin.getZ()));
+            if (cell == null) {
+                helper.fail("captured cell is unreadable");
+                return;
+            }
+            helper.assertValueEqual(
+                ReadStatus.readable,
+                lease.view().statusOf(LatticePoint.of(origin.getX(), origin.getY(), origin.getZ())),
+                "cell status"
+            );
         }
-        helper.assertValueEqual(
-            ReadStatus.readable,
-            captured.view().statusOf(LatticePoint.of(origin.getX(), origin.getY(), origin.getZ())),
-            "cell status"
-        );
         helper.succeed();
     }
 

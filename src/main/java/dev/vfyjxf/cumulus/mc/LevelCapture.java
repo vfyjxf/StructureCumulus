@@ -20,6 +20,7 @@ import dev.vfyjxf.cumulus.kernel.world.SectionSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldCapture;
+import dev.vfyjxf.cumulus.mc.LevelWatch.WatchHandle;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -49,7 +50,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @NullMarked
 public final class LevelCapture implements WorldCapture {
 
-    private static final int cellSize = 16;
+    static final int cellSize = 16;
     private static final FindingCode notCaptured = FindingCode.of(FindingCode.Family.mc, 1);
     private static final Comparator<EntityCandidate> entityOrder = Comparator.comparing(EntityCandidate::type)
             .thenComparing(EntityCandidate::anchor).thenComparing(EntityCandidate::footprint)
@@ -61,6 +62,7 @@ public final class LevelCapture implements WorldCapture {
     private final TraitLookup traitLookup;
     private final AtomicLong revisions = new AtomicLong();
     private volatile boolean closed;
+    private @Nullable WatchHandle watch;
 
     public LevelCapture(ServerLevel level) {
         this(level, NestedExtentLookup.capabilities());
@@ -94,12 +96,19 @@ public final class LevelCapture implements WorldCapture {
         try {
             SnapshotId snapshot = new SnapshotId(world, revision);
             CaptureContext context = new CaptureContext(snapshot, policy, volume);
-            FrameData root = new FrameCapture(context, 0, 0, bounds, LatticePoint.origin, true).build(List.of());
+            FrameCapture rootCapture = new FrameCapture(context, 0, 0, bounds, LatticePoint.origin, true);
+            FrameData root = rootCapture.build(List.of());
             if (root == null) {
                 return new CaptureResult.Unavailable(ReadStatus.notCaptured, notCaptured);
             }
             LevelSnapshot view = new LevelSnapshot(snapshot, policy, root);
-            LevelLease lease = new LevelLease(snapshot, view, () -> !closed && revisions.get() == revision);
+            LevelWatch.WatchHandle handle = acquire(rootCapture.watch());
+            LevelLease lease = new LevelLease(
+                snapshot,
+                view,
+                () -> !closed && revisions.get() == revision && handle.isCurrent(),
+                handle::release
+            );
             captured = true;
             return new CaptureResult.Captured(view, lease);
         } finally {
@@ -117,6 +126,25 @@ public final class LevelCapture implements WorldCapture {
     /** Invalidates every lease handed out by this capture; idempotent. */
     void close() {
         closed = true;
+        WatchHandle handle = watch;
+        if (handle != null) {
+            handle.release();
+        }
+    }
+
+    private WatchHandle acquire(LevelWatch.WatchRegion region) {
+        WatchHandle handle = LevelWatch.acquire(level, region);
+        WatchHandle previous = watch;
+        watch = handle;
+        if (previous != null) {
+            previous.release();
+        }
+        return handle;
+    }
+
+    @Nullable
+    WatchHandle watchHandle() {
+        return watch;
     }
 
     private final class FrameCapture {
@@ -130,6 +158,7 @@ public final class LevelCapture implements WorldCapture {
         private final boolean nestedEnabled;
         private final Map<SectionKey, SectionSlot> sections = new TreeMap<>();
         private final Map<LatticePoint, NestedExtent> blockExtents = new TreeMap<>();
+        private final LevelWatch.WatchRegion watch = new LevelWatch.WatchRegion();
 
         private FrameCapture(
             CaptureContext context,
@@ -153,7 +182,11 @@ public final class LevelCapture implements WorldCapture {
             if (!captureSections()) {
                 return null;
             }
+            watch.frame(bounds, origin);
             List<EntityCandidate> candidates = entityCandidates();
+            for (EntityCandidate candidate : candidates) {
+                watch.entity(candidate.id(), candidate.type(), candidate.anchor(), candidate.footprint());
+            }
             List<OccupantSnapshot> entities = entityBodies(candidates);
             Map<LatticePoint, NestedExtent> declarations = nestedDeclarations(candidates);
             List<OccupantSnapshot> nestedBodies = new ArrayList<>();
@@ -213,12 +246,20 @@ public final class LevelCapture implements WorldCapture {
             int childFrame = context.reserveFrame();
             List<NestedKey> childPath = new ArrayList<>(path);
             childPath.add(key);
-            FrameData result = new FrameCapture(context, childFrame, depth + 1, childBounds, extent.origin(), false)
-                    .build(childPath);
+            FrameCapture childCapture = new FrameCapture(
+                context,
+                childFrame,
+                depth + 1,
+                childBounds,
+                extent.origin(),
+                false
+            );
+            FrameData result = childCapture.build(childPath);
             if (result == null) {
                 context.restore(spentBefore, frameBefore);
                 return null;
             }
+            watch.merge(childCapture.watch);
             return result;
         }
 
@@ -343,6 +384,9 @@ public final class LevelCapture implements WorldCapture {
                                 : OccupantDescriptors
                                         .blockEntity(context.snapshot(), frame, cell, state, blockEntity, traits);
                         occupants.put(cell, occupant);
+                        if (blockEntity != null) {
+                            watch.blockEntity(worldPos, blockEntity, level.registryAccess());
+                        }
                         if (nestedEnabled && (!state.hasBlockEntity() || blockEntity != null)) {
                             NestedExtent extent = blockExtent(worldPos, state, blockEntity);
                             if (extent != null) {
@@ -440,6 +484,10 @@ public final class LevelCapture implements WorldCapture {
             return world.offset(-origin.x(), -origin.y(), -origin.z());
         }
 
+        private LevelWatch.WatchRegion watch() {
+            return watch;
+        }
+
         private @Nullable Cuboid local(Cuboid world) {
             return world.translate(-origin.x(), -origin.y(), -origin.z());
         }
@@ -502,12 +550,12 @@ public final class LevelCapture implements WorldCapture {
         found.putIfAbsent(candidate.id(), candidate);
     }
 
-    private static NamespacedId entityType(Entity entity) {
+    static NamespacedId entityType(Entity entity) {
         var location = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         return NamespacedId.of(location.getNamespace(), location.getPath());
     }
 
-    private static AABB box(Cuboid cuboid) {
+    static AABB box(Cuboid cuboid) {
         return new AABB(
             cuboid.min().x(),
             cuboid.min().y(),
@@ -523,7 +571,7 @@ public final class LevelCapture implements WorldCapture {
         return Objects.requireNonNull(translated, "world bounds");
     }
 
-    private static @Nullable Cuboid footprint(AABB body) {
+    static @Nullable Cuboid footprint(AABB body) {
         int minX = (int) Math.max(LatticePoint.minXz, Math.min(LatticePoint.maxXz, Math.floor(body.minX)));
         int minY = (int) Math.max(LatticePoint.minY, Math.min(LatticePoint.maxY, Math.floor(body.minY)));
         int minZ = (int) Math.max(LatticePoint.minXz, Math.min(LatticePoint.maxXz, Math.floor(body.minZ)));

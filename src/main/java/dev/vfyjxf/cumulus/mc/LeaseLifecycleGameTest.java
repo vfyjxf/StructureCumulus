@@ -43,6 +43,7 @@ public final class LeaseLifecycleGameTest {
         first.lease().close();
         helper.assertTrue(second.lease().isCurrent(), "closing the old handle leaves the newest lease current");
         second.lease().close();
+        capture.close();
         helper.succeed();
     }
 
@@ -71,6 +72,7 @@ public final class LeaseLifecycleGameTest {
         helper.assertValueEqual(1L, capture.currentRevision(), "an unavailable capture stamps no revision");
 
         first.lease().close();
+        capture.close();
         helper.succeed();
     }
 

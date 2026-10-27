@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus;
 import dev.vfyjxf.cumulus.mc.CumulusCommand;
 import dev.vfyjxf.cumulus.mc.DatapackBlueprints;
 import dev.vfyjxf.cumulus.mc.ServerState;
+import dev.vfyjxf.cumulus.mc.WatchEvents;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -26,6 +27,7 @@ public final class StructureCumulus {
         NeoForge.EVENT_BUS.addListener(ServerState::close);
         NeoForge.EVENT_BUS.addListener(ServerState::unload);
         NeoForge.EVENT_BUS.addListener(CumulusCommand::register);
+        WatchEvents.register();
         logger.info("{} loading", Constants.modId);
     }
 }
