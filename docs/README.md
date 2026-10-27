@@ -21,7 +21,7 @@ table defines who may emit each finding code.
 7. [design/06-verification.md](design/06-verification.md) — gates, scenario tests, code producers.
 8. [design/07-regeneration.md](design/07-regeneration.md) — how the kernel is rebuilt from this set.
 
-There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately; until then it still shows the v1.0 code and decision counts.
+There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately; it now reflects the current v1.2 code, decision and test counts.
 
 Then the module files, in dependency order:
 
@@ -58,7 +58,9 @@ Then the module files, in dependency order:
   committed at `d4b6d82`; its `SavedClaims`/`SavedContexts` persistence is compatible with Model C and
   its CAS/release/reload tests are green. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
   (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
-  implemented; capture-revision lease invalidation landed at `0f0bf25`. Non-upright pitch/roll state
+  implemented; capture-revision lease invalidation landed at `0f0bf25`, and the determinism gate
+  (`DeterminismTest`: canonical bytes, parse/write fixed point, equal compile runs, stable finding
+  order) is green. Non-upright pitch/roll state
   mapping, `SC-MC-0004`/`0005` emission, watched-region mark-counter lease invalidation and the
   deferred `SC-MC-0003` remain pending.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
@@ -66,7 +68,7 @@ Then the module files, in dependency order:
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 116
-  kernel JUnit 5 tests and 101 adapter unit tests pass; `runGameTestServer` passes 32/32; `./gradlew
+  kernel JUnit 5 tests and 106 adapter unit tests pass; `runGameTestServer` passes 32/32; `./gradlew
   check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean.
 
 ## The one rule

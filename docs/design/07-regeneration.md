@@ -19,7 +19,8 @@ CAS/release/reload), M2c at `cb06aa8`/`64d04ce` (Model C, body identity, total r
 traits, the five adapter trait keys) and M2d at `f3e0338`/`d6aefc2` (nested extents, one
 `LevelSnapshot` + `FrameData`, child frames, cuts, child entities), M4a at `f2659c7` (JSON
 reader/writer), M4b at `76a8e5c` (datapack reload) and the command slice at `4899d86` (settle, plus
-compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25`. M3 persistence is
+compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25` and the determinism
+gate landed with `DeterminismTest`. M3 persistence is
 compatible with Model C. Still pending: non-upright pitch/roll state mapping, `SC-MC-0004`/`0005`
 emission, watched-region mark-counter lease invalidation and the deferred `SC-MC-0003` channel.
 
@@ -92,8 +93,10 @@ the exact failure this set exists to prevent.
 
 - **M4.** Implemented: JSON reader/writer, datapack reload and the five commands (`compile`, `settle`,
   `explain`, `claims`) on top of the committed `SavedClaims`/`SavedContexts` stores.
-- **M5.** The remaining host gates: determinism golden test and watched-region mark-counter lease
-  invalidation. The kernel and adapter suites are green (116 kernel, 101 adapter, 32 GameTests).
+- **M5.** The determinism gate is implemented (`DeterminismTest`: canonical bytes, the parse/write
+  fixed point, equal compile runs and stable finding order). The remaining host gate is the
+  watched-region mark-counter lease invalidation. The kernel and adapter suites are green (116 kernel,
+  106 adapter, 32 GameTests).
 - **Non-upright tilt.** The 40 pitch/roll/inverted orientations, capability-aware state remapping
   and `SC-MC-0004` emission.
 - **`SC-MC-0005`** capture-over-cap emission at the host boundary, and the deferred `SC-MC-0003`

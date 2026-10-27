@@ -28,10 +28,12 @@
   `SC-OCC-0004`, `SC-MC-0002` relay. M2d: `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
   `FrameData`, child frames, budgets/cuts, child entities and entity-hosted extents. M3: `SavedClaims`/
   `SavedContexts`, CAS settle/release, reload codecs and per-level stores. M4: the JSON reader/writer,
-  the datapack source, the merged document source and the five `/cumulus` subcommands.
+  the datapack source, the merged document source and the five `/cumulus` subcommands. M5: the
+  determinism gate (`DeterminismTest`) covers canonical bytes across member order, the parse/write
+  fixed point, equal compile runs and stable finding order; capture-revision lease invalidation is
+  in place.
 - **Pending.** Watched-region mark-counter lease invalidation, `SC-MC-0004`/`0005` emission,
-  non-upright pitch/roll state mapping and the deferred `SC-MC-0003` capture-finding channel. M5 is
-  the determinism/host gate pass.
+  non-upright pitch/roll state mapping and the deferred `SC-MC-0003` capture-finding channel.
 - No kernel type names a Minecraft type; the adapter may name every kernel type.
 
 ## 2. Types
@@ -318,7 +320,7 @@ definition origin's anchor property is read from the `BlockState` properties, no
 
 ## 11. Commands and lifecycle
 
-All five subcommands run on the server thread and return 1 on success, 0 on a reported failure.
+All five subcommands run on the server thread. `check` returns 1 whenever it reaches a result (including a reported failed/undecided/dropped check) and 0 only on an argument/document/capture/siting failure; the mutating `settle` returns 1 only for `Formed`; `compile`, `explain` and `claims` return 1 on a produced result and 0 on a reported failure.
 
 - `/cumulus check <id> <origin>` — capture, siting, `check`; print the result and findings.
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and

@@ -20,9 +20,11 @@ and record the commands.
 
 Current evidence (2026-10-27): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are committed; M4a/M4b, the
 command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) and capture-revision lease
-invalidation (`0f0bf25`) are implemented. `./gradlew check` is green: 116 kernel tests and 101 adapter
+invalidation (`0f0bf25`) are implemented. `./gradlew check` is green: 116 kernel tests and 106 adapter
 unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 32/32. `tools/spec-check.py` is clean.
-Model C, body identity, trait capture and the nested capability are implemented, not pending.
+Model C, body identity, trait capture and the nested capability are implemented, not pending. The
+determinism gate is implemented (`DeterminismTest`): canonical bytes across member order, the
+parse/write fixed point, equal compile runs and stable finding order.
 
 **Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
 in code documented; it is green. There is no documented-but-not-in-code list and no suppression.
@@ -150,9 +152,10 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   command surface (`SettleCommandGameTest`, `CommandGameTest`). Unit evidence: `LevelSnapshotTest` for
   body/precedence/partial reads, `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for
   the capability declaration, `SavedClaimsTest`/`SavedContextsTest` for persistence,
-  `OrientationMappingTest` for upright mapping, and `ServerStateDocumentSourceTest`/
+  `OrientationMappingTest` for upright mapping, `DeterminismTest` for canonical bytes, the
+  parse/write fixed point and equal compile runs, and `ServerStateDocumentSourceTest`/
   `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing. **Still pending:**
-  M5 determinism gate, non-upright pitch/roll state mapping (the 40 orientations), `SC-MC-0004`/`0005`
+  non-upright pitch/roll state mapping (the 40 orientations), `SC-MC-0004`/`0005`
   emission, watched-region mark-counter lease invalidation, and the deferred `SC-MC-0003`
   capture-finding channel.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.

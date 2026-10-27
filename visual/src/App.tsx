@@ -206,13 +206,13 @@ export default function App() {
                 StructureCumulus / {zh ? '设计 review 1.2' : 'design review 1.2'}<br />
                 {zh ? '8 份设计文件 · 11 个 kernel 模块 + adapter 规范' : '8 design files · 11 kernel modules + adapter spec'}<br />
                 {zh ? <>kernel 11 个 package · {CODE_COUNT} 个 code · {TEST_COUNT} 个 kernel 测试</> : <>kernel 11 packages · {CODE_COUNT} codes · {TEST_COUNT} kernel tests</>}<br />
-                kernel commit b5f9857
+                kernel commit cb06aa8
               </div>
             </div>
             <div className="footer-rule rule" />
             <div className="footer-small">
               <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
-              <span>{zh ? 'Adapter M1–M3 + M4a JSON；M4b/M5/M6 待完成' : 'Adapter M1–M3 + M4a JSON; M4b/M5/M6 pending'}</span>
+              <span>{zh ? 'Adapter M1–M4；M5 determinism 已落地' : 'Adapter M1–M4; M5 determinism landed'}</span>
               <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>

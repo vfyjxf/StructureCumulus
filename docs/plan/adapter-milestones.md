@@ -13,9 +13,10 @@ clean kernel regeneration. No client overlay, network payload, schematic importe
 
 The commit order was **M1 → M2a → M2b → M3 → M2c → M2d**, then **M4a → M4b → the command slice**. M3
 was committed before Model C landed; its `SavedClaims`/`SavedContexts` code is compatible as-is, so the
-"rebase" is a checkpoint, not a rewrite. M4 is implemented; M5 remains. A milestone is complete only
+"rebase" is a checkpoint, not a rewrite. M4 is implemented; M5 is partial (the determinism gate
+landed, the watched-region mark counter remains). A milestone is complete only
 when its code and its named tests are both on the tree and re-run; the current counts are 116 kernel
-tests, 101 adapter unit tests and 32 GameTests, with `./gradlew check` and `tools/spec-check.py` green.
+tests, 106 adapter unit tests and 32 GameTests, with `./gradlew check` and `tools/spec-check.py` green.
 
 | Milestone | Deliverable | State |
 | --- | --- | --- |
@@ -27,7 +28,7 @@ tests, 101 adapter unit tests and 32 GameTests, with `./gradlew check` and `tool
 | M2d | **Nested capability**: `NestedExtent`/`NestedExtents`, one `LevelSnapshot` + `FrameData`, child frames, budgets/cuts, child entities, fake-provider seam | committed at `f3e0338`/`d6aefc2`; nested unit + GameTests green |
 | M3 | `SavedClaims`, `SavedContexts`, CAS/release/reload, per-level `ServerState` | committed at `d4b6d82`; compatible checkpoint passed; settle command implemented at `4899d86` |
 | M4 | JSON reader/writer (`f2659c7`), datapack reload (`76a8e5c`), commands (`compile`, `settle`, `explain`, `claims`; settle at `4899d86`) | **implemented**; `CommandGameTest`/`SettleCommandGameTest` green |
-| M5 | Remaining GameTests, determinism golden test, watched-region mark-counter lease invalidation, Gradle gates | partial: 116 kernel + 101 adapter + 32/32 GameTests and `check` green; capture-revision lease invalidation at `0f0bf25`; determinism and mark-counter invalidation pending |
+| M5 | Determinism gate, watched-region mark-counter lease invalidation, Gradle gates | partial: 116 kernel + 106 adapter + 32/32 GameTests and `check` green; capture-revision lease invalidation at `0f0bf25`; determinism gate (`DeterminismTest`) landed; watched-region mark-counter invalidation pending |
 | M6 | Clean delete/regenerate on a branch | pending |
 
 ## Acceptance
@@ -38,7 +39,7 @@ tests, 101 adapter unit tests and 32 GameTests, with `./gradlew check` and `tool
 | M2d | Met: `NestedCaptureGameTest`/`LevelSnapshotTest` cover frame/depth/parent/origin, one snapshot, cut reasons, child build-height partial sections, block-over-entity precedence, body identity and entity-hosted extents; no built-in provider; no chunk load. |
 | M3 checkpoint | Met: `SavedClaimsTest`/`SavedContextsTest` and the claims GameTest pass after Model C; `SC-OCC-0004`/relayed host codes persist. The `settle` command is implemented at `4899d86`. |
 | M4 | Met: reader/writer round-trip, datapack reload and the five commands; `SettleCommandGameTest`/`CommandGameTest` cover the command surface. |
-| M5 | `./gradlew check` green and `runGameTestServer` all required tests pass; determinism golden and watched-region mark-counter invalidation added. |
+| M5 | `./gradlew check` green and `runGameTestServer` all required tests pass; the determinism gate is met (`DeterminismTest`); watched-region mark-counter invalidation still pending. |
 | M6 | Delete → regenerate → gates green on a branch. |
 
 ## Owners
