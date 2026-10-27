@@ -126,14 +126,15 @@ compare-and-set; it never merges per row or per bay.
 | Footprint | Owned cells | Resolved when |
 | --- | --- | --- |
 | `Box` | `bay.cells` | build (a local set, translated at settle) |
-| `Bound` | union of the bound subjects' non-air footprints | settle |
+| `Bound` | union of the bound subjects' readable non-air root-frame footprints | settle |
 | `Declared` | the declared `CuboidSet` | build |
 | `None` | ∅ | always |
 
 Claims protect what a structure occupies or declares, never what it merely reads. `Box` is how an
 empty cavity is protected; `Declared` is ground the author writes down; `None` is an observation
 that owns nothing. `Footprint` does not decide whether a `Match` is complete; that is `Coverage` in
-`structure`.
+`structure`. A nested body or a non-root subject is never part of a `Bound` footprint; the engine
+rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
 
 ### 4.5 Ledger behaviour
 

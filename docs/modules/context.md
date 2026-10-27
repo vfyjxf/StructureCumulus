@@ -150,9 +150,10 @@ diagnostic is a `match` value; a value the instance keeps is `instance`.
 `SC-CTX-0001` (ERROR, primary): a computation produced no value. Producer: `engine.check`.
 `SC-CTX-0004` (ERROR, primary): a derivation names
 a missing deriver. Producer: `engine.derive`. `SC-CTX-0005` (ERROR, primary): a deriver failed.
-Producer: `engine.derive`. `SC-CTX-0006` (ERROR, primary): a fold has a refused section. Producer:
-`engine.check`. `SC-CTX-0007` (ERROR, primary): a required key is absent. Producer: `Focuses.context`
-and `engine.derive`.
+Producer: `engine.derive`. `SC-CTX-0006` (ERROR, primary): a fold has a refused section, or a
+section computation returned `Missing` for a `Partial` slice. Producer: `engine.check`.
+`SC-CTX-0007` (ERROR, primary): a required key is absent. Producer: `Focuses.context` and
+`engine.derive`.
 
 ## 7. Tests
 

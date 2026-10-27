@@ -18,16 +18,27 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current M1 + M2a/M2b evidence (2026-10-27): `./gradlew check` is green; `runGameTestServer` passes
-3/3 (capture-only; capture → compile → check; capture entity over block); `kernelTest` is 97; the
-adapter `test` task is 18; `tools/spec-check.py` is clean; the visual build is green. The three
-GameTests are separate from the 97 kernel tests.
+Current evidence (2026-10-27): M1, M2a and M2b are committed; M3 is committed at `d4b6d82` and will
+be rebased. `./gradlew test` is green: 97 kernel tests and 43 adapter unit tests, 0 failures,
+0 skipped. The last recorded `runGameTestServer` run passes 4/4 (capture-only; capture → compile → check;
+capture entity over block; claims). Model C and the nested capability are **specified, not
+implemented**; their new names are the only expected spec-index red. The spec index is the only gate
+this round turns red; no Java changed, so compile, purity, tests and no-stubs are unchanged.
+
+**Spec index red (expected).** `tools/spec-check.py` reports the approved-but-unimplemented names
+as documented-but-not-in-code, exactly:
+`world: Absent, CellRead, Found, Partial, ReadRefusal, TraitSlot, Unreadable`. The seven are
+`ReadRefusal`, `CellRead` (with `Found`/`Unreadable`), `TraitSlot` (with `Absent`) and
+`SectionSlot.Partial`; there is no other mismatch. The red is the honest gap described in
+`05-decisions.md` D-24 and the module §3 notes; it must not be suppressed, and it clears when M2c
+implements the read model. `SC-OCC-0004` is a docs-only code until M2c as well; the code table is
+allowed to lead the tree because the producer row is the contract.
 
 ## 2. Requirement → module → test
 
 | Requirement | Modules | Test |
 | --- | --- | --- |
-| F-01 occupants are not blocks | world, structure | entity pen, nested |
+| F-01 occupants are not blocks | world, structure | entity pen; nested (pending M2d) |
 | F-02 purity | all | purity gate |
 | F-03 typed context | context, structure | furnace capacity, iron count |
 | F-04 anchor/no controller | structure, space | anchor read; orientation policy |
@@ -69,6 +80,14 @@ They are the acceptance suite; a module test that does not feed one of them is o
     `match` output is rejected, a stale context is not possible by contract.
 12. **Document parity** — the campfire/furnace as a `Document` and as a builder produce equal
     blueprints; a bad schema field/kind/placement produces the documented code and no blueprint.
+13. **Refusal (specified, pending M2c)** — a `Partial` section: a `count`/`air` computation returns
+    `Missing` and reports the refusal, never a short sum; a check over the refused cell is
+    `Unreadable`; a host code is relayed, and a relayed kernel code becomes `SC-OCC-0004` with a
+    note; `not(trait(...))` stays `Unreadable`; missing-slot traits are never `Mismatch`.
+14. **Nested (specified, pending M2d)** — one snapshot with a child frame: distinct frame/depth/
+    parent, local bounds and `world = origin + local`; `nested(cell)` anchor-only; a cut child keeps
+    the body and yields `SC-OCC-0003`; a nested body bound as a claim is `Failed(SC-CLM-0004)`; a
+    child build-height section is refused, not air; two same-type/same-anchor entities are distinct.
 
 ## 4. Module tests
 
@@ -77,24 +96,28 @@ They are the acceptance suite; a module test that does not feed one of them is o
 | `core` | id grammar, catalog freeze, Value content equality, budget, key equality |
 | `space` | packing bijection, cuboid edges, CuboidSet normalization and semantic-equality laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
 | `finding` | code parse, `Codes.all` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
-| `world` | air vs refused, statusOf, multi-cell, nested frame/ref, section digest, descriptor/trait, window |
-| `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution |
-| `structure` | bay/coverage rules, reply combinators, focus kinds, build table, plan DAG, anchors, computations |
+| `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window |
+| `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |
+| `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations |
 | `context` | context view, publish merge/revision, derive order, merges |
-| `document` | schema validation, placement/alias, key types, compile parity, determinism |
-| `engine` | §3 scenarios, gate, budget, fold, ledger retry |
+| `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity |
+| `engine` | §3 scenarios, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection |
 | `remedy` | provider order/cap, edit/overlay values |
 | `spi` | builtins, host empty, facade paths, two-kernel isolation |
 
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. A test reads `Codes.all` and asserts:
+The authoritative table is `finding.md` §6. `Codes.all` has 56 entries in v1.1; the committed
+registry has 55 until M2c adds `SC-OCC-0004`. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
 - every code appears exactly once in the producer table (a hand-maintained `Map<FindingCode,String>`
-  in the test, checked against `Codes.all`);
+  in the test, checked against `Codes.all`; the `SC-MC-*` wildcard row is excluded from the map);
 - no producer row names a code absent from `Codes.all`;
-- `SC-MC-*` are absent from `Codes.all` (adapter-only).
+- `SC-MC-*` are absent from `Codes.all` (adapter-only); `SC-MC-0003` is reserved/deferred and not a
+  producer row;
+- a relayed host code is not allocated by the kernel, and a relayed code already in `Codes.all` is
+  replaced by `SC-OCC-0004` with a note.
 
 A code with no producer is deleted, not reserved. An unknown addon code is legal; it is not in
 `Codes.all`.
@@ -115,6 +138,16 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 10. Can a stale lease produce a `Formed`? (gate before and after)
 11. Can a budget-exhausted attempt be turned into a `Formed` by a warm cache? (no cache)
 12. Can a missing extension be silently replaced by a default? (no reflection, no fallback)
+13. Can a refused cell become air, a zero, or a short sum? (world/`Computations`: `Unreadable`,
+    then `Missing` + report)
+14. Can `not(trait(...))` turn a refused or unasked trait into a pass? (structure: `Unreadable`
+    stays)
+15. Can a nested body or a non-root subject become a claim row? (engine: `SC-CLM-0004`)
+16. Can a host code enter `Codes.all` or impersonate a kernel code? (world/finding: opaque payload,
+    trust guard)
+17. Can a cut child appear as a refused or empty child? (adapter: `null` + `SC-OCC-0003`)
+18. Can a non-empty `SnapshotPolicy.traits` become empty in the constructor? (world: copy by id, no
+    silent drop)
 
 ## 7. What is not verified in this round
 
@@ -122,15 +155,16 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   snapshot and lease, block/block-entity descriptors, `ServerState`, in-memory `BuiltinDocuments` and
   `/cumulus check <id> <origin>`, with the capture-only and capture → compile → check GameTests. M2a
   is executed by `runGameTestServer` (capture entity over block) and by the `LevelSnapshotTest`
-  precedence cases: loaded-entity capture, policy windows, full footprint indexing and
-  entity-vs-block precedence (`world.md` §4.3). M2b is executed by `OrientationMappingTest`: upright
-  heading/turn/flip mapping and a mirror-then-rotate state transform; non-level tilts return
-  `UnsupportedTilt`. Still reviewed, not executed: the rest of M2 — traits/`OccupantTraits`, nested
-  views/`NestedLevelSnapshot`, non-upright pitch/roll state mapping, `SC-MC-0002`–`0005` emission,
-  window/mark-counter lease invalidation and capture findings; M3 claims/context persistence with
-  CAS/release/reload; M4 JSON reader/writer, datapack reload and the remaining commands (`compile`,
-  `settle`, `explain`, `claims`). The orientation, door and furnace GameTests are also still
-  reviewed, not executed.
+  precedence cases. M2b is executed by `OrientationMappingTest`: upright heading/turn/flip mapping
+  and a mirror-then-rotate state transform; non-level tilts return `UnsupportedTilt`. M3 is executed
+  by `SavedClaimsTest`/`SavedContextsTest` and the claims GameTest (CAS/release/reload), but its
+  rebase onto Model C is not done. **Specified, not executed:** Model C (body identity,
+  `ReadRefusal`/`CellRead`/`Partial`/`TraitSlot`, trait four states, `SC-OCC-0004`, host-code relay,
+  policy ids), the nested capability (`NestedExtent`/`NestedExtents`, frames, cuts, child entities),
+  non-upright pitch/roll state mapping, `SC-MC-0004`/`0005` emission, window/mark-counter lease
+  invalidation, and M4 JSON/datapack and the remaining commands. The spec index is red only for the
+  four pending world names; that is the expected gap, not a pass. The orientation, door and furnace
+  GameTests are also reviewed, not executed.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.

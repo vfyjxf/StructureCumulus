@@ -164,6 +164,7 @@ public final class Codes {
     public static final CodeEntry unreadableCell = ...;            // SC-OCC-0001
     public static final CodeEntry footprintClipped = ...;          // SC-OCC-0002
     public static final CodeEntry nestedCut = ...;                 // SC-OCC-0003
+    public static final CodeEntry unreadableRead = ...;            // SC-OCC-0004
     public static final CodeEntry expected = ...;                  // SC-EXP-0001
     public static final CodeEntry negationMatched = ...;           // SC-EXP-0002
     public static final CodeEntry thresholdImpossible = ...;       // SC-EXP-0003
@@ -232,6 +233,12 @@ severity and explanation live in its `CodeEntry`; a producer copies the severity
 well-formed code still constructs, orders and renders; the registry has no entry, so `explain`
 returns `null` and `explainOrFallback` synthesises the family text.
 
+`Codes.all` is the kernel's table. An adapter or addon code is a `FindingCode` with no `CodeEntry`
+and never enters `Codes.all`; `SC-MC-*` is the adapter family. A `ReadRefusal` may carry such an
+opaque host code; the kernel relays it at the report site (it never branches on it, mints it or
+allocates it) unless the code is already in `Codes.all`, in which case the site substitutes
+`SC-OCC-0004` and adds a note (`world` §4.1).
+
 ### 4.2 Finding validation
 
 - `code`, `severity`, `phase`, `message` non-null; `message` non-blank after `strip()`.
@@ -294,9 +301,10 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | --- | --- | --- | --- | --- |
 | `SC-SPC-0001` | ERROR | ✓ | a locus/cell cannot be mapped into the requested frame | `structure`/`engine` when `LocusMap`/`Siting` returns null |
 | `SC-SPC-0002` | ERROR | ✓ | a box operation leaves the lattice | `document`/`structure` build |
-| `SC-OCC-0001` | ERROR | ✓ | the cell is unreadable | `Focuses` when `occupant` returns null |
+| `SC-OCC-0001` | ERROR | ✓ | a focus needed a subject that is missing for a non-refusal reason | `Focuses` |
 | `SC-OCC-0002` | WARNING | ✓ | a footprint leaves the snapshot | `Focuses` |
-| `SC-OCC-0003` | ERROR | ✓ | a nested view was cut by depth | `Focuses`/`WorldView` consumer |
+| `SC-OCC-0003` | ERROR | ✓ | a nested view was cut by depth, cap, cycle or an unloaded chunk | `Focuses.nested`/`WorldView` consumer |
+| `SC-OCC-0004` | ERROR | ✓ | a required read is unavailable (default refusal; also the substitute for a relayed kernel code) | `WorldView.read`, `Focuses`, `SectionContext`/`StructureContext` consumers |
 | `SC-EXP-0001` | ERROR | ✓ | the default element/state mismatch | `Expectations` leaf tests |
 | `SC-EXP-0002` | ERROR | ✓ | a negated test matched | `Expectations.not` |
 | `SC-EXP-0003` | ERROR | ✓ | a threshold cannot be met | `Expectations.atLeast/atMost/exactly` |
@@ -305,7 +313,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-CLM-0001` | ERROR | ✓ | two claims conflict | `engine.check`/`settle` |
 | `SC-CLM-0002` | WARNING | – | the ledger cannot answer | `engine.check` |
 | `SC-CLM-0003` | ERROR | – | the revision moved twice | `engine.settle` |
-| `SC-CLM-0004` | ERROR | ✓ | a settle binding is invalid | `engine.settle` |
+| `SC-CLM-0004` | ERROR | ✓ | a binding is invalid (a nested or non-root subject, a foreign bay/cell) | `engine.check`/`settle` |
 | `SC-CLM-0005` | ERROR | ✓ | an exclusive bound footprint is empty | `ClaimPlanner`/`engine.settle` |
 | `SC-BPT-0001` | ERROR | ✓ | a blueprint has no checks/bounds | `Blueprint.build` |
 | `SC-BPT-0002` | ERROR | ✓ | two bays overlap with an exclusive side | `Blueprint.build` |
@@ -347,14 +355,23 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-RMD-0002` | ERROR | ✓ | a provider returned a malformed remedy | `StructureKernel.solve` |
 | `SC-SPI-0001` | ERROR | ✓ | an extension threw or returned a malformed finding | `engine` guard |
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
-| `SC-MC-*` | — | — | adapter-only; not produced by the kernel | adapter |
+| `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; a host code may be relayed from a `ReadRefusal` | adapter |
+
+`Codes.all` has 56 entries in this revision. `SC-OCC-0004` is specified with Model C; the committed
+`Codes` still has 55 entries until M2c, and the extra entry is the documented pending code, not a
+silent omission. `SC-MC-0003` is reserved/deferred: the adapter has no capture-finding channel in
+this round, so it is not produced and not listed in `Codes.all`; a cut child is reported by the
+consumer as `SC-OCC-0003`, never fabricated as a refused child (`adapter.md` §7).
 
 ## 7. Tests
 
-- Code parse/text round-trip; malformed parse returns null; `Codes.all` has one entry per code and
-  every entry has an explanation; every code in `all` appears in the producer table.
+- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 56 entries, one per code,
+  every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-0003` is
+  absent from `all`.
 - Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`
   round-trip `SC-<TAG>-<NNNN>`, and the JSON renderer emits tags rather than constant names.
+- Host code: an opaque `SC-MC-*` refusal renders and orders without a `CodeEntry`; it never enters
+  `Codes.all`; a relayed code already in `Codes.all` is replaced by `SC-OCC-0004` with a note.
 - Finding builder: primary label requirement, message defaulting, label sort, blank rejection.
 - Bundle: dedup, order, caps (errors uncapped), truncation note, idempotent build, filter prefixes.
 - Renderers: golden human text for a door/finding; JSON schema fields; no fabricated source line.

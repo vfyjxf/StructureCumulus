@@ -3,6 +3,11 @@
 > Rank 7. One check, one settle, one derive. The engine is the only package that knows the whole
 > pipeline; it owns the request, the outcome, the result arms, the gate, the row planner and the
 > two entry points. It schedules nothing, stores nothing and renders nothing.
+>
+> **Pending implementation (Model C / nested capability).** Partial sections, refused-cell
+> computations, host-code relay and nested claim rejection are approved; the committed engine still
+> has the section-only refusal model and accepts a nested subject until settle. `Blueprint.reads()`
+> is the host's policy source.
 
 ## 1. Scope
 
@@ -102,7 +107,8 @@ check(request):
       for each section of region ∩ view:
           if budget exhausted                          -> Undecided(budgetExhausted)
           if cancelled                                 -> Undecided(cancelled)
-          if slot not readable                         -> session.refuse(key, SC-CTX-0006)
+          if slot Refused                              -> session.refuse(key, SC-CTX-0006)
+          else if slot Partial                         -> compute with unreadable(); Found -> contribute
           else                                         -> compute; Found -> contribute
   fold contributions per key                           // SectionKey order
   for each aggregate computation in plan.aggregates(): // Kahn order
@@ -118,6 +124,7 @@ check(request):
   fold replies: any Mismatch -> Failed; any Unreadable -> Undecided(unreadable);
                 any Abstain -> Undecided(abstained); else Admitted
   admitted:
+      if a binding carries a nested subject or a non-root frame -> Failed(SC-CLM-0004)
       if no claimable bay                              -> ledgerAvailable=false, revision=0
       else if request.claims() == null/!available      -> Undecided(ledgerUnavailable)
       else derive rows; matrix against claims.rows()
@@ -126,6 +133,8 @@ check(request):
 ```
 
 `check` never writes. It reads only the lease's view, the request's frozen claims and the blueprint.
+A `Partial` section is readable: its refused cells are exposed through `SectionContext.unreadable()`
+and are never silently counted as air. A wholly `Refused` section refuses the key before `compute`.
 
 ## 5. The settle algorithm
 
@@ -134,7 +143,7 @@ settle(request, admitted, ledger, contexts):
   if !request.lease().isCurrent()                      -> Dropped(settle) + SC-ENG-0002
   if admitted.phase() != check                          -> Undecided(designDefect)
   bindings = admitted.outcome().bindings()
-  validate(bindings)                                    // blueprint, snapshot, frame, cells, oneSubject
+  validate(bindings)                                    // blueprint, snapshot, root frame, cells, no nested, oneSubject
       failure -> Failed(SC-CLM-0004)
   rows = ClaimPlanner.derive(blueprint, siting, owner, bindings)
   if rows.isEmpty():
@@ -193,8 +202,9 @@ boundaries; a long extension checks its own token. `CancelToken.never()` is the 
 `MatchOutcome.values` contains the folded section values, the aggregate values, and the
 `Retention.match`/`instance` values; keys are sorted by `(id, type name)`. `bindings` has one
 `BayBinding` per bay that has checks, in bay declaration order; a bay with no non-air subject carries
-an empty list, which is how an empty `Bound` claim is detected. `reads` is the union of every check's
-read scope and every computation's region. `spend` is the sum of every charge.
+an empty list, which is how an empty `Bound` claim is detected. `reads` is `Blueprint.reads()`: the
+engine charges and reports exactly the declared closure, and a focus that reads outside it is a
+review defect, never a silent widening. `spend` is the sum of every charge.
 
 ### 7.3 Result
 
@@ -202,7 +212,9 @@ read scope and every computation's region. `spend` is the sum of every charge.
 `Settled` (or an empty-row registration that needed no ledger) and carries the claims, the context
 revision and the ledger revision. `Failed` has at least one `error` finding. `Undecided` carries a
 reason and, when available, a partial outcome. `Dropped` means the snapshot was no longer current;
-the attempt read nothing that can be trusted.
+the attempt read nothing that can be trusted. A `Partial` section does not make an attempt
+`Undecided` by itself: the computation's `Missing` propagates through the normal fold, and the
+finding carries the refusal's code.
 
 `MatchResult` is a pure value: no `AutoCloseable`, no lease, no `close()`. The host scopes the lease.
 
@@ -216,14 +228,19 @@ version. A stale snapshot never publishes a claim or a context value.
 
 `ClaimPlanner` is the only row factory; it is pure and takes no view and no ledger. `Box` and
 `Declared` are local sets translated by the siting; `Bound` is the union of the subjects' world
-footprints; a subject from a nested frame (`frame != 0`) is invalid for a claimable bay. Rows are one
-per cell per bay; a cell may carry two rows only when both bays are `shared` (the blueprint refuses
-an exclusive overlap). `rows` is sorted by `(cell, owner, bay)`.
+footprints; a subject from a nested frame (`frame != 0`) or of kind `OccupantKind.nested` is invalid
+for a claimable bay. A nested structure is checkable but never claimable: a nested focus returns no
+subject, and a check that binds a nested body through `Focuses.occupant` is rejected before rows are
+minted. Rows are one per cell per bay; a cell may carry two rows only when both bays are `shared`
+(the blueprint refuses an exclusive overlap). `rows` is sorted by `(cell, owner, bay)`.
 
 `settle` validates before deriving: each bay is this blueprint's; each subject's ref belongs to this
-snapshot and the root frame; every subject footprint lies inside the bay's world cells; for
-`oneSubject` the union equals the bay; for `exclusive + Bound` at least one non-air subject exists.
-A failure is `Failed(SC-CLM-0004)`/`SC-CLM-0005)` and nothing is written.
+snapshot and the root frame; no subject has kind `nested`; every subject footprint lies inside the
+bay's world cells; for `oneSubject` the union equals the bay; for `exclusive + Bound` at least one
+non-air subject exists. A failure is `Failed(SC-CLM-0004)`/`SC-CLM-0005` and nothing is written.
+`ClaimPlanner.derive` throws `IllegalArgumentException` carrying `SC-CLM-0004` if a nested or
+non-root subject reaches it; that is a proof failure, because `settle` already validated the
+bindings.
 
 ### 7.6 Budget and determinism
 
@@ -231,15 +248,18 @@ Charges: a section computation charges the slice volume plus one section per sec
 charges its declared cells' volume plus the sections they touch, and a window charges its inflated
 volume plus its sections; an aggregate charges nothing. Charges happen before the unit runs; a
 refusal returns `Undecided(budgetExhausted)`. The budget is the request's; the engine does not reset
-it. For a fixed tuple the result value, finding order and spend are identical; `Plan` order is fixed
-at build; the fold sorts by `SectionKey`; the finding bundle sorts.
+it. A `Partial` section is charged as one section; its refused cells are not a second read. For a
+fixed tuple the result value, finding order and spend are identical; `Plan` order is fixed at build;
+the fold sorts by `SectionKey`; the finding bundle sorts.
 
 ## 8. Codes
 
 `SC-ENG-0001` budget, `SC-ENG-0002` stale snapshot, `SC-ENG-0004` internal plan defect,
 `SC-ENG-0005` cancelled; `SC-CLM-0001` conflict, `SC-CLM-0002` ledger unavailable, `SC-CLM-0003`
-revision moved twice, `SC-CLM-0004` invalid binding, `SC-CLM-0005` empty exclusive bound;
-`SC-CTX-0001/0004/0005/0006/0007`; `SC-SPI-0001` extension guard.
+revision moved twice, `SC-CLM-0004` invalid binding (including a nested or non-root subject),
+`SC-CLM-0005` empty exclusive bound; `SC-CTX-0001/0004/0005/0006/0007`; `SC-OCC-0004` as the relayed
+default for a refused section read and `SC-SPI-0001` extension guard. A host code carried by a
+`ReadRefusal` is relayed unchanged unless it is already in `Codes.all`.
 
 ## 9. Tests
 
@@ -249,7 +269,10 @@ revision moved twice, `SC-CLM-0004` invalid binding, `SC-CLM-0005` empty exclusi
 - Hatch: shared/shared coexists; exclusive conflicts; release re-claims.
 - Pipe corner: eight asserted, four owned; neighbour does not conflict.
 - Entity pen: window read, subject footprint, `anySubject + Bound`.
-- Absence: a refused section makes the key absent; a read is `Unreadable`, never a short sum.
+- Absence: a refused section makes the key absent; a read is `Unreadable`, never a short sum; a
+  partial section makes `count`/`air` `Missing` and reports the refusal, while `volume` stays total.
+- Nested: a nested focus yields no subject; a nested body bound through an occupant focus is
+  `Failed(SC-CLM-0004)` before rows; a child-frame subject is rejected the same way.
 - Budget: a too-small budget is `Undecided`; no claims.
 - Gate: an invalidated lease is `Dropped`; nothing written.
 - Ledger: revision moved once retries; twice is `Undecided`; conflict is `Failed`; no row on failure.

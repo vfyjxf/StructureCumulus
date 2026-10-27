@@ -11,14 +11,17 @@ idea, not an API.
 
 **Output:** `src/kernel/java/dev/vfyjxf/cumulus/kernel/{core,space,finding,world,claim,structure,
 context,document,engine,remedy,spi}`, `src/kernelTest/java`, and the `src/main/java` mod entry with
-the M1 adapter (host + `/cumulus check` + capture-check): `LevelCapture`, `LevelSnapshot`,
-`LevelLease`, block/block-entity descriptors, the `ServerState` lifecycle, in-memory
-`BuiltinDocuments` (`structurecumulus:air_cell`) and `/cumulus check <id> <origin>`, plus two
-GameTests (capture-only; capture → compile → check). M2 is partial: M2a adds loaded-entity capture,
-policy windows, full footprint indexing and entity-vs-block precedence (`world.md` §4.3), plus a
-third GameTest (capture entity over block); M2b adds upright orientation mapping. Traits, nested
-views, non-upright pitch/roll state mapping, `SC-MC-0002`–`0005` emission, window/mark-counter lease
-invalidation, claims/persistence, JSON/datapack and the rest of the command surface remain pending.
+the adapter. Committed: M1 (host + `/cumulus check` + capture-check: `LevelCapture`,
+`LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState` lifecycle, in-memory
+`BuiltinDocuments`, two GameTests), M2a (loaded-entity capture, policy windows, footprint indexing,
+entity-vs-block precedence, a third GameTest), M2b (upright orientation mapping) and M3 at `d4b6d82`
+(`SavedClaims`, `SavedContexts`, CAS/release/reload, a claims GameTest). **Specified, not
+implemented:** Model C (body identity, `ReadRefusal`/`CellRead`/`SectionSlot.Partial`/`TraitSlot`,
+trait four states, `SC-OCC-0004`, host-code relay, `SnapshotPolicy.traits` by id, `Blueprint.reads`)
+and the nested capability (`NestedExtent`/`NestedExtents`, one `LevelSnapshot` + `FrameData`, child
+frames, cuts, child entities). Still pending: non-upright pitch/roll state mapping,
+`SC-MC-0004`/`0005` emission, window/mark-counter lease invalidation, the M3 rebase, JSON/datapack
+and the remaining commands.
 
 ## 2. The order
 
@@ -57,7 +60,7 @@ module file.
 | 1 | `javac --release 21` over `src/kernel/java`, JSpecify only | exit 0, zero errors |
 | 2 | no Minecraft/NeoForge/Mojang name under `kernel.**` | purity scan; compile classpath |
 | 3 | `src/kernelTest/java` compiles and all tests pass | JUnit launcher; 0 failures, 0 skipped |
-| 4 | the twelve scenarios in `06-verification.md` §3 pass | named test classes |
+| 4 | the twelve committed scenarios in `06-verification.md` §3 pass, and the two pending ones are named | named test classes |
 | 5 | every public type in code is in a module file, and vice versa | `tools/spec-check.py` |
 | 6 | every `SC-` code in code is in `Codes.all`, and every `Codes.all` entry is in a producer row | registry test |
 | 7 | no `TODO`/`FIXME`/`UnsupportedOperationException`/empty public body | grep |
@@ -65,6 +68,12 @@ module file.
 | 9 | the campfire/furnace examples in `04-api.md` compile as test sources | `ScenarioTest`; the document form in `DocumentCompilerTest` |
 | 10 | the old `docs/spec`, `docs/design-notes`, `docs/guide.zh.md`, `docs/README.zh.md` and the old
     kernel sources are gone | `git status`; only the new set remains |
+
+While Model C and the nested capability are **specified, not implemented**, gate 5 is red for the
+seven approved world names (`CellRead`, `Found`, `Unreadable`, `ReadRefusal`, `TraitSlot`, `Absent`,
+`SectionSlot.Partial`) and for nothing else. That red is recorded, not suppressed
+(`06-verification.md` §1). The gate becomes a pass when M2c lands; it is not a definition-of-done
+waiver for an unrelated public type.
 
 ## 5. Regeneration is not a one-way door
 
@@ -83,16 +92,20 @@ the exact failure this set exists to prevent.
 
 ## 7. What the next round owes
 
-- The rest of the adapter (`modules/adapter.md`) against the four ports: the rest of M2 — traits,
-  nested views/`NestedLevelSnapshot`, non-upright pitch/roll state mapping, `SC-MC-0002`–`0005`
-  emission, window/mark-counter lease invalidation and capture findings; M3 claims/context
-  persistence with CAS/release/reload; M4 JSON reader/writer, datapack reload and the remaining
-  commands (`compile`, `settle`, `explain`, `claims`). The orientation, door and furnace GameTests
-  follow. M1's two GameTests (capture-only; capture → compile → check) and M2a's
-  capture-entity-over-block GameTest already run; `OrientationMappingTest` covers M2b's upright
-  mapping.
+- **M2c — Model C.** Implement the approved `world`/`structure`/`engine` shape: `OccupantRef.body`,
+  `ReadStatus.failed`, `ReadRefusal`, `CellRead`, `SectionSlot.Partial`, `TraitSlot`, the total
+  `WorldView.read` and derived accessors, `FocusContext`/`SectionContext`/`BayView` reads,
+  `ReadScope` traits/kinds/depth, `Blueprint.reads`, `SnapshotPolicy.traits` by id, `SC-OCC-0004`
+  and host-code relay. Re-run the kernel suite and the adapter tests; spec-check becomes clean.
+- **M2d — nested capability.** Implement `mc.capability.NestedExtent`/`NestedExtents`, one
+  `LevelSnapshot` + `FrameData`, root/child origins and local bounds, the nested body, cut rules,
+  child build-height partial sections, child entities and the fake-provider seam. No built-in
+  Structure Block provider.
+- **M3 rebase.** Re-run `SavedClaimsTest`/`SavedContextsTest`/the claims GameTest after M2c/M2d;
+  ensure a persisted `SC-OCC-0004` and a relayed host code round-trip.
+- **M4.** JSON reader/writer, datapack reload and the remaining commands (`compile`, `settle`,
+  `explain`, `claims`).
 - A host scheduler with coalescing, dirty windows and a per-world ledger, outside the kernel.
-- A real JSON reader/writer and a datapack reload.
-- A performance pass: claim-row volume for large structures, `statusOf` cost, and the section pass.
-  If a row form other than per-cell is needed, it is a `ClaimRow`/ledger amendment, not a hidden
-  optimization.
+- A performance pass: claim-row volume for large structures, the per-cell `read`/`statusOf` cost, the
+  section pass and the nested-frame budget. If a row form other than per-cell is needed, it is a
+  `ClaimRow`/ledger amendment, not a hidden optimization.

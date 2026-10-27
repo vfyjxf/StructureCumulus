@@ -31,17 +31,20 @@ A match has exactly three phases:
 No unit declares a phase; the operation names it. There is no fourth stage, no stage enum on a
 `Check`, and no `expand(stage)`.
 
-## Law 4 — Absence is explicit, and it has three kinds
+## Law 4 — Absence is explicit, and it has four kinds
 
 | Kind | Type | Meaning |
 | --- | --- | --- |
 | no value | `Outcome.Missing` | a lookup found nothing |
 | no subject | `FocusResult.Unavailable` | the focus could not bind what the check needs |
+| no read | `CellRead.Unreadable` / `ReadRefusal` | the host answered that it could not read this cell or trait |
 | no verdict | `MatchResult.Undecided` / `Dropped` | the attempt could not conclude |
 
 A `Reply` distinguishes `Mismatch` (refuted), `Unreadable` (not looked at), and `Abstain`
-(declined). Collapsing any two is a bug, not a simplification. `null` is reserved for a genuine
-optional lookup; it never means "unreadable".
+(declined). Collapsing any two is a bug, not a simplification. A refused read is a value, not a
+`null`: `null` is reserved for a genuine optional lookup and never means "unreadable". A consumer
+that receives `null` from a total read has a producer bug; a consumer that receives
+`CellRead.Unreadable` has a fact it must report or propagate.
 
 ## Law 5 — One publication, at the end
 

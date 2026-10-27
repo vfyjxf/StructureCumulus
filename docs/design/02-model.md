@@ -19,6 +19,9 @@
 | siting | `Siting` | space | origin + placement: where a blueprint stands |
 | locus | `Locus` | space | where a finding points: definition, local, world or key |
 | occupant | `OccupantSnapshot` | world | what is in a cell: block, block entity, entity, nested structure, air |
+| read | `CellRead` | world | the total answer for one cell: a found occupant or a refusal |
+| refusal | `ReadRefusal` | world | a failed read: a non-readable status and a code |
+| trait slot | `TraitSlot` | world | one trait id: present (possibly null), absent, or refused |
 | view | `WorldView` | world | an immutable, section-based snapshot read face |
 | lease | `SnapshotLease` | world | a view plus `isCurrent()` |
 | expectation | `Expectation<T>` | structure | a test over one typed subject |
@@ -83,22 +86,27 @@ not a scheduling unit and not declared by a blueprint.
    in the bundle; nothing is read.
 2. **Section pass.** For each `SectionComputation`, for each section of its `region` intersecting the
    captured sections, call `compute(SectionContext)`. A `Found(value)` becomes a contribution
-   stamped with the section; a `Missing` makes the whole key absent. Charge cells and sections.
+   stamped with the section; a `Missing` makes the whole key absent. A `Refused` section refuses
+   the key before `compute`; a `Partial` section hands the computation its `unreadable()` map, and a
+   computation that sums over the slice must return `Missing` for a refused cell. Charge cells and
+   sections.
 3. **Barrier.** For each contributed key, sort contributions by `SectionKey` and fold with
    `Merge.combine`. If any section was missing or refused, the key is absent. If all sections were
    readable and nothing was contributed, use `ContextKey.whenAbsent` (possibly null).
 4. **Aggregate pass.** In a topological order of `inputs()`, call `compute(AggregateContext)`. A
-   `Found(value)` writes the key; a `Missing` makes it absent and reports `SC-CTX-0201` unless the
+   `Found(value)` writes the key; a `Missing` makes it absent and reports `SC-CTX-0001` unless the
    computation reported its own finding. A cycle is a compile error, so this cannot fail here.
 5. **Checks.** In declaration order, call `Check.run(FocusContext)`. A check's focus binds a subject
-   from the snapshot; a missing subject is `Unreadable`, never `Mismatch`. Charge the read scope.
+   from the snapshot through the total `read`; a missing subject or an `Unreadable` cell is
+   `Unreadable`, never `Mismatch`. Charge the read scope.
 6. **Gate again.** A mark or invalidation during the attempt drops it. This is the conservative
    gate: one counter for the whole watched region.
 7. **Verdict fold.** Any `Mismatch` → `Failed`. Else any `Unreadable` or `Abstain` or zero checks →
    `Undecided`. Else `Admitted` with the values, bindings and spend.
 8. **Claim prediction.** Derive rows from the bindings, compare with the frozen `ClaimView`. An
-   unavailable view is `Undecided(ledgerUnavailable)`; a conflict is `Failed(SC-CLM-0002)`; else
-   `Admitted` carries the view's revision.
+   unavailable view is `Undecided(ledgerUnavailable)`; a conflict is `Failed(SC-CLM-0001)`; a
+   nested body or a non-root frame is `Failed(SC-CLM-0004)`; else `Admitted` carries the view's
+   revision.
 
 ## 5. The settle pipeline
 
@@ -118,11 +126,17 @@ not a scheduling unit and not declared by a blueprint.
 - `Outcome<T>` = `Found(T)` | `Missing`: a lookup.
 - `FocusResult<T>` = `Taken(T, subjects, notes)` | `Unavailable(findings)`: a focus.
 - `Reply` = `Match(bindings)` | `Mismatch(findings)` | `Unreadable(findings)` | `Abstain`: a test.
+- `CellRead` = `Found(OccupantSnapshot)` | `Unreadable(ReadRefusal)`: a total cell read; a
+  `ReadRefusal(status, code)` is its non-readable half.
+- `SectionSlot` = `Air` | `Present` | `Partial(section, unreadable)` | `Refused(status, code)`: a
+  section answer.
+- `TraitSlot` = `Present(trait)` | `Absent(id)` | `Refused(id, refusal)`: one trait id's answer.
 - `MatchResult` = `Admitted` | `Formed` | `Failed` | `Undecided` | `Dropped`: an attempt.
 - `ClaimVerdict` = `Settled` | `Conflict` | `RevisionMoved`: a ledger answer.
 
 Each family is sealed and each arm is a record. A `switch` over one is exhaustive; a `default` over
-one is a defect.
+one is a defect. A refusal is a value, not an exception and not a `null`: a total read has exactly
+two arms, and a consumer that receives `Unreadable` reports the refusal or propagates it.
 
 ## 7. What is deliberately absent
 
@@ -131,7 +145,8 @@ one is a defect.
   `Segment`, `SegmentKey`, `Overlap`, `PrescreenIndex`, `Census`, `Fingerprint`, `EntityKey`,
   `ChangeSet`, `DirtyIndex`, `WatchedInstance`, `Ticket`, `RetryToken`, `PinBudget`, `InstanceBudget`,
   `InstanceRecord`, `Deferred`, `CacheMode`, `AttemptCache`, `PlanId`, `UnitId`, `Projection`,
-  `NestedLevelSnapshot`, `NestedView`, `ReadSet`, `ClaimPlan.Overlap`.
+  `NestedLevelSnapshot`, `NestedView`, `ReadSet`, `ClaimPlan.Overlap`, `ReadResult`,
+  `OccupantResult`.
 - No public `MatchSession`, no `ProbeSession`, no child lease handles, no `AutoCloseable` results, no
   `solve`/`edit` execution, no `Stability` enum, no `ExplainBook` interface.
 - No document profile, schema upgrade, canonicaliser, emitter or compact writer. One schema, one

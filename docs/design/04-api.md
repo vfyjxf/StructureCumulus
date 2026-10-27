@@ -69,6 +69,10 @@ builder knot, no `Requirement`, no stage, and no hidden default that changes a v
   owns exactly the subject's cells (door); `None` owns nothing and is illegal with `exclusive`.
 - Two bays of one blueprint may overlap only when both are `shared`; any other overlap is a build
   error. There is no pairwise `overlap` declaration.
+- A nested focus (`Focuses.nested`) binds a child view but no claim subject: a nested structure is
+  checkable, never claimable through the nested body (`engine` §7.5).
+- A trait read has four states. An addon uses `OccupantSnapshot.slot(id)` (or `find`) to separate
+  `Absent` from `Refused`/unasked; a refused or unasked trait is `Unreadable`, never `Mismatch`.
 
 ## 3. The host surface
 
@@ -107,14 +111,25 @@ final class HatchExpectation implements Expectation<OccupantSnapshot> {
     }
     @Override public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
         OccupantSnapshot occupant = ctx.subject();
-        if (!occupant.has(inventory)) {
-            return Reply.mismatch(Finding.builder(Codes.expected)
+        return switch (occupant.slot(inventory.id())) {
+            case TraitSlot.Present present -> Reply.match();
+            case TraitSlot.Absent absent -> Reply.mismatch(Finding.builder(Codes.expected)
                     .phase(ctx.phase())
                     .message("expected an inventory-bearing hatch")
                     .label(Label.primary(ctx.locus(), "expected an inventory"))
                     .build());
-        }
-        return Reply.match();
+            case TraitSlot.Refused refused -> Reply.unreadable(Finding.builder(Codes.unreadableRead)
+                    .phase(ctx.phase())
+                    .message("the inventory trait is unreadable")
+                    .label(Label.primary(ctx.locus(), "the inventory could not be read"))
+                    .note("refusal: " + refused.refusal().status())
+                    .build());
+            case null -> Reply.unreadable(Finding.builder(Codes.unreadableRead)
+                    .phase(ctx.phase())
+                    .message("the inventory trait was not captured")
+                    .label(Label.primary(ctx.locus(), "the inventory was not asked for"))
+                    .build());
+        };
     }
 }
 ```

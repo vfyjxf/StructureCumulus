@@ -45,7 +45,7 @@ extension path is one interface and one catalog registration. The host path is f
 | --- | --- |
 | **N-01** | A value is immutable; a public collection is an immutable copy with a defined order. |
 | **N-02** | A structural failure is a value (`Reply`, `MatchResult`, `Outcome`), never an exception. An exception means a programmer precondition was violated. |
-| **N-03** | Absence, unreadability and refutation are three distinct answers. Merging any two is a defect. |
+| **N-03** | Absence, unreadability (including a refused read) and refutation are three distinct answers. Merging any two is a defect. |
 | **N-04** | All iteration that can reach a result is over a defined order; no hash order, no identity hash. |
 | **N-05** | The kernel has no static mutable state; a kernel is a value created from frozen catalogs. |
 | **N-06** | A public type is reachable from a worked example or a host port. A type used only by the engine is package-private. |

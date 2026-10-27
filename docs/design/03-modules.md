@@ -62,14 +62,17 @@ Notes:
   and `Catalog<T>` from `core`.
 - `engine` is the only package that knows the whole pipeline. `spi` is the only package that knows
   `StructureKernel`.
-- `mc` is a separate Gradle source set (`main`), not a kernel package. In v1 it was specified in
-  `modules/adapter.md` only; the M1 slice (host + `/cumulus check` + capture-check: capture, root
-  snapshot, lease, block/block-entity descriptors, `ServerState`, in-memory documents, two GameTests)
-  is now implemented, and M2 is partial: M2a adds loaded-entity capture with policy windows, full
-  footprint indexing and entity-vs-block precedence (`world.md` §4.3), plus a third GameTest; M2b
-  adds upright orientation mapping. Still pending: traits, nested views, non-upright pitch/roll state
-  mapping, `SC-MC-0002`–`0005` emission, window/mark-counter lease invalidation, claims/persistence,
-  JSON/datapack and the rest of the command surface. The main source set also compiles the mod entry.
+- `mc` is a separate Gradle source set (`main`), not a kernel package. The M1 slice (host +
+  `/cumulus check` + capture-check: capture, root snapshot, lease, block/block-entity descriptors,
+  `ServerState`, in-memory documents, two GameTests) is implemented; M2a adds loaded-entity capture
+  with policy windows, full footprint indexing and entity-vs-block precedence (`world.md` §4.3); M2b
+  adds upright orientation mapping; M3 adds `SavedClaims`/`SavedContexts` with CAS/release/reload at
+  `d4b6d82`. Model C (body identity, total refusal read, four-state traits) and the nested capability
+  (`mc.capability.NestedExtent`/`NestedExtents`, one `LevelSnapshot` with `FrameData`) are **specified
+  and not implemented**. Still pending: non-upright pitch/roll state mapping, `SC-MC-0004`/`0005`
+  emission, window/mark-counter lease invalidation, JSON/datapack, the rest of the command surface and
+  the M3 rebase. `mc.capability` is a subpackage of `mc`; it adds no kernel edge. The main source set
+  also compiles the mod entry.
 
 ## 2. Ownership
 
@@ -78,12 +81,12 @@ Notes:
 | `core` | ids, world/instance/snapshot/owner, phase, source spans, budgets, typed keys, `Outcome`, `FindingCode`, `Catalog<T>`, `Value`, `CancelToken` | any geometry, any report, any traversal |
 | `space` | lattice, boxes, orientations, sitings, loci | what is in a cell, what a bay expects |
 | `finding` | finding values, bundles, renderers, explanations, the code table | which unit emits which code |
-| `world` | occupants, traits, sections, views, capture SPI, lease | claims, expectations, the engine |
+| `world` | occupants, trait slots, total reads/refusals, sections, views, capture SPI, lease | claims, expectations, the engine |
 | `claim` | rows, sharing, footprint, ledger SPI, conflict matrix | how rows are derived (engine), how a bay is checked (structure) |
 | `structure` | bay, focus, expectation, check, blueprint, anchors, plan, read scope | context values, claims rows, the engine loop |
 | `context` | keys' semantics, computations, derivers, fold, store, structure context | blueprint shape, matching |
 | `document` | the data IR, the compiler, reader/writer ports | Java-side factories, catalogs |
-| `engine` | request, outcome, result, gate, planner, check/settle/derive bodies | scheduling, persistence, rendering |
+| `engine` | request, outcome, result, gate, planner, check/settle/derive bodies, nested-claim rejection | scheduling, persistence, rendering |
 | `remedy` | remedy/edit/overlay values, provider SPI | applying a plan |
 | `spi` | catalogs, facade, host ports, code registry, built-ins | anything a lower module already owns |
 
@@ -140,4 +143,9 @@ Every module file has exactly these sections:
 8. **Dependencies** — the exact edges, and what is deliberately not imported.
 
 A signature in section 3 that is absent from code is a regeneration defect; a public member in code
-that is absent from section 3 is a design defect.
+that is absent from section 3 is a design defect. The one exception is an explicitly marked
+**Pending implementation** block in section 3: it is the approved target for a named milestone, is
+absent from code until that milestone, and `tools/spec-check.py` reports it as a
+documented-but-not-in-code red (`06-verification.md` §1). The marker is a status, not a suppression;
+every pending type is named in the gate's red list, and a pending method is still reviewed against
+its law.

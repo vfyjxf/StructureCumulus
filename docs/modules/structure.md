@@ -29,13 +29,13 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `CheckResult` | record | reply + subjects + non-fatal notes |
 | `Focus<T>` | interface | binds a subject or explains why not |
 | `FocusResult<T>` | sealed | `Taken(value, subjects, notes)`, `Unavailable(findings)` |
-| `FocusContext` | interface | what a focus sees: bay, view, siting, cells, phase, locus, context, budget |
+| `FocusContext` | interface | what a focus sees: bay, view, siting, cells, phase, locus, context, budget, a total `read` |
 | `Expectation<T>` | interface | one test over one subject type |
 | `ExpectationContext<T>` | interface | focus context + the subject and its re-typing |
 | `ExpectationMeta` | record | id, specificity, required keys, default mismatch code |
 | `Reply` | sealed | `Match`, `Mismatch`, `Unreadable`, `Abstain` |
-| `ReadScope` | record | cells + keys + entity windows |
-| `BayView` | record | a bay's own read face |
+| `ReadScope` | record | cells + keys + trait ids + occupant kinds + depth + entity windows |
+| `BayView` | record | a bay's own read face; total `read` |
 | `DoorView` | record | the two halves of a door + its bay |
 | `Focuses` | final class | the shipped focus kinds |
 | `Expectations` | final class | the shipped expectation combinators and leaves |
@@ -50,12 +50,17 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `Computation<T>` | interface | id + output + inputs + region |
 | `SectionComputation<T>` | interface | `compute(SectionContext)` |
 | `AggregateComputation<T>` | interface | `compute(AggregateContext)` |
-| `SectionContext` / `AggregateContext` | interfaces | what a computation sees |
+| `SectionContext` / `AggregateContext` | interfaces | what a computation sees; `SectionContext` has a total `read`, `unreadable()` and `phase()` |
 | `Computations` | final class | `count`, `volume`, `air` |
 | `FocusFactory` / `ExpectationFactory` / `ComputationFactory` | interfaces | data-driven constructors |
 | `FactoryContext` | record | document id, source, finding reporter |
 
 ## 3. Signatures
+
+> **Pending implementation (Model C).** The four-part `ReadScope` (`traits`/`kinds`/`depth`), total
+> `FocusContext`/`SectionContext`/`BayView` reads, `SectionContext.unreadable()`/`phase()`,
+> `Blueprint.reads()` and the `traitAbsent` expectation are approved; the committed kernel still has
+> the three-component read scope and the section-only refusal model.
 
 ```java
 package dev.vfyjxf.cumulus.kernel.structure;
@@ -115,7 +120,9 @@ public interface FocusContext {
     ContextView context();
     Budget remaining();
     CancelToken cancel();
-    @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    CellRead read(LatticePoint cell);
+    default @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    default @Nullable ReadRefusal refusalAt(LatticePoint cell);
     java.util.List<ClaimRow> claimsAt(LatticePoint cell);
 }
 
@@ -160,15 +167,21 @@ public sealed interface Reply {
 }
 
 public record ReadScope(CuboidSet cells, java.util.Set<ContextKey<?>> keys,
-                        java.util.List<EntityWindow> windows) {
+                        java.util.Set<NamespacedId> traits, java.util.Set<OccupantKind> kinds,
+                        int depth, java.util.List<EntityWindow> windows) {
+    public ReadScope { /* depth >= 0; canonical sets; windows deduplicated in declaration order */ }
     public static ReadScope none();
     public static ReadScope cells(CuboidSet cells);
     public ReadScope union(ReadScope other);
     public ReadScope withKeys(java.util.Set<ContextKey<?>> keys);
+    public ReadScope withTraits(java.util.Set<NamespacedId> traits);
+    public ReadScope withKinds(java.util.Set<OccupantKind> kinds);
+    public ReadScope withDepth(int depth);
     public ReadScope withWindows(java.util.List<EntityWindow> windows);
 }
 
 public record BayView(NamespacedId id, CuboidSet cells, WorldView view, Siting siting) {
+    public CellRead read(LatticePoint cell);
     public @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
     public java.util.List<OccupantSnapshot> occupants();
     public java.util.List<OccupantSnapshot> occupants(OccupantFilter filter);
@@ -194,6 +207,7 @@ public final class Expectations {
     public static Expectation<OccupantSnapshot> trait(TraitKey<?> key);
     public static <T> Expectation<OccupantSnapshot> trait(TraitKey<T> key,
                                                           java.util.function.Predicate<T> test);
+    public static Expectation<OccupantSnapshot> traitAbsent(TraitKey<?> key);
     public static Expectation<OccupantSnapshot> anyOccupant();
     public static <T> Expectation<T> allOf(Expectation<T>... children);
     public static <T> Expectation<T> anyOf(Expectation<T>... children);
@@ -295,7 +309,11 @@ public interface SectionContext {
     CuboidSet cells();
     WorldView view();
     Siting siting();
-    @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    Phase phase();
+    CellRead read(LatticePoint cell);
+    default @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
+    default @Nullable ReadRefusal refusalAt(LatticePoint cell);
+    java.util.Map<LatticePoint, ReadRefusal> unreadable();
     java.util.List<OccupantSnapshot> occupants();
     java.util.List<OccupantSnapshot> occupants(Cuboid box);
     Budget remaining();
@@ -337,6 +355,7 @@ public final class Blueprint {
     public Value arguments();
     public @Nullable SourceSpan source();
     public Plan plan();
+    public ReadScope reads();
     public @Nullable Bay bay(NamespacedId id);
     public @Nullable Check<?> check(NamespacedId id);
     public @Nullable Seam seam(SeamId id);
@@ -433,31 +452,76 @@ Combinators evaluate every child (diagnostics matter more than a short-circuit) 
 A focus binds a subject or says why not. `staticCells` is the build-time decision set; it is empty
 for dynamic focuses (`context`, `entity`) and non-empty for static ones (`occupant`, `bay`,
 `allCells`, `door`, `nested`). `bindsSubjects` is false only for `context`. `reads` defaults to the
-static cells; an entity focus adds a window; an expectation that reads outside its cells declares it
-through `Expectation.reads()`.
+static cells; an entity focus adds a window and the `entity` kind; a nested focus adds the `nested`
+kind and one level of depth; a trait expectation adds its trait id. An expectation that reads outside
+its cells declares it through `Expectation.reads()`.
 
 `Focuses.occupant(cell)` is air-aware: an air cell is `Taken(air, List.of(), notes)`, never
-`Unavailable`. `Focuses.bay`/`allCells` include air; subjects exclude air. `Focuses.door(origin)`
-reads `origin` and `origin + (0,1,0)` and requires both to be non-air; otherwise `Unavailable`.
+`Unavailable`. An unreadable cell is `Unavailable`: the finding relays `refusalAt(cell).code()`
+through the trust guard (`world` §4.1) and uses the focus's own locus. `Focuses.bay`/`allCells`
+include air; subjects exclude air. `allCells` stops at the first `Unreadable` and reports it; a
+`bay` query returns only readable occupants, so a caller that needs totality reads `BayView.read`
+per cell. Neither treats a refused cell as empty. `Focuses.door(origin)` reads `origin` and
+`origin + (0,1,0)` and requires both to be readable and non-air; otherwise `Unavailable`.
 `Focuses.entity(type)` requires exactly one entity of that type in the bay; zero or many is
-`Unavailable` (`SC-OCC-0001` for zero, an ambiguity finding for many). `Focuses.nested(cell)` requires
-a nested occupant and returns its child view. `Focuses.context(key)` is `context().require(key)`;
-absent is `Unavailable` with `SC-CTX-0007` on a `key` locus.
+`Unavailable` (`SC-OCC-0001` for zero, an ambiguity finding for many); it reads the bay cells, the
+entity window and the `entity` kind. `Focuses.context(key)` is `context().require(key)`; absent is
+`Unavailable` with `SC-CTX-0007` on a `key` locus.
+
+`Focuses.nested(cell)` is anchor-only: it asks `ctx.view().nested(world)` directly and does not
+require `occupant(cell)` to narrow to the nested body, so an entity or block over the anchor does not
+hide the child. A `null` child is a cut: `Unavailable(SC-OCC-0003)` with a local/world label. A
+successful take is `Taken(child, List.of(), notes)`: the child view is the subject, but the focus
+produces **no claim subject**. A nested body is still an ordinary occupant of the parent frame; a
+check that binds it through `Focuses.occupant` reaches settle, where `OccupantKind.nested` is rejected
+as a claim binding (`engine` §7.5).
 
 ### 4.5 Read scope
 
+`ReadScope` is the one read closure: `(cells, keys, traits, kinds, depth, windows)`. `cells` is the
+declared cell set, `keys` the context keys a check or computation reads, `traits` the trait ids, and
+`kinds` the occupant kinds the host must resolve. `depth` is the nested-frame ceiling the reads need
+(`0` for a blueprint that never nests). `union` combines cells/keys/traits/kinds by set union, takes
+the larger depth and appends the windows in declaration order with equal windows deduplicated;
+`withKeys`/`withTraits`/`withKinds`/`withWindows` union their argument and `withDepth` keeps the
+larger value, so a narrowed copy can never lower a requirement. `none()` is empty with depth `0`.
+
 `Check.reads()` is `focus.reads(bay.cells()) ∪ expectation.reads()` plus
-`expectation.meta().requires()`. The engine charges `cells.volume()` and the sections the cells
-touch; a window charges its inflated volume and sections. Declared reads are a promise: a check that
-reads a cell or key outside its scope is a bug (review), not a runtime error. A non-`None` bay's
-cells must stay inside `bay.cells ∪ footprint`; a `Bound` footprint is checked at settle, a
-`Box`/`Declared` at build.
+`expectation.meta().requires()`. `Blueprint.reads()` is the union of every check's `reads()` and every
+computation's `ReadScope.cells(region)`: computations contribute cells only, because a `Computation`
+declares no trait or kind. A computation that reads a trait must be accompanied by a check that
+declares that trait id, or the host will not capture it. The engine charges `cells.volume()` and the
+sections the cells touch; a window charges its inflated volume and sections. Declared reads are a
+promise: a check that reads a cell or key outside its scope is a bug (review), not a runtime error. A
+non-`None` bay's cells must stay inside `bay.cells ∪ footprint`; a `Bound` footprint is checked at
+settle, a `Box`/`Declared` at build.
+
+The host derives `SnapshotPolicy` from `Blueprint.reads()`: `kinds`, `traits` and `depth` map
+directly, and `windows` is `reads.windows()`. `maxElements` and the capture bounds remain the host's
+choice. No hidden read is legal; a policy without the declared trait ids produces `TraitSlot.Refused`
+(or no slot), never a default value. A generic `occupant`/`bay` read declares no kind: it sees
+whatever the host captured. A blueprint that requires entity-over-block or a nested body therefore
+uses an `entity`/`nested` focus (or a custom focus that declares the kind), because `reads.kinds` is
+the only capture signal; an `occupant` focus over an entity the host never captured sees the block
+under it.
 
 ### 4.6 Expectation context
 
 `FocusContext` is what a focus sees. `ExpectationContext` adds the subject and `withSubject`, which
 re-types the subject for `each_cell`. Both expose the same bay/view/siting/phase/locus/context/budget
-and the same `occupantAt`/`claimsAt`; there is no second session object.
+and the same `read`/`occupantAt`/`refusalAt`/`claimsAt`; there is no second session object. `read` maps
+the local cell through the siting before asking the view; an unmapped local cell is
+`Unreadable(outOfBounds, SC-OCC-0004)`, never air and never a silent skip. `BayView.read` is the same
+local-to-world total read; it does not clip to the bay, and a siting miss is the same refusal.
+
+The trait four states are normative (`world` §4.7): `Present` and `Present(null)` are positive facts,
+`Absent` is a positive fact of no trait, and `Refused` or an unasked slot is unreadable.
+`trait(key)` matches a present trait including present-null; `trait(key, test)` matches a present
+non-null value whose test passes, and a present-null value matches without applying the test;
+`traitAbsent(key)` matches an `Absent` slot and mismatches a present one. A `Refused` slot or no slot
+is `Unreadable`, never `Mismatch`, and `not(trait(...))` preserves that unreadable answer.
+`trait(key, test)` on a value outside the key's type is unreadable, not a mismatch: the typed lookup
+could not answer.
 
 `ExpectationMeta.requires` is a coverage demand: the engine checks the keys before calling `test`; if
 any is missing, the check is `Unreadable(SC-CTX-0007)` and `test` is not called. An expectation that
@@ -467,17 +531,18 @@ uses `context().get(key)` for a key it did not declare is a review defect.
 
 `Blueprint` is a final class with a package-private constructor. The builder is the only public
 construction path.
-It is immutable: private final fields, copied collections, a cached `Plan` and cached `bayCells()`
-(excluded from equality). `equals` is structural over the declarations (id, bounds, bays, checks,
-computations, seams, anchors, orientation, derivations, arguments); it excludes `source`, `plan` and
-`bayCells()`.
+It is immutable: private final fields, copied collections, a cached `Plan`, cached `bayCells()` and
+cached `reads()` (all excluded from equality). `equals` is structural over the declarations (id,
+bounds, bays, checks, computations, seams, anchors, orientation, derivations, arguments); it excludes
+`source`, `plan`, `bayCells()` and `reads()`.
 
 `plan()` returns the cached `Plan`: sections in declaration order, aggregates in a topological order
 of `inputs()`, checks in declaration order. An **aggregate** input must be produced by another
 computation in the same blueprint; a section computation has no inputs (its `SectionContext` exposes
 the snapshot, not context keys); a derivation output is not available at check time and a check that
 reads one is a build error. A cycle, a missing producer, a section input, or a duplicate output key
-is `SC-BPT-0007`.
+is `SC-BPT-0007`. `reads()` is computed once from the same immutable declarations; it is a
+consequence of the blueprint, not a second declaration.
 
 ### 4.8 Build validation
 
@@ -508,7 +573,8 @@ duplicate-free and in canonical order; `uprightOnly` is a build-time promise (`o
 not a match-time filter. A blueprint with no anchor has a null orientation policy and takes a
 `Siting` directly; `Anchors.resolve` is only for anchored blueprints.
 
-`Anchors.resolve` reads exactly one cell (`origin`): a missing cell is `SC-OCC-0001`; an air cell, a
+`Anchors.resolve` reads exactly one cell (`origin`): an unreadable cell is reported with the
+refusal's code (`SC-OCC-0004` as the kernel default, or a relayed host code); an air cell, a
 missing property, a value that is not a heading, no admissible orientation, or a null policy is
 `SC-BPT-0006`. There is no fallback heading and no search.
 
@@ -525,9 +591,18 @@ computation runs once after the fold and returns one value; it reads the folded 
 `report` for its own findings; the engine adds `SC-CTX-0001` when an aggregate computation returns `Missing`
 without reporting; a missing section contribution makes the key absent and records `SC-CTX-0006`.
 
+`SectionContext.read` is total, maps through the siting like `FocusContext.read`, and `unreadable()`
+lists the slice's refused local cells with their refusals, in cell order. A section that is wholly
+`Refused` is never handed to `compute`; its key is absent and the engine records `SC-CTX-0006`. A
+`Partial` section is handed over with its refused cells visible. `SectionContext.occupants()` is
+readable-only: a computation that uses its size for a total must consult `unreadable()` first.
 `Computations.count` counts non-air occupants whose anchor is in the slice; `volume` counts cells;
-`air` counts air cells. An occupant spanning a section boundary belongs to the section of its
-anchor, so a fold never counts it twice. All three are section computations; folding is the key's `Merge`.
+`air` counts air cells. `count`/`air` require a total slice: when `unreadable()` is non-empty they
+report each refusal (relaying the refusal's code through the trust guard) and return `Missing`, never
+a short sum. `volume` is geometry and stays total. A custom computation that sums over its slice and
+ignores `unreadable()` is a review defect, not a different verdict. An occupant spanning a section
+boundary belongs to the section of its anchor, so a fold never counts it twice. All three are section
+computations; folding is the key's `Merge`.
 
 ## 5. Pipeline role
 
@@ -539,19 +614,27 @@ anchor, so a fold never counts it twice. All three are section computations; fol
 ## 6. Codes
 
 `SC-BPT-0001`…`0010`, `SC-CHK-0001`…`0003`, `SC-EXP-0001`…`0005`, `SC-SPC-0001`/`0002` (via
-`LocusMap`/`Siting`), `SC-CTX-0007` (focus), `SC-OCC-0001`/`0002`/`0003` (focus). The producer
-table in `finding.md` is authoritative.
+`LocusMap`/`Siting`), `SC-CTX-0007` (focus), `SC-OCC-0001`/`0002`/`0003`/`0004` (focus and relay).
+The producer table in `finding.md` is authoritative. A focus relay of a host `ReadRefusal` code is
+not a kernel producer row: the kernel only guarantees the `SC-OCC-0004` substitute for a code already
+in `Codes.all`.
 
 ## 7. Tests
 
 - Bay: `CuboidSet` shell, door pair, pipe box; empty cells rejected; `None + exclusive` rejected.
 - Coverage: `everyCell` gap, `anySubject` with a static focus, `oneSubject` with a context focus.
-- Focus: air-aware occupant; door missing half; entity zero/many; nested; context absent.
-- Reply combinators: all four states; thresholds; `not`; `each_cell`; findings merged.
+- Focus: air-aware occupant; unreadable occupant relays its refusal; door missing half; entity
+  zero/many; nested anchor-only, no claim subject and a cut; context absent.
+- Reply combinators: all four states; thresholds; `not`; `each_cell`; findings merged; `not` leaves a
+  trait refusal unreadable.
+- Traits: present/present-null/absent/refused; `traitAbsent`; a missing slot is unreadable, never a
+  mismatch; a JSON `TraitKey<Object>` reads a typed capture.
 - Build: every row of §4.8; duplicate ids; overlapping exclusive bays; shared overlap allowed;
-  derivation/check read conflict; `Plan` order and cycle.
+  derivation/check read conflict; `Plan` order and cycle; `Blueprint.reads()` equals the union of
+  checks and computation regions.
 - Anchors: one-cell read; missing/air/bad heading; upright policy; identity for no anchor.
-- Computations: section/aggregate split; count/volume/air; `Missing` → absent key.
+- Computations: section/aggregate split; count/volume/air; `Missing` → absent key; a partial section
+  makes `count`/`air` Missing, never a short sum; `volume` stays total.
 
 ## 8. Dependencies
 
