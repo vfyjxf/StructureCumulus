@@ -33,7 +33,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.jspecify.annotations.NullMarked;
 
-/** The M1 command surface: {@code /cumulus check <id> <origin>}. */
+/** The command surface: {@code /cumulus check <id> <origin>} and {@code /cumulus settle <id> <origin>}. */
 @NullMarked
 public final class CumulusCommand {
 
@@ -44,10 +44,19 @@ public final class CumulusCommand {
                 .register(
                     Commands.literal("cumulus")
                             .then(
-                                Commands.literal("check").then(
+                                Commands.literal("check")
+                                        .then(
+                                            Commands.argument("id", ResourceLocationArgument.id()).then(
+                                                Commands.argument("origin", BlockPosArgument.blockPos())
+                                                        .executes(CumulusCommand::check)
+                                            )
+                                        )
+                            )
+                            .then(
+                                Commands.literal("settle").then(
                                     Commands.argument("id", ResourceLocationArgument.id()).then(
                                         Commands.argument("origin", BlockPosArgument.blockPos())
-                                                .executes(CumulusCommand::check)
+                                                .executes(SettleCommand::run)
                                     )
                                 )
                             )

@@ -6,6 +6,8 @@ import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.World;
+import dev.vfyjxf.cumulus.kernel.document.Document;
+import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
@@ -30,14 +32,20 @@ public final class ServerState {
     private final Catalogs catalogs;
     private final StructureKernel kernel;
     private final DatapackBlueprints blueprints;
+    private final DocumentSource documents;
     private final Map<ServerLevel, LevelStore> levels = new HashMap<>();
     private final Map<ServerLevel, LevelCapture> captures = new HashMap<>();
 
     private ServerState() {
         this.catalogs = Catalogs.builtin();
         this.blueprints = DatapackBlueprints.attach();
-        this.kernel = StructureKernel
-                .create(catalogs, new Host(BuiltinDocuments.source(), null, ContextStore.inMemory(), Map.of()));
+        DocumentSource builtin = BuiltinDocuments.source();
+        // A datapack document wins over the built-in document on an id collision.
+        this.documents = id -> {
+            Document document = blueprints.find(id);
+            return document != null ? document : builtin.find(id);
+        };
+        this.kernel = StructureKernel.create(catalogs, new Host(documents, null, ContextStore.inMemory(), Map.of()));
     }
 
     public static void open(ServerAboutToStartEvent event) {
@@ -106,7 +114,7 @@ public final class ServerState {
                     .computeIfAbsent(SavedClaims.factory(world), SavedClaims.dataName);
             SavedContexts contexts = attached.getDataStorage()
                     .computeIfAbsent(SavedContexts.factory(world), SavedContexts.dataName);
-            Host host = new Host(BuiltinDocuments.source(), claims, contexts, Map.of());
+            Host host = new Host(documents, claims, contexts, Map.of());
             return new LevelStore(claims, contexts, StructureKernel.create(catalogs, host));
         });
     }
