@@ -16,7 +16,7 @@ entities); M3 adds `SavedClaims`/`SavedContexts` at `d4b6d82`, compatible with M
 command slice (settle at `4899d86`, plus compile, explain, claims) is green. M5 is partial: the
 determinism gate (`DeterminismTest`) covers canonical bytes, the parse/write fixed point, equal
 compile runs and stable finding order, and capture-revision lease invalidation landed at `0f0bf25`;
-the watched-region mark counter, M6 clean regeneration, non-upright pitch/roll mapping,
+the watched-region mark counter, non-upright pitch/roll mapping,
 `SC-MC-0004`/`0005` emission and the deferred `SC-MC-0003` channel remain pending.
 116 kernel tests, 106 adapter unit tests and 32/32 GameTests are green. The UI opens in **中文**; the
 **EN** button in the top bar switches to the English reading layer. Technical identifiers, code,

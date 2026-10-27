@@ -6,17 +6,18 @@
 
 ## Scope
 
-Adapter implementation for Minecraft 1.21.1 / NeoForge 21.1.x, plus GameTests, release gates and a
-clean kernel regeneration. No client overlay, network payload, schematic importer, GUI or scheduler.
+Adapter implementation for Minecraft 1.21.1 / NeoForge 21.1.x, plus GameTests and release gates. No
+client overlay, network payload, schematic importer, GUI or scheduler.
 
 ## Order and state at 2026-10-27
 
 The commit order was **M1 → M2a → M2b → M3 → M2c → M2d**, then **M4a → M4b → the command slice**. M3
 was committed before Model C landed; its `SavedClaims`/`SavedContexts` code is compatible as-is, so the
-"rebase" is a checkpoint, not a rewrite. M4 is implemented; M5 is partial (the determinism gate
-landed, the watched-region mark counter remains). A milestone is complete only
-when its code and its named tests are both on the tree and re-run; the current counts are 116 kernel
-tests, 106 adapter unit tests and 32 GameTests, with `./gradlew check` and `tools/spec-check.py` green.
+"rebase" is a checkpoint, not a rewrite. The kernel was regenerated from the design set at `4a6e093`,
+so the regeneration objective is historical, not pending. M4 is implemented; M5 is partial (the
+determinism gate landed, the watched-region mark counter remains). A milestone is complete only when
+its code and its named tests are both on the tree and re-run; the current counts are 116 kernel tests,
+106 adapter unit tests and 32 GameTests, with `./gradlew check` and `tools/spec-check.py` green.
 
 | Milestone | Deliverable | State |
 | --- | --- | --- |
@@ -29,7 +30,6 @@ tests, 106 adapter unit tests and 32 GameTests, with `./gradlew check` and `tool
 | M3 | `SavedClaims`, `SavedContexts`, CAS/release/reload, per-level `ServerState` | committed at `d4b6d82`; compatible checkpoint passed; settle command implemented at `4899d86` |
 | M4 | JSON reader/writer (`f2659c7`), datapack reload (`76a8e5c`), commands (`compile`, `settle`, `explain`, `claims`; settle at `4899d86`) | **implemented**; `CommandGameTest`/`SettleCommandGameTest` green |
 | M5 | Determinism gate, watched-region mark-counter lease invalidation, Gradle gates | partial: 116 kernel + 106 adapter + 32/32 GameTests and `check` green; capture-revision lease invalidation at `0f0bf25`; determinism gate (`DeterminismTest`) landed; watched-region mark-counter invalidation pending |
-| M6 | Clean delete/regenerate on a branch | pending |
 
 ## Acceptance
 
@@ -40,7 +40,6 @@ tests, 106 adapter unit tests and 32 GameTests, with `./gradlew check` and `tool
 | M3 checkpoint | Met: `SavedClaimsTest`/`SavedContextsTest` and the claims GameTest pass after Model C; `SC-OCC-0004`/relayed host codes persist. The `settle` command is implemented at `4899d86`. |
 | M4 | Met: reader/writer round-trip, datapack reload and the five commands; `SettleCommandGameTest`/`CommandGameTest` cover the command surface. |
 | M5 | `./gradlew check` green and `runGameTestServer` all required tests pass; the determinism gate is met (`DeterminismTest`); watched-region mark-counter invalidation still pending. |
-| M6 | Delete → regenerate → gates green on a branch. |
 
 ## Owners
 
@@ -49,7 +48,7 @@ tests, 106 adapter unit tests and 32 GameTests, with `./gradlew check` and `tool
 - B: `mc/claim`, `mc/context`, M3 checkpoint and the settle command.
 - C: `mc/document`, `mc/host`, `mc/command`, mod entry (M4).
 - D: GameTests and test resources.
-- E: build/CI, determinism, lease invalidation, regeneration branch.
+- E: build/CI, determinism and lease invalidation.
 
 ## Rules
 
