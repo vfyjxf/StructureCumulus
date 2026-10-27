@@ -38,7 +38,7 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
-  125 tests / 125 successful / 0 failed
+  169 tests / 169 successful / 0 failed
 $ python3 tools/spec-check.py
   spec-check: ok
 $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
@@ -85,7 +85,7 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、125 个 kernel 测试、130 个 adapter 单元测试、66 个 GameTests、56 个 code、29 条决策。六道 gate 全部通过。adapter 已完成到 S6：M2c 的 Model C、body identity、total read 和四态 traits；M2d 的 nested extents、frames 和 cuts；M3 的 <code>SavedClaims</code>/<code>SavedContexts</code> 在 <code>d4b6d82</code> 提交，兼容 Model C。M4a JSON reader/writer 在 <code>f2659c7</code> 提交；M4b 的 datapack reload 在 <code>76a8e5c</code> 提交；命令切片（settle 在 <code>4899d86</code>，另有 compile/explain/claims）已实现；M5a 的 watched-region mark counter、M5d 的非 upright pitch/roll mapping、M5e 的 capture report（D-28）和 S6 的 sited-root descriptor projection（D-29，siting-aware property expectation）已完成。剩下：performance/cost pass 和 review screenshots。</> : <>Six gates, 125 kernel tests, 130 adapter unit tests, 66 GameTests, 56 codes and 29 decisions. All six gates are green. The adapter is complete through S6: M2c Model C, body identity, total read and four-state traits; M2d nested extents, frames and cuts; M3 <code>SavedClaims</code>/<code>SavedContexts</code> at <code>d4b6d82</code>, compatible with Model C. M4a JSON reader/writer at <code>f2659c7</code>; M4b datapack reload at <code>76a8e5c</code>; the command slice (settle at <code>4899d86</code>, plus compile, explain, claims); M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping, M5e's capture report (D-28) and S6's sited-root descriptor projection (D-29, siting-aware property expectation) are complete. Pending only a performance/cost pass and fresh review screenshots.</>}
+        note={zh ? <>六道 gate、169 个 kernel 测试、130 个 adapter 单元测试、66 个 GameTests、56 个 code、29 条决策。六道 gate 全部通过。adapter 已完成到 S6：M2c 的 Model C、body identity、total read 和四态 traits；M2d 的 nested extents、frames 和 cuts；M3 的 <code>SavedClaims</code>/<code>SavedContexts</code> 在 <code>d4b6d82</code> 提交，兼容 Model C。M4a JSON reader/writer 在 <code>f2659c7</code> 提交；M4b 的 datapack reload 在 <code>76a8e5c</code> 提交；命令切片（settle 在 <code>4899d86</code>，另有 compile/explain/claims）已实现；M5a 的 watched-region mark counter、M5d 的非 upright pitch/roll mapping、M5e 的 capture report（D-28）和 S6 的 sited-root descriptor projection（D-29，siting-aware property expectation）已完成。第一批 stress 场景（12 个 class，110e797）已落地；剩下：performance/cost pass 和 review screenshots。</> : <>Six gates, 169 kernel tests, 130 adapter unit tests, 66 GameTests, 56 codes and 29 decisions. All six gates are green. The adapter is complete through S6: M2c Model C, body identity, total read and four-state traits; M2d nested extents, frames and cuts; M3 <code>SavedClaims</code>/<code>SavedContexts</code> at <code>d4b6d82</code>, compatible with Model C. M4a JSON reader/writer at <code>f2659c7</code>; M4b datapack reload at <code>76a8e5c</code>; the command slice (settle at <code>4899d86</code>, plus compile, explain, claims); M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping, M5e's capture report (D-28) and S6's sited-root descriptor projection (D-29, siting-aware property expectation) are complete. The first stress batch (12 scenario classes at 110e797) is on the tree; pending only a performance/cost pass and fresh review screenshots.</>}
       />
 
       <Reveal>
@@ -114,7 +114,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 17 JUnit containers
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 29 JUnit containers
               </div>
             </div>
           </div>

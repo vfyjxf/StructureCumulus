@@ -67,17 +67,20 @@ Then the module files, in dependency order:
   `SC-MC-0003` cut / `SC-MC-0004` orientation / `SC-MC-0005` over-cap, the host code catalog and the
   command report block) at `28d0334`. S6 implements the sited-root descriptor projection (D-29) and
   closes the siting-aware `property` expectation gap: a sited root publishes definition-frame
-  descriptors, an unrepresentable state keeps the raw one and still reports `SC-MC-0004`. Pending
+  descriptors, an unrepresentable state keeps the raw one and still reports `SC-MC-0004`. Kernel
+  stress batch 1 (tag `kernel-stress-batch-1`, `110e797`) adds 44 characterization scenarios across
+  12 `engine` classes, so the kernel suite is 169 tests; its documented gaps and the `DoorFocus`
+  coverage fix are in `design/06-verification.md` §3.1. Pending
   only: the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review
   screenshots. There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-27): the kernel compiles with `javac --release 21` and JSpecify only; 125
-  kernel JUnit 5 tests and 130 adapter unit tests pass; `runGameTestServer` passes 66/66; `./gradlew
-  check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean. `Codes.all` has 56
-  entries and the decision record has 29 decisions (D-29).
+- Verification (2026-10-28, HEAD `110e797`): the kernel compiles with `javac --release 21` and JSpecify
+  only; 169 kernel JUnit 5 tests and 130 adapter unit tests pass; `runGameTestServer` passes 66/66;
+  `./gradlew check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean. `Codes.all`
+  has 56 entries and the decision record has 29 decisions (D-29).
 
 ## The one rule
 

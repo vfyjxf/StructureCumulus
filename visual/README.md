@@ -18,7 +18,7 @@ command slice (settle at `4899d86`, plus compile, explain, claims) is green. M5a
 complete; the determinism gate (`DeterminismTest`) covers canonical bytes, the
 parse/write fixed point, equal compile runs and stable finding order, and capture-revision lease
 invalidation landed at `0f0bf25`. Pending only a performance/cost pass and fresh review screenshots.
-125 kernel tests, 130 adapter unit tests and 66/66 GameTests are green. The UI opens in **中文**; the
+169 kernel tests (29 containers), 130 adapter unit tests and 66/66 GameTests are green. The first kernel stress batch (12 scenario classes at `110e797`) is on the tree. The UI opens in **中文**; the
 **EN** button in the top bar switches to the English reading layer. Technical identifiers, code,
 JSON, Java and finding codes stay in their original form in both languages.
 
@@ -37,7 +37,7 @@ network request.
 
 ## What is inside
 
-125 kernel tests, 130 adapter unit tests, 66 GameTests, 56 codes, 29 decisions and 11 ranked kernel
+169 kernel tests, 130 adapter unit tests, 66 GameTests, 56 codes, 29 decisions and 11 ranked kernel
 packages. One complete document and a Java builder excerpt target the same IR.
 
 | Chapter | What you can do |

@@ -18,12 +18,13 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current evidence (2026-10-27): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are
+Current evidence (2026-10-28, HEAD `110e797`): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are
 committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`),
 capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase capture (P1, `56c632c`),
 the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright orientation remap (M5d,
 `ac11d0c`), the capture report (M5e, `28d0334`) and the sited-root descriptor projection (S6, D-29)
-are implemented. `./gradlew check` is green: 125
+are implemented, and the kernel stress batch 1 (`kernel-stress-batch-1`, `110e797`) adds 44
+characterization scenarios (§3.1). `./gradlew check` is green: 169
 kernel tests and 130 adapter unit tests, 0 failures, 0 skipped; `runGameTestServer` passes 66/66.
 `tools/spec-check.py` is clean. Model C, body identity, trait capture, the nested capability, the
 mark counter, the capture-report channel and the definition-frame descriptor projection are
@@ -111,6 +112,48 @@ They are the acceptance suite; a module test that does not feed one of them is o
     `CaptureAuditGameTest` (the orientation audit) and `CommandCaptureReportGameTest` (print order and
     command surfacing).
 
+### 3.1 Stress batch `kernel-stress-batch-1`
+
+A second end-to-end suite over realistic multiblock shapes, tagged `kernel-stress-batch-1` and committed
+at `110e797`: 12 scenario classes and 44 tests in `kernelTest/.../engine`, plus the `MagicFixtures` and
+`TechFixtures` shape builders. It runs with the same in-memory `WorldView`/`ClaimLedger`/`ContextStore`
+as §3 and adds no type, no decision and no kernel scenario obligation; it is a **characterization**
+suite, and each gap below is asserted rather than hidden.
+
+| Class | Shape it drives | Tests |
+| --- | --- | --- |
+| `Ae2CpuScenarioTest` | AE2 crafting CPU: 2×2×2 solid, missing storage cell, outside block, lattice edge, exclusive conflict | 5 |
+| `AnchorValueScenarioTest` | declared anchor value; two allowed orientations sharing one north image | 3 |
+| `AstralAltarScenarioTest` | Astral Altar tier II (54 cells) and tier III (72 cells) grown in place | 4 |
+| `BloodAltarScenarioTest` | Blood Altar tier prefixes, any-rune slots, footprint variants, a NOTAIR probe | 5 |
+| `ContextInstanceScenarioTest` | a context-focus check over already-published instance values | 1 |
+| `DoorCoverageScenarioTest` | two-cell door coverage and a three-cell `everyCell` bay | 2 |
+| `EntityWindowScenarioTest` | a read-scope entity window at a sited capture | 2 |
+| `FusionVoidScenarioTest` | Mekanism fusion torus: hollow ring, air void, blocks hidden in the void | 4 |
+| `GtEbfScenarioTest` | GT Modern EBF: 3×3×4 shell, nine coils, four yaw turns, host-side coil count | 4 |
+| `PncRefineryScenarioTest` | PneumaticCraft refinery: two body layers, four outputs, controller on top, edge cases | 7 |
+| `SeamScenarioTest` | a declared seam over air; a seam outside every bay | 2 |
+| `TerraPlateScenarioTest` | Botania Terra Plate: 3×3 two-material base, one plate above, ten claimed cells | 5 |
+
+**Characterized gaps** — documented limitations of the current kernel, each with its asserting test;
+they are not owed work and not a pending list:
+
+| Gap | Asserted by |
+| --- | --- |
+| `AnchorSpec.value` is ignored; only the anchor property's heading selects the orientation | `AnchorValueScenarioTest.anchorValueMismatchIsIgnored` |
+| Two allowed orientations with one north image resolve to the canonical first match | `AnchorValueScenarioTest.twoAllowedOrientationsWithTheSameNorthImagePickTheFirst` |
+| A check cannot read instance context already published in `ContextStore` (it stays `SC-CTX-0007`) | `ContextInstanceScenarioTest.checkCannotReadPersistedInstanceContext` |
+| An entity read-scope window is published in the blueprint-local frame, not the world frame | `EntityWindowScenarioTest.sitedEntityWindowIsPublishedInTheLocalFrame` |
+| `anyOccupant` has no fluid predicate, so water satisfies a NOTAIR slot | `BloodAltarScenarioTest.waterInANotAirSlotIsAdmittedAsAKnownFalsePositive` |
+| A cell outside every bay is never read or judged, so a closed-world "no extra blocks" check is not expressible | `Ae2CpuScenarioTest.anExtraBlockJustOutsideTheBayIsAdmitted`, `GtEbfScenarioTest.anExtraHatchOutsideTheBayIsNotEvidence`, `PncRefineryScenarioTest.aFifthOutputOutsideTheBayIsAdmitted`, `TerraPlateScenarioTest.anExtraBlockAboveThePlateIsIgnored` |
+| Per-cell checks cannot express "exactly one controller" or a mixed coil count; a host `Computation`/aggregate must | `PncRefineryScenarioTest.twoControllersAreAdmittedByPerCellChecks`, `PncRefineryScenarioTest.aHostCountRejectsTwoControllers`, `GtEbfScenarioTest.mixedCoilCountNeedsAHostAggregate` |
+| A seam is inert: it declares a connectable edge, never feeds the engine and never owns a cell | `SeamScenarioTest.aDeclaredSeamOverAirPassesAndDoesNotChangeTheResult` |
+
+**DoorFocus coverage fixed.** `DoorFocus.staticCells` now answers the two cells it actually reads
+(`origin` and `origin + (0,1,0)`) instead of the whole bay, so a two-cell door satisfies
+`Coverage.everyCell` and a three-cell `everyCell` bay fails the build with undecided cells instead of
+being silently covered (`DoorCoverageScenarioTest`, `110e797`).
+
 ## 4. Module tests
 
 | Module | Must test |
@@ -123,7 +166,7 @@ They are the acceptance suite; a module test that does not feed one of them is o
 | `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations |
 | `context` | context view, publish merge/revision, derive order, merges |
 | `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity |
-| `engine` | §3 scenarios, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection |
+| `engine` | §3 scenarios and the §3.1 stress batch, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection |
 | `remedy` | provider order/cap, edit/overlay values |
 | `spi` | builtins, host empty, facade paths, two-kernel isolation |
 

@@ -17,7 +17,9 @@ was committed before Model C landed; its `SavedClaims`/`SavedContexts` code is c
 "rebase" is a checkpoint, not a rewrite. The kernel was regenerated from the design set at `4a6e093`,
 so the regeneration objective is historical, not pending; there is no regeneration milestone and no
 M6. Every milestone is implemented, and a milestone is complete only when its code and its named
-tests are both on the tree and re-run. Current counts (2026-10-27): **125 kernel tests, 130 adapter
+tests are both on the tree and re-run. The kernel stress batch `kernel-stress-batch-1` (`110e797`)
+adds 44 kernel characterization scenarios in 12 `engine` classes; it is kernelTest-only and adds no
+adapter milestone. Current counts (2026-10-28, HEAD `110e797`): **169 kernel tests, 130 adapter
 unit tests, 66 GameTests**, `Codes.all` 56 entries, 29 decisions (D-29); `./gradlew check`,
 `runGameTestServer` and `tools/spec-check.py` are green. Pending only: the performance/cost pass and
 fresh review screenshots.

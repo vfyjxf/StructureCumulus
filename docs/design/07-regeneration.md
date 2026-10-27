@@ -24,7 +24,9 @@ gate with `DeterminismTest`, the rotated-siting two-phase capture (P1) at `56c63
 event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
 `ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. The sited-root
 descriptor projection (S6, D-29) is implemented and closes the siting-aware `property` expectation gap
-(`SitedDescriptorGameTest`). M3 persistence is compatible with Model C. Pending only: the
+(`SitedDescriptorGameTest`). Kernel stress batch 1 (`kernel-stress-batch-1`, `110e797`) adds 44
+characterization scenarios in 12 `engine` classes (`06-verification.md` §3.1), taking the kernel suite
+to 169 tests; it changes no type and no decision. M3 persistence is compatible with Model C. Pending only: the
 performance/cost pass (block-entity-lazy
 and entity sweep) and fresh visual review screenshots. There is no regeneration milestone.
 

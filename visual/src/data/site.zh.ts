@@ -79,7 +79,7 @@ export const ZH_GROUPS: Record<string, string> = {
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
   Compile: { label: '编译', note: 'javac 21 · gradlew check 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 17 个容器；adapter 130 · GameTests 66/66' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 29 个容器；adapter 130 · GameTests 66/66' },
   'Spec index': { label: '规范索引', note: 'spec-check.py · 56 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
