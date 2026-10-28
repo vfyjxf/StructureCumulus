@@ -20,6 +20,8 @@ table defines who may emit each finding code.
 6. [design/05-decisions.md](design/05-decisions.md) — every ruling that replaced an older one.
 7. [design/06-verification.md](design/06-verification.md) — gates, scenario tests, code producers.
 8. [design/07-regeneration.md](design/07-regeneration.md) — how the kernel is rebuilt from this set.
+9. [design/08-context-cache.md](design/08-context-cache.md) — the host-owned cached-context port.
+10. [design/09-structure-sets.md](design/09-structure-sets.md) — root/satellite structure sets and links.
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 

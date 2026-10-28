@@ -1,0 +1,551 @@
+# 09. Structure sets and satellites
+
+> Status: proposed, not implemented. This document is the source of truth for the structure-set
+> layer; module files and the code are updated when the implementation lands.
+
+## 1. Purpose
+
+A `Blueprint` is one structure: one bounds, one siting, one capture, one plan, one claim set.
+
+Real multiblocks are often more than one structure:
+
+- a blast furnace with optional preheaters on its faces;
+- a reactor with solar generators anywhere within a range;
+- a controller with a logical subnetwork;
+- a wide attachment that touches several parent cells.
+
+The structure-set layer describes those relationships without turning the kernel into a
+multi-structure engine.
+
+```text
+StructureSet
+  root:      one Blueprint, placed by the host
+  satellites: zero or more Blueprints, placed relative to the root
+  links:     optional spatial relationships between root cells and satellite cells
+```
+
+The kernel still checks and settles one blueprint at a time. The host owns capture, orchestration,
+rollback, and claim/context lifecycle for the set.
+
+## 2. Terms
+
+| Term | Meaning |
+| --- | --- |
+| set | a `structure_set` document or Java `StructureSet` |
+| root | the primary structure; placed by the host |
+| satellite | an independent structure placed relative to the root |
+| parent cell | a **local root cell** used as a link endpoint |
+| satellite cell | a **local satellite cell** used as a link endpoint |
+| face link | a link whose endpoints are face-adjacent (Manhattan distance 1) |
+| range link | a link whose endpoints are within `max_distance` under a metric |
+| presence | whether a satellite region contains at least one non-air block |
+
+`parent_cell` is not a world coordinate, a bay id, or an `InstanceId`. It is a local cell in the
+root blueprint, mapped to the world through the root siting.
+
+## 3. Document kind
+
+The existing blueprint document stays unchanged. A new root member `kind` discriminates the
+document:
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "structure_set",
+  "id": "mymod:blast_furnace_set",
+  "root": "mymod:blast_furnace",
+  "satellites": []
+}
+```
+
+- `kind` is optional on blueprint documents; absence means `blueprint`.
+- `kind: "structure_set"` selects the structure-set reader.
+- `schemaVersion` stays `1`.
+- The set document is root-only; definitions never carry a structure set.
+- Old readers reject a set document with `SC-DOC-0002`; this is a pre-release forward break.
+
+## 4. JSON schema
+
+### 4.1 Set document
+
+| Member | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `schemaVersion` | yes | — | exactly `1` |
+| `kind` | yes | — | `structure_set` |
+| `id` | yes | — | set id |
+| `root` | yes | — | root blueprint id |
+| `satellites` | yes | — | array, may be empty |
+| `extensions` | no | `{}` | document-level extensions |
+
+Unknown members are rejected with `SC-DOC-0002`.
+
+### 4.2 Satellite
+
+| Member | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `id` | yes | — | unique within the set |
+| `blueprint` | yes | — | blueprint document id |
+| `at` | yes | — | offset in the root local frame |
+| `orientation` | no | `identity` | orientation relative to the root |
+| `required` | no | `false` | whether absence is an error |
+| `arguments` | no | `{}` | shallow override of the blueprint's arguments |
+| `presence` | no | satellite bounds | presence region override |
+| `links` | no | `[]` | link pairs |
+
+### 4.3 Presence
+
+```json
+"presence": { "cell": [0, 0, 0] }
+```
+
+or:
+
+```json
+"presence": { "boxes": [[0, 0, 0, 2, 1, 2]] }
+```
+
+- exactly one of `cell` / `boxes`;
+- must be inside the satellite bounds;
+- omitted means the whole satellite bounds.
+
+### 4.4 Links
+
+`links` is an array. Each link is one pair:
+
+```json
+"links": [
+  {
+    "mode": "face",
+    "parent_cell": [2, 0, 1],
+    "satellite_cell": [0, 0, 1]
+  },
+  {
+    "mode": "range",
+    "parent_cell": [2, 0, 1],
+    "satellite_cell": [0, 0, 0],
+    "max_distance": 8,
+    "metric": "chebyshev"
+  }
+]
+```
+
+| Member | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `mode` | yes | — | `face`, `range`, `none` |
+| `parent_cell` | yes for face/range | — | local root cell |
+| `satellite_cell` | yes for face/range | — | local satellite cell |
+| `max_distance` | yes for range | — | non-negative integer |
+| `metric` | no | `chebyshev` | `chebyshev`, `manhattan`, `euclidean` |
+
+`mode: none` has no cells and no distance; it is a logical link only. Omitting `links` is the same
+as no spatial link.
+
+### 4.5 Canonical example
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "structure_set",
+  "id": "mymod:blast_furnace_set",
+  "root": "mymod:blast_furnace",
+  "satellites": [
+    {
+      "id": "left_preheater",
+      "blueprint": "mymod:preheater",
+      "at": [-1, 0, 0],
+      "orientation": "identity",
+      "required": false,
+      "arguments": { "tier": 2 },
+      "links": [
+        {
+          "mode": "face",
+          "parent_cell": [2, 0, 1],
+          "satellite_cell": [0, 0, 1]
+        }
+      ]
+    },
+    {
+      "id": "right_preheater",
+      "blueprint": "mymod:preheater",
+      "at": [3, 0, 0],
+      "orientation": "half",
+      "required": false,
+      "arguments": { "tier": 3 },
+      "links": [
+        {
+          "mode": "face",
+          "parent_cell": [2, 0, 2],
+          "satellite_cell": [0, 0, 1]
+        }
+      ]
+    },
+    {
+      "id": "solar",
+      "blueprint": "mymod:solar_generator",
+      "at": [8, 0, 0],
+      "required": false,
+      "links": [
+        {
+          "mode": "range",
+          "parent_cell": [2, 0, 1],
+          "satellite_cell": [0, 0, 0],
+          "max_distance": 8,
+          "metric": "chebyshev"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## 5. Placement
+
+The host places the root:
+
+```java
+Siting rootSiting = Siting.of(origin, orientation);
+```
+
+A satellite's relative siting is:
+
+```java
+Siting relative = Siting.of(LatticePoint.of(atX, atY, atZ), relativeOrientation);
+```
+
+Its absolute siting is:
+
+```java
+Siting satelliteSiting = rootSiting.compose(relative);
+```
+
+`Siting.compose` is a new convenience over the existing `Placement.compose`:
+
+```text
+origin = root.toWorld(relative.origin)
+placement = root.placement().compose(relative.placement())
+```
+
+- `at` is an origin in the root local frame;
+- `orientation` is relative to the root;
+- the root rotates, satellites rotate with it;
+- a null mapping (lattice overflow) is a set finding, not a crash.
+
+The set document never stores world coordinates. It is a portable placement graph.
+
+## 6. Links
+
+### 6.1 Face
+
+```text
+Manhattan distance(parentWorldCell, satelliteWorldCell) == 1
+```
+
+- same world cell is rejected;
+- diagonal is rejected;
+- the direction is one of the six faces of the parent cell.
+
+### 6.2 Range
+
+```text
+distance(parentWorldCell, satelliteWorldCell) <= max_distance
+```
+
+Metrics:
+
+| Metric | Distance |
+| --- | --- |
+| `chebyshev` | `max(|dx|, |dy|, |dz|)` |
+| `manhattan` | `|dx| + |dy| + |dz|` |
+| `euclidean` | `sqrt(dx² + dy² + dz²)` |
+
+`euclidean` compares squared integers to avoid floating point.
+
+### 6.3 Coverage
+
+A link cell must be read by a check:
+
+```text
+parent_cell ∈ root.plan() checks' read scopes
+satellite_cell ∈ satellite.plan() checks' read scopes
+```
+
+Bay membership is optional; it only adds claims. A bay that no check reads does **not** satisfy
+coverage.
+
+This rule exists because `Blueprint.reads()` is the union of check scopes and computation regions;
+bounds-only validation would make the link inert.
+
+### 6.4 Duplicate parent face
+
+For `face` links, the pair:
+
+```text
+(parent_cell, face direction)
+```
+
+must be unique across the whole set.
+
+- one parent cell may have up to six face links, one per direction;
+- two satellites may not share the same parent cell and the same face;
+- one satellite may have several face links, provided their parent cells differ;
+- a wide satellite uses one link pair per contact cell.
+
+`range` and `none` links do not have a face direction and may fan in to one parent cell.
+
+### 6.5 Wide satellite
+
+A satellite whose port spans several cells declares several link pairs:
+
+```json
+"links": [
+  {"mode": "face", "parent_cell": [0,0,0], "satellite_cell": [0,0,0]},
+  {"mode": "face", "parent_cell": [1,0,0], "satellite_cell": [1,0,0]},
+  {"mode": "face", "parent_cell": [2,0,0], "satellite_cell": [2,0,0]}
+]
+```
+
+All pairs are validated independently.
+
+## 7. Presence
+
+### 7.1 Definition
+
+A satellite is present when its presence region contains at least one:
+
+```text
+OccupantKind.block && !OccupantSnapshot.isAir()
+```
+
+Entities, fluids, and nested bodies do not prove presence.
+
+### 7.2 Region
+
+- default: the satellite bounds;
+- override: `presence.cell` or `presence.boxes`;
+- the override must be inside the satellite bounds.
+
+### 7.3 Reading and budget
+
+Presence is read through `WorldView.read`:
+
+- every cell is charged to the attempt budget;
+- an unreadable cell makes presence unprovable;
+- presence never bypasses the engine budget.
+
+### 7.4 Required / optional
+
+| `required` | Present | Absent | Unknown |
+| --- | --- | --- | --- |
+| `true` | check satellite | `SC-SET-0001` | `SC-SET-0004` |
+| `false` | check satellite | skip | `SC-SET-0004` |
+
+Unknown is never treated as absent, even for optional satellites.
+
+## 8. Arguments
+
+```json
+"arguments": { "tier": 3, "material": "invar" }
+```
+
+- optional;
+- same `Value` schema as blueprint arguments;
+- effective arguments:
+
+```text
+blueprint document root arguments
+  <- shallow merge
+satellite.arguments
+```
+
+- satellite wins on duplicate keys;
+- no nested merge;
+- no key removal.
+
+Compilation:
+
+- same blueprint with different effective arguments compiles separately;
+- cache key is `(blueprintId, effectiveArguments)`;
+- same blueprint and same effective arguments may reuse a compiled `Blueprint`, but each satellite
+  still gets its own id and siting.
+
+## 9. Identity and duplicates
+
+- satellite ids are unique within the set; duplicate -> `SC-DOC-0004`;
+- `(at, orientation)` pairs are unique within the set; duplicate -> `SC-SET-0005`;
+- the same blueprint may appear several times with different ids/arguments;
+- different sitings may overlap in bounds; claims decide whether that is legal;
+- nested structure sets are not supported; a satellite must name a blueprint document.
+
+## 10. Host orchestration
+
+### 10.1 Check all
+
+The host checks, in order:
+
+1. presence of every required satellite;
+2. link distance/coverage;
+3. root check;
+4. every present satellite check.
+
+Any failure means no settle.
+
+### 10.2 Settle all
+
+If every check passed, settle in a fixed order:
+
+```text
+root, satellites in declaration order
+```
+
+Each settle is an independent kernel `settle`.
+
+### 10.3 Rollback
+
+If a settle fails:
+
+- release successfully settled structures in reverse order;
+- report the original settle failure;
+- report rollback failures with `SC-SET-0007`;
+- do not auto-retry.
+
+`release(owner, siting)` is coarse and advances the ledger revision. The host must also invalidate
+context for released structures; kernel context is not rolled back.
+
+### 10.4 Result
+
+The set result is per structure, not one merged `MatchOutcome`:
+
+```java
+record StructureSetResult(
+    Map<NamespacedId, MatchOutcome> outcomes,
+    List<Finding> setFindings,
+    List<NamespacedId> settled,
+    List<NamespacedId> rolledBack,
+    List<Finding> rollbackFailures
+) { }
+```
+
+The host filters `Formed.claims()` by `(owner, siting, bay)`; the ledger row set is ledger-wide.
+
+## 11. Java API
+
+```java
+StructureSet.builder(id("blast_furnace_set"))
+    .root(id("blast_furnace"))
+    .satellite(SatelliteSpec.builder(id("left_preheater"), id("preheater"))
+        .at(-1, 0, 0)
+        .orientation(Orientation.identity())
+        .required(false)
+        .arguments(Value.object(Map.of("tier", new Value.NumberValue(2, null))))
+        .presence(PresenceSpec.cell(LatticePoint.origin))
+        .link(LinkSpec.face(LatticePoint.of(2, 0, 1), LatticePoint.of(0, 0, 1)))
+        .build())
+    .build();
+```
+
+Public records:
+
+```java
+record StructureSet(NamespacedId id, Blueprint root, List<Satellite> satellites) { }
+
+record Satellite(
+    NamespacedId id,
+    Blueprint blueprint,
+    Siting relativeSiting,
+    boolean required,
+    Value arguments,
+    @Nullable PresenceSpec presence,
+    List<LinkSpec> links
+) { }
+
+record PresenceSpec(CuboidSet cells) { }
+
+record LinkSpec(
+    LinkMode mode,
+    @Nullable LatticePoint parentCell,
+    @Nullable LatticePoint satelliteCell,
+    int maxDistance,
+    DistanceMetric metric
+) { }
+
+enum LinkMode { face, range, none }
+
+enum DistanceMetric { chebyshev, manhattan, euclidean }
+```
+
+`StructureSet` lives outside `kernel.engine`; it is a document/host-layer plan. The kernel does not
+execute it.
+
+## 12. Document pipeline
+
+| Layer | Addition |
+| --- | --- |
+| document IR | `StructureSetDocument`, `StructureSetSpec`, `SatelliteSpec`, `LinkSpec`, `PresenceSpec` |
+| reader | `StructureSetReader`; kind dispatcher before `JsonReader` |
+| compiler | `StructureSetCompiler`; resolves root/satellite documents, merges arguments, compiles blueprints, validates links/presence/duplicates |
+| writer | `StructureSetWriter`; canonical member order |
+| spans | set-member spans for findings |
+| adapter | host `StructureSet` execution, capture, check, settle, rollback |
+
+`JsonReader` remains blueprint-only. A small dispatcher reads `kind` and selects the reader.
+
+## 13. Codes
+
+Add a `set` family to `FindingCode.Family` and seven entries to `Codes.all` (57 -> 64):
+
+| Code | Meaning | Producer |
+| --- | --- | --- |
+| `SC-SET-0001` | required satellite is absent | host presence |
+| `SC-SET-0002` | satellite link distance is invalid | compiler/host link |
+| `SC-SET-0003` | link cell is outside its blueprint or not covered by a check | compiler |
+| `SC-SET-0004` | satellite presence is unreadable | host presence |
+| `SC-SET-0005` | duplicate satellite placement | compiler |
+| `SC-SET-0006` | duplicate parent face link | compiler |
+| `SC-SET-0007` | structure set rollback failed | host settle |
+
+Document errors reuse existing codes:
+
+| Situation | Code |
+| --- | --- |
+| unknown kind/member | `SC-DOC-0002` |
+| duplicate satellite id | `SC-DOC-0004` |
+| missing root/satellite blueprint | `SC-DOC-0011` |
+| satellite names a structure_set | `SC-DOC-0002` |
+| invalid `at`/orientation/arguments | `SC-DOC-0002`/factory code |
+
+## 14. Non-goals
+
+- kernel multi-structure transaction;
+- nested structure sets;
+- satellite-of-satellite;
+- automatic retry;
+- context rollback;
+- world-coordinate placement in the document;
+- claim transaction across structures;
+- link direction beyond the six faces;
+- per-link arguments.
+
+## 15. Test obligations
+
+- JSON round-trip and Java/JSON parity for a set.
+- Relative siting under identity/half/clockwise, negative offsets, relative orientation.
+- Face adjacency, range metrics, `none`.
+- Link coverage: bounds-only cell rejected; bay-only unread cell rejected; check-read cell accepted.
+- Duplicate parent face, wide satellite, multiple range fan-in.
+- Presence: block present, all air, unreadable, optional unknown, required absent.
+- Arguments shallow merge and per-instance compile.
+- Duplicate id/placement rejection.
+- Host check-all/settle-all/rollback, ledger-wide claims filtering, context invalidation.
+- Document errors: unknown kind, missing blueprint, nested set, duplicate id, invalid link/presence.
+- Codes family and count.
+
+## 16. Implementation slices
+
+| Slice | Scope | Gate |
+| --- | --- | --- |
+| S1 | `Siting.compose`, `FindingCode.Family.set`, seven `Codes` entries, `CodesTest` | focused space/finding tests |
+| S2 | set document IR, reader/dispatcher/writer/spans, compiler, argument merge, duplicate/link/presence validation | focused document tests |
+| S3 | `StructureSet`/`SatelliteSpec`/`LinkSpec`/`PresenceSpec`, host placement/link/presence/check/settle/rollback, adapter result | focused adapter/kernel tests |
+| S4 | docs, counts, stress scenarios | docs + focused regression |
+
+Visual review stays last.
