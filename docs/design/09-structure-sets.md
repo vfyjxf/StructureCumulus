@@ -1,9 +1,9 @@
 # 09. Structure sets and satellites
 
-> Status: implemented (S1, S2, S3 and S4). This document remains the source of truth for the
-> structure-set layer; the document IR, JSON reader/dispatcher/writer, `StructureSetCompiler`, the
-> host plan, the host orchestration and the SS4 stress suite are on the tree. Visual review stays
-> last and was not regenerated.
+> Status: implemented (S1, S2, S3 and S4); the H4 host-data round changes no set-layer rule. This
+> document remains the source of truth for the structure-set layer; the document IR, JSON
+> reader/dispatcher/writer, `StructureSetCompiler`, the host plan, the host orchestration and the SS4
+> stress suite are on the tree. Visual review stays last and was not regenerated.
 
 ## 1. Purpose
 
@@ -596,9 +596,11 @@ Document errors reuse existing codes:
   `StructureSetHostTest` (22 tests) and `DatapackStructureSetTest` (5 tests).
 - **S4** is implemented in the working tree after `93f5941`: six adapter stress classes (33 tests) in
   `src/test/.../mc` cover IE preheaters, TEP range fan-in, AE2 logical subnetworks, controller/port
-  envelopes, rotation and rollback (`06-verification.md` §3.3); the counts are 257 kernel tests
-  (40 containers) and 241 adapter unit tests (32 containers), `@GameTest` 79, `Codes.all` 64 and 32
-  decisions (D-32). S4 adds no kernel type and regenerates no visual.
+  envelopes, rotation and rollback (`06-verification.md` §3.3). The counts at H4 (2026-10-28) are
+  **258 kernel tests (39 containers), 276 adapter unit tests (36 containers), 64 `@GameTest`
+  methods**, `Codes.all` 64 and 33 decisions (D-33; D-29 is superseded). S4 adds no kernel type and
+  regenerates no visual; the H4 host-data group (`06-verification.md` §3.4) touches the same
+  adapter unit suite and changes no set-layer type or rule.
 - **Not in the set layer:** a command or capture executor that runs a set; the adapter result is a
   library entry point only.
 

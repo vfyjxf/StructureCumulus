@@ -74,9 +74,10 @@ Notes:
   (`LevelWatch`/`WatchEvents`, lazy entity and block-entity fingerprints) at `d1fa42f`; P1 fixes the
   rotated-siting capture bounds with the two-phase anchored capture at `56c632c`; M5d adds the
   non-upright orientation remap (`ac11d0c`); M5e adds the capture report the adapter answers with
-  (`world.CaptureReport`, `SC-MC-0003`/`0004`/`0005`) at `28d0334`; S6 adds the sited-root descriptor
-  projection (D-29), so a `property` expectation matches at a rotated siting
-  (`SitedDescriptorGameTest`). Pending only: the
+  (`world.CaptureReport`, `SC-MC-0003`/`0004`/`0005`) at `28d0334`; S6 added the sited-root descriptor
+  projection (D-29), which H4 records as superseded by the typed host snapshot (D-33, H1–H4):
+  `OccupantDescriptor` is `(type, kind)`, the projection is retired, `OrientationAuditGameTest` keeps
+  the orientation audit and the adapter's value checks read the captured snapshot. Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   `mc.capability` is a subpackage of `mc`; it adds no kernel edge. The main source set also compiles
   the mod entry.

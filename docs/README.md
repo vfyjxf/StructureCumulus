@@ -45,11 +45,13 @@ Then the module files, in dependency order:
 
 ## Status
 
-- Design revision: **v1.2**, 2026-10-27, plus the [08 context-cache](design/08-context-cache.md) and
-  [09 structure-set](design/09-structure-sets.md) extension documents. The v1.1 round specified
-  Model C (body identity, the narrowest-read refusal, four-state traits) and the nested capability;
-  v1.2 records them as implemented, and its M5a/M5d/M5e slices close the adapter round. 08/09 specify
-  the host-owned cached-context port (D-31) and the root/satellite set layer (D-32).
+- Design revision: **v1.2**, 2026-10-27, plus the [08 context-cache](design/08-context-cache.md),
+  [09 structure-set](design/09-structure-sets.md) and [10 host-data](design/10-host-data.md) extension
+  documents. The v1.1 round specified Model C (body identity, the narrowest-read refusal, four-state
+  traits) and the nested capability; v1.2 records them as implemented, and its M5a/M5d/M5e slices
+  close the adapter round. 08/09 specify the host-owned cached-context port (D-31) and the
+  root/satellite set layer (D-32); 10 specifies the typed host snapshot (D-33), implemented as H1–H4
+  and superseding the descriptor projection (D-29).
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -70,9 +72,10 @@ Then the module files, in dependency order:
   with the two-phase anchored capture at `56c632c`; M5d remaps the 40 non-upright orientations at
   `ac11d0c`; M5e adds the capture report (D-28: `world.CaptureReport` on every `CaptureResult` arm,
   `SC-MC-0003` cut / `SC-MC-0004` orientation / `SC-MC-0005` over-cap, the host code catalog and the
-  command report block) at `28d0334`. S6 implements the sited-root descriptor projection (D-29) and
-  closes the siting-aware `property` expectation gap: a sited root publishes definition-frame
-  descriptors, an unrepresentable state keeps the raw one and still reports `SC-MC-0004`. Kernel
+  command report block) at `28d0334`. S6 implemented the sited-root descriptor projection (D-29),
+  which H1 retired and H4 records as superseded by the typed host snapshot (D-33): `OccupantDescriptor`
+  is `(type, kind)`, the projection is retired, `OrientationAuditGameTest` keeps the orientation audit
+  and the adapter's value checks read the captured snapshot. Kernel
   stress batch 1 (tag `kernel-stress-batch-1`, `110e797`) adds 44 characterization scenarios across
   12 `engine` classes, and batch 2 (tag `kernel-stress-batch-2`, `3e60ed4`) adds 17 kernel scenarios
   plus 11 adapter unit tests and fixes `NestedFocus` to bind no subject; the documented gaps are in
@@ -86,24 +89,29 @@ Then the module files, in dependency order:
   structure-set layer: the `structure_set` document IR/reader/writer/compiler (`9cf2794`,
   `00cf6c4`), the host `StructureSet` plan and `StructureSetHost` orchestration with rollback
   (`93f5941`), and the seven `SC-SET` codes. SS4 adds the six-class/33-test structure-set stress
-  suite (`design/06-verification.md` §3.3) and the counts close-out. The tree registers 257 kernel
-  tests in 40 containers, 241 adapter unit tests in 32 containers and 79 `@GameTest` methods; the last
-  full green `./gradlew check` is at `3e60ed4` (186 kernel tests in 33 containers, 141 adapter tests)
-  and the last recorded `runGameTestServer` is 66/66 at `6263414`. Slices after `3e60ed4` report
-  focused runs only. Pending only: the performance/cost pass (block-entity-lazy and entity sweep) and
-  fresh visual review screenshots. There is no regeneration milestone.
+  suite (`design/06-verification.md` §3.3). H1–H4 add the host-data round: `HostType`,
+  `WorldView.get`, `Expectations.host` and `OccupantDescriptor(type, kind)`; one `SnapshotLevel` per
+  frame with copied states, fluids, block entities and entities; the adapter
+  `property`/`state`/`tag`/`fluid` factories and `SC-MC-0006`…`0010`; and the `HostDataScenarioTest`
+  group (§3.4) over a rotated structure set, a nested child frame, a waterlogged slab and a missing
+  snapshot. The tree registers 258 kernel tests in 39 containers, 276 adapter unit tests in 36
+  containers and 64 `@GameTest` methods; the last full green `./gradlew check` is at `3e60ed4` (186
+  kernel tests in 33 containers, 141 adapter tests) and the last recorded `runGameTestServer` is
+  66/66 at `6263414`. Slices after `3e60ed4` report focused runs only. Pending only: the
+  performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+  There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-28, HEAD `93f5941` plus the SS4 working tree): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 257 kernel JUnit 5 tests (40 test
-  containers), 241 adapter unit tests (32 containers) and 79 `@GameTest` methods; the last full
+- Verification (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): the kernel compiles with
+  `javac --release 21` and JSpecify only. The tree registers 258 kernel JUnit 5 tests (39 test
+  containers), 276 adapter unit tests (36 containers) and 64 `@GameTest` methods; the last full
   `./gradlew check` is at `3e60ed4` (186/141) and the last recorded `runGameTestServer` is 66/66 at
-  `6263414`, so no full-suite or GameTest result is claimed for this revision. SS4's focused gates
-  are `compileKernelTestJava`, `compileTestJava`, the structure-set `kernelTest` and `test`
-  selections, `spotlessCheck`, `tools/spec-check.py` and `git diff --check`, all green. `Codes.all`
-  has 64 entries and the decision record has 32 decisions (D-32).
+  `6263414`, so no full-suite or GameTest result is claimed for this revision. H4's focused gates are
+  `compileKernelTestJava`, `compileTestJava`, the `HostDataScenarioTest` `test` selection,
+  `spotlessCheck`, `tools/spec-check.py` and `git diff --check`, all green. `Codes.all` has 64 entries
+  and the decision record has 33 decisions (D-33; D-29 superseded).
 
 ## The one rule
 

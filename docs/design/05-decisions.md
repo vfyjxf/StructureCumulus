@@ -25,7 +25,7 @@ the code" section remains banned; a future pending block needs the same decision
 Core kernel + document compiler + thin remedy SPI. The v1 round scoped the NeoForge adapter to
 `modules/adapter.md` and left it unimplemented at the time; no scheduler, no dirty index, no overlay
 renderer, no schematic importer, no client code. This kept the first regeneration small enough to
-prove, while the ports make the adapter a later, independent exercise. Current status (2026-10-27):
+prove, while the ports make the adapter a later, independent exercise. Current status (2026-10-28):
 M1 (host + command + capture-check), M2a (loaded-entity capture), M2b (upright orientation), M2c
 (Model C, body identity, total read, four-state traits and the five adapter trait keys), M2d (nested
 extents, frames, cuts, child entities) and M3 (`d4b6d82`: `SavedClaims`, `SavedContexts`, CAS
@@ -34,14 +34,17 @@ settle/release and reload codecs) are committed. M4a/M4b and the command slice (
 invalidation landed at `0f0bf25`. The rotated-siting two-phase capture (P1) landed at `56c632c`, the
 event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
 `ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. The sited-root
-descriptor projection (S6, D-29) is implemented and closes the siting-aware `property` expectation
-gap (`SitedDescriptorGameTest`). Pending only: the performance/cost pass (block-entity-lazy and entity
-sweep) and fresh visual review screenshots. There is no regeneration milestone.
+descriptor projection (S6, D-29) was implemented and is superseded by the host snapshot (D-33,
+H1–H4): `OccupantDescriptor` carries no properties, so there is nothing to project, and the retained
+orientation audit is `OrientationAuditGameTest`. The host-data round adds `HostType`,
+`WorldView.get`, `Expectations.host`, one snapshot per frame and the adapter `property`/`state`/`tag`/
+`fluid` factories. Pending only: the performance/cost pass (block-entity-lazy and entity sweep) and
+fresh visual review screenshots. There is no regeneration milestone.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is implemented through S6. The spec index is green at v1.2: the M5e amendment was applied
-docs-first (`world` §4.10, D-28) and its carrier landed, so the index is green; D-29 adds no public
-type, so the index was unaffected while the S6 projection landed. No pending signature is ever
+adapter is implemented through H4. The spec index is green at v1.2: the M5e amendment was applied
+docs-first (`world` §4.10, D-28) and its carrier landed; D-29 added no public type, and D-33 keeps
+the host bridge to `HostType`, `WorldView.get` and `Expectations.host`. No pending signature is ever
 documented as implemented (`06-verification.md` §1).
 
 ### D-03 — English only
@@ -207,10 +210,11 @@ mismatch is caught by a registry test, not a `SC-DIA` code.
 **Why:** the old U10 was ~20 unbuilt types with no compiled test. The kernel can describe a repair
 and hand it to a host; execution is a host transaction with its own report.
 
-### D-17 — The facade is five operations, one final class
+### D-17 — The facade is four operations, one final class
 
-`StructureKernel` is a final class with `compile`, `siting`, `check`, `settle`, `derive`; `solve`,
-`explain`/`explainOrFallback` are helpers; `document`/`ledger`/`catalogs` are lookups. It is not an
+`StructureKernel` is a final class with `compile`, `check`, `settle`, `derive`; `solve`,
+`explain`/`explainOrFallback` are helpers; `document`/`ledger`/`catalogs` are lookups. Anchor
+resolution is host work (`McAnchors`, D-33); the facade has no `siting` operation. It is not an
 interface and has no static-method-in-interface factories. `Host` is one record of ports. `Catalogs`
 has six families; there is no `contextKeys` catalog, because a key is a blueprint/document value.
 
@@ -221,7 +225,9 @@ The new shape is one class a host can hold and an addon can ignore.
 ### D-18 — Trait and kind are open values
 
 `OccupantKind` is a `NamespacedId` record with four constants, not a five-case enum; there is no
-`OTHER`, no `compareTo` by ordinal. `OccupantDescriptor` is `(type, kind, properties, tags)`.
+`OTHER`, no `compareTo` by ordinal. `OccupantDescriptor` is `(type, kind)`. **Amendment (H1):** the
+property map and tag list were removed and the host payload moved to the typed snapshot (D-33,
+`10-host-data.md`).
 
 A trait has four capture states, not two. `Trait<T>` stays `(key, @Nullable value)`; `TraitSlot` is
 `Present(Trait<?>)`, `Absent(id)`, `Refused(id, ReadRefusal)`, and "no slot" (unasked). Present-null
@@ -266,13 +272,13 @@ between `13` and `15`. A test asserts the table is bijective with the producers.
 | Q11 capture SPI | One `WorldCapture.capture(CaptureRequest)` returning `Captured(view, lease)`/`TooLarge`/`Unavailable`. |
 | Q12 section phase read | `SectionComputation`/`SectionContext` has no `read(ContextKey)`; it does have a total cell `read(LatticePoint)` and `unreadable()` (D-24). `AggregateComputation` has no `contribute`. |
 | Q13 step vocabulary | No step types; `Plan` has sections/aggregates/checks; a check cannot read a derivation output. |
-| Q14 facade | Five operations, one final class, one `Host` (D-17). |
+| Q14 facade | Four operations, one final class, one `Host` (D-17; `siting` moved to the adapter, D-33). |
 | Q15 code table | One table in `finding`, one producer, no dead codes (D-19). |
 | Q16 `LocusMap`/`definition` | `LocusMap` maps local↔world only; a definition label is created where the source is in hand; no `toDefinition`. |
 | Q18 U10 | Thin values + provider (D-16). |
 | Q19 named-but-unimplemented | `DataView`/`DataKind` → `Value`; `Codes` implemented; `Checks` in core; `Stability`/`ExplainBook` deleted; no empty names. |
 | Q20 trait model | Typed `Trait` with present-null (D-18). |
-| Q21 descriptor | `(type, kind, properties, tags)`. |
+| Q21 descriptor | `(type, kind)`; properties/tags removed by H1 (D-33). |
 | Q22 `OccupantKind.OTHER` | No `OTHER`; an open id record with four constants. |
 | Q23 `ClaimMatrix`/`Overlap` | One public `conflicts(a,b)`; no `Overlap`; internal overlap is a build rule. |
 | Q24 `MatchSession` | Package-private; no public members; not a resumable session. |
@@ -484,6 +490,10 @@ projection (D-29).
 
 ### D-29 — A sited root capture publishes definition-frame descriptors
 
+**Superseded by D-33.** The kernel descriptor no longer carries properties (H1), so the projection
+has no carrier; the orientation audit (`SC-MC-0004`) remains, and the adapter's value checks read the
+raw captured snapshot. The body below is the historical ruling.
+
 The kernel's `property` expectation compares a descriptor's property string to a literal declared in
 the definition frame (`world` §4.7). A root view of a sited capture is not the world frame: the
 definition is posed at `siting.orientation()`, so before this decision a correct structure
@@ -534,8 +544,9 @@ also carries `SC-MC-0004`, and the audit still reports the capability fact. The 
 rotated-siting adapter GameTests: stairs at clockwise/half/pitchUp publish definition-frame values, a
 `property` expectation settles at a rotated siting, identity/phase-1 captures are unchanged, and an
 unrepresentable state keeps the raw descriptor with the warning. **Status (v1.2):** implemented in
-`LevelCapture` (inverse-orientation projection before `OccupantDescriptors`) with
-`SitedDescriptorGameTest`; no kernel type was added.
+`LevelCapture` (inverse-orientation projection before `OccupantDescriptors`) with the S6 GameTest; no
+kernel type was added. **Status (H1/H4):** superseded by D-33; the projection was removed with the
+descriptor's properties, and the retained orientation audit is `OrientationAuditGameTest`.
 
 ### D-30 — The envelope is derived from the bounds, not declared cell by cell
 
@@ -644,6 +655,61 @@ command/capture executor for a set are out. **Status (SS4):** the document/compi
 `9cf2794`/`00cf6c4`, the host plan and orchestration at `93f5941`, and SS4 adds the six-class/33-test
 stress suite plus the counts and gap close-out (`06-verification.md` §3.3).
 
+### D-33 — Host payload is one typed snapshot read, never a descriptor projection
+
+H1 removed the descriptor's `properties`/`tags` and the kernel `Expectations.property`, H1 added
+`HostType<H>`/`WorldView.get`, H2 added one immutable snapshot per frame, H3 added the adapter's
+`property`/`state`/`tag`/`fluid` factories over `Expectations.host`, and H4 closes the docs, counts
+and stress evidence. D-29's definition-frame descriptor projection therefore has no carrier:
+`OccupantDescriptor` is `(type, kind)`, and the only siting fact the capture publishes is the
+`SC-MC-0004` orientation audit.
+
+The replacement contract:
+
+- one world snapshot per frame: copied `PalettedContainer<BlockState>` sections, per-section
+  `FluidState` arrays, detached block entities and captured entities; no live `Level` is retained;
+- `HostType<H>` is an id token, never a `Class<?>`; the adapter owns the constants (`HostTypes`);
+- `WorldView.get(pos, type)` is the only host read: default `null`, total, no exception;
+  `get(ref, type)` reads the ref's anchor; a capture overrides it and answers from its snapshot;
+- `Expectations.host(type, test, mismatchCode, absentCode, description)` is the only bridge: a
+  missing value is `Unreadable` with the caller's absent code, a false predicate is `Mismatch`; the
+  kernel mints no MC code and never decodes, transforms or re-frames the value;
+- the value is the captured one in the snapshot's frame. A sited root capture is in the world frame,
+  so a property/state check compares the observed world value; the adapter does not project
+  definition-frame states, and a host that needs them must capture them;
+- the composite `fluid` factory is two host leaves under `all_of`: the fluid state's type and the
+  block's own legacy fluid block. Its `ExpectationMeta` is the kernel junction's `SC-EXP-0001`,
+  while the findings are the leaves' `SC-MC-0009`; a waterlogged slab stays a block state, not the
+  real fluid;
+- a missing anchor `BlockState` is `SC-MC-0010`, the shared "host value was not captured" code, never
+  `SC-MC-0001` and never a live read; `SC-MC-0001` remains the capture refusal;
+- heightmaps are not captured: no kernel request path exists.
+
+The alternatives were rejected:
+
+- **Keeping D-29's projection on the descriptor** would resurrect a property map the descriptor no
+  longer has and put a Minecraft state model back into a publication the kernel owns.
+- **A per-cell `HostData`/`HostTable` or a `HostView` wrapper** would duplicate the snapshot and turn
+  "one snapshot" into a claim instead of a shape.
+- **A `Class<?>` token or an `McSnapshot` union** would put a host type or a host discriminator in
+  the kernel.
+- **A default value for a missing read** would turn a missing capture into a false fact instead of
+  `Unreadable`; the absent code has to be the caller's, so the kernel never mints `SC-MC-*`.
+
+**Why:** one snapshot is the only thing a host can capture once and read many ways; typing it at the
+read boundary keeps the kernel `(type, kind)`-only while letting an adapter compare real values. The
+absent code must be the caller's for the same reason the mismatch code is: the kernel has no MC
+registry. The frame is the host's because only the host knows which pose it captured.
+
+**Consequence:** a rotated siting compares world-frame values unless the host projects its own
+snapshot; `SC-MC-0004` remains the capability warning for a pose the observed state cannot express;
+`SC-MC-0010` covers both a missing expectation value and a missing anchor state. D-29's projection
+and its test are retired; `OrientationAuditGameTest` covers the audit and `HostDataScenarioTest`
+covers the rotated set, nested child frame, waterlogged slab and missing snapshot. The record set is
+now 33 decisions; `Codes.all` is unchanged at 64 entries because every `SC-MC-*` code is the
+adapter's own. **Status (H4):** implemented; H1 added `HostType`/`WorldView.get`/`Expectations.host`,
+and H2/H3/H4 added no kernel type beyond those.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -664,19 +730,20 @@ stress suite plus the counts and gap close-out (`06-verification.md` §3.3).
   warning by a different host. That is the price of the host owning the reason; the match result
   stays deterministic (Law 11).
 - The orientation audit reads only observed blocks: a `SC-MC-0004` says the pose is not realisable
-  for those blocks, not that a declaration is wrong. Since D-29 projects a sited root's descriptors
-  into the definition frame, `SC-EXP-0001` on a rotated siting is possible only for an unrepresentable
-  state: capability and value, two findings, not a contradiction.
+  for those blocks, not that a declaration is wrong. The typed snapshot (D-33, superseding D-29)
+  publishes no definition-frame properties: a check at a rotated siting compares the captured world
+  value, so a definition-frame property declaration must be captured in that frame by the host.
+  Capability (warning) and value (finding) stay two findings, not a contradiction.
 - The nested source is a third-party capability; the adapter's block-over-entity precedence and
   first-provider-wins rule are policy, not a merge. A mod that wants two nested bodies at one cell
   cannot express it (D-26).
 - A cell outside every bay is ignored unless the blueprint opts into `envelope` (D-30). Then every
   cell inside `bounds` is judged: a port or an "any occupant" cell has to be a declared bay, and only
   cells outside `bounds` stay invisible.
-- Model C, the nested capability, the capture report, the root descriptor projection (D-29), the
-  derived envelope (D-30), the cached-context port (D-31) and the structure-set host layer (D-32) are
-  implemented, and the spec index is green; what remains is the performance/cost pass and fresh visual
-  review screenshots (D-02, `07-regeneration.md` §7).
+- Model C, the nested capability, the capture report, the typed host snapshot (D-33, superseding
+  D-29), the derived envelope (D-30), the cached-context port (D-31) and the structure-set host layer
+  (D-32) are implemented, and the spec index is green; what remains is the performance/cost pass and
+  fresh visual review screenshots (D-02, `07-regeneration.md` §7).
 - A structure set is not atomic across structures or context (D-32): a later settle failure releases
   the earlier claim rows in reverse order, but the earlier kernel contexts stay published.
   `StructureSetResult.rolledBack` is the host's list, and `ContextStore` has no removal operation; the

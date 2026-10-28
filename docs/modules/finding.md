@@ -382,7 +382,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-MC-0007` | ERROR | ✓ | a block state does not match | adapter `state` (mismatch) |
 | `SC-MC-0008` | ERROR | ✓ | a block/fluid/entity tag does not match | adapter `tag` (mismatch) |
 | `SC-MC-0009` | ERROR | ✓ | a fluid does not match | adapter `fluid` (mismatch) |
-| `SC-MC-0010` | ERROR | ✓ | a host snapshot value was not captured | adapter host expectations (absent, always unreadable) |
+| `SC-MC-0010` | ERROR | ✓ | a host snapshot value was not captured | adapter host expectations (absent) and `McAnchors` (missing anchor state), always unreadable, never a mismatch |
 | `SC-MC-*` | — | — | adapter-only family; never minted by the kernel, never in `Codes.all`; the capture paths (`0001`–`0005`) relay through a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10), and the expectation paths (`0006`–`0010`) pass `SC-MC-0010` as the absent code of `Expectations.host` (`world` §4.11) | adapter |
 
 `Codes.all` has 64 entries in this revision, matching the registry; the capture-report and host
@@ -391,7 +391,8 @@ express the siting orientation) and `SC-MC-0005` (the root is over the element c
 the adapter in a `CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries,
 and the adapter's own catalog gives them their severity (`0005` ERROR, `0003`/`0004` WARNING) and their
 explanation. `SC-MC-0006`…`0010` are the adapter's expectation codes (`adapter` §3.2, §12): `0006`–`0009`
-are mismatches and `0010` is the unreadable absent value; the adapter catalog gives each its ERROR
+are mismatches and `0010` is the unreadable absent value (a missing anchor state is the same code);
+the adapter catalog gives each its ERROR
 severity and explanation, and none enters `Codes.all`. A cut child is still reported by the check as
 `SC-OCC-0003` (`adapter` §8); the capture entry explains the cut, the check finding judges it, and
 neither channel suppresses the other.

@@ -12,9 +12,10 @@
 | **Addon** | `Expectation`, `Focus`, `Computation`, `Deriver`, `RemedyProvider`, `TraitKey`, `ContextKey` | teach the kernel one domain |
 | **Host** | `WorldCapture`, `WorldView`, `SnapshotLease`, `ClaimLedger`, `ContextStore`, `DocumentReader`, `DocumentWriter` | bind the kernel to a world, a store and a format |
 
-The facade is one final class, `StructureKernel`, with five pipeline operations (`compile`,
-`siting`, `check`, `settle`, `derive`), three helpers (`solve`, `explain`, `explainOrFallback`) and
-three lookups (`document`, `ledger`, `catalogs`).
+The facade is one final class, `StructureKernel`, with four pipeline operations (`compile`, `check`,
+`settle`, `derive`), three helpers (`solve`, `explain`, `explainOrFallback`) and three lookups
+(`document`, `ledger`, `catalogs`). Anchor resolution is host work (`McAnchors` in the adapter); the
+facade has no `siting` operation.
 
 ## 2. The author surface
 
@@ -43,9 +44,8 @@ Blueprint campfire = Blueprint.builder(id)
                 Expectations.eachCell(Expectations.block(mc("stone_bricks")))))
         .check(Check.of(id("hollow_air"), hollow, Focuses.bay(),
                 Expectations.eachCell(Expectations.air())))
-        .check(Check.of(id("lit"), fire, Focuses.occupant(LatticePoint.of(1, 0, 1)),
-                Expectations.allOf(Expectations.block(mc("campfire")),
-                        Expectations.property("lit", "true"))))
+        .check(Check.of(id("fire"), fire, Focuses.occupant(LatticePoint.of(1, 0, 1)),
+                Expectations.block(mc("campfire"))))
         .computation(Computations.air(air, hollow.cells()))
         .build();
 ```
@@ -96,7 +96,31 @@ if (result instanceof CaptureResult.Captured captured) {
 ```
 
 The host owns the lease. The kernel never closes it, never retains it and never hands a child
-handle back. A result is a pure value; a lease is a resource the host scopes.
+handle back. A result is a pure value; a lease is a resource the host scopes. An anchored blueprint
+resolves its `Siting` in the host: `McAnchors.resolve(blueprint, origin, view)` reads the captured
+anchor cell and answers the `SitingResult` the request needs; the facade has no `siting` call.
+
+### 3.1 Host data
+
+The kernel models no block state. A host that has one exposes it as a typed read:
+
+```java
+HostType<BlockState> blockState = HostType.of(NamespacedId.of("mymod", "block_state"));
+BlockState state = lease.view().get(LatticePoint.of(1, 0, 1), blockState);
+```
+
+`HostType<H>` carries an id, never a `Class<?>`; `WorldView.get` defaults to `null` and a capture
+answers from its one snapshot, never from the live level. The adapter owns the constants
+(`HostTypes.blockState`, `fluidState`, `entity`, `blockEntity`).
+
+A host-fact expectation is
+`Expectations.host(type, test, mismatchCode, absentCode, description)`: one typed read at the
+subject's anchor; a missing value is `Unreadable` with the caller's absent code, and a false
+predicate is `Mismatch`. Both codes come from the caller; the kernel never mints an MC code. The
+adapter registers `property`, `state`, `tag` and `fluid` as ordinary check kinds in its document
+catalog, and each lowers to one or two `Expectations.host` leaves. The `fluid` kind is two leaves
+under `allOf`, so its `ExpectationMeta` is the kernel junction's `SC-EXP-0001` while its findings are
+the leaves' `SC-MC-0009`.
 
 ## 4. The addon surface
 
@@ -159,10 +183,8 @@ The same campfire as data. A document is the authoring form; the compiler lowers
      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone_bricks"}}},
     {"id": "hollow_air", "bay": "hollow", "focus": {"kind": "bay"},
      "expect": {"kind": "each_cell", "element": {"kind": "air"}}},
-    {"id": "lit", "bay": "fire", "focus": {"kind": "occupant", "cell": [1,0,1]},
-     "expect": {"kind": "all_of", "children": [
-       {"kind": "block", "id": "minecraft:campfire"},
-       {"kind": "property", "key": "lit", "value": "true"}]}}
+    {"id": "fire", "bay": "fire", "focus": {"kind": "occupant", "cell": [1,0,1]},
+     "expect": {"kind": "block", "id": "minecraft:campfire"}}
   ],
   "computations": [
     {"id": "air_cells", "kind": "air", "region": [[1,1,1,2,2,2]],
@@ -329,7 +351,6 @@ public final class StructureKernel {
     public @Nullable ClaimLedger ledger();
 
     public CompileResult compile(Document document);
-    public SitingResult siting(Blueprint blueprint, LatticePoint origin, WorldView view);
     public MatchResult check(MatchRequest request);
     public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted);
     public StructureContext derive(MatchResult.Formed formed, List<DerivationSpec> derivations);
@@ -339,6 +360,7 @@ public final class StructureKernel {
 }
 ```
 
-Five pipeline operations, three helpers, three lookups. `settle` takes only the request and the
+Four pipeline operations, three helpers, three lookups. `settle` takes only the request and the
 admitted result; it finds its ledger in the kernel's `Host`. `create(catalogs)` is the no-host form
 for compile-only use; `check` with a lease works, `settle` reports `Undecided(ledgerUnavailable)`.
+`McAnchors.resolve(...)` is the adapter's anchor operation, not a facade method.

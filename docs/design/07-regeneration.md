@@ -23,15 +23,23 @@ compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25`
 gate with `DeterminismTest`, the rotated-siting two-phase capture (P1) at `56c632c`, the
 event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
 `ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. The sited-root
-descriptor projection (S6, D-29) is implemented and closes the siting-aware `property` expectation gap
-(`SitedDescriptorGameTest`). Kernel stress batch 1 (`kernel-stress-batch-1`, `110e797`) adds 44
-characterization scenarios in 12 `engine` classes (`06-verification.md` §3.1) and batch 2
-(`kernel-stress-batch-2`, `3e60ed4`) adds 17 kernel scenarios plus 11 adapter unit tests (§3.2),
-taking the kernel suite to 186 tests in 33 containers and the adapter suite to 141; batch 2's one
-code change is the `NestedFocus` non-binding fix. Neither batch changes a type or a decision. M3
-persistence is compatible with Model C. Pending only: the
-performance/cost pass (block-entity-lazy
-and entity sweep) and fresh visual review screenshots. There is no regeneration milestone.
+descriptor projection (S6, D-29) was implemented and is superseded by the typed host snapshot (D-33,
+`10-host-data.md`): `OccupantDescriptor` is `(type, kind)`, the projection is retired, and
+`OrientationAuditGameTest` covers the retained orientation audit. Kernel stress batch 1
+(`kernel-stress-batch-1`, `110e797`) adds 44 characterization scenarios in 12 `engine` classes
+(`06-verification.md` §3.1) and batch 2 (`kernel-stress-batch-2`, `3e60ed4`) adds 17 kernel scenarios
+plus 11 adapter unit tests (§3.2), taking the kernel suite to 186 tests in 33 containers and the
+adapter suite to 141 at that commit; batch 2's one code change is the `NestedFocus` non-binding fix.
+Neither batch changes a type or a decision. M3 persistence is compatible with Model C.
+
+The host-data round closes with H4: H1 adds `HostType`, `WorldView.get`, `Expectations.host` and
+`OccupantDescriptor(type, kind)`; H2 adds one `SnapshotLevel` per frame and the capture wiring; H3
+adds the adapter `property`/`state`/`tag`/`fluid` factories and `SC-MC-0006`…`0010`; H4 adds the
+documented counts and the adapter host-data stress group (§3.4). The tree registers **258 kernel
+tests in 39 containers, 276 adapter unit tests in 36 containers and 64 `@GameTest` methods**;
+`Codes.all` has 64 entries and the decision record has 33 decisions (D-33). Pending only: the
+performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots. There
+is no regeneration milestone.
 
 ## 2. The order
 
@@ -70,12 +78,12 @@ module file.
 | 1 | `javac --release 21` over `src/kernel/java`, JSpecify only | exit 0, zero errors |
 | 2 | no Minecraft/NeoForge/Mojang name under `kernel.**` | purity scan; compile classpath |
 | 3 | `src/kernelTest/java` compiles and all tests pass | JUnit launcher; 0 failures, 0 skipped |
-| 4 | the fifteen scenarios in `06-verification.md` §3 pass | named test classes |
+| 4 | the sixteen scenarios in `06-verification.md` §3 and the §3.1/§3.2/§3.3/§3.4 stress groups pass | named test classes |
 | 5 | every public type in code is in a module file, and vice versa | `tools/spec-check.py` |
 | 6 | every `SC-` code in code is in `Codes.all`, and every `Codes.all` entry is in a producer row | registry test |
 | 7 | no `TODO`/`FIXME`/`UnsupportedOperationException`/empty public body | grep |
 | 8 | two runs over one tuple are equal | golden test |
-| 9 | the campfire/furnace examples in `04-api.md` compile as test sources | `ScenarioTest`; the document form in `DocumentCompilerTest` |
+| 9 | the campfire/furnace examples in `04-api.md` compile as test sources, and the host kinds compile only through the adapter catalog | `ScenarioTest`; the document form in `DocumentCompilerTest`/`AdapterExpectationsTest` |
 | 10 | the old `docs/spec`, `docs/design-notes`, `docs/guide.zh.md`, `docs/README.zh.md` and the old
     kernel sources are gone | `git status`; only the new set remains |
 
@@ -110,5 +118,7 @@ the exact failure this set exists to prevent.
 - A host scheduler with coalescing, dirty windows and a per-world ledger stays outside v1; this round
   does not owe it.
 
-The siting-aware `property` expectation, previously owed here, is closed by D-29: a sited root capture
-publishes definition-frame descriptors (S6), so no kernel change is needed.
+The siting-aware value question is now answered by the typed host snapshot (D-33), not by D-29: a
+host expectation reads the captured snapshot in its own frame, and the adapter projects no
+definition-frame state. A host that wants definition-frame values captures them itself; a missing
+value is the host's `SC-MC-0010`, never a kernel mismatch.

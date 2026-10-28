@@ -45,7 +45,7 @@ import java.util.Set;
 @NullMarked
 @GameTestHolder(Constants.modId)
 @PrefixGameTestTemplate(false)
-public final class SitedDescriptorGameTest {
+public final class OrientationAuditGameTest {
 
     private static final Orientation clockwise = Orientation.of(Turn.clockwise, Tilt.level, Flip.none);
     private static final Orientation pitchUp = Orientation.of(Turn.none, Tilt.pitchUp, Flip.none);

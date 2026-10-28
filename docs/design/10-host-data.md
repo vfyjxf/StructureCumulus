@@ -1,7 +1,7 @@
 # 10. Host snapshot and typed reads
 
-> Status: H1–H3 implemented; H4 proposed. This document is the source of truth for the world
-> snapshot, the typed host-read bridge, and MC-specific property/state/tag/fluid checks.
+> Status: implemented (H1–H4). This document is the source of truth for the world snapshot, the
+> typed host-read bridge, and MC-specific property/state/tag/fluid checks.
 
 ## 1. Purpose
 
@@ -68,7 +68,7 @@ static-field style.
 
 ## 3. WorldView bridge
 
-`WorldView` gains one generic read method:
+`WorldView` has one generic read method:
 
 ```java
 public interface WorldView {
@@ -87,7 +87,9 @@ public interface WorldView {
 - default `null`;
 - `LevelSnapshot` overrides it and reads its world snapshot;
 - never reads the live world;
-- total: missing means "not in this snapshot", not an exception.
+- total: missing means "not in this snapshot", not an exception;
+- the value is the captured one, in the snapshot's frame: the kernel never re-frames it and the host
+  owns the frame.
 
 The method is a field extension, not a wrapper object:
 
@@ -126,7 +128,7 @@ final class SnapshotLevel implements BlockGetter {
 - out-of-bounds reads return air / empty fluid;
 - no live `Level` retained for reads;
 - one snapshot, not one per data type;
-- heightmaps are absent until a request path exists (H2 adds none).
+- heightmaps are not captured: no kernel request path exists (§13).
 
 `CapturedEntity` is the adapter's internal record: entity UUID, type, local footprint and the captured
 entity reference.
@@ -164,7 +166,7 @@ A new field extension adds a `HostType` and one branch; no existing type changes
 
 ## 5. Capture
 
-H2 implements the capture as one section walk:
+The capture is one section walk:
 
 1. for each non-air world section the frame walk touches, copy its `PalettedContainer<BlockState>`
    once (`copy()`), keyed by the world section coordinates;
@@ -201,7 +203,8 @@ Semantics:
 - `H host = ctx.view().get(subject.ref().anchor(), type)`;
 - `null` -> `Unreadable` with `absentCode`, the caller's code;
 - `test.test(host, cell)` true -> `Match`;
-- false -> `Mismatch` with `mismatchCode` and `description`.
+- false -> `Mismatch` with `mismatchCode` and `description`;
+- the read is one snapshot value: the kernel does not decode, transform or re-frame it.
 
 The predicate and both codes are supplied by the adapter. The kernel mints no MC code: it never
 declares `SC-MC-0010` and never interprets host data. The adapter passes its `SC-MC-0010` as
@@ -214,6 +217,11 @@ adapter factories compiles into an `Expectations.host` predicate. The adapter re
 `state`, `tag` and `fluid` in its expectation catalog; the kernel document reader stays blueprint-only
 and its built-in expectation catalog has none of the four.
 
+A host expectation reads the value the snapshot carries. A sited capture's root snapshot is the world
+frame, so a serialized property or an exact state is the observed world value: the adapter does not
+project definition-frame states (D-29 is superseded by D-33). A host that needs definition-frame
+values must capture them itself.
+
 ### 7.1 Property
 
 ```json
@@ -223,10 +231,10 @@ and its built-in expectation catalog has none of the four.
 ```java
 Expectations.host(
     blockState,
-    (state, cell) -> state.getValue(property).getName().equals(value),
+    (state, cell) -> propertyValue(state, key).equals(value),   // false when the block has no key
     SC_MC_0006,
     SC_MC_0010,
-    "expected property ..."
+    "expected property " + key + "=" + value
 )
 ```
 
@@ -270,7 +278,7 @@ BlockState block = view.get(cell, HostTypes.blockState);
 FluidState fluid = view.get(cell, HostTypes.fluidState);
 
 fluid.getType() == expected
-    && block.getBlock() == fluid.createLegacyBlock().getBlock()
+    && block.getBlock() == block.getFluidState().createLegacyBlock().getBlock()
 ```
 
 - real water matches;
@@ -278,15 +286,20 @@ fluid.getType() == expected
 - waterlogged is a block state: use `property("waterlogged", "true")` or `state`;
 - lava and modded fluids use the MC fluid registry.
 
-The adapter expresses the two conditions as two `Expectations.host` leaves under one `all_of`: the
+The adapter composes the two conditions as two `Expectations.host` leaves under one `all_of`: the
 captured `FLUID_STATE`'s type is the expected fluid, and the captured `BLOCK_STATE`'s block is that
-cell's own legacy fluid block. Both leaves carry `SC-MC-0009` as the mismatch code and `SC-MC-0010` as
-the absent code.
+cell's own legacy fluid block (`block.getFluidState().createLegacyBlock()`). Both leaves carry
+`SC-MC-0009` as the mismatch code and `SC-MC-0010` as the absent code.
+
+The composed check's `ExpectationMeta` is the kernel `Junction`'s: id `all_of` and mismatch code
+`SC-EXP-0001`, not `SC-MC-0009`; the attempt's mismatch findings are the leaves' `SC-MC-0009`. A host
+that needs the fluid code reads the findings, not the meta. A waterlogged slab passes the fluid-state
+leaf and the fluid tag, and fails only the block-state leaf.
 
 ## 8. Anchor
 
-The kernel `Anchors` and `StructureKernel.siting` are removed. The adapter resolves anchors from
-the snapshot:
+The kernel has no `Anchors` resolver and `StructureKernel` has no `siting` operation. The adapter
+resolves anchors from the snapshot:
 
 ```java
 public final class McAnchors {
@@ -310,34 +323,28 @@ public final class McAnchors {
 ```
 
 - `AnchorSpec` and `OrientationPolicy` remain kernel declarations;
-- `AnchorSpec.value` becomes a real constraint;
+- `AnchorSpec.value` is a real constraint;
 - the anchor cell is captured with the same world snapshot;
 - no live world read.
 
-H2 implements the snapshot read. The phase-1 command capture supplies the anchor cell's view, so
-`McAnchors` reads the captured `BlockState`; a missing state is the adapter's `SC-MC-0001`, not a
-live read. H3 implements the declared-value comparison: `AnchorSpec.value` is compared
-case-insensitively against the captured property value at the definition origin, and a mismatch is
-`Codes.anchorInvalid` (`SC-BPT-0006`). The `SC-MC-0010` catalog entry is the absent code of the host
-expectations, not the anchor's missing-state code.
+The phase-1 command capture supplies the anchor cell's view, so `McAnchors` reads the captured
+`BlockState`; a missing state is `AdapterCodes.valueNotCaptured` (`SC-MC-0010`), never a live read and
+never `SC-MC-0001`. `AnchorSpec.value` is compared case-insensitively against the captured property
+value at the definition origin, and a mismatch is `Codes.anchorInvalid` (`SC-BPT-0006`). `SC-MC-0001`
+remains the capture refusal (an unloaded chunk or a refused section, §3); `SC-MC-0010` is both the
+host expectation absent code and the anchor's missing-state answer.
 
 ## 9. Descriptor
 
-`OccupantDescriptor` becomes:
+`OccupantDescriptor` is:
 
 ```java
 (type, kind)
 ```
 
-Removed:
-
-- `properties`;
-- `tags`;
-- `property(...)`.
-
-`OccupantRef` remains the occupant identity. `OccupantFilter` still uses type/kind.
-
-`Expectations.property` is removed from the kernel; the adapter registers the `property` factory.
+It carries no `properties`, no `tags` and no `property(...)`; those were removed with the kernel
+`Expectations.property` leaf. `OccupantRef` remains the occupant identity, and `OccupantFilter` still
+uses type/kind. The adapter registers the `property` factory.
 
 ## 10. Digest
 
@@ -347,8 +354,8 @@ Removed:
 - descriptor type/kind;
 - the snapshot's block/fluid/entity content for the section.
 
-H2 implements the composition: `SnapshotLevel.contentDigest(region)` hashes each captured block
-state, fluid state and entity that intersects the section, and `LevelCapture` combines that value
+The composition is implemented by `SnapshotLevel.contentDigest(region)`, which hashes each captured
+block state, fluid state and entity that intersects the section; `LevelCapture` combines that value
 with the occupant digest. The same occupant type with a different `BlockState` therefore changes the
 section digest.
 
@@ -369,10 +376,11 @@ Adapter codes, not in `Codes.all`:
 | `SC-MC-0007` | exact state mismatch |
 | `SC-MC-0008` | tag mismatch |
 | `SC-MC-0009` | fluid mismatch |
-| `SC-MC-0010` | host snapshot value was not captured |
+| `SC-MC-0010` | host snapshot value was not captured (host expectation absent code and a missing anchor state) |
 
-`SC-MC-0010` is `Unreadable`, never a mismatch. It is the adapter's code, passed as the `absentCode`
-of `Expectations.host`; the kernel never mints it. `SC-EXP-0001` remains for kernel leaves.
+`SC-MC-0010` never answers a mismatch: a host expectation returns `Unreadable`, and `McAnchors` fails
+the siting. It is the adapter's code, passed as the `absentCode` of `Expectations.host`; the kernel
+never mints it. `SC-EXP-0001` remains for kernel leaves.
 
 ## 12. JSON
 
@@ -394,18 +402,19 @@ of `Expectations.host`; the kernel never mints it. `SC-EXP-0001` remains for ker
 - no trait reuse for block/fluid/entity data;
 - no live world read in `WorldView.get`;
 - no MC type in the kernel;
-- no property map or tag list in `OccupantDescriptor`.
+- no property map or tag list in `OccupantDescriptor`;
+- no heightmap capture: no kernel request path exists.
 
-## 14. Impact
+## 14. Impact (implemented)
 
 Kernel:
 
-- `OccupantDescriptor` becomes `(type, kind)`;
-- `Expectations.property` is removed;
-- `Anchors` and `StructureKernel.siting` are removed;
-- `WorldView` gains `get(pos, type)`;
-- `Expectations.host` is added;
-- `Expectations.Property` is removed.
+- `OccupantDescriptor` is `(type, kind)`;
+- `Expectations.property` is gone;
+- `Anchors` and `StructureKernel.siting` are gone;
+- `HostType` is added;
+- `WorldView.get(pos, type)` is added;
+- `Expectations.host` is added.
 
 Adapter:
 
@@ -419,13 +428,17 @@ Adapter:
 
 Tests/docs:
 
-- descriptor tests remove properties/tags;
-- anchor tests move to adapter;
-- `SitedDescriptorGameTest`/`WorldTest` migrate;
-- `DocumentCompilerTest` property checks move to adapter catalogs;
-- snapshot read/digest tests;
-- waterlogged distinction tests;
-- JSON/Java parity for property/state/tag/fluid.
+- descriptor tests use `(type, kind)`;
+- the anchor tests are `McAnchorsTest`;
+- `OrientationAuditGameTest` covers the siting audit and `HostExpectationTest` the default read and
+  the bridge;
+- `AdapterExpectationsTest` compiles the host kinds through the adapter catalog and shows that the
+  kernel catalog rejects them;
+- snapshot read/digest tests: `HostExpectationTest`, `SnapshotLevelTest`, `LevelSnapshotTest`;
+- the waterlogged distinction is `AdapterExpectationsTest` and `HostDataScenarioTest`;
+- JSON/Java parity is `AdapterExpectationsTest`;
+- the host-data stress group is `HostDataScenarioTest`: a rotated structure set, a nested child
+  frame, a waterlogged slab and a snapshot with no captured host values.
 
 ## 15. Implementation slices
 
@@ -451,7 +464,11 @@ H3 is implemented: the adapter's `property`/`state`/`tag`/`fluid` factories lowe
 its `BlockState` at compile time; the `fluid` factory composes the fluid-state and block-state leaves;
 `McAnchors` enforces `AnchorSpec.value` against the captured origin property; `AdapterCodes` carries
 the `SC-MC-0006`…`0010` catalog entries; and the adapter expectation catalog is merged into
-`ServerState`'s catalogs so a normal JSON `checks` entry compiles. H4 closes docs, counts and stress
-scenarios.
+`ServerState`'s catalogs so a normal JSON `checks` entry compiles.
+
+H4 is implemented: this document's implemented status, the counts in `06-verification.md` and
+`README.md`, the supersession of D-29 by D-33, and the adapter host-data stress group
+(`HostDataScenarioTest`: a rotated structure set, a nested child frame, a waterlogged slab and a
+snapshot with no captured host values). H4 adds no public type and no kernel change.
 
 Visual review stays last.

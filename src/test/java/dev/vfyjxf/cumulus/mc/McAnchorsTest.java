@@ -96,13 +96,16 @@ class McAnchorsTest {
     }
 
     @Test
-    void anUncapturedAnchorStateIsTheNotCapturedCode() {
+    void anUncapturedAnchorStateIsTheValueNotCapturedCode() {
         LevelSnapshot uncaptured = new LevelSnapshot(snapshot(), bounds, Map.of());
 
         SitingResult result = McAnchors.resolve(blueprint("north"), LatticePoint.origin, uncaptured);
 
         assertFalse(result.succeeded());
-        assertEquals(AdapterCodes.notCaptured, Objects.requireNonNull(result.findings().primary(), "finding").code());
+        assertEquals(
+            AdapterCodes.valueNotCaptured,
+            Objects.requireNonNull(result.findings().primary(), "finding").code()
+        );
     }
 
     @Test

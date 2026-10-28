@@ -466,8 +466,8 @@ live world: an implementation answers from the captured snapshot. Host reads add
 (`structure` §4.6): it reads the subject's anchor once, answers `Unreadable` with the caller's
 `absentCode` when the value is absent, `Match` when `test` passes, and
 `Mismatch(mismatchCode, description)` when it does not. The kernel mints no MC code: `absentCode` is
-a parameter, the kernel never declares `SC-MC-0010`, and the adapter passes its `SC-MC-0010` in H3
-(§6).
+a parameter, the kernel never declares `SC-MC-0010`, and the adapter passes its `SC-MC-0010` for a
+missing host value and for a missing anchor state (H3/H4, §6).
 
 ## 5. Pipeline role
 

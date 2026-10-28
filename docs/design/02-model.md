@@ -40,7 +40,7 @@
 | bundle | `FindingBundle` | finding | ordered, deduplicated, capped report |
 | remedy | `Remedy` | remedy | a repair or a preview |
 | document | `Document` | document | the data form of a blueprint |
-| kernel | `StructureKernel` | spi | the facade: five operations and two lookups |
+| kernel | `StructureKernel` | spi | the facade: four operations, three helpers and three lookups |
 
 ## 2. The flow
 

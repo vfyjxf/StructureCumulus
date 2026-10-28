@@ -19,7 +19,7 @@
 | `Catalogs` | interface | six frozen families + `builtin()` + `builder()` |
 | `Catalogs.Builder` | interface | merge families over built-ins, then freeze |
 | `Host` | record | documents, ledger, context store, custom type registry |
-| `StructureKernel` | final class | the facade: five operations, two helpers, three lookups |
+| `StructureKernel` | final class | the facade: four operations, three helpers, three lookups |
 
 ## 3. Signatures
 

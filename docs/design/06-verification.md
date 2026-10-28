@@ -18,43 +18,51 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current evidence (2026-10-28, HEAD `93f5941` plus the SS4 working tree): M1, M2a, M2b, M2c, M2d and
+Current evidence (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): M1, M2a, M2b, M2c, M2d and
 M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
 `explain`, `claims`), capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase
 capture (P1, `56c632c`), the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright
 orientation remap (M5d, `ac11d0c`), the capture report (M5e, `28d0334`) and the sited-root descriptor
-projection (S6, D-29) are implemented. The two stress batches add characterization scenarios: batch 1
-(`kernel-stress-batch-1`, `110e797`) 44 kernel scenarios (§3.1) and batch 2 (`kernel-stress-batch-2`,
-`3e60ed4`) 17 kernel scenarios plus 11 adapter unit tests (§3.2). The envelope (`a5f7084`), the cached
-context port (`681c505`, D-31), the structure-set document/compiler (S2, `00cf6c4`) and the host set
-layer (S3, `93f5941`, D-32) are implemented; SS4 adds the six-class/33-test structure-set stress batch
-(§3.3) and this close-out. The last full `./gradlew check` is at `3e60ed4`: 186 kernel tests (33
-containers), 141 adapter unit tests, 0 failures, 0 skipped, and the last recorded `runGameTestServer`
-is 66/66 at `6263414`. The tree now registers 257 kernel tests in 40 containers, 241 adapter unit
-tests in 32 containers and 79 `@GameTest` methods; the slices after `3e60ed4` report focused runs only
-in this design set, so no full-suite or GameTest result is claimed for this revision.
-`tools/spec-check.py` is clean. `Codes.all` has 64 entries and the decision record has 32 decisions
-(D-32). Model C, body identity, trait capture, the nested capability, the mark counter, the
-capture-report channel, the definition-frame descriptor projection, the cached-context port and the
-structure-set layer are implemented, not pending. The determinism gate is implemented
-(`DeterminismTest`): canonical bytes across member order, the parse/write fixed point, equal compile
-runs and stable finding order.
+projection (S6, D-29) were implemented. D-29 is superseded by the typed host snapshot (D-33,
+`10-host-data.md`): the projection is retired, `OccupantDescriptor` is `(type, kind)`, and
+`OrientationAuditGameTest` covers the retained orientation audit. The two stress batches add
+characterization scenarios: batch 1 (`kernel-stress-batch-1`, `110e797`) 44 kernel scenarios (§3.1)
+and batch 2 (`kernel-stress-batch-2`, `3e60ed4`) 17 kernel scenarios plus 11 adapter unit tests
+(§3.2). The envelope (`a5f7084`), the cached context port (`681c505`, D-31), the structure-set
+document/compiler (S2, `00cf6c4`) and the host set layer (S3, `93f5941`, D-32) are implemented; SS4
+adds the six-class/33-test structure-set stress batch (§3.3). The host-data round closes with H4:
+H1 adds `HostType`/`WorldView.get`/`Expectations.host` and `OccupantDescriptor(type, kind)`; H2 adds
+one `SnapshotLevel` per frame and the capture wiring; H3 adds the adapter host expectation factories
+and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). The
+last full `./gradlew check` is at `3e60ed4`: 186 kernel tests (33 containers), 141 adapter unit tests,
+0 failures, 0 skipped, and the last recorded `runGameTestServer` is 66/66 at `6263414`. The tree now
+registers **258 kernel tests in 39 containers, 276 adapter unit tests in 36 containers and 64
+`@GameTest` methods**; the slices after `3e60ed4` report focused runs only in this design set, so no
+full-suite or GameTest result is claimed for this revision. `tools/spec-check.py` is clean.
+`Codes.all` has 64 entries and the decision record has 33 decisions (D-33). Model C, body identity,
+trait capture, the nested capability, the mark counter, the capture-report channel, the typed host
+snapshot, the cached-context port and the structure-set layer are implemented, not pending. The
+determinism gate is implemented (`DeterminismTest`): canonical bytes across member order, the
+parse/write fixed point, equal compile runs and stable finding order.
 
 The envelope batch (`a5f7084`) adds `EnvelopeTest` (7 tests), `EnvelopeScenarioTest` (12 tests) and
 three `DocumentCompilerTest` cases in the kernel, plus four `JsonDocumentTest` cases in the adapter.
 The context-cache batch (`681c505`) adds 31 kernel tests across four classes and changes the aggregate
 scenario; the structure-set slices add `StructureSetCompilerTest` (13 kernel tests),
 `JsonStructureSetTest` (10), `StructureSetPlanTest` (6), `StructureSetHostTest` (22),
-`DatapackStructureSetTest` (5) and the SS4 stress suite (33). Their focused runs are green:
-`compileKernelTestJava`, `compileTestJava`, `kernelTest` selections and `test` selections; no
-full-suite result is claimed for any of them.
+`DatapackStructureSetTest` (5) and the SS4 stress suite (33). The host-data round adds
+`HostExpectationTest` (7 kernel tests), `McAnchorsTest` (7), `SnapshotLevelTest` (7),
+`LevelSnapshotTest` (17), `AdapterExpectationsTest` (12) and the H4 `HostDataScenarioTest` (4, §3.4).
+Their focused runs are green: `compileKernelTestJava`, `compileTestJava`, `kernelTest` selections and
+`test` selections; no full-suite result is claimed for any of them.
 
 **What remains.** Two items only: the performance/cost pass over the block-entity-lazy and entity
 sweep, and fresh visual review screenshots. There is no regeneration milestone. The former
-siting-aware `property` gap is closed by the host-side root descriptor projection (D-29): a sited root
-publishes definition-frame descriptor properties, so `Expectations.property` needs no kernel change;
-only an `Unrepresentable` state keeps the raw descriptor, and the same capture reports `SC-MC-0004`
-for it. The projection adds no kernel type, so the spec index is unaffected.
+siting-aware `property` gap is now the typed host snapshot (D-33): a value check reads the captured
+snapshot, so the kernel needs no property descriptor and the adapter projects nothing. A state that
+cannot express the pose is still `SC-MC-0004` in the capture report; a missing value is
+`SC-MC-0010`, never a mismatch. The snapshot adds no kernel type beyond `HostType` and
+`WorldView.get`, so the spec index is unaffected.
 
 **Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
 in code documented; it is green. There is no documented-but-not-in-code list and no suppression.
@@ -82,7 +90,7 @@ These are end-to-end kernel tests with an in-memory `WorldView`, `ClaimLedger` a
 They are the acceptance suite; a module test that does not feed one of them is optional.
 
 1. **Campfire** — 3×3×3 shell + hollow + lit fire; 3 checks; `air` section computation; check →
-   admitted → settle → formed → derive. Asserts the shell subtraction, air occupant, property test,
+   admitted → settle → formed → derive. Asserts the shell subtraction, air occupant, block test,
    the published `Long`, and that `check` wrote no claim.
 2. **Furnace** — shell/cavity/mouth, `Box` cavity, door expectation, `volume` + capacity deriver;
    asserts claim rows, context revision, and a second check at the same siting does not self-conflict.
@@ -142,14 +150,15 @@ They are the acceptance suite; a module test that does not feed one of them is o
 
 A second end-to-end suite over realistic multiblock shapes, tagged `kernel-stress-batch-1` and committed
 at `110e797`: 12 scenario classes and 44 tests in `kernelTest/.../engine`, plus the `MagicFixtures` and
-`TechFixtures` shape builders. It runs with the same in-memory `WorldView`/`ClaimLedger`/`ContextStore`
+`TechFixtures` shape builders. H1 removed `AnchorValueScenarioTest` together with the kernel anchor
+resolver, so the current tree has 11 classes and 41 tests; `McAnchorsTest` covers the captured anchor,
+the declared value and the missing-state code. It runs with the same in-memory `WorldView`/`ClaimLedger`/`ContextStore`
 as §3 and adds no type, no decision and no kernel scenario obligation; it is a **characterization**
 suite, and each gap below is asserted rather than hidden.
 
 | Class | Shape it drives | Tests |
 | --- | --- | --- |
 | `Ae2CpuScenarioTest` | AE2 crafting CPU: 2×2×2 solid, missing storage cell, outside block, lattice edge, exclusive conflict | 5 |
-| `AnchorValueScenarioTest` | declared anchor value; two allowed orientations sharing one north image | 3 |
 | `AstralAltarScenarioTest` | Astral Altar tier II (54 cells) and tier III (72 cells) grown in place | 4 |
 | `BloodAltarScenarioTest` | Blood Altar tier prefixes, any-rune slots, footprint variants, a NOTAIR probe | 5 |
 | `ContextInstanceScenarioTest` | a context-focus check over already-published instance values | 1 |
@@ -166,8 +175,6 @@ they are not owed work and not a pending list:
 
 | Gap | Asserted by |
 | --- | --- |
-| `AnchorSpec.value` is ignored; only the anchor property's heading selects the orientation | `AnchorValueScenarioTest.anchorValueMismatchIsIgnored` |
-| Two allowed orientations with one north image resolve to the canonical first match | `AnchorValueScenarioTest.twoAllowedOrientationsWithTheSameNorthImagePickTheFirst` |
 | A check cannot read instance context already published in `ContextStore` (it stays `SC-CTX-0007`) | `ContextInstanceScenarioTest.checkCannotReadPersistedInstanceContext` |
 | An entity read-scope window is published in the blueprint-local frame, not the world frame | `EntityWindowScenarioTest.sitedEntityWindowIsPublishedInTheLocalFrame` |
 | `anyOccupant` has no fluid predicate, so water satisfies a NOTAIR slot | `BloodAltarScenarioTest.waterInANotAirSlotIsAdmittedAsAKnownFalsePositive` |
@@ -245,6 +252,28 @@ have passed the compiler. The adapter still has no command or capture executor f
 GameTest covers the set layer: `StructureSetHost` is a library entry point (§13.5) exercised only by
 the adapter unit suite.
 
+### 3.4 Host-data stress group (H4)
+
+One adapter unit group, `HostDataScenarioTest` (4 tests in `src/test/.../mc`), drives the typed
+snapshot through a realistic layout: a structure set whose root siting is clockwise and whose
+satellite is placed at `half`, a nested child frame with its own snapshot, a waterlogged slab and a
+snapshot with no captured host values. It adds no kernel type and no GameTest.
+
+| Test | What it drives |
+| --- | --- |
+| `aRotatedStructureSetFormsFromTheCapturedHostSnapshot` | presence, check and settle of a root and a half-turned satellite; `property`, exact `state`, block `tag`, fluid `tag` and `fluid` checks read the captured world cells; the rotated stair state is the world-frame value |
+| `aWaterloggedSlabIsABlockStateAndNotTheRealFluid` | `property("waterlogged","true")`, the exact state and the fluid tag match; the composed `fluid` mismatches `SC-MC-0009`; the composed `all_of` meta is `SC-EXP-0001` |
+| `aNestedChildFrameServesItsOwnHostSnapshot` | frame/depth/parent/origin; the child's property/state/tag/fluid reads come from the child snapshot, not the root frame |
+| `aSetWithoutACapturedHostSnapshotIsUnreadable` | the same set over a host-less `LevelSnapshot`: no settle, `SC-MC-0010` findings and no mismatch code |
+
+**Characterized behaviour** (documented, each with its asserting test):
+
+| Behaviour | Asserted by |
+| --- | --- |
+| A rotated siting compares the captured world-frame value; the adapter projects no definition-frame state (D-29 superseded by D-33) | `aRotatedStructureSetFormsFromTheCapturedHostSnapshot` |
+| The composed `fluid` expectation's meta is the kernel junction's `SC-EXP-0001`, while its findings are the leaves' `SC-MC-0009` | `aWaterloggedSlabIsABlockStateAndNotTheRealFluid` |
+| A nested child frame answers its own snapshot; a missing snapshot makes every host expectation `SC-MC-0010` (unreadable), never a mismatch | `aNestedChildFrameServesItsOwnHostSnapshot`, `aSetWithoutACapturedHostSnapshotIsUnreadable` |
+
 ## 4. Module tests
 
 | Module | Must test |
@@ -252,7 +281,7 @@ the adapter unit suite.
 | `core` | id grammar, catalog freeze, Value content equality, budget, key equality |
 | `space` | packing bijection, cuboid edges, CuboidSet normalization and semantic-equality laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
 | `finding` | code parse, `Codes.all` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
-| `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors, descriptor frame (the property leaf compares the published string and never transforms it) |
+| `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors, the typed `get` default and the expectation absent code (`HostExpectationTest`) |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |
 | `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations, derived envelope (empty no-op, reserved id, idempotent build) |
 | `context` | context view, publish merge/revision, derive order, merges |
@@ -261,8 +290,8 @@ the adapter unit suite.
 | `remedy` | provider order/cap, edit/overlay values |
 | `spi` | builtins, host empty, facade paths, two-kernel isolation |
 
-The §3.3 structure-set suite is adapter-level (`src/test`), not a kernel module; it is listed in §3.3
-and in `adapter.md` §13, not in this table.
+The §3.3 structure-set suite and the §3.4 host-data group are adapter-level (`src/test`), not kernel
+modules; they are listed in their sections and in `adapter.md` §13/§3.2, not in this table.
 
 ## 5. Code producers
 
@@ -328,7 +357,7 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 79 `@GameTest` methods; the
+- The rest of the NeoForge adapter and its GameTests. The tree registers 64 `@GameTest` methods; the
   last recorded full `runGameTestServer` is 66/66 at `6263414`, before the later stress batches and
   slices, and SS4 ran no GameTest. The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, M2c traits, M2d nested frames/cuts, capture-revision lease invalidation
@@ -336,11 +365,11 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   rotated-siting two-phase capture
   (`RotatedSitingGameTest`), the M4 command surface (`SettleCommandGameTest`, `CommandGameTest`), the
   M5e capture report (`CaptureAuditGameTest`, `CommandCaptureReportGameTest`, `NestedCaptureGameTest`),
-  the claims read in check (`CheckClaimsGameTest`) and the S6 projection
-  (`SitedDescriptorGameTest`: upright and non-upright definition-frame descriptors,
-  unoriented/identity raw descriptors, the unrepresentable raw fallback with `SC-MC-0004`, a
-  `property` expectation matching at a rotated siting, and child frames staying world-frame). Unit
-  evidence: `LevelSnapshotTest` for
+  the claims read in check (`CheckClaimsGameTest`) and the retained orientation audit
+  (`OrientationAuditGameTest`: an upright siting reports no `SC-MC-0004`, an unrepresentable state
+  reports one grouped entry, and a child frame is not audited). Unit evidence: `HostExpectationTest`
+  for the typed bridge and absent codes, `SnapshotLevelTest` for the copied states/fluids/entities,
+  `LevelSnapshotTest` for
   body/precedence/partial reads, `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for
   the capability declaration, `SavedClaimsTest`/`SavedContextsTest` for persistence,
   `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
@@ -351,7 +380,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   characterization), `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row
   collapse) and `SavedContextsLifecycleTest` (merge/reload, instance isolation, D5 growth, unknown
   type), and the structure-set units `StructureSetPlanTest`, `StructureSetHostTest`,
-  `DatapackStructureSetTest` and the six-class SS4 stress suite (§3.3). **What remains:** the
+  `DatapackStructureSetTest`, the six-class SS4 stress suite (§3.3) and `HostDataScenarioTest` (§3.4).
+  **What remains:** the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.

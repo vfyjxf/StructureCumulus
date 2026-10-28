@@ -42,7 +42,7 @@ public final class McAnchors {
         }
         BlockState state = view.get(origin, HostTypes.blockState);
         if (state == null) {
-            return failure(origin, AdapterCodes.notCapturedEntry, "the anchor block state was not captured");
+            return failure(origin, AdapterCodes.valueNotCapturedEntry, "the anchor block state was not captured");
         }
         if (state.isAir()) {
             return failure(origin, Codes.anchorInvalid, "the anchor cell is air");

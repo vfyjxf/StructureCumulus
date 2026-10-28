@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S4 + H1/H2/H3)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S4 + H1–H4)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -42,15 +42,17 @@
   `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`. S1–S4 add the structure-set
   layer: `Siting.compose` and the seven `SC-SET` codes (`9cf2794`), the set document IR/reader/
   writer/compiler (`00cf6c4`), the host `StructureSet` plan, `StructureSetHost` and `StructureSetResult`
-  (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3). H2 adds the per-frame `SnapshotLevel`,
-  the capture wiring, the typed `WorldView.get` dispatch, snapshot anchors and the digest content. H3
-  adds the `property`/`state`/`tag`/`fluid` expectation factories and catalog, the `SC-MC-0006`…`0010`
-  entries and the anchor's declared-value constraint.
-- **Implemented (S6, revised by host-data H1, completed by H3).** A capture carrying a siting orientation
+  (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3). H1 adds `HostType`,
+  `WorldView.get` and `Expectations.host` and retires the descriptor properties; H2 adds the per-frame
+  `SnapshotLevel`, the capture wiring, the typed `WorldView.get` dispatch, snapshot anchors and the
+  digest content. H3 adds the `property`/`state`/`tag`/`fluid` expectation factories and catalog, the
+  `SC-MC-0006`…`0010` entries and the anchor's declared-value constraint. H4 closes the docs, counts
+  and the `HostDataScenarioTest` stress group (`06-verification.md` §3.4).
+- **Implemented (S6, retired by host-data H1; D-29 superseded by D-33).** A capture carrying a siting orientation
   audits every root block state through the inverse orientation and reports an unrepresentable state as
   `SC-MC-0004` (§3, §10). The definition-frame descriptor projection is retired: the kernel
   `OccupantDescriptor` is `(type, kind)`, so a descriptor carries no properties and the audit is the
-  only siting fact the capture publishes (`SitedDescriptorGameTest` covers the audit). The adapter
+  only siting fact the capture publishes (`OrientationAuditGameTest` covers the audit). The adapter
   `property`/`state`/`tag`/`fluid` expectation factories and `SC-MC-0006..0010` are implemented in §3.2
   and §12.
 - **Pending.** Two items only: the performance/cost pass (block-entity-lazy and entity sweep) and fresh
@@ -70,7 +72,7 @@
 | `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value → `(type, kind)` descriptor; entity body identity; nested body |
-| `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the declared `AnchorSpec.value` is compared at the definition origin; no live read |
+| `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the declared `AnchorSpec.value` is compared at the definition origin; a missing state is `SC-MC-0010`; no live read |
 | `OccupantTraits` | — | the five stable trait keys and generic provider dispatch into four-state slots |
 | `TraitLookup` | final class (`trait`) | immutable registry; `builtin()` and sequential plugin-loaded `load(Logger)`; `provider(id)` |
 | `TraitProvider<T>` | interface (`trait`) | one typed provider: `key()`, block/entity reads defaulting to `Absent` |
@@ -144,7 +146,7 @@ The rules below are implemented.
   carries one `SC-MC-0003` entry per cut and one `SC-MC-0004` entry per unrepresentable state group
   (§10). An empty report is the normal case and `Unavailable` carries one only when the host has
   extra detail; its own `SC-MC-0001` code already is its finding.
-- H2 copies host data from the same walk (§3.1): each world section's `PalettedContainer<BlockState>`
+- The capture copies host data from the same walk (§3.1): each world section's `PalettedContainer<BlockState>`
   is copied once, the fluids are filled from the copy, block entities are detached copies and the
   captured entity candidates keep their local footprints. The per-cell occupant walk reads the state
   from the copy, so no cell is read twice.
@@ -183,8 +185,7 @@ world read. No `Level` is retained.
 - The section digest composes the occupant digest with `SnapshotLevel.contentDigest(region)`, which
   hashes the captured block states, fluid states and entities of the section. A same-type occupant
   with a different `BlockState` therefore changes `contentDigest`.
-- Heightmaps are not captured: no request path exists in H2 (the design's "when requested" has no
-  kernel field yet).
+- Heightmaps are not captured: no kernel request path exists (D-33, `10-host-data.md` §13).
 
 ### 3.2 Host expectations
 
@@ -205,7 +206,8 @@ property value is a compile finding. The `fluid` factory is two host leaves unde
 fluid-state leaf matches the fluid type and the block-state leaf matches `block.getBlock()` against
 `block.getFluidState().createLegacyBlock().getBlock()`. A waterlogged slab therefore fails the block
 leaf (its block is not the water block) even though its fluid state is water; a real water or lava
-cell passes both. `property`, `state` and the block tag read `HostTypes.blockState`; the fluid tag
+cell passes both. The composed check's `ExpectationMeta` is the kernel `Junction`'s (`all_of`,
+`SC-EXP-0001`); its mismatch findings are the leaves' `SC-MC-0009`. `property`, `state` and the block tag read `HostTypes.blockState`; the fluid tag
 reads `HostTypes.fluidState`; the entity tag reads `HostTypes.entity`; the fluid check reads both
 block and fluid state. A missing value is `Unreadable` with `SC-MC-0010`, never a mismatch.
 
@@ -514,10 +516,11 @@ load, no second traversal, no `ReadRefusal`. The orientation comes from the two-
 
 `SC-MC-0004` is a capability fact about the observed blocks, not a value fact about the check. Since
 `OccupantDescriptor` is `(type, kind)`, an unrepresentable state publishes no descriptor fallback and
-the capture report is the only trace of the capability; the check's own value expectations return
-with the H3 host factories, which read the snapshot rather than a descriptor. The projection is the
-inverse-orientation `OrientationMapping.transform` result described above; `FocusContext.siting()` is
-unchanged. The definition origin's anchor property is read from the captured anchor `BlockState` (the
+the capture report is the only trace of the capability; the check's own value expectations are the
+H3 host factories, which read the snapshot rather than a descriptor. The audit transform is the
+inverse-orientation `OrientationMapping.transform` result described above, not a descriptor
+publication: a value check compares the captured world state, so a host that needs definition-frame
+values must capture them (D-33). `FocusContext.siting()` is unchanged. The definition origin's anchor property is read from the captured anchor `BlockState` (the
 phase-1 capture is not audited) and its declared `AnchorSpec.value` is compared there, case-insensitively;
 a mismatch is `SC-BPT-0006` anchor-invalid, and `SC-MC-0004` never becomes a `ReadRefusal`.
 
@@ -532,8 +535,9 @@ All five subcommands run on the server thread. `check` returns 1 whenever it rea
   sited bounds are the capture the orientation audit runs on. The phase-1 view is closed after
   resolution. The anchor property still selects the orientation, and `AnchorSpec.value` is now a real
   constraint: a captured value that differs from the declaration (case-insensitively) is
-  `SC-BPT-0006` anchor-invalid. An uncaptured anchor state remains `SC-MC-0001`; `SC-MC-0010` is the
-  absent code of the host expectations (§3.2, §12).
+  `SC-BPT-0006` anchor-invalid. An uncaptured anchor state is `SC-MC-0010`, the same
+  host-value-not-captured code as the expectation absent value; `SC-MC-0001` remains the capture
+  refusal (§3.2, §12).
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
   findings.
 - `/cumulus settle <id> <origin>` — capture once, `check`, then `settle` with the same request; print
@@ -561,7 +565,7 @@ never changes the exit code.
 ## 12. Codes
 
 `SC-MC-0001` unloaded chunk/not captured: implemented as `CaptureResult.Unavailable` or a refused
-section/`ReadRefusal`, and the anchor cell's missing state. `SC-MC-0002` unreadable trait or
+section/`ReadRefusal`. `SC-MC-0002` unreadable trait or
 block-entity read: carried in a `TraitSlot.Refused` and relayed by the consumer, not a capture
 finding. `SC-MC-0003` a nested extent
 the adapter cut (depth, budget, cycle, unloaded chunk, or a declaration that does not fit its parent
@@ -574,7 +578,8 @@ over the element ceiling: an ERROR entry on `CaptureResult.TooLarge`, which stay
 captured block state differs from the state resolved at compile time; `SC-MC-0008` a captured block
 state, fluid state or entity type is outside the declared registry tag; `SC-MC-0009` a captured fluid
 cell is not the declared real fluid block; `SC-MC-0010` a host expectation's typed read answered no
-value (always `Unreadable`). `SC-MC-0001`…`0010` are adapter-only, and none enters `Codes.all`. The
+value, or `McAnchors` found no captured anchor state (always `Unreadable`/a failed siting, never a
+mismatch). `SC-MC-0001`…`0010` are adapter-only, and none enters `Codes.all`. The
 kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value code from the caller. H3
 registers the `SC-MC-0006`…`0010` catalog entries and the `property`/`state`/`tag`/`fluid` factories,
 passing `SC-MC-0010` as the absent code (§3.2).
