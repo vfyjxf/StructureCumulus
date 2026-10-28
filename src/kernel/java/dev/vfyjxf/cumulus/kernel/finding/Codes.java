@@ -477,6 +477,69 @@ public final class Codes {
         "One id was added twice with different values. Keep one registration."
     );
 
+    public static final CodeEntry satelliteAbsent = entry(
+        FindingCode.Family.set,
+        1,
+        Severity.error,
+        "A required satellite is absent.",
+        "The presence region of a satellite declared required holds no non-air block. Check the "
+                + "satellite blueprint and its relative siting, or mark the satellite optional."
+    );
+
+    public static final CodeEntry linkDistanceInvalid = entry(
+        FindingCode.Family.set,
+        2,
+        Severity.error,
+        "A satellite link distance is invalid.",
+        "A face link's endpoints are not one cell apart, or a range link exceeds its max distance. "
+                + "Check the link cells, the mode and the metric."
+    );
+
+    public static final CodeEntry linkCoverageInvalid = entry(
+        FindingCode.Family.set,
+        3,
+        Severity.error,
+        "A link cell is outside its blueprint or not covered by a check.",
+        "A link endpoint lies outside its blueprint bounds or outside every check's read scope. "
+                + "Check the parent and satellite cells against each side's plan."
+    );
+
+    public static final CodeEntry presenceUnreadable = entry(
+        FindingCode.Family.set,
+        4,
+        Severity.error,
+        "A satellite's presence is unreadable.",
+        "A presence cell could not be read, so presence is unknown. Check the capture bounds, "
+                + "the budget and the presence region."
+    );
+
+    public static final CodeEntry duplicatePlacement = entry(
+        FindingCode.Family.set,
+        5,
+        Severity.error,
+        "Two satellites share one placement.",
+        "Two satellites in the set declare the same relative offset and orientation. Give each "
+                + "satellite a distinct placement."
+    );
+
+    public static final CodeEntry duplicateFaceLink = entry(
+        FindingCode.Family.set,
+        6,
+        Severity.error,
+        "Two face links share a parent cell and face.",
+        "A parent cell already carries a face link in the same direction. Check the link pairs "
+                + "and move or remove the duplicate."
+    );
+
+    public static final CodeEntry rollbackFailed = entry(
+        FindingCode.Family.set,
+        7,
+        Severity.error,
+        "A structure set rollback failed.",
+        "A settled structure could not be released after a later settle failed. Check the ledger, "
+                + "the owner and the siting before retrying."
+    );
+
     public static final List<CodeEntry> all = List.of(
         locusUnmapped,
         cuboidOffLattice,
@@ -534,7 +597,14 @@ public final class Codes {
         remedyFailed,
         remedyMalformed,
         extensionFailed,
-        catalogDuplicate
+        catalogDuplicate,
+        satelliteAbsent,
+        linkDistanceInvalid,
+        linkCoverageInvalid,
+        presenceUnreadable,
+        duplicatePlacement,
+        duplicateFaceLink,
+        rollbackFailed
     );
 
     private Codes() {}
@@ -568,6 +638,7 @@ public final class Codes {
             case dia -> "finding";
             case rmd -> "remedy";
             case spi -> "spi";
+            case set -> "structure";
             case mc -> "adapter";
         };
     }

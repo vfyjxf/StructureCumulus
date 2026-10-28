@@ -216,6 +216,13 @@ public final class Codes {
     public static final CodeEntry remedyMalformed = ...;           // SC-RMD-0002
     public static final CodeEntry extensionFailed = ...;           // SC-SPI-0001
     public static final CodeEntry catalogDuplicate = ...;          // SC-SPI-0003
+    public static final CodeEntry satelliteAbsent = ...;           // SC-SET-0001
+    public static final CodeEntry linkDistanceInvalid = ...;       // SC-SET-0002
+    public static final CodeEntry linkCoverageInvalid = ...;       // SC-SET-0003
+    public static final CodeEntry presenceUnreadable = ...;        // SC-SET-0004
+    public static final CodeEntry duplicatePlacement = ...;        // SC-SET-0005
+    public static final CodeEntry duplicateFaceLink = ...;         // SC-SET-0006
+    public static final CodeEntry rollbackFailed = ...;            // SC-SET-0007
     public static final java.util.List<CodeEntry> all;
     private Codes() {}
 }
@@ -225,7 +232,7 @@ public final class Codes {
 
 ### 4.1 The code
 
-`SC-<FAMILY>-<NNNN>`, family one of the 13, number `1..9999` zero-padded. `parse` returns `null`
+`SC-<FAMILY>-<NNNN>`, family one of the 14, number `1..9999` zero-padded. `parse` returns `null`
 for a malformed string; `text()` and `parse` are inverse on well-formed input. The `Family` constants
 are lowerCamel and each carries an explicit uppercase tag: `text()` renders that tag and `parse`
 accepts only an uppercase tag from the table, so the wire text stays `SC-SPC-0001`, never
@@ -362,9 +369,16 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-RMD-0002` | ERROR | ✓ | a provider returned a malformed remedy | `StructureKernel.solve` |
 | `SC-SPI-0001` | ERROR | ✓ | an extension threw or returned a malformed finding | `engine` guard |
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
+| `SC-SET-0001` | ERROR | – | a required satellite is absent | host presence |
+| `SC-SET-0002` | ERROR | – | a satellite link distance is invalid | compiler/host link |
+| `SC-SET-0003` | ERROR | – | a link cell is outside its blueprint or not covered by a check | compiler |
+| `SC-SET-0004` | ERROR | – | satellite presence is unreadable | host presence |
+| `SC-SET-0005` | ERROR | – | duplicate satellite placement | compiler |
+| `SC-SET-0006` | ERROR | – | duplicate parent face link | compiler |
+| `SC-SET-0007` | ERROR | – | structure set rollback failed | host settle |
 | `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; a host code may be relayed from a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10) | adapter |
 
-`Codes.all` has 57 entries in this revision, matching the registry; the capture-report channel adds
+`Codes.all` has 64 entries in this revision, matching the registry; the capture-report channel adds
 none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot express the siting
 orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by the adapter in a
 `CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries, and the
@@ -374,7 +388,7 @@ entry explains the cut, the check finding judges it, and neither channel suppres
 
 ## 7. Tests
 
-- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 57 entries, one per code,
+- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 64 entries, one per code,
   every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-*` are
   absent from `all`.
 - Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`

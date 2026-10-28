@@ -162,6 +162,7 @@ public record Siting(LatticePoint origin, Placement placement) {
     public static Siting of(LatticePoint origin, Placement placement);
     public Siting withOrigin(LatticePoint origin);
     public Siting withPlacement(Placement placement);
+    public @Nullable Siting compose(Siting relative);
     public @Nullable LatticePoint toWorld(LatticePoint local);
     public @Nullable Cuboid toWorld(Cuboid local);
     public @Nullable CuboidSet toWorld(CuboidSet local);
@@ -267,6 +268,11 @@ negated offset leaves the lattice. The inverse law holds when both are non-null:
 the inverse. A local delta must be oriented before it is added to a world point: `toWorld` is affine,
 not linear.
 
+`Siting.compose(relative)` places a relative siting in this siting's frame:
+`origin = toWorld(relative.origin())` and `placement = placement().compose(relative.placement())`, so
+the relative origin is a cell in this siting's local frame. It returns `null` when the origin image or
+the placement composition leaves the lattice.
+
 ### 4.6 SectionKey
 
 `SectionKey` is the view's section index: `(world, frame, x, y, z)`, ordered by world, frame, `x`,
@@ -316,6 +322,8 @@ lattice. `SC-SPC-0002` (ERROR): a `CuboidSet` operation would leave the lattice.
 - Orientation: `all().size() == 48`; distinct; inverse; composition; volume invariant; the
   `1 -` mirror case; `of` normalises the 72 triples.
 - Placement: compose/inverse when non-null; off-lattice returns null; affine equivariance.
+- `Siting.compose`: identity, half-turn and clockwise roots, negative and positive relative origins,
+  a relative orientation, a nonzero root origin, and null on lattice overflow.
 - `SectionKey`: floorDiv for negative coordinates; frame separates nested views; order.
 - Locus: frame/field table enforced; `LocusMap` round-trip and null cases.
 - Wire tags: `LocusFrame.wireName()` is the uppercase tag; a heading property parses from `north`

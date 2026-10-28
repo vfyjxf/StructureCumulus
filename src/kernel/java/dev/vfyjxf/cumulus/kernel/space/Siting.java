@@ -28,6 +28,16 @@ public record Siting(LatticePoint origin, Placement placement) {
         return new Siting(origin, placement);
     }
 
+    public @Nullable Siting compose(Siting relative) {
+        Objects.requireNonNull(relative, "relative");
+        LatticePoint origin = toWorld(relative.origin());
+        if (origin == null) {
+            return null;
+        }
+        Placement placement = this.placement.compose(relative.placement());
+        return placement == null ? null : new Siting(origin, placement);
+    }
+
     public @Nullable LatticePoint toWorld(LatticePoint local) {
         LatticePoint placed = placement.apply(local);
         if (placed == null) {

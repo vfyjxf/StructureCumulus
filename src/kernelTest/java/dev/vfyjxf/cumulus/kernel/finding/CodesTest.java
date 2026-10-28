@@ -74,6 +74,13 @@ class CodesTest {
             SC-RMD-0002 ERROR
             SC-SPI-0001 ERROR
             SC-SPI-0003 ERROR
+            SC-SET-0001 ERROR
+            SC-SET-0002 ERROR
+            SC-SET-0003 ERROR
+            SC-SET-0004 ERROR
+            SC-SET-0005 ERROR
+            SC-SET-0006 ERROR
+            SC-SET-0007 ERROR
             """;
 
     private static Severity severity(String wire) {
@@ -93,7 +100,7 @@ class CodesTest {
                 rows.add(line);
             }
         }
-        assertEquals(57, rows.size());
+        assertEquals(64, rows.size());
         assertEquals(rows.size(), Codes.all.size());
 
         Set<FindingCode> seen = new HashSet<>();
@@ -111,6 +118,12 @@ class CodesTest {
             }
             previous = code;
         }
+    }
+
+    @Test
+    void setFamilyCarriesItsSubject() {
+        assertEquals("structure sets and satellites", FindingCode.Family.set.subject());
+        assertEquals("SC-SET-0001", FindingCode.of(FindingCode.Family.set, 1).text());
     }
 
     @Test

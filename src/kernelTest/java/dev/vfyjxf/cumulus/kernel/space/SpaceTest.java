@@ -132,6 +132,60 @@ class SpaceTest {
     }
 
     @Test
+    void sitingComposeWithIdentityRootAddsTheRelativeOrigin() {
+        Siting root = Siting.of(LatticePoint.of(120, 70, -40), Orientation.identity);
+        Siting negative = root.compose(Siting.of(LatticePoint.of(-3, 2, -7), Orientation.identity));
+        assertNotNull(negative);
+        assertEquals(LatticePoint.of(117, 72, -47), negative.origin());
+        assertEquals(Placement.identity, negative.placement());
+        Siting positive = root.compose(Siting.of(LatticePoint.of(4, -1, 6), Orientation.identity));
+        assertNotNull(positive);
+        assertEquals(LatticePoint.of(124, 69, -34), positive.origin());
+        assertEquals(Placement.identity, positive.placement());
+    }
+
+    @Test
+    void sitingComposeWithHalfTurnRootRotatesTheRelativeOrigin() {
+        Orientation half = Orientation.of(Turn.half, Tilt.level, Flip.none);
+        Siting root = Siting.of(LatticePoint.of(100, 64, -20), half);
+        Siting composed = root.compose(Siting.of(LatticePoint.of(-4, 1, 7), Orientation.identity));
+        assertNotNull(composed);
+        assertEquals(LatticePoint.of(104, 65, -27), composed.origin());
+        assertEquals(half, composed.placement().orientation());
+        assertEquals(LatticePoint.origin, composed.placement().offset());
+        assertEquals(LatticePoint.of(102, 68, -22), composed.toWorld(LatticePoint.of(2, 3, -5)));
+    }
+
+    @Test
+    void sitingComposeWithClockwiseRootComposesTheRelativeOrientation() {
+        Orientation clockwise = Orientation.of(Turn.clockwise, Tilt.level, Flip.none);
+        Orientation half = Orientation.of(Turn.half, Tilt.level, Flip.none);
+        Siting root = Siting.of(LatticePoint.of(100, 64, -20), clockwise);
+        Siting relative = Siting.of(LatticePoint.of(-2, 3, -4), half);
+        Siting composed = root.compose(relative);
+        assertNotNull(composed);
+        assertEquals(LatticePoint.of(104, 67, -22), composed.origin());
+        assertEquals(Orientation.of(Turn.counterclockwise, Tilt.level, Flip.none), composed.placement().orientation());
+        LatticePoint local = LatticePoint.of(1, 2, 3);
+        LatticePoint throughRoot = root.toWorld(Objects.requireNonNull(relative.toWorld(local), "relative image"));
+        assertEquals(throughRoot, composed.toWorld(local));
+    }
+
+    @Test
+    void sitingComposeReturnsNullWhenAnImageLeavesTheLattice() {
+        Siting high = Siting.of(LatticePoint.of(LatticePoint.maxXz - 1, 0, 0), Orientation.identity);
+        assertNull(high.compose(Siting.of(LatticePoint.of(2, 0, 0), Orientation.identity)));
+        Siting low = Siting.of(LatticePoint.of(LatticePoint.minXz + 1, 0, 0), Orientation.identity);
+        assertNull(low.compose(Siting.of(LatticePoint.of(-2, 0, 0), Orientation.identity)));
+        Siting shifted = Siting.of(
+            LatticePoint.origin,
+            new Placement(Orientation.identity, LatticePoint.of(LatticePoint.maxXz, 0, 0))
+        );
+        Siting relative = Siting.of(LatticePoint.origin, new Placement(Orientation.identity, LatticePoint.of(1, 0, 0)));
+        assertNull(shifted.compose(relative));
+    }
+
+    @Test
     void sectionKeyFloorsNegativeCoordinates() {
         World world = World.of(NamespacedId.of("minecraft", "overworld"));
         SectionKey key = SectionKey.of(world, 0, LatticePoint.of(-1, -1, -1), 16);

@@ -15,7 +15,7 @@ public record FindingCode(Family family, int number) implements Comparable<Findi
     public enum Family {
         spc("SPC"), occ("OCC"), exp("EXP"), clm("CLM"), bpt("BPT"), chk("CHK"), doc("DOC"), ctx("CTX"), eng("ENG"), dia(
             "DIA"
-        ), rmd("RMD"), spi("SPI"), mc("MC");
+        ), rmd("RMD"), spi("SPI"), set("SET"), mc("MC");
 
         private final String tag;
 
@@ -50,6 +50,7 @@ public record FindingCode(Family family, int number) implements Comparable<Findi
                 case dia -> "the finding layer";
                 case rmd -> "remedies";
                 case spi -> "catalogs and extensions";
+                case set -> "structure sets and satellites";
                 case mc -> "the Minecraft adapter";
             };
         }
