@@ -7,8 +7,10 @@
 ## 1. Scope
 
 **Owns:** `Document`, `BlueprintSpec`, `BaySpec`, `SeamSpec`, `CheckSpec`, `ComputationSpec`,
-`KeySpec`, `PlacementSpec`, `CompileResult`, `CompilerContext`, `DocumentCompiler`, `DocumentReader`,
-`DocumentWriter`, `DocumentSource`.
+`KeySpec`, `PlacementSpec`, `StructureSetDocument`, `StructureSetSpec`, `SatelliteSpec`, `LinkSpec`,
+`PresenceSpec`, `LinkMode`, `DistanceMetric`, `CompileResult`, `StructureSetCompileResult`,
+`CompiledStructureSet`, `CompiledSatellite`, `CompilerContext`, `DocumentCompiler`,
+`StructureSetCompiler`, `DocumentReader`, `DocumentWriter`, `DocumentSource`.
 
 **Does not own:** JSON/SNBT parsing (`mc` supplies a reader), catalogs (`spi`), the blueprint's
 validation (`structure`), the `Value` tree (`core`), the run-time meaning of a factory (`structure`).
@@ -28,12 +30,23 @@ validation (`structure`), the `Value` tree (`core`), the run-time meaning of a f
 | `ComputationSpec` | record | data form of a computation |
 | `KeySpec` | record | a declared context key |
 | `PlacementSpec` | record | one definition placed under an alias at an offset |
+| `StructureSetDocument` | record | schema version + set spec + extensions |
+| `StructureSetSpec` | record | set id + root blueprint id + satellites |
+| `SatelliteSpec` | record | id + blueprint + relative placement + presence + links |
+| `LinkSpec` | record | a face/range/none link between a root cell and a satellite cell |
+| `PresenceSpec` | record | the cells whose occupants prove a satellite is present |
+| `LinkMode` | enum | `face`, `range`, `none` |
+| `DistanceMetric` | enum | `chebyshev`, `manhattan`, `euclidean` |
 | `CompileResult` | record | findings + optional blueprint |
+| `StructureSetCompileResult` | record | findings + optional compiled set |
+| `CompiledStructureSet` | record | compiled root blueprint + compiled satellites |
+| `CompiledSatellite` | record | a `SatelliteSpec` + its effective blueprint |
 | `CompilerContext` | record | the catalogs, type registry and document source the compiler needs |
 | `DocumentCompiler` | final class | validation + lowering |
+| `StructureSetCompiler` | final class | set resolution + argument merge + link/presence/duplicate validation |
 | `DocumentReader` | interface | text → `Document`, host-supplied |
 | `DocumentWriter` | interface | `Document` → text, host-supplied |
-| `DocumentSource` | interface | id → document, for cross-document definitions |
+| `DocumentSource` | interface | id → document, for cross-document definitions and set resolution |
 
 ## 3. Signatures
 
@@ -84,8 +97,64 @@ public record KeySpec(NamespacedId id, String type, Retention retention,
 public record PlacementSpec(NamespacedId definition, LatticePoint offset, NamespacedId alias,
                             @Nullable SourceSpan source) { }
 
+public record StructureSetDocument(int schemaVersion, StructureSetSpec spec,
+                                   java.util.Map<String, Value> extensions) {
+    public static final int currentVersion = 1;
+    public StructureSetDocument { /* version >= 1; extensions immutable and ordered */ }
+    public StructureSetDocument withoutSpans();
+}
+
+public record StructureSetSpec(NamespacedId id, NamespacedId root,
+                               java.util.List<SatelliteSpec> satellites,
+                               @Nullable SourceSpan source) {
+    public StructureSetSpec { /* id, root and satellites non-null; satellites immutable */ }
+    public StructureSetSpec withoutSpans();
+}
+
+public record SatelliteSpec(NamespacedId id, NamespacedId blueprint, LatticePoint at,
+                            Orientation orientation, boolean required, Value arguments,
+                            @Nullable PresenceSpec presence, java.util.List<LinkSpec> links,
+                            @Nullable SourceSpan source) {
+    public SatelliteSpec { /* arguments is an object; links immutable */ }
+    public SatelliteSpec withoutSpans();
+}
+
+public record PresenceSpec(CuboidSet cells, @Nullable SourceSpan source) {
+    public static PresenceSpec cell(LatticePoint cell);
+    public static PresenceSpec of(CuboidSet cells);
+    public PresenceSpec withoutSpans();
+}
+
+public record LinkSpec(LinkMode mode, @Nullable LatticePoint parentCell,
+                       @Nullable LatticePoint satelliteCell, int maxDistance,
+                       DistanceMetric metric, @Nullable SourceSpan source) {
+    public static LinkSpec face(LatticePoint parentCell, LatticePoint satelliteCell);
+    public static LinkSpec range(LatticePoint parentCell, LatticePoint satelliteCell,
+                                 int maxDistance, DistanceMetric metric);
+    public static LinkSpec range(LatticePoint parentCell, LatticePoint satelliteCell, int maxDistance);
+    public static LinkSpec none();
+    public LinkSpec withoutSpans();
+}
+
+public enum LinkMode { face, range, none }
+
+public enum DistanceMetric { chebyshev, manhattan, euclidean }
+
 public record CompileResult(FindingBundle findings, @Nullable Blueprint blueprint) {
     public boolean succeeded();
+}
+
+public record StructureSetCompileResult(FindingBundle findings, @Nullable CompiledStructureSet set) {
+    public boolean succeeded();
+}
+
+public record CompiledStructureSet(NamespacedId id, Blueprint root,
+                                   java.util.List<CompiledSatellite> satellites) {
+    public @Nullable CompiledSatellite satellite(NamespacedId id);
+}
+
+public record CompiledSatellite(SatelliteSpec spec, Blueprint blueprint) {
+    public Siting relativeSiting();
 }
 
 public record CompilerContext(Catalog<FocusFactory> focuses,
@@ -96,13 +165,21 @@ public record CompilerContext(Catalog<FocusFactory> focuses,
 
 public interface DocumentSource {
     @Nullable Document find(NamespacedId id);
+    default @Nullable StructureSetDocument findSet(NamespacedId id);
     static DocumentSource of(java.util.Map<NamespacedId, Document> documents);
+    static DocumentSource of(java.util.Map<NamespacedId, Document> documents,
+                             java.util.Map<NamespacedId, StructureSetDocument> sets);
     static DocumentSource empty();
 }
 
 public final class DocumentCompiler {
     public static CompileResult compile(Document document, CompilerContext context);
     private DocumentCompiler() {}
+}
+
+public final class StructureSetCompiler {
+    public static StructureSetCompileResult compile(StructureSetDocument document, CompilerContext context);
+    private StructureSetCompiler() {}
 }
 
 public interface DocumentReader {
@@ -211,6 +288,73 @@ A `compile` finding carries a `definition` label when the reader supplied a span
 compiler never throws for bad data; a reader that cannot parse returns `null` and appends
 `SC-DOC-0013`.
 
+### 4.5 Structure sets
+
+A blueprint document carries no `kind`, or `"kind": "blueprint"`. A set document carries
+`"kind": "structure_set"`; the host JSON layer reads that member before choosing the reader, so
+`JsonReader` stays blueprint-only. The set document is root-only: it has no `definitions`,
+`placements`, `bays` or `checks`.
+
+| Member | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `schemaVersion` | yes | — | exactly `1` |
+| `kind` | yes | — | `structure_set` |
+| `id` | yes | — | set id |
+| `root` | yes | — | root blueprint id |
+| `satellites` | yes | — | array, may be empty |
+| `extensions` | no | `{}` | document-level extensions |
+
+A satellite:
+
+| Member | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `id` | yes | — | unique within the set (`SC-DOC-0004`) |
+| `blueprint` | yes | — | blueprint document id |
+| `at` | yes | — | `[x, y, z]` offset in the root local frame |
+| `orientation` | no | `identity` | orientation relative to the root |
+| `required` | no | `false` | whether absence is an error |
+| `arguments` | no | `{}` | shallow override of the blueprint's root arguments |
+| `presence` | no | satellite bounds | presence region override |
+| `links` | no | `[]` | link array |
+
+`presence` is exactly one of `{"cell": [x, y, z]}` and `{"boxes": [[x, y, z, sx, sy, sz]]}`; the
+region must be non-empty and inside the satellite bounds (`SC-DOC-0002` on the bounds violation).
+A link names `mode` (`face`, `range`, `none`) and, for `face`/`range`, `parent_cell` and
+`satellite_cell`; `range` also requires `max_distance` (non-negative) and accepts `metric`
+(`chebyshev` default, `manhattan`, `euclidean`). A `none` link carries no cells and no distance.
+A member the chosen mode does not use is `SC-DOC-0002`.
+
+An effective argument set is the satellite blueprint document's root `arguments` shallow-merged
+with the satellite `arguments`; the satellite wins on duplicate keys, there is no nested merge and
+no key removal. `StructureSetCompiler` caches a compiled blueprint by
+`(blueprint id, effective arguments)`; each satellite keeps its own id and relative siting.
+
+Validation after lowering:
+
+| Rule | Code |
+| --- | --- |
+| a link cell is outside its blueprint bounds or outside every check's read scope | `SC-SET-0003` |
+| a face link is not face-adjacent, or a range link exceeds its distance/metric | `SC-SET-0002` |
+| two satellites share `(at, orientation)` | `SC-SET-0005` |
+| two face links share a parent cell and face direction | `SC-SET-0006` |
+| a root or satellite id names no blueprint document | `SC-DOC-0011` |
+| a root or satellite id names a structure set | `SC-DOC-0002` |
+| a satellite cell cannot be mapped into the root frame | `SC-SPC-0001` |
+
+A link is validated in the root local frame: the satellite cell is mapped by
+`Siting.of(at, orientation)` and the face direction is the unit delta from the parent cell; rotation
+by a root siting preserves both adjacency and every metric. Link findings label the link's set
+document span (or the satellite's), with a secondary label on the offending blueprint document.
+Bounds-only cells and bay-only cells do not satisfy coverage; only a check read scope does.
+
+The host writer emits the canonical member order `schemaVersion`, `kind`, `id`, `root`,
+`satellites`, `extensions`, and never writes spans. A single 1×1×1 presence region is written as a
+`cell`, anything else as `boxes`; `orientation` and `required` are always written, empty
+`arguments`/`links` and a null `presence` are omitted. `StructureSetDocument.withoutSpans()` (and the
+same method on `StructureSetSpec`, `SatelliteSpec`, `LinkSpec` and `PresenceSpec`) is the
+content-only form used for round-trip comparison; the blueprint writer's absence of `kind` is the
+canonical blueprint form.
+
 ## 5. Codes
 
 | Code | Sev | Meaning | Producer |
@@ -229,6 +373,12 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
 | `SC-DOC-0012` | INFO | reader supplied no spans | `DocumentReader` |
 | `SC-DOC-0013` | ERROR | reader/writer parse/format failure | `DocumentReader`/`Writer` |
 
+`StructureSetCompiler` reuses `SC-DOC-0002` for a malformed or nested set reference,
+`SC-DOC-0004` for a duplicate satellite id (raised by the reader) and `SC-DOC-0011` for a root or
+satellite that names no document. Its link, placement and parent-face failures use the `set` family
+(`SC-SET-0002`, `SC-SET-0003`, `SC-SET-0005`, `SC-SET-0006`); the family is defined in
+[design/09](../design/09-structure-sets.md) and [`finding`](finding.md).
+
 ## 6. Tests
 
 - JSON → `Document` → `Blueprint` for the campfire and furnace; the Java builder produces an equal
@@ -246,6 +396,21 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
   absent and `false` stay off; a definition-level member and a non-boolean value are `SC-DOC-0002`;
   an envelope root compiles to the same `Blueprint`, `Plan` and `ReadScope` as the Java `.envelope()`;
   an envelope-only root (`"bays": []`, `"checks": []`) yields one synthetic bay/check.
+- Structure set: a valid set (root + two preheaters) reads, compiles and writes back equal content;
+  `kind` selects the reader and is omitted on a canonically written blueprint; unknown members,
+  wrong kind, bad `at`/`orientation`/`arguments`/link/presence members and a duplicate satellite id
+  are located document errors; the JSON set and a Java-built set are equal.
+- Relative siting: an identity/half/clockwise satellite and negative offsets map their local cells
+  through `Siting.of(at, orientation)` as the root would see them.
+- Links: face adjacency accepts only Manhattan distance one; range honors `chebyshev`, `manhattan`
+  and `euclidean`; `none` carries no cells; a bounds-only or bay-only cell is rejected but a
+  check-read cell is accepted; duplicate parent faces and duplicate `(at, orientation)` pairs are
+  rejected.
+- Arguments: shallow merge over the satellite blueprint's root arguments; equal
+  `(blueprint id, effective arguments)` reuse one compiled blueprint while ids and sitings stay
+  per satellite.
+- Missing root/satellite documents are `SC-DOC-0011`; a set naming a set is `SC-DOC-0002`; a
+  presence region outside the satellite bounds is `SC-DOC-0002`.
 
 ## 7. Dependencies
 
@@ -265,6 +430,10 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
   `SC-DOC-0003`; the compiler never silently retargets.
 - Document content never throws. Every malformed field, cycle, unknown factory or invalid blueprint
   becomes a located finding; `CompileResult.blueprint()` is null whenever an error exists.
+- A blueprint document is kindless or `blueprint`; a set document is `structure_set`. A set names
+  only blueprints, never another set (no nesting).
+- A set compile is a pure function of `(set document, DocumentSource, CompilerContext)`. The kernel
+  never executes a set; it owns no host placement, presence read, claim or rollback.
 
 ## 9. Pipeline
 
@@ -272,3 +441,8 @@ compiler never throws for bad data; a reader that cannot parse returns `null` an
 checks, computations and derivations, validates them through `BlueprintBuilder`, and returns the
 same `Blueprint` a Java builder would. The result is either one blueprint or a `FindingBundle`; the
 engine never sees a half-built blueprint.
+
+`StructureSetCompiler.compile(document, context)` resolves the root and every satellite through
+`DocumentSource`, compiles each with the effective arguments, then validates presence bounds, links,
+duplicate placements and parent faces. The result is either one `CompiledStructureSet` or a
+`FindingBundle`; the host owns placement composition, capture, check, settle and rollback.

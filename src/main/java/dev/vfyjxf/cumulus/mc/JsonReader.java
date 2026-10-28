@@ -57,6 +57,7 @@ public final class JsonReader implements DocumentReader {
 
     private static final Set<String> documentMembers = Set.of(
         "schemaVersion",
+        "kind",
         "id",
         "bounds",
         "envelope",
@@ -137,7 +138,7 @@ public final class JsonReader implements DocumentReader {
         return document;
     }
 
-    private static Finding parseFailure(NamespacedId source, String text, RuntimeException failure) {
+    static Finding parseFailure(NamespacedId source, String text, RuntimeException failure) {
         String detail = failure.getMessage();
         String message = "the document is not valid JSON: "
                 + (detail == null ? failure.getClass().getSimpleName() : detail);
@@ -228,6 +229,18 @@ public final class JsonReader implements DocumentReader {
                     "unsupported schemaVersion " + version + ", expected " + Document.currentVersion
                 );
                 return null;
+            }
+            @Nullable
+            JsonElement kindElement = object.get("kind");
+            if (kindElement != null) {
+                String kind = string(kindElement, field("$", "kind"));
+                if (kind == null) {
+                    return null;
+                }
+                if (!kind.equals("blueprint")) {
+                    fail(Codes.documentField, field("$", "kind"), "$", "kind must be 'blueprint', not '" + kind + "'");
+                    return null;
+                }
             }
             NamespacedId id = id(object, "id", "$");
             Cuboid bounds = box(required(object, "bounds", "$"), field("$", "bounds"));

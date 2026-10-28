@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
@@ -19,9 +18,7 @@ import dev.vfyjxf.cumulus.kernel.document.DocumentWriter;
 import dev.vfyjxf.cumulus.kernel.document.KeySpec;
 import dev.vfyjxf.cumulus.kernel.document.PlacementSpec;
 import dev.vfyjxf.cumulus.kernel.document.SeamSpec;
-import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
-import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.structure.AnchorSpec;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
@@ -63,7 +60,7 @@ public final class JsonWriter implements DocumentWriter {
         JsonObject out = new JsonObject();
         out.addProperty("schemaVersion", document.schemaVersion());
         out.addProperty("id", JsonVocabulary.idText(root.id()));
-        out.add("bounds", box(root.bounds()));
+        out.add("bounds", JsonValues.box(root.bounds()));
         if (root.envelope()) {
             out.addProperty("envelope", true);
         }
@@ -98,8 +95,8 @@ public final class JsonWriter implements DocumentWriter {
         if (root.orientation() != null) {
             out.add("orientation", orientation(root.orientation()));
         }
-        addArguments(out, root.arguments());
-        addExtensions(out, document.extensions());
+        JsonValues.addArguments(out, root.arguments());
+        JsonValues.addExtensions(out, document.extensions());
         return gson.toJson(out);
     }
 
@@ -108,8 +105,8 @@ public final class JsonWriter implements DocumentWriter {
             throw new IllegalStateException("a definition may not declare an envelope");
         }
         JsonObject out = new JsonObject();
-        out.add("bounds", box(spec.bounds()));
-        addArguments(out, spec.arguments());
+        out.add("bounds", JsonValues.box(spec.bounds()));
+        JsonValues.addArguments(out, spec.arguments());
         if (!spec.bays().isEmpty()) {
             out.add("bays", bays(spec.bays()));
         }
@@ -137,7 +134,7 @@ public final class JsonWriter implements DocumentWriter {
         if (!spec.placements().isEmpty()) {
             addPlacements(out, spec.placements());
         }
-        addExtensions(out, spec.extensions());
+        JsonValues.addExtensions(out, spec.extensions());
         return out;
     }
 
@@ -150,7 +147,7 @@ public final class JsonWriter implements DocumentWriter {
             JsonObject json = new JsonObject();
             json.addProperty("definition", JsonVocabulary.idText(placement.definition()));
             json.addProperty("as", JsonVocabulary.idText(placement.alias()));
-            json.add("at", point(placement.offset()));
+            json.add("at", JsonValues.point(placement.offset()));
             array.add(json);
         }
         out.add("placements", array);
@@ -178,7 +175,7 @@ public final class JsonWriter implements DocumentWriter {
         for (SeamSpec seam : seams) {
             JsonObject json = new JsonObject();
             json.addProperty("id", JsonVocabulary.idText(seam.id().id()));
-            json.add("box", box(seam.cells()));
+            json.add("box", JsonValues.box(seam.cells()));
             json.addProperty("kind", JsonVocabulary.seamKindName(seam.kind()));
             if (!seam.properties().isEmpty()) {
                 JsonObject properties = new JsonObject();
@@ -219,7 +216,7 @@ public final class JsonWriter implements DocumentWriter {
                 json.addProperty("bay", JsonVocabulary.idText(computation.bay()));
             }
             if (computation.region() != null) {
-                json.add("region", boxSet(computation.region()));
+                json.add("region", JsonValues.boxSet(computation.region()));
             }
             if (!computation.inputs().isEmpty()) {
                 JsonArray inputs = new JsonArray();
@@ -245,7 +242,7 @@ public final class JsonWriter implements DocumentWriter {
                 json.addProperty("merge", JsonVocabulary.idText(key.merge()));
             }
             if (key.whenAbsent() != null) {
-                json.add("whenAbsent", value(key.whenAbsent()));
+                json.add("whenAbsent", JsonValues.value(key.whenAbsent()));
             }
             array.add(json);
         }
@@ -259,7 +256,7 @@ public final class JsonWriter implements DocumentWriter {
             json.addProperty("deriver", JsonVocabulary.idText(derivation.deriver()));
             json.addProperty("output", JsonVocabulary.idText(derivation.output()));
             json.addProperty("order", derivation.order());
-            addArguments(json, derivation.arguments());
+            JsonValues.addArguments(json, derivation.arguments());
             array.add(json);
         }
         return array;
@@ -293,9 +290,9 @@ public final class JsonWriter implements DocumentWriter {
 
     private static void addCells(JsonObject json, CuboidSet cells) {
         if (cells.boxCount() == 1) {
-            json.add("box", box(cells.boxes().get(0)));
+            json.add("box", JsonValues.box(cells.boxes().get(0)));
         } else {
-            json.add("boxes", boxSet(cells));
+            json.add("boxes", JsonValues.boxSet(cells));
         }
     }
 
@@ -306,7 +303,7 @@ public final class JsonWriter implements DocumentWriter {
             case Footprint.None ignored -> new JsonPrimitive("none");
             case Footprint.Declared declared -> {
                 JsonObject json = new JsonObject();
-                json.add("declared", boxSet(declared.cells()));
+                json.add("declared", JsonValues.boxSet(declared.cells()));
                 yield json;
             }
         };
@@ -329,78 +326,8 @@ public final class JsonWriter implements DocumentWriter {
                     what + " argument '" + entry.getKey() + "' collides with a schema member"
                 );
             }
-            json.add(entry.getKey(), value(entry.getValue()));
+            json.add(entry.getKey(), JsonValues.value(entry.getValue()));
         }
-    }
-
-    private static void addArguments(JsonObject json, Value arguments) {
-        if (!(arguments instanceof Value.ObjectValue object)) {
-            throw new IllegalStateException("arguments must be a JSON object");
-        }
-        if (!object.members().isEmpty()) {
-            json.add("arguments", value(object));
-        }
-    }
-
-    private static void addExtensions(JsonObject json, Map<String, Value> extensions) {
-        if (extensions.isEmpty()) {
-            return;
-        }
-        JsonObject encoded = new JsonObject();
-        for (Map.Entry<String, Value> entry : extensions.entrySet()) {
-            encoded.add(entry.getKey(), value(entry.getValue()));
-        }
-        json.add("extensions", encoded);
-    }
-
-    private static JsonElement value(Value value) {
-        return switch (value) {
-            case Value.ObjectValue object -> {
-                JsonObject json = new JsonObject();
-                for (Map.Entry<String, Value> entry : object.members().entrySet()) {
-                    json.add(entry.getKey(), value(entry.getValue()));
-                }
-                yield json;
-            }
-            case Value.ArrayValue array -> {
-                JsonArray json = new JsonArray();
-                for (Value element : array.elements()) {
-                    json.add(value(element));
-                }
-                yield json;
-            }
-            case Value.StringValue string -> new JsonPrimitive(string.value());
-            case Value.NumberValue number -> new JsonPrimitive(number.value());
-            case Value.BooleanValue bool -> new JsonPrimitive(bool.value());
-            case Value.NullValue ignored -> JsonNull.INSTANCE;
-        };
-    }
-
-    private static JsonArray box(Cuboid box) {
-        JsonArray array = new JsonArray();
-        array.add(box.min().x());
-        array.add(box.min().y());
-        array.add(box.min().z());
-        array.add(box.sizeX());
-        array.add(box.sizeY());
-        array.add(box.sizeZ());
-        return array;
-    }
-
-    private static JsonArray boxSet(CuboidSet cells) {
-        JsonArray array = new JsonArray();
-        for (Cuboid box : cells.boxes()) {
-            array.add(box(box));
-        }
-        return array;
-    }
-
-    private static JsonArray point(LatticePoint point) {
-        JsonArray array = new JsonArray();
-        array.add(point.x());
-        array.add(point.y());
-        array.add(point.z());
-        return array;
     }
 
 }

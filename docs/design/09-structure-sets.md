@@ -1,7 +1,8 @@
 # 09. Structure sets and satellites
 
-> Status: proposed, not implemented. This document is the source of truth for the structure-set
-> layer; module files and the code are updated when the implementation lands.
+> Status: S1 and S2 implemented; S3 (host plan and orchestration) and S4 (counts, stress, docs
+> close-out) pending. This document remains the source of truth for the structure-set layer; the
+> document IR, JSON reader/dispatcher/writer and `StructureSetCompiler` are on the tree.
 
 ## 1. Purpose
 
@@ -138,7 +139,8 @@ or:
 | `metric` | no | `chebyshev` | `chebyshev`, `manhattan`, `euclidean` |
 
 `mode: none` has no cells and no distance; it is a logical link only. Omitting `links` is the same
-as no spatial link.
+as no spatial link. A reader rejects a member that the chosen mode does not use (`SC-DOC-0002`):
+`max_distance`/`metric` on `face`, and any cell or distance on `none`.
 
 ### 4.5 Canonical example
 
@@ -228,7 +230,7 @@ placement = root.placement().compose(relative.placement())
 - `at` is an origin in the root local frame;
 - `orientation` is relative to the root;
 - the root rotates, satellites rotate with it;
-- a null mapping (lattice overflow) is a set finding, not a crash.
+- a null mapping (lattice overflow) is a set finding, not a crash; the compiler reports `SC-SPC-0001`.
 
 The set document never stores world coordinates. It is a portable placement graph.
 
@@ -547,5 +549,22 @@ Document errors reuse existing codes:
 | S2 | set document IR, reader/dispatcher/writer/spans, compiler, argument merge, duplicate/link/presence validation | focused document tests |
 | S3 | `StructureSet`/`SatelliteSpec`/`LinkSpec`/`PresenceSpec`, host placement/link/presence/check/settle/rollback, adapter result | focused adapter/kernel tests |
 | S4 | docs, counts, stress scenarios | docs + focused regression |
+
+### 16.1 Progress
+
+- **S1** landed at `9cf2794`: `Siting.compose`, `FindingCode.Family.set`, the seven `Codes` entries
+  (64 total).
+- **S2** is implemented in the working tree (uncommitted, based on `9cf2794`). `kernel.document` gains
+  `StructureSetDocument`/`StructureSetSpec`/`SatelliteSpec`/`LinkSpec`/`PresenceSpec`/`LinkMode`/
+  `DistanceMetric`, `StructureSetCompiler`/`StructureSetCompileResult`,
+  `CompiledStructureSet`/`CompiledSatellite`, and `DocumentSource.findSet`; `mc` gains
+  `StructureSetReader`, the `JsonDocument` kind dispatcher, `StructureSetWriter` and the shared
+  `JsonValues` encoder. `JsonReader` accepts an optional `kind: "blueprint"`. The focused tests are
+  `StructureSetCompilerTest` (13 tests) and `JsonStructureSetTest` (10 tests); `document.md` §4.5
+  owns the set schema.
+- **Not in S2:** the host `StructureSet` plan and orchestration, presence reading, check/settle/
+  rollback and the adapter result (S3); `DatapackBlueprints` stays blueprint-only, so a set file in
+  the datapack folder is rejected with `SC-DOC-0002` until the host loads sets; the S4 counts,
+  stress scenarios and docs close-out.
 
 Visual review stays last.
