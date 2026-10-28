@@ -237,7 +237,11 @@ built-in structural forms are `all_of`, `any_of`, `sequence`, `not`, `each_cell`
 `context`. A built-in kind may be written without a namespace and resolves in `structurecumulus`; a
 custom kind is `namespace:path`. A host payload check (`property`, `state`, `tag`, `fluid`) is a host
 catalog entry that lowers to `Expectations.host`, not a kernel kind
-([design/10](../design/10-host-data.md) §7). A computation names its output key by id and either a
+([design/10](../design/10-host-data.md) §7). The four kinds are ordinary `checks` entries: there is no
+`mc_checks` member and no separate MC JSON check type; the adapter's expectation catalog registers
+them, and the kernel's built-in catalog alone rejects them as `SC-DOC-0003`. The `state` kind resolves
+its `block` + `properties` to a `BlockState` at compile time; a malformed declaration is a compile
+finding, not a runtime error. A computation names its output key by id and either a
 bay (region = that bay's cells) or a `region` box array.
 
 A `trait`/`trait_absent` declaration names a trait by `NamespacedId` and adds that id to the
@@ -391,6 +395,9 @@ satellite that names no document. Its link, placement and parent-face failures u
 - Keys: `long`/`int`/`boolean`/`string`/`id`/`cuboid`/`cuboid_set`; merge names; `whenAbsent`.
 - Reads: a `trait`/`trait_absent` declaration contributes its trait id, a `nested` focus its kind and
   depth; the document path and the Java builder produce equal `Blueprint.reads()`.
+- Host kinds: `property`, `state`, `tag` and `fluid` read as ordinary `checks` and compile only
+  through the adapter catalog; the same declarations built through the adapter factories produce the
+  same check shape and the same match/mismatch verdicts. There is no `mc_checks` member.
 - Determinism: reordered object members and definition order produce equal blueprints.
 - Reader/writer round-trip: a `Document` written by a test writer reads back equal (content, not
   spans).

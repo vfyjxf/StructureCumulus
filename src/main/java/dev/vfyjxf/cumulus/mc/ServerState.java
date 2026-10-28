@@ -46,7 +46,8 @@ public final class ServerState {
     private final Map<ServerLevel, LevelCapture> captures = new HashMap<>();
 
     private ServerState() {
-        this.catalogs = Catalogs.builder().codes(AdapterCodes.catalog()).build();
+        this.catalogs = Catalogs.builder().expectations(AdapterExpectations.catalog()).codes(AdapterCodes.catalog())
+                .build();
         this.blueprints = DatapackBlueprints.attach();
         DocumentSource builtin = BuiltinDocuments.source();
         // A datapack document wins over the built-in document on an id collision.

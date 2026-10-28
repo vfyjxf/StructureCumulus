@@ -71,6 +71,7 @@ public final class RotatedSitingGameTest {
             helper,
             clockwise,
             Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.EAST),
+            "east",
             stairs,
             flatBounds,
             flatCells,
@@ -84,6 +85,7 @@ public final class RotatedSitingGameTest {
             helper,
             half,
             Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.SOUTH),
+            "south",
             stairs,
             flatBounds,
             flatCells,
@@ -97,6 +99,7 @@ public final class RotatedSitingGameTest {
             helper,
             pitchUp,
             Blocks.END_ROD.defaultBlockState().setValue(DirectionalBlock.FACING, Direction.UP),
+            "up",
             endRod,
             tallBounds,
             tallCells,
@@ -108,6 +111,7 @@ public final class RotatedSitingGameTest {
         GameTestHelper helper,
         Orientation orientation,
         BlockState anchorState,
+        String anchorValue,
         NamespacedId anchorType,
         Cuboid bounds,
         CuboidSet bayCells,
@@ -136,7 +140,14 @@ public final class RotatedSitingGameTest {
         RecordingSource recording = new RecordingSource();
         CommandSourceStack source = stack(helper, origin, recording);
         try {
-            Blueprint blueprint = anchoredBlueprint(orientation, anchorType, bounds, bayCells, secondLocal);
+            Blueprint blueprint = anchoredBlueprint(
+                orientation,
+                anchorValue,
+                anchorType,
+                bounds,
+                bayCells,
+                secondLocal
+            );
             MatchResult result = SettleCommand.settle(source, state, level, blueprint, point);
             if (!(result instanceof MatchResult.Formed formed)) {
                 helper.fail("the anchored settle did not form: " + result + " / " + recording.text());
@@ -166,6 +177,7 @@ public final class RotatedSitingGameTest {
 
     private static Blueprint anchoredBlueprint(
         Orientation orientation,
+        String anchorValue,
         NamespacedId anchorType,
         Cuboid bounds,
         CuboidSet bayCells,
@@ -175,7 +187,7 @@ public final class RotatedSitingGameTest {
         return Blueprint.builder(blueprintId).bounds(bounds).check(
             Check.of(anchorCheck, bay, Focuses.occupant(LatticePoint.of(0, 0, 0)), Expectations.block(anchorType))
         ).check(Check.of(otherCheck, bay, Focuses.occupant(secondLocal), Expectations.air()))
-                .anchor(new AnchorSpec(AnchorRoles.primary, "facing", "east"))
+                .anchor(new AnchorSpec(AnchorRoles.primary, "facing", anchorValue))
                 .orientation(OrientationPolicy.builder(AnchorRoles.primary).allow(orientation).build()).build();
     }
 

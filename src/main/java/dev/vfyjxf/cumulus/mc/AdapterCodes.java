@@ -18,6 +18,11 @@ final class AdapterCodes {
     static final FindingCode cut = code(3);
     static final FindingCode orientation = code(4);
     static final FindingCode overCap = code(5);
+    static final FindingCode propertyMismatch = code(6);
+    static final FindingCode stateMismatch = code(7);
+    static final FindingCode tagMismatch = code(8);
+    static final FindingCode fluidMismatch = code(9);
+    static final FindingCode valueNotCaptured = code(10);
 
     static final CodeEntry notCapturedEntry = entry(
         notCaptured,
@@ -56,6 +61,46 @@ final class AdapterCodes {
         "The root volume is over the policy's element ceiling. No partial root is built; the arm stays TooLarge."
     );
 
+    static final CodeEntry propertyMismatchEntry = entry(
+        propertyMismatch,
+        Severity.error,
+        "A block property does not match the declaration.",
+        "The captured block state has another value for the declared property, or the block has no such property. "
+                + "Check the property name and value against the block."
+    );
+
+    static final CodeEntry stateMismatchEntry = entry(
+        stateMismatch,
+        Severity.error,
+        "A block state does not match the declaration.",
+        "The captured block state differs from the state resolved at compile time. Check the block id and every "
+                + "declared property."
+    );
+
+    static final CodeEntry tagMismatchEntry = entry(
+        tagMismatch,
+        Severity.error,
+        "A registry tag does not match the declaration.",
+        "The captured block state, fluid state or entity type is not in the declared tag. Check the registry, the "
+                + "tag id and the loaded tag data."
+    );
+
+    static final CodeEntry fluidMismatchEntry = entry(
+        fluidMismatch,
+        Severity.error,
+        "A fluid does not match the declaration.",
+        "The captured fluid is not the declared fluid, or the block at the cell is not that fluid's legacy block. A "
+                + "waterlogged block is a block state, not a fluid."
+    );
+
+    static final CodeEntry valueNotCapturedEntry = entry(
+        valueNotCaptured,
+        Severity.error,
+        "A host snapshot value was not captured.",
+        "The typed read answered no value for the checked cell. The expectation is unreadable, never a mismatch. "
+                + "Check the capture bounds and the snapshot the check runs against."
+    );
+
     static Catalog<CodeEntry> catalog() {
         Catalog.Builder<CodeEntry> builder = Catalog.builder(NamespacedId.of("structurecumulus", "codes"));
         for (CodeEntry entry : entries()) {
@@ -65,7 +110,18 @@ final class AdapterCodes {
     }
 
     static List<CodeEntry> entries() {
-        return List.of(notCapturedEntry, unreadableTraitEntry, cutEntry, orientationEntry, overCapEntry);
+        return List.of(
+            notCapturedEntry,
+            unreadableTraitEntry,
+            cutEntry,
+            orientationEntry,
+            overCapEntry,
+            propertyMismatchEntry,
+            stateMismatchEntry,
+            tagMismatchEntry,
+            fluidMismatchEntry,
+            valueNotCapturedEntry
+        );
     }
 
     private static FindingCode code(int number) {

@@ -1,6 +1,6 @@
 # 10. Host snapshot and typed reads
 
-> Status: H1 and H2 implemented; H3–H4 proposed. This document is the source of truth for the world
+> Status: H1–H3 implemented; H4 proposed. This document is the source of truth for the world
 > snapshot, the typed host-read bridge, and MC-specific property/state/tag/fluid checks.
 
 ## 1. Purpose
@@ -205,12 +205,14 @@ Semantics:
 
 The predicate and both codes are supplied by the adapter. The kernel mints no MC code: it never
 declares `SC-MC-0010` and never interprets host data. The adapter passes its `SC-MC-0010` as
-`absentCode` in H3.
+`absentCode`.
 
 ## 7. Adapter expectations
 
 The JSON document has no separate MC check type. A normal check whose expectation kind is one of the
-adapter factories compiles into an `Expectations.host` predicate.
+adapter factories compiles into an `Expectations.host` predicate. The adapter registers `property`,
+`state`, `tag` and `fluid` in its expectation catalog; the kernel document reader stays blueprint-only
+and its built-in expectation catalog has none of the four.
 
 ### 7.1 Property
 
@@ -276,6 +278,11 @@ fluid.getType() == expected
 - waterlogged is a block state: use `property("waterlogged", "true")` or `state`;
 - lava and modded fluids use the MC fluid registry.
 
+The adapter expresses the two conditions as two `Expectations.host` leaves under one `all_of`: the
+captured `FLUID_STATE`'s type is the expected fluid, and the captured `BLOCK_STATE`'s block is that
+cell's own legacy fluid block. Both leaves carry `SC-MC-0009` as the mismatch code and `SC-MC-0010` as
+the absent code.
+
 ## 8. Anchor
 
 The kernel `Anchors` and `StructureKernel.siting` are removed. The adapter resolves anchors from
@@ -309,7 +316,10 @@ public final class McAnchors {
 
 H2 implements the snapshot read. The phase-1 command capture supplies the anchor cell's view, so
 `McAnchors` reads the captured `BlockState`; a missing state is the adapter's `SC-MC-0001`, not a
-live read. The declared-value comparison and the `SC-MC-0010` catalog entry arrive with H3.
+live read. H3 implements the declared-value comparison: `AnchorSpec.value` is compared
+case-insensitively against the captured property value at the definition origin, and a mismatch is
+`Codes.anchorInvalid` (`SC-BPT-0006`). The `SC-MC-0010` catalog entry is the absent code of the host
+expectations, not the anchor's missing-state code.
 
 ## 9. Descriptor
 
@@ -362,7 +372,7 @@ Adapter codes, not in `Codes.all`:
 | `SC-MC-0010` | host snapshot value was not captured |
 
 `SC-MC-0010` is `Unreadable`, never a mismatch. It is the adapter's code, passed as the `absentCode`
-of `Expectations.host` in H3; the kernel never mints it. `SC-EXP-0001` remains for kernel leaves.
+of `Expectations.host`; the kernel never mints it. `SC-EXP-0001` remains for kernel leaves.
 
 ## 12. JSON
 
@@ -434,8 +444,14 @@ H2 is implemented: one `SnapshotLevel` per frame, built by the existing section 
 section states, per-section fluids, detached block entities and captured entities; `LevelSnapshot.get`
 dispatches typed reads to its frame snapshot; `McAnchors` resolves the anchor from the captured
 block state; `LevelCapture` composes the snapshot content into the section digest. Heightmaps are
-not captured because no request path exists. H3 adds `AnchorSpec.value`'s declared-value constraint,
-the adapter's `property`/`state`/`tag`/`fluid` factories and the `SC-MC-0006`…`0010` catalog entries;
-H4 closes docs, counts and stress scenarios.
+not captured because no request path exists.
+
+H3 is implemented: the adapter's `property`/`state`/`tag`/`fluid` factories lower to
+`Expectations.host` over `HostTypes.blockState`/`fluidState`/`entity`; the `state` factory resolves
+its `BlockState` at compile time; the `fluid` factory composes the fluid-state and block-state leaves;
+`McAnchors` enforces `AnchorSpec.value` against the captured origin property; `AdapterCodes` carries
+the `SC-MC-0006`…`0010` catalog entries; and the adapter expectation catalog is merged into
+`ServerState`'s catalogs so a normal JSON `checks` entry compiles. H4 closes docs, counts and stress
+scenarios.
 
 Visual review stays last.

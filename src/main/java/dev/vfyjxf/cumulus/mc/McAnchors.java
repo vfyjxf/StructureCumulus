@@ -51,6 +51,13 @@ public final class McAnchors {
         if (value == null) {
             return failure(origin, Codes.anchorInvalid, "the anchor has no property " + spec.property());
         }
+        if (!value.equalsIgnoreCase(spec.value())) {
+            return failure(
+                origin,
+                Codes.anchorInvalid,
+                "the anchor property " + spec.property() + " is " + value + ", not " + spec.value()
+            );
+        }
         Heading heading = heading(value);
         if (heading == null) {
             return failure(origin, Codes.anchorInvalid, "the property is not a heading: " + value);

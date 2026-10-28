@@ -8,9 +8,11 @@ import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
 import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.structure.AnchorSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
@@ -57,6 +59,40 @@ class McAnchorsTest {
             throw new AssertionError("the siting is missing");
         });
         assertEquals(Orientation.identity, siting.placement().orientation());
+    }
+
+    @Test
+    void theDeclaredValueSelectsTheCapturedHeading() {
+        BlockState stairs = Blocks.OAK_STAIRS.defaultBlockState()
+                .setValue(HorizontalDirectionalBlock.FACING, Direction.EAST);
+        SitingResult result = McAnchors.resolve(blueprint("east"), LatticePoint.origin, view(stairs));
+
+        assertTrue(result.succeeded());
+        Siting siting = result.outcome().fold(value -> value, () -> {
+            throw new AssertionError("the siting is missing");
+        });
+        assertEquals(Orientation.of(Turn.clockwise, Tilt.level, Flip.none), siting.placement().orientation());
+    }
+
+    @Test
+    void theDeclaredValueComparesIgnoringCase() {
+        BlockState furnace = Blocks.FURNACE.defaultBlockState()
+                .setValue(HorizontalDirectionalBlock.FACING, Direction.NORTH);
+
+        SitingResult result = McAnchors.resolve(blueprint("NORTH"), LatticePoint.origin, view(furnace));
+
+        assertTrue(result.succeeded());
+    }
+
+    @Test
+    void aDeclaredValueThatDiffersFromTheCapturedPropertyIsAnchorInvalid() {
+        BlockState furnace = Blocks.FURNACE.defaultBlockState()
+                .setValue(HorizontalDirectionalBlock.FACING, Direction.NORTH);
+
+        SitingResult result = McAnchors.resolve(blueprint("south"), LatticePoint.origin, view(furnace));
+
+        assertFalse(result.succeeded());
+        assertEquals(Codes.anchorInvalid.code(), Objects.requireNonNull(result.findings().primary(), "finding").code());
     }
 
     @Test

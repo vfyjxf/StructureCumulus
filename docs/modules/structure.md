@@ -555,7 +555,8 @@ payload. It reads `ctx.view().get(subject.ref().anchor(), type)` once: an absent
 `Match`, and a failing test is `Mismatch(mismatchCode, description)`. The kernel never constructs or
 interprets the host value, never declares a host type in `ReadScope`, never mints `SC-MC-0010`, and
 `meta().mismatchCode()` is the supplied code. The adapter passes its own absent code (`world` §4.11,
-`adapter` §12).
+`adapter` §12); its `property`, `state`, `tag` and `fluid` factories are exactly one or two such
+leaves, and the `fluid` factory composes its two typed reads under `allOf` (`adapter` §3.2).
 
 ### 4.7 Blueprint
 
@@ -611,11 +612,13 @@ not a match-time filter. A blueprint with no anchor has a null orientation polic
 `Siting` directly.
 
 `AnchorSpec` and `OrientationPolicy` are declarations, not a kernel read. The host resolves the
-anchor cell against its snapshot and answers a `SitingResult`; `AnchorSpec.value` is a declaration
-for the host, compared in the frame the host publishes. The kernel has no `Anchors` resolver and no
-live anchor read: an air cell, a missing property, a value that is not a heading, no admissible
-orientation and a null policy are the host's `SC-BPT-0006` finding, and an uncaptured anchor cell is
-the host's unreadable answer. There is no fallback heading and no search (`adapter` §3, §11).
+anchor cell against its snapshot and answers a `SitingResult`. `AnchorSpec.value` is a real
+constraint, not a comment: the host compares it case-insensitively against the captured property
+value at the definition origin, and a value that differs is the host's anchor-invalid
+`SC-BPT-0006`, alongside an air cell, a missing property, a value that is not a heading, no
+admissible orientation and a null policy. An uncaptured anchor cell is the host's unreadable answer.
+The kernel has no `Anchors` resolver and no live anchor read. There is no fallback heading and no
+search (`adapter` §3, §11).
 
 ### 4.10 Computations
 

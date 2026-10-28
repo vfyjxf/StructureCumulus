@@ -248,7 +248,8 @@ untouched. A `ReadRefusal` or a `CaptureReport` entry may carry an opaque host c
 relays it at the report site (it never branches on it, mints it or allocates it) unless the code is
 already in `Codes.all`, in which case the site substitutes `SC-OCC-0004` and adds a note (`world`
 §4.1, §4.10). `Expectations.host` takes its absent-value code from the caller (`world` §4.11), so
-the kernel mints no host code even there.
+the kernel mints no host code even there; the adapter's `SC-MC-0006`…`0010` are its own expectation
+codes (`adapter` §3.2).
 
 ### 4.2 Finding validation
 
@@ -377,15 +378,23 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-SET-0005` | ERROR | – | duplicate satellite placement | compiler |
 | `SC-SET-0006` | ERROR | – | duplicate parent face link | compiler |
 | `SC-SET-0007` | ERROR | – | structure set rollback failed | host settle |
-| `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; `Expectations.host` takes its absent-value code from the caller (`world` §4.11), and other host codes are relayed from a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10) | adapter |
+| `SC-MC-0006` | ERROR | ✓ | a block property does not match | adapter `property` (mismatch) |
+| `SC-MC-0007` | ERROR | ✓ | a block state does not match | adapter `state` (mismatch) |
+| `SC-MC-0008` | ERROR | ✓ | a block/fluid/entity tag does not match | adapter `tag` (mismatch) |
+| `SC-MC-0009` | ERROR | ✓ | a fluid does not match | adapter `fluid` (mismatch) |
+| `SC-MC-0010` | ERROR | ✓ | a host snapshot value was not captured | adapter host expectations (absent, always unreadable) |
+| `SC-MC-*` | — | — | adapter-only family; never minted by the kernel, never in `Codes.all`; the capture paths (`0001`–`0005`) relay through a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10), and the expectation paths (`0006`–`0010`) pass `SC-MC-0010` as the absent code of `Expectations.host` (`world` §4.11) | adapter |
 
-`Codes.all` has 64 entries in this revision, matching the registry; the capture-report channel adds
-none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot express the siting
-orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by the adapter in a
-`CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries, and the
-adapter's own catalog gives them their severity (`0005` ERROR, `0003`/`0004` WARNING) and their
-explanation. A cut child is still reported by the check as `SC-OCC-0003` (`adapter` §8); the capture
-entry explains the cut, the check finding judges it, and neither channel suppresses the other.
+`Codes.all` has 64 entries in this revision, matching the registry; the capture-report and host
+expectation channels add none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot
+express the siting orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by
+the adapter in a `CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries,
+and the adapter's own catalog gives them their severity (`0005` ERROR, `0003`/`0004` WARNING) and their
+explanation. `SC-MC-0006`…`0010` are the adapter's expectation codes (`adapter` §3.2, §12): `0006`–`0009`
+are mismatches and `0010` is the unreadable absent value; the adapter catalog gives each its ERROR
+severity and explanation, and none enters `Codes.all`. A cut child is still reported by the check as
+`SC-OCC-0003` (`adapter` §8); the capture entry explains the cut, the check finding judges it, and
+neither channel suppresses the other.
 
 ## 7. Tests
 
@@ -398,7 +407,9 @@ entry explains the cut, the check finding judges it, and neither channel suppres
   `Codes.all`; a relayed code already in `Codes.all` is replaced by `SC-OCC-0004` with a note.
 - Host catalog: a host's own `CodeEntry` carries that code's severity and makes it explainable
   through `StructureKernel.explain`, and the code still never enters `Codes.all`; a `CaptureReport`
-  entry relays under the same trust guard as a `ReadRefusal`.
+  entry relays under the same trust guard as a `ReadRefusal`. The adapter's `SC-MC-0006`…`0010`
+  entries are explainable the same way, and `0006`–`0009` surface as mismatches while `0010`
+  surfaces as unreadable.
 - Finding builder: primary label requirement, message defaulting, label sort, blank rejection.
 - Bundle: dedup, order, caps (errors uncapped), truncation note, idempotent build, filter prefixes.
 - Renderers: golden human text for a door/finding; JSON schema fields; no fabricated source line.
