@@ -20,11 +20,13 @@ M6. Every milestone is implemented, and a milestone is complete only when its co
 tests are both on the tree and re-run. The kernel stress batches `kernel-stress-batch-1` (`110e797`,
 44 kernel scenarios in 12 `engine` classes) and `kernel-stress-batch-2` (`3e60ed4`, 17 kernel
 scenarios plus 11 adapter unit tests) are kernelTest/adapter-test-only and add no adapter milestone;
-batch 2's one code change is the `NestedFocus` non-binding fix. Current counts (2026-10-28, HEAD
-`3e60ed4`): **186 kernel tests in 33 containers, 141 adapter unit tests, 66 GameTests**, `Codes.all`
-56 entries, 29 decisions (D-29); `./gradlew check`,
-`runGameTestServer` and `tools/spec-check.py` are green. Pending only: the performance/cost pass and
-fresh review screenshots.
+batch 2's one code change is the `NestedFocus` non-binding fix; the envelope, cached-context and
+structure-set slices (`a5f7084`, `681c505`, `9cf2794`, `00cf6c4`, `93f5941`) and the SS4 stress batch
+follow. Current counts (2026-10-28, SS4 working tree): **257 kernel tests in 40 containers, 241 adapter
+unit tests in 32 containers, 79 registered GameTests**, `Codes.all` 64 entries, 32 decisions (D-32).
+The last full green `./gradlew check` is at `3e60ed4` (186/141) and the last recorded
+`runGameTestServer` is 66/66 at `6263414`; later slices report focused gates only. Pending only: the
+performance/cost pass and fresh review screenshots.
 
 | Milestone | Deliverable | State |
 | --- | --- | --- |
@@ -53,7 +55,7 @@ fresh review screenshots.
 | M5 | Met: `./gradlew check` green and `runGameTestServer` all required tests pass; the determinism gate is met (`DeterminismTest`); capture-revision lease invalidation is in place. |
 | M5a | Met: `LevelWatchTest` covers the refcounted watched chunks, the epoch and the lazy fingerprints; `LeaseMarkCounterGameTest` covers set-block, outside-chunk, revert, entity join/leave/move, a 10k high-frequency move sweep with no dispatch, chunk unload and level epoch; a stale lease is never current and no chunk is loaded. |
 | M5d | Met: `OrientationMappingTest` covers the 8 upright and 40 non-upright orientations, the mapped and unrepresentable fixtures and the inverse round-trip; no silent identity. |
-| M5e | Met: `CaptureReportTest` covers the payload and the compatibility constructors; `CaptureReportsTest` covers severity, the trust guard, the world label and notes; `NestedCaptureGameTest` covers the over-cap entry and a cut reason with the unchanged `nested(cell) == null`; `CaptureAuditGameTest` covers the grouped orientation audit and no chunk load; `CommandCaptureReportGameTest` covers the print order and the `SC-MC-0005` command surfacing. `Codes.all` stays at 56 and `./gradlew check` plus `runGameTestServer` are green. |
+| M5e | Met: `CaptureReportTest` covers the payload and the compatibility constructors; `CaptureReportsTest` covers severity, the trust guard, the world label and notes; `NestedCaptureGameTest` covers the over-cap entry and a cut reason with the unchanged `nested(cell) == null`; `CaptureAuditGameTest` covers the grouped orientation audit and no chunk load; `CommandCaptureReportGameTest` covers the print order and the `SC-MC-0005` command surfacing. `Codes.all` is 64 and the focused gates are green. |
 | S6 | Met: `SitedDescriptorGameTest` covers upright and non-upright definition-frame descriptors, unoriented/identity raw descriptors, the unrepresentable raw fallback with `SC-MC-0004`, a `property` expectation matching at a rotated siting, and child frames staying world-frame; `world` §4.7 owns the frame law and the kernel keeps no transform. |
 
 ## Owners

@@ -44,9 +44,11 @@ Then the module files, in dependency order:
 
 ## Status
 
-- Design revision: **v1.2**, 2026-10-27. The v1.1 round specified Model C (body identity, the
-  narrowest-read refusal, four-state traits) and the nested capability; v1.2 records them as
-  implemented, and its M5a/M5d/M5e slices close the adapter round.
+- Design revision: **v1.2**, 2026-10-27, plus the [08 context-cache](design/08-context-cache.md) and
+  [09 structure-set](design/09-structure-sets.md) extension documents. The v1.1 round specified
+  Model C (body identity, the narrowest-read refusal, four-state traits) and the nested capability;
+  v1.2 records them as implemented, and its M5a/M5d/M5e slices close the adapter round. 08/09 specify
+  the host-owned cached-context port (D-31) and the root/satellite set layer (D-32).
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -72,26 +74,35 @@ Then the module files, in dependency order:
   descriptors, an unrepresentable state keeps the raw one and still reports `SC-MC-0004`. Kernel
   stress batch 1 (tag `kernel-stress-batch-1`, `110e797`) adds 44 characterization scenarios across
   12 `engine` classes, and batch 2 (tag `kernel-stress-batch-2`, `3e60ed4`) adds 17 kernel scenarios
-  plus 11 adapter unit tests and fixes `NestedFocus` to bind no subject; the pre-envelope suite is 186
-  kernel tests in 33 containers and 141 adapter unit tests, and the documented gaps are in
+  plus 11 adapter unit tests and fixes `NestedFocus` to bind no subject; the documented gaps are in
   `design/06-verification.md` §3.1/§3.2. D-30 adds the derived envelope: `BlueprintBuilder.envelope()`
   / the root `"envelope": true` member closes the bounds with a reserved
   `structurecumulus:envelope` bay and check, a foreign occupant is `SC-EXP-0006`, and an empty
   uncovered set is a no-op. Its batch adds 22 kernel tests (19 in two new containers plus three
-  `DocumentCompilerTest` cases) and four `JsonDocumentTest` cases. Pending
-  only: the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review
-  screenshots. There is no regeneration milestone.
+  `DocumentCompilerTest` cases) and four `JsonDocumentTest` cases. D-31 adds the optional
+  `MatchRequest.cachedContext` port: a host-owned `(id, type)` value cache composed with the attempt
+  context, current attempt authoritative, no kernel writes or invalidation (`681c505`). D-32 adds the
+  structure-set layer: the `structure_set` document IR/reader/writer/compiler (`9cf2794`,
+  `00cf6c4`), the host `StructureSet` plan and `StructureSetHost` orchestration with rollback
+  (`93f5941`), and the seven `SC-SET` codes. SS4 adds the six-class/33-test structure-set stress
+  suite (`design/06-verification.md` §3.3) and the counts close-out. The tree registers 257 kernel
+  tests in 40 containers, 241 adapter unit tests in 32 containers and 79 `@GameTest` methods; the last
+  full green `./gradlew check` is at `3e60ed4` (186 kernel tests in 33 containers, 141 adapter tests)
+  and the last recorded `runGameTestServer` is 66/66 at `6263414`. Slices after `3e60ed4` report
+  focused runs only. Pending only: the performance/cost pass (block-entity-lazy and entity sweep) and
+  fresh visual review screenshots. There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-28, HEAD `3e60ed4`): the kernel compiles with `javac --release 21` and JSpecify
-  only; 186 kernel JUnit 5 tests (33 test containers) and 141 adapter unit tests pass;
-  `runGameTestServer` passes 66/66;
-  `./gradlew check` is green; `tools/spec-check.py` is clean; `git diff --check` is clean. `Codes.all`
-  has 57 entries and the decision record has 30 decisions (D-30). The envelope batch is uncommitted
-  from `1bf0cef`: its focused `compileKernelTestJava`, `compileTestJava`, `kernelTest` and `test`
-  selections are green; no full-suite result is claimed for it.
+- Verification (2026-10-28, HEAD `93f5941` plus the SS4 working tree): the kernel compiles with
+  `javac --release 21` and JSpecify only. The tree registers 257 kernel JUnit 5 tests (40 test
+  containers), 241 adapter unit tests (32 containers) and 79 `@GameTest` methods; the last full
+  `./gradlew check` is at `3e60ed4` (186/141) and the last recorded `runGameTestServer` is 66/66 at
+  `6263414`, so no full-suite or GameTest result is claimed for this revision. SS4's focused gates
+  are `compileKernelTestJava`, `compileTestJava`, the structure-set `kernelTest` and `test`
+  selections, `spotlessCheck`, `tools/spec-check.py` and `git diff --check`, all green. `Codes.all`
+  has 64 entries and the decision record has 32 decisions (D-32).
 
 ## The one rule
 

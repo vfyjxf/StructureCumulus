@@ -454,8 +454,9 @@ The four rulings this record fixes:
   `TooLarge` carry entries, `Unavailable` normally none because its own code already is its finding.
 - **Adapter-only codes are catalog codes.** The adapter registers `SC-MC-0001`…`0005` in its own code
   catalog through `Catalogs.Builder.codes`, so each carries a canonical severity and an explanation
-  and `/cumulus explain` resolves it. `Codes.all` stays kernel-only (57 entries after D-30); the
-  kernel registry is not a host registry, and a host code never enters it.
+  and `/cumulus explain` resolves it. `Codes.all` stays kernel-only (64 entries after the
+  structure-set family, D-32); the kernel registry is not a host registry, and a host code never
+  enters it.
 - **The severities are the host's.** `SC-MC-0005` (refused root) is an ERROR; `SC-MC-0003` (cut) and
   `SC-MC-0004` (orientation mismatch) are WARNINGs, because a check can still pass over both, and a
   warning printed before a `Formed` summary is honest while an error would not be.
@@ -573,6 +574,76 @@ definition is `SC-DOC-0002`; an empty `E` changes nothing. **Status:** implement
 `BlueprintBuilder`, `Expectations.envelopeAir`, `BlueprintSpec`/`DocumentCompiler`,
 `JsonReader`/`JsonWriter`, `Codes.envelopeOpen` and the envelope tests.
 
+### D-31 — Cached context is a host-owned `(id, type)` value cache
+
+`MatchRequest.cachedContext` carries an optional `CachedContext`: a read-only `(id, type)` lookup for
+values an earlier settle/derive produced. The current attempt is authoritative. A value computed or
+published in this attempt wins; a cached value is visible only for an instance key the plan declares
+(`ExpectationMeta.requires()` for a check, `Computation.inputs()` for an aggregate); a missing or
+wrong-typed cached value stays absent. Producer-only key fields (`merge`, `whenAbsent`, `retention`)
+are not part of the lookup key. The kernel never writes, serialises, stamps, evicts or invalidates the
+cache; the host owns every freshness rule.
+
+The alternatives were rejected:
+
+- **Keying the cache by the full `ContextKey`** would force a host to reconstruct producer-only fields
+  it never stored, and a cached value whose producer merged differently would not match its own key.
+- **A kernel cache** would make a match result depend on hidden host state and break the determinism
+  tuple (Law 11); the default path must stay a fresh computation.
+- **Check-only visibility** would leave an aggregate unable to read the prior structure context even
+  when it declares that key as an input.
+
+**Why:** the cache is a host optimisation, not a match input. One read-only port with the existing
+absence semantics keeps the kernel free of eviction and freshness policy while letting a host reuse a
+large aggregate across attempts.
+
+**Consequence:** a cache hit cannot change the attempt's tuple, bypass the read scope, or skip the
+budget; the current attempt's value always wins; and the host owns eviction (the shipped in-memory
+persistence grows one entry per instance, `06-verification.md` §3.2 D5). **Status:** implemented in
+`CachedContext`, `MatchRequest.cachedContext`, `MatchEngine`, `Computations`/`Expectations` and
+`08-context-cache.md`; the focused evidence is `CachedContextTest`, `AggregateContextTest` and
+`ComputationsCountTest`.
+
+### D-32 — A structure set is a derived host layer, not a kernel transaction
+
+A `Blueprint` remains one structure: one bounds, one siting, one check, one settle, one claim set.
+The `structure_set` document adds a root blueprint, satellites placed in the root local frame, and
+optional face/range/logical links between local root cells and local satellite cells.
+`StructureSetCompiler` resolves the members and compiles their blueprints; the adapter's
+`StructureSet` composes the host root siting with each relative siting and maps bounds and presence
+into world space; `StructureSetHost` sequences presence, link validation, check-all, settle-all and
+release. The kernel gains no set type, no multi-structure ledger transaction, no claim transaction
+and no context rollback.
+
+The alternatives were rejected:
+
+- **A kernel multi-structure engine** would duplicate the budget, read-scope, claim, context and
+  determinism rules on a second path, and make one attempt's tuple depend on the whole set.
+- **A merged mega-blueprint** cannot express optional satellites, per-satellite arguments, independent
+  claims or per-structure outcomes; it would turn a skipped preheater into a required cell.
+- **World coordinates in the set document** would make it a placement record, not a portable graph;
+  a satellite is exactly `rootSiting.compose(relativeSiting)`, and a null composition is a finding.
+- **A kernel context rollback** would hide the published value from the host that owns the instance;
+  release is claim-only and the result names every rolled-back id.
+- **Host-only JSON parsing without the document layer** would lose the shared schema, spans and the
+  `(blueprint, effective arguments)` compile cache; the set document reuses the blueprint compiler.
+
+**Why:** a set is placement and orchestration policy over the single-structure primitives. It reuses
+`Siting.compose`, `Blueprint.reads`, the check/settle split, the ledger CAS and the per-structure
+`MatchOutcome` without weakening a kernel law, and it keeps the host responsible for the lifecycle it
+alone can observe.
+
+**Consequence:** set failures live in the `set` code family (`SC-SET-0001`…`0007`); presence and links
+are host work before any check; any failure before a settle means no settle; a settle failure releases
+the formed structures in reverse declaration order and reports a failed release as `SC-SET-0007`;
+`claims` is filtered by `(owner, siting, bay)` so a ledger-wide `ClaimSet` never leaks another
+structure's rows; a rolled-back structure keeps the context its settle published (`ContextStore` has
+no removal operation, so the host owns whatever it does with that `InstanceId`); nested sets,
+satellite-of-satellite, automatic retry, world-coordinate placement in the document and a
+command/capture executor for a set are out. **Status (SS4):** the document/compiler layer landed at
+`9cf2794`/`00cf6c4`, the host plan and orchestration at `93f5941`, and SS4 adds the six-class/33-test
+stress suite plus the counts and gap close-out (`06-verification.md` §3.3).
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -602,9 +673,17 @@ definition is `SC-DOC-0002`; an empty `E` changes nothing. **Status:** implement
 - A cell outside every bay is ignored unless the blueprint opts into `envelope` (D-30). Then every
   cell inside `bounds` is judged: a port or an "any occupant" cell has to be a declared bay, and only
   cells outside `bounds` stay invisible.
-- Model C, the nested capability, the capture report, the root descriptor projection (D-29) and the
-  derived envelope (D-30) are implemented, and the spec index is green; what remains is the
-  performance/cost pass and fresh visual review screenshots (D-02, `07-regeneration.md` §7).
+- Model C, the nested capability, the capture report, the root descriptor projection (D-29), the
+  derived envelope (D-30), the cached-context port (D-31) and the structure-set host layer (D-32) are
+  implemented, and the spec index is green; what remains is the performance/cost pass and fresh visual
+  review screenshots (D-02, `07-regeneration.md` §7).
+- A structure set is not atomic across structures or context (D-32): a later settle failure releases
+  the earlier claim rows in reverse order, but the earlier kernel contexts stay published.
+  `StructureSetResult.rolledBack` is the host's list, and `ContextStore` has no removal operation; the
+  host must use a fresh instance or its own store if it needs invalidation.
+- Presence is charged to a ceiling seeded from the run budget's `cells`, while each structure attempt
+  still receives the full `Budget`; a set's total reads can therefore exceed `budget.cells()`
+  (`06-verification.md` §3.3).
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates

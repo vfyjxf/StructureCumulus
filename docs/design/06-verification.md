@@ -18,30 +18,36 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
-Current evidence (2026-10-28, HEAD `3e60ed4`): M1, M2a, M2b, M2c, M2d and M3 (`d4b6d82`) are
-committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`),
-capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase capture (P1, `56c632c`),
-the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright orientation remap (M5d,
-`ac11d0c`), the capture report (M5e, `28d0334`) and the sited-root descriptor projection (S6, D-29)
-are implemented, and the two stress batches add characterization scenarios: batch 1
-(`kernel-stress-batch-1`, `110e797`) 44 kernel scenarios (§3.1) and batch 2
-(`kernel-stress-batch-2`, `3e60ed4`) 17 kernel scenarios plus 11 adapter unit tests (§3.2).
-`./gradlew check` is green: 186
-kernel tests (33 test containers), 141 adapter unit tests, 0 failures, 0 skipped;
-`runGameTestServer` passes 66/66.
-`tools/spec-check.py` is clean. Model C, body identity, trait capture, the nested capability, the
-mark counter, the capture-report channel and the definition-frame descriptor projection are
-implemented, not pending. The determinism gate is
-implemented (`DeterminismTest`): canonical bytes across member order, the parse/write fixed point,
-equal compile runs and stable finding order. `Codes.all` has 57 entries and the decision record has 30
-decisions (D-30).
+Current evidence (2026-10-28, HEAD `93f5941` plus the SS4 working tree): M1, M2a, M2b, M2c, M2d and
+M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
+`explain`, `claims`), capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase
+capture (P1, `56c632c`), the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright
+orientation remap (M5d, `ac11d0c`), the capture report (M5e, `28d0334`) and the sited-root descriptor
+projection (S6, D-29) are implemented. The two stress batches add characterization scenarios: batch 1
+(`kernel-stress-batch-1`, `110e797`) 44 kernel scenarios (§3.1) and batch 2 (`kernel-stress-batch-2`,
+`3e60ed4`) 17 kernel scenarios plus 11 adapter unit tests (§3.2). The envelope (`a5f7084`), the cached
+context port (`681c505`, D-31), the structure-set document/compiler (S2, `00cf6c4`) and the host set
+layer (S3, `93f5941`, D-32) are implemented; SS4 adds the six-class/33-test structure-set stress batch
+(§3.3) and this close-out. The last full `./gradlew check` is at `3e60ed4`: 186 kernel tests (33
+containers), 141 adapter unit tests, 0 failures, 0 skipped, and the last recorded `runGameTestServer`
+is 66/66 at `6263414`. The tree now registers 257 kernel tests in 40 containers, 241 adapter unit
+tests in 32 containers and 79 `@GameTest` methods; the slices after `3e60ed4` report focused runs only
+in this design set, so no full-suite or GameTest result is claimed for this revision.
+`tools/spec-check.py` is clean. `Codes.all` has 64 entries and the decision record has 32 decisions
+(D-32). Model C, body identity, trait capture, the nested capability, the mark counter, the
+capture-report channel, the definition-frame descriptor projection, the cached-context port and the
+structure-set layer are implemented, not pending. The determinism gate is implemented
+(`DeterminismTest`): canonical bytes across member order, the parse/write fixed point, equal compile
+runs and stable finding order.
 
-The envelope batch (uncommitted, based on `1bf0cef`) adds `EnvelopeTest` (7 tests),
-`EnvelopeScenarioTest` (12 tests) and three `DocumentCompilerTest` cases in the kernel, plus four
-`JsonDocumentTest` cases in the adapter. Its focused runs are green: `compileKernelTestJava`,
-`compileTestJava`, `kernelTest --tests '*Envelope*' --tests '*CodesTest' --tests
-'*DocumentCompilerTest'` and `test --tests '*JsonDocumentTest'`; no full-suite run is claimed for
-that batch.
+The envelope batch (`a5f7084`) adds `EnvelopeTest` (7 tests), `EnvelopeScenarioTest` (12 tests) and
+three `DocumentCompilerTest` cases in the kernel, plus four `JsonDocumentTest` cases in the adapter.
+The context-cache batch (`681c505`) adds 31 kernel tests across four classes and changes the aggregate
+scenario; the structure-set slices add `StructureSetCompilerTest` (13 kernel tests),
+`JsonStructureSetTest` (10), `StructureSetPlanTest` (6), `StructureSetHostTest` (22),
+`DatapackStructureSetTest` (5) and the SS4 stress suite (33). Their focused runs are green:
+`compileKernelTestJava`, `compileTestJava`, `kernelTest` selections and `test` selections; no
+full-suite result is claimed for any of them.
 
 **What remains.** Two items only: the performance/cost pass over the block-entity-lazy and entity
 sweep, and fresh visual review screenshots. There is no regeneration milestone. The former
@@ -208,6 +214,37 @@ and not a pending list:
 building a blueprint that can never admit (`NestedCoverageScenarioTest`, `3e60ed4`; `structure` §4.4).
 The `anySubject + Bound` acceptance above remains the open half and is characterized, not fixed.
 
+### 3.3 Structure-set stress batch (SS4)
+
+The structure-set characterization suite, added in SS4: six adapter classes and 33 tests in
+`src/test/.../mc`, over the same in-memory `WorldView`, `ClaimLedger` and `ContextStore` as §3 and
+with no GameTest. It adds no kernel type, no code, no kernel scenario obligation and no decision; it
+drives the adapter's `StructureSet.place` and `StructureSetHost` against realistic member shapes and
+records every limitation it meets.
+
+| Class | Shape it drives | Tests |
+| --- | --- | --- |
+| `ImprovedBlastFurnaceSetStressTest` | IE improved blast furnace: 3×3×3 casing shell, two optional preheaters, a wide hot-blast main with three face pairs, one/both optional absent, required absence, claims disjoint | 5 |
+| `TepReactorSetStressTest` | TEP reactor: several solar generators range-fan-in to one controller cell, chebyshev/manhattan/euclidean, optional absence, out-of-range failure, an absent optional link still validated, euclidean squared boundary | 6 |
+| `LogicalSubnetworkSetStressTest` | AE2 logical subnetwork: no links / `mode: none`, required and optional presence, partial presence, unreadable presence, entity is not presence, presence-budget exhaustion, one-cell roots under a shared ceiling | 8 |
+| `PortEnvelopeSetStressTest` | controller/port root: the parent cell is a declared bay/check, a satellite outside the envelope, a satellite inside it (`SC-EXP-0006`), an envelope-read parent without a bay, a bay cell no check reads (`SC-SET-0003`) | 4 |
+| `StructureSetRotationStressTest` | root identity/clockwise/half/counterclockwise, relative half alignment, composed orientation `root ∘ relative`, wide main under a half turn, exact world mapping | 4 |
+| `StructureSetRollbackStressTest` | root and satellite check failure, settle-failure reverse release, failed release `SC-SET-0007`, ledger-wide claim filtering with foreign rows, required-last declaration order, context left published | 6 |
+
+**Characterized gaps** — documented limitations, each with its asserting test; they are not owed work
+and not a pending list:
+
+| Gap | Asserted by |
+| --- | --- |
+| Presence is charged to a `cells` ceiling seeded from the run budget, while every structure attempt still receives the full `Budget`; a set's total reads can exceed `budget.cells()` | `LogicalSubnetworkSetStressTest.presenceAndEachStructureAttemptUseTheFullBudgetCeiling` |
+| A rolled-back structure keeps the `StructureContext` its settle published; `ContextStore` has no removal operation, so the design's host-side invalidation (09 §10.3) is not expressible through the kernel API | `StructureSetRollbackStressTest.aSettleFailureReleasesInReverseOrder` |
+
+**Boundaries, not gaps.** The host re-checks link distance and coverage but not the compiler's
+duplicate placement/parent-face rules (09 §6.4, §9); a hand-built `CompiledStructureSet` is assumed to
+have passed the compiler. The adapter still has no command or capture executor for a set, and no
+GameTest covers the set layer: `StructureSetHost` is a library entry point (§13.5) exercised only by
+the adapter unit suite.
+
 ## 4. Module tests
 
 | Module | Must test |
@@ -219,14 +256,17 @@ The `anySubject + Bound` acceptance above remains the open half and is character
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |
 | `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations, derived envelope (empty no-op, reserved id, idempotent build) |
 | `context` | context view, publish merge/revision, derive order, merges |
-| `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity, root-only envelope and definition rejection |
+| `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity, root-only envelope and definition rejection, structure-set schema/compile/link/presence/duplicate rules |
 | `engine` | §3 scenarios and the §3.1/§3.2 stress batches, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection, envelope strict air, unreadable and budget paths |
 | `remedy` | provider order/cap, edit/overlay values |
 | `spi` | builtins, host empty, facade paths, two-kernel isolation |
 
+The §3.3 structure-set suite is adapter-level (`src/test`), not a kernel module; it is listed in §3.3
+and in `adapter.md` §13, not in this table.
+
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. `Codes.all` has 57 entries in this revision, matching the
+The authoritative table is `finding.md` §6. `Codes.all` has 64 entries in this revision, matching the
 registry. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
@@ -276,13 +316,24 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 21. Can a cell inside `bounds` escape the envelope, or a cell outside it become evidence? (structure:
     `E` is the bounds minus every bay and declared footprint; engine: only `E` is read, and a siting
     maps it)
+22. Can a set settle a structure after presence, link or check has failed? (host: presence and links
+    run before any check, any error returns before the first settle, and a failed check stops the
+    remaining checks)
+23. Can a rolled-back structure keep claim rows, or can one structure's view leak a foreign owner's
+    rows? (host: release removes every `(owner, siting)` row for the released structure, and
+    `claimsOf` filters by `(owner, siting, bay)`; §3.3)
+24. Can a satellite link be considered aligned under a root rotation without composing both sitings?
+    (host: the plan is `rootSiting.compose(relativeSiting)`, and both endpoints are mapped through
+    their own sitings; §3.3)
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. All 66 GameTests are executed by
-  `runGameTestServer`: M1 capture/host, M2a entity precedence, M2b orientation, M3 claims, M2c traits,
-  M2d nested frames/cuts, capture-revision lease invalidation (`LeaseLifecycleGameTest`), the
-  watched-region mark counter (`LeaseMarkCounterGameTest`), the rotated-siting two-phase capture
+- The rest of the NeoForge adapter and its GameTests. The tree registers 79 `@GameTest` methods; the
+  last recorded full `runGameTestServer` is 66/66 at `6263414`, before the later stress batches and
+  slices, and SS4 ran no GameTest. The registered set covers M1 capture/host, M2a entity precedence,
+  M2b orientation, M3 claims, M2c traits, M2d nested frames/cuts, capture-revision lease invalidation
+  (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
+  rotated-siting two-phase capture
   (`RotatedSitingGameTest`), the M4 command surface (`SettleCommandGameTest`, `CommandGameTest`), the
   M5e capture report (`CaptureAuditGameTest`, `CommandCaptureReportGameTest`, `NestedCaptureGameTest`),
   the claims read in check (`CheckClaimsGameTest`) and the S6 projection
@@ -299,8 +350,10 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   site, and the batch-2 persistence/policy units `EntityWindowPolicyTest` (D4 local-window
   characterization), `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row
   collapse) and `SavedContextsLifecycleTest` (merge/reload, instance isolation, D5 growth, unknown
-  type). **What remains:** the performance/cost pass (block-entity-lazy and entity sweep) and fresh
-  visual review screenshots. There is no regeneration milestone.
+  type), and the structure-set units `StructureSetPlanTest`, `StructureSetHostTest`,
+  `DatapackStructureSetTest` and the six-class SS4 stress suite (§3.3). **What remains:** the
+  performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+  There is no regeneration milestone.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.
 - A real JSON parser; the kernel ships `Value` and the ports; a test writer/reader is test-only.

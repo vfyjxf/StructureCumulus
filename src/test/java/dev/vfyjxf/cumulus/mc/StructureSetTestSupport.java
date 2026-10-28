@@ -335,6 +335,13 @@ final class StructureSetTestSupport {
             return this;
         }
 
+        TestView putEntity(LatticePoint cell, NamespacedId type) {
+            OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.entity, cell);
+            OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity, Map.of(), List.of());
+            occupants.put(cell, new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), List.of()));
+            return this;
+        }
+
         TestView air(LatticePoint cell) {
             occupants.put(cell, OccupantSnapshot.air(snapshot, 0, cell));
             return this;
@@ -545,6 +552,13 @@ final class StructureSetTestSupport {
         int settleCalls;
         int releaseCalls;
         final List<Siting> released = new ArrayList<>();
+
+        void seed(ClaimRow... seeded) {
+            for (ClaimRow row : seeded) {
+                rows.add(row);
+            }
+            rows.sort(ClaimRow::compareTo);
+        }
 
         @Override
         public World world() {

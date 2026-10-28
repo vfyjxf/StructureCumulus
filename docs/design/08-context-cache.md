@@ -1,6 +1,6 @@
 # 08. Context cache extension
 
-> Status: implemented. This document is the source of truth for the cached-context seam; the module
+> Status: implemented (D-31). This document is the source of truth for the cached-context seam; the module
 > files record the same contract.
 
 ## 1. Purpose

@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S3)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S4)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -39,7 +39,10 @@
   capture so the sited world bounds are captured under the resolved siting (`56c632c`). M5d: the
   non-upright orientation remap with `MappingResult.Unrepresentable` (`ac11d0c`). M5e: the capture
   report (over-cap `SC-MC-0005`, cut `SC-MC-0003`, the sited-capture `SC-MC-0004` audit, the
-  `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`.
+  `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`. S1–S4 add the structure-set
+  layer: `Siting.compose` and the seven `SC-SET` codes (`9cf2794`), the set document IR/reader/
+  writer/compiler (`00cf6c4`), the host `StructureSet` plan, `StructureSetHost` and `StructureSetResult`
+  (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3).
 - **Implemented (S6).** The sited-root descriptor projection (D-29): a capture carrying a siting
   orientation publishes definition-frame descriptor properties, so a `property` expectation matches at
   a rotated siting without a kernel change (§3, §10); an unrepresentable state keeps its raw
@@ -505,7 +508,7 @@ on a rotated siting is possible only for a cell that also carries `SC-MC-0004`.
 The adapter registers those codes in its own code catalog through `Catalogs.Builder.codes`
 (`AdapterCodes` holds the five codes and their entries), so each carries the canonical severity
 above and an explanation, and `/cumulus explain` resolves it. The catalog is the host's, not
-`Codes.all`: `Codes.all` stays at 56 entries, and a capture entry's code is never a kernel registry
+`Codes.all`: `Codes.all` stays at 64 entries, and a capture entry's code is never a kernel registry
 entry. `CaptureReports` is the only report site: it reads the code's `CodeEntry` (or answers `error`
 when the host registered none), relays the entry as a finding, and applies the kernel's trust guard —
 a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (`world` §4.1, §4.10).
@@ -527,8 +530,10 @@ either the placed set or the findings, never a partially placed set.
 ### 13.2 Presence and budget
 
 Presence is probed for required satellites first and then optional ones, each group in declaration
-order. Presence is read through the lease's `WorldView.read`; every read cell is charged to the run
-budget's `cells` ceiling. A satellite is present when its presence region holds a non-air block-family
+order. Presence is read through the lease's `WorldView.read`; every read cell is charged to a ceiling
+seeded from the run budget's `cells`. Each structure check is a separate kernel attempt and receives
+the full `Budget`, so the set's total reads can exceed `budget.cells()` (`06-verification.md` §3.3).
+A satellite is present when its presence region holds a non-air block-family
 occupant (`block` or `blockEntity`); entities, fluids and nested bodies do not prove presence. The
 first non-air block proves presence and stops the probe; an unreadable cell or budget exhaustion
 makes presence unknown. A present satellite is checked; an absent required satellite is
@@ -569,9 +574,14 @@ the context of every id in `rolledBack`.
 ### 13.5 Boundaries
 
 There is no kernel multi-structure engine, no command that runs a set and no capture executor for a
-set in this slice: the host plan and `StructureSetHost` are a library entry point the host may drive.
-No claim transaction spans structures; each settle is independent and a later satellite's CAS retry
-sees the earlier rows through the ledger.
+set: the host plan and `StructureSetHost` are a library entry point the host may drive. No claim
+transaction spans structures; each settle is independent and a later satellite's CAS retry sees the
+earlier rows through the ledger. Rollback releases claims only; a rolled-back structure keeps its
+kernel context, and `ContextStore` has no removal operation, so `StructureSetResult.rolledBack` is
+the host's own invalidation list. The SS4 stress suite (`ImprovedBlastFurnaceSetStressTest`,
+`TepReactorSetStressTest`, `LogicalSubnetworkSetStressTest`, `PortEnvelopeSetStressTest`,
+`StructureSetRotationStressTest`, `StructureSetRollbackStressTest`; 33 tests) exercises these rules
+with fake views, leases and ledgers; no GameTest drives a set.
 
 ## 14. What is deliberately absent
 

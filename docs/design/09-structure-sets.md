@@ -1,9 +1,9 @@
 # 09. Structure sets and satellites
 
-> Status: S1, S2 and S3 implemented; S4 (counts, stress, docs close-out) pending. This document
-> remains the source of truth for the structure-set layer; the document IR, JSON
-> reader/dispatcher/writer, `StructureSetCompiler`, the host plan and the host orchestration are on
-> the tree.
+> Status: implemented (S1, S2, S3 and S4). This document remains the source of truth for the
+> structure-set layer; the document IR, JSON reader/dispatcher/writer, `StructureSetCompiler`, the
+> host plan, the host orchestration and the SS4 stress suite are on the tree. Visual review stays
+> last and was not regenerated.
 
 ## 1. Purpose
 
@@ -333,9 +333,14 @@ Entities, fluids, and nested bodies do not prove presence.
 
 Presence is read through `WorldView.read`:
 
-- every cell is charged to the attempt budget;
+- every cell is charged against the run budget's `cells` ceiling, which the host tracks separately
+  from the per-structure attempt budgets;
 - an unreadable cell makes presence unprovable;
 - presence never bypasses the engine budget.
+
+The host seeds one presence ceiling from `Budget.cells()`; each structure check is a separate kernel
+attempt and receives the full `Budget`, so a set's total reads can exceed `budget.cells()`
+(characterized in `06-verification.md` §3.3).
 
 ### 7.4 Required / optional
 
@@ -418,8 +423,9 @@ If a settle fails:
 - report rollback failures with `SC-SET-0007`;
 - do not auto-retry.
 
-`release(owner, siting)` is coarse and advances the ledger revision. The host must also invalidate
-context for released structures; kernel context is not rolled back.
+`release(owner, siting)` is coarse and advances the ledger revision. Kernel context is not rolled
+back, and `ContextStore` has no removal operation: a rolled-back structure keeps its published
+context, so the host owns whatever invalidation policy it applies (`06-verification.md` §3.3).
 
 ### 10.4 Result
 
@@ -442,7 +448,8 @@ check/settle result's findings (a formed structure's warnings included). `claims
 filtered by `(owner, siting, bay)`; the ledger row set is ledger-wide and a `Formed.claims()` may
 carry rows of other structures. `settled` is the settle order and `rolledBack` is the release
 order. Rollback releases claims only: the kernel context published by a rolled-back `settle` stays,
-so the host must invalidate the context of every id in `rolledBack`.
+and `ContextStore` exposes no removal, so the result names every id in `rolledBack` for the host's own
+invalidation policy.
 
 ## 11. Java API
 
@@ -510,7 +517,8 @@ the instances are allocated in check order root-first.
 
 ## 13. Codes
 
-Add a `set` family to `FindingCode.Family` and seven entries to `Codes.all` (57 -> 64):
+A `set` family was added to `FindingCode.Family` with seven entries in `Codes.all` (57 -> 64; the
+registry now has 64):
 
 | Code | Meaning | Producer |
 | --- | --- | --- |
@@ -554,7 +562,8 @@ Document errors reuse existing codes:
 - Presence: block present, all air, unreadable, optional unknown, required absent.
 - Arguments shallow merge and per-instance compile.
 - Duplicate id/placement rejection.
-- Host check-all/settle-all/rollback, ledger-wide claims filtering, context invalidation.
+- Host check-all/settle-all/rollback, ledger-wide claims filtering; context stays published on
+  rollback because the kernel has no removal (06 §3.3).
 - Document errors: unknown kind, missing blueprint, nested set, duplicate id, invalid link/presence.
 - Codes family and count.
 
@@ -579,14 +588,18 @@ Document errors reuse existing codes:
   `JsonValues` encoder. `JsonReader` accepts an optional `kind: "blueprint"`. The focused tests are
   `StructureSetCompilerTest` (13 tests) and `JsonStructureSetTest` (10 tests); `document.md` §4.5
   owns the set schema.
-- **S3** is implemented in the working tree (uncommitted, based at `00cf6c4`). `mc` gains the host
-  plan `StructureSet`/`StructureSet.Satellite`/`StructureSet.Placement`, the orchestration
-  `StructureSetHost`, and `StructureSetResult`; the result adds the per-structure filtered `claims`
-  map to the five-field shape above. `DatapackBlueprints` loads `structure_set` files beside
-  blueprints and `ServerState` serves `findSet` and compiles a set. Focused tests are
-  `StructureSetPlanTest` (6 tests), `StructureSetHostTest` (22 tests) and
-  `DatapackStructureSetTest` (5 tests).
-- **Not in S3:** a command or capture executor that runs a set; the adapter result is a library
-  entry point only. The S4 counts, stress scenarios and docs close-out remain.
+- **S3** landed at `93f5941` (based at `00cf6c4`). `mc` gains the host plan
+  `StructureSet`/`StructureSet.Satellite`/`StructureSet.Placement`, the orchestration
+  `StructureSetHost`, and `StructureSetResult`; the result carries the per-structure filtered `claims`
+  map. `DatapackBlueprints` loads `structure_set` files beside blueprints and `ServerState` serves
+  `findSet` and compiles a set. Focused tests are `StructureSetPlanTest` (6 tests),
+  `StructureSetHostTest` (22 tests) and `DatapackStructureSetTest` (5 tests).
+- **S4** is implemented in the working tree after `93f5941`: six adapter stress classes (33 tests) in
+  `src/test/.../mc` cover IE preheaters, TEP range fan-in, AE2 logical subnetworks, controller/port
+  envelopes, rotation and rollback (`06-verification.md` §3.3); the counts are 257 kernel tests
+  (40 containers) and 241 adapter unit tests (32 containers), `@GameTest` 79, `Codes.all` 64 and 32
+  decisions (D-32). S4 adds no kernel type and regenerates no visual.
+- **Not in the set layer:** a command or capture executor that runs a set; the adapter result is a
+  library entry point only.
 
 Visual review stays last.
