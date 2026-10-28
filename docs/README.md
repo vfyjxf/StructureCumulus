@@ -23,6 +23,7 @@ table defines who may emit each finding code.
 9. [design/08-context-cache.md](design/08-context-cache.md) — the host-owned cached-context port.
 10. [design/09-structure-sets.md](design/09-structure-sets.md) — root/satellite structure sets and links.
 11. [design/10-host-data.md](design/10-host-data.md) — host data capture and MC-specific checks.
+12. [design/11-trait-providers.md](design/11-trait-providers.md) — generic per-holder trait providers.
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
