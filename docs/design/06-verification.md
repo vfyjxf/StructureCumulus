@@ -23,7 +23,7 @@ M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`,
 `explain`, `claims`), capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase
 capture (P1, `56c632c`), the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright
 orientation remap (M5d, `ac11d0c`), the capture report (M5e, `28d0334`) and the sited-root descriptor
-projection (S6, D-29) were implemented. D-29 is superseded by the typed host snapshot (D-33,
+projection (the old S6 label, D-29) were implemented. D-29 is superseded by the typed host snapshot (D-33,
 `10-host-data.md`): the projection is retired, `OccupantDescriptor` is `(type, kind)`, and
 `OrientationAuditGameTest` covers the retained orientation audit. The two stress batches add
 characterization scenarios: batch 1 (`kernel-stress-batch-1`, `110e797`) 44 kernel scenarios (§3.1)
@@ -35,11 +35,13 @@ H1 adds `HostType`/`WorldView.get`/`Expectations.host` and `OccupantDescriptor(t
 one `SnapshotLevel` per frame and the capture wiring; H3 adds the adapter host expectation factories
 and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). The
 T1–T3 trait-provider slice (D-34) then replaces the provider shape and the trait values. S5 adds the
-production set command and its one capture, the check-only host path and the set GameTests (§3.5). On
-the S5 working tree a full `./gradlew check` and `runGameTestServer` both pass: 258 kernel tests (39
-containers), 286 adapter unit tests (37 containers), 69/69 `@GameTest` methods, 0 failures, 0 skipped.
+production set command and its one capture, the check-only host path and the set GameTests (§3.5). S6
+closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
+invalidation, and one set budget shared by presence and every member attempt (§3.3). On the S6
+working tree a full `./gradlew check` and `runGameTestServer` both pass: 261 kernel tests (39
+containers), 292 adapter unit tests (37 containers), 69/69 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
-`Codes.all` has 64 entries and the decision record has 34 decisions (D-34). Model C, body identity,
+`Codes.all` has 65 entries and the decision record has 35 decisions (D-35). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -49,9 +51,10 @@ parse/write fixed point, equal compile runs and stable finding order.
 The envelope batch (`a5f7084`) adds `EnvelopeTest` (7 tests), `EnvelopeScenarioTest` (12 tests) and
 three `DocumentCompilerTest` cases in the kernel, plus four `JsonDocumentTest` cases in the adapter.
 The context-cache batch (`681c505`) adds 31 kernel tests across four classes and changes the aggregate
-scenario; the structure-set slices add `StructureSetCompilerTest` (13 kernel tests),
-`JsonStructureSetTest` (10), `StructureSetPlanTest` (6), `StructureSetHostTest` (24, two of them S5's
-check-only path), `DatapackStructureSetTest` (5) and the SS4 stress suite (33). S5 adds the two
+scenario; the structure-set slices add `StructureSetCompilerTest` (15 kernel tests),
+`JsonStructureSetTest` (10), `StructureSetPlanTest` (8), `StructureSetHostTest` (26, two of them S5's
+check-only path), `DatapackStructureSetTest` (5) and the SS4 stress suite (34 after S6's shared-budget
+case). S6 also adds `ContextTest` (4) and `SavedContextsLifecycleTest` (6). S5 adds the two
 real-level GameTest classes below (§3.5). The host-data round adds
 `HostExpectationTest` (7 kernel tests), `McAnchorsTest` (7), `SnapshotLevelTest` (7),
 `LevelSnapshotTest` (17), `AdapterExpectationsTest` (12) and the H4 `HostDataScenarioTest` (4, §3.4).
@@ -225,35 +228,36 @@ The `anySubject + Bound` acceptance above remains the open half and is character
 
 ### 3.3 Structure-set stress batch (SS4)
 
-The structure-set characterization suite, added in SS4: six adapter classes and 33 tests in
+The structure-set characterization suite, added in SS4: six adapter classes and 34 tests in
 `src/test/.../mc`, over the same in-memory `WorldView`, `ClaimLedger` and `ContextStore` as §3 and
-with no GameTest. It adds no kernel type, no code, no kernel scenario obligation and no decision; it
-drives the adapter's `StructureSet.place` and `StructureSetHost` against realistic member shapes and
-records every limitation it meets.
+with no GameTest. SS4 added no kernel type, no code, no kernel scenario obligation and no decision;
+S6 then closes the two characterized gaps below with `SC-SET-0008`, `ContextStore.remove` and one
+shared set budget (D-35). The suite drives the adapter's `StructureSet.place` and `StructureSetHost`
+against realistic member shapes and records every limitation it meets.
 
 | Class | Shape it drives | Tests |
 | --- | --- | --- |
 | `ImprovedBlastFurnaceSetStressTest` | IE improved blast furnace: 3×3×3 casing shell, two optional preheaters, a wide hot-blast main with three face pairs, one/both optional absent, required absence, claims disjoint | 5 |
 | `TepReactorSetStressTest` | TEP reactor: several solar generators range-fan-in to one controller cell, chebyshev/manhattan/euclidean, optional absence, out-of-range failure, an absent optional link still validated, euclidean squared boundary | 6 |
-| `LogicalSubnetworkSetStressTest` | AE2 logical subnetwork: no links / `mode: none`, required and optional presence, partial presence, unreadable presence, entity is not presence, presence-budget exhaustion, one-cell roots under a shared ceiling | 8 |
+| `LogicalSubnetworkSetStressTest` | AE2 logical subnetwork: no links / `mode: none`, required and optional presence, partial presence, unreadable presence, entity is not presence, shared set budget (presence + root + satellite), a one-cell budget that cannot cover presence and an attempt | 9 |
 | `PortEnvelopeSetStressTest` | controller/port root: the parent cell is a declared bay/check, a satellite outside the envelope, a satellite inside it (`SC-EXP-0006`), an envelope-read parent without a bay, a bay cell no check reads (`SC-SET-0003`) | 4 |
 | `StructureSetRotationStressTest` | root identity/clockwise/half/counterclockwise, relative half alignment, composed orientation `root ∘ relative`, wide main under a half turn, exact world mapping | 4 |
-| `StructureSetRollbackStressTest` | root and satellite check failure, settle-failure reverse release, failed release `SC-SET-0007`, ledger-wide claim filtering with foreign rows, required-last declaration order, context left published | 6 |
+| `StructureSetRollbackStressTest` | root and satellite check failure, settle-failure reverse release, failed release `SC-SET-0007`, ledger-wide claim filtering with foreign rows, required-last declaration order, every formed context removed after rollback | 6 |
 
-**Characterized gaps** — documented limitations, each with its asserting test; they are not owed work
-and not a pending list:
+**S6 rules** — the shared budget, context invalidation and same-siting rule, each with its asserting
+tests:
 
-| Gap | Asserted by |
+| Rule | Asserted by |
 | --- | --- |
-| Presence is charged to a `cells` ceiling seeded from the run budget, while every structure attempt still receives the full `Budget`; a set's total reads can exceed `budget.cells()` | `LogicalSubnetworkSetStressTest.presenceAndEachStructureAttemptUseTheFullBudgetCeiling` |
-| A rolled-back structure keeps the `StructureContext` its settle published; `ContextStore` has no removal operation, so the design's host-side invalidation (09 §10.3) is not expressible through the kernel API | `StructureSetRollbackStressTest.aSettleFailureReleasesInReverseOrder` |
+| Presence charges one cell per read and each attempt sees the set budget minus presence and the earlier admitted spends; a budget-exhausted attempt stops the set | `LogicalSubnetworkSetStressTest.presenceAndEveryStructureAttemptShareOneBudgetCeiling`, `aOneCellBudgetCannotCoverPresenceAndAnAttempt` |
+| A rollback removes the `StructureContext` of every formed attempt, including a failed-release root; a removal `RuntimeException` is `SC-SET-0007` and does not stop the other releases | `StructureSetRollbackStressTest.aSettleFailureReleasesInReverseOrder`, `aFailedReleaseReportsScSet0007AndKeepsTheRest`; `StructureSetHostTest.aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals`, `rollbackRemovesTheKernelContextOfEveryFormedAttempt` |
+| A satellite siting equal to the root siting is rejected in the compiler, in `StructureSet.place` and defensively by the host; an origin satellite with a non-identity orientation is allowed | `StructureSetCompilerTest.aSatellitePlacedExactlyOnTheRootIsRejected`, `aSatelliteAtTheRootOriginWithANonIdentityOrientationIsAllowed`; `StructureSetPlanTest.aHandBuiltSatelliteOnTheRootSitingIsRejected`, `aSatelliteAtTheRootOriginWithANonIdentityOrientationIsAllowed`; `StructureSetHostTest.aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence` |
 
-**Boundaries, not gaps.** The host re-checks link distance and coverage but not the compiler's
-duplicate placement/parent-face rules (09 §6.4, §9); a hand-built `CompiledStructureSet` is assumed to
-have passed the compiler. S5 adds the production command and its one capture (adapter §13.5) and two
-real-level GameTest classes (§3.5), so `StructureSetHost` is no longer exercised only as a library
-entry point by the adapter unit suite. The shared budget, `ContextStore` removal and same-siting
-rejection stay S6 and out of this round.
+**Boundaries, not gaps.** The host re-checks link distance, coverage and now same-siting, but not the
+compiler's duplicate placement/parent-face rules (09 §6.4, §9); a hand-built `CompiledStructureSet` is
+otherwise assumed to have passed the compiler. S5 adds the production command and its one capture
+(adapter §13.5) and two real-level GameTest classes (§3.5), so `StructureSetHost` is no longer
+exercised only as a library entry point by the adapter unit suite.
 
 ### 3.4 Host-data stress group (H4)
 
@@ -309,7 +313,7 @@ type, no code and no decision.
 | `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors, the typed `get` default and the expectation absent code (`HostExpectationTest`) |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |
 | `structure` | bay/coverage rules, reply combinators, focus kinds, nested focus (anchor-only, no subject, cut), four-state trait expectations, build table, `Blueprint.reads` union, plan DAG, anchors, partial-slice computations, derived envelope (empty no-op, reserved id, idempotent build) |
-| `context` | context view, publish merge/revision, derive order, merges |
+| `context` | context view, publish merge/revision, remove and empty-after-remove, derive order, merges |
 | `document` | schema validation, placement/alias, key types, compile parity, determinism, trait/read-scope parity, root-only envelope and definition rejection, structure-set schema/compile/link/presence/duplicate rules |
 | `engine` | §3 scenarios and the §3.1/§3.2 stress batches, gate, budget, fold, ledger retry, partial-section `Missing`, nested-claim rejection, envelope strict air, unreadable and budget paths |
 | `remedy` | provider order/cap, edit/overlay values |
@@ -320,7 +324,7 @@ modules; they are listed in their sections and in `adapter.md` §13/§3.2, not i
 
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. `Codes.all` has 64 entries in this revision, matching the
+The authoritative table is `finding.md` §6. `Codes.all` has 65 entries in this revision, matching the
 registry. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
@@ -357,6 +361,11 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 14. Can `not(trait(...))` turn a refused or unasked trait into a pass? (structure: `Unreadable`
     stays)
 15. Can a nested body or a non-root subject become a claim row? (engine: `SC-CLM-0004`)
+16. Can a satellite share the root siting? (compiler, `place` and host: `SC-SET-0008`)
+17. Can a rolled-back structure keep a context? (host rollback: `ContextStore.remove` for every
+    formed attempt, even a failed release)
+18. Can a set read more cells than its budget? (host: one set budget; presence `(1, 0)` and admitted
+    spend are subtracted)
 16. Can a host code enter `Codes.all` or impersonate a kernel code? (world/finding: opaque payload,
     trust guard)
 17. Can a cut child appear as a refused or empty child? (adapter: `null` + `SC-OCC-0003`)

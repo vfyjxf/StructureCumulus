@@ -223,6 +223,7 @@ public final class Codes {
     public static final CodeEntry duplicatePlacement = ...;        // SC-SET-0005
     public static final CodeEntry duplicateFaceLink = ...;         // SC-SET-0006
     public static final CodeEntry rollbackFailed = ...;            // SC-SET-0007
+    public static final CodeEntry rootPlacementCollision = ...;    // SC-SET-0008
     public static final java.util.List<CodeEntry> all;
     private Codes() {}
 }
@@ -378,6 +379,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-SET-0005` | ERROR | – | duplicate satellite placement | compiler |
 | `SC-SET-0006` | ERROR | – | duplicate parent face link | compiler |
 | `SC-SET-0007` | ERROR | – | structure set rollback failed | host settle |
+| `SC-SET-0008` | ERROR | – | root/satellite placement collision | compiler, `StructureSet.place`, host check |
 | `SC-MC-0006` | ERROR | ✓ | a block property does not match | adapter `property` (mismatch) |
 | `SC-MC-0007` | ERROR | ✓ | a block state does not match | adapter `state` (mismatch) |
 | `SC-MC-0008` | ERROR | ✓ | a block/fluid/entity tag does not match | adapter `tag` (mismatch) |
@@ -385,7 +387,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-MC-0010` | ERROR | ✓ | a host snapshot value was not captured | adapter host expectations (absent) and `McAnchors` (missing anchor state), always unreadable, never a mismatch |
 | `SC-MC-*` | — | — | adapter-only family; never minted by the kernel, never in `Codes.all`; the capture paths (`0001`–`0005`) relay through a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10), and the expectation paths (`0006`–`0010`) pass `SC-MC-0010` as the absent code of `Expectations.host` (`world` §4.11) | adapter |
 
-`Codes.all` has 64 entries in this revision, matching the registry; the capture-report and host
+`Codes.all` has 65 entries in this revision, matching the registry; the capture-report and host
 expectation channels add none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot
 express the siting orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by
 the adapter in a `CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries,
@@ -399,7 +401,7 @@ neither channel suppresses the other.
 
 ## 7. Tests
 
-- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 64 entries, one per code,
+- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 65 entries, one per code,
   every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-*` are
   absent from `all`.
 - Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`

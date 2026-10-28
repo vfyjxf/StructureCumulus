@@ -26,10 +26,12 @@ follow, and the H1–H4 host-data round closes the adapter's typed-snapshot work
 projection is superseded by the typed host snapshot (D-33): the descriptor has no properties, the
 projection is retired and the orientation audit remains (`OrientationAuditGameTest`). S5 of the 09
 structure-set close-out then adds the production set command and its one capture, the check-only host
-path and the two real-level set GameTest classes. Current counts (2026-10-29, after T1–T3 and the 09
-S5 slice): **258 kernel tests in 39 containers, 286 adapter unit tests in 37 containers, 69
-registered GameTests**, `Codes.all` 64 entries, 34 decisions (D-34; D-29 superseded). A full
-`./gradlew check` and `runGameTestServer` pass on the S5 working tree (258 kernel tests, 286 adapter
+path and the two real-level set GameTest classes; S6 closes the set layer with `SC-SET-0008`
+same-siting, `ContextStore.remove` rollback invalidation and one shared set budget (D-35). Current
+counts (2026-10-29, after T1–T3, the 09 S5 slice and the 09 S6 slice): **261 kernel tests in 39
+containers, 292 adapter unit tests in 37 containers, 69
+registered GameTests**, `Codes.all` 65 entries, 35 decisions (D-35; D-29 superseded). A full
+`./gradlew check` and `runGameTestServer` pass on the S6 working tree (261 kernel tests, 292 adapter
 tests, 69/69 GameTests). Pending only: the performance/cost pass and fresh review screenshots.
 
 | Milestone | Deliverable | State |
@@ -49,7 +51,8 @@ tests, 69/69 GameTests). Pending only: the performance/cost pass and fresh revie
 | S6 | **Sited-root descriptor projection (D-29)**: root-frame `BlockState` properties projected into the definition frame before `OccupantDescriptors`; unrepresentable states keep the raw descriptor and report `SC-MC-0004`; child/nested frames and the phase-1 anchor capture stay world-frame | **superseded by D-33 (H1)**; the projection is retired and the audit stays as `OrientationAuditGameTest` |
 | H1–H4 | **Host snapshot and typed reads (D-33)**: `HostType`, `WorldView.get`, `Expectations.host`, `OccupantDescriptor(type, kind)`, one `SnapshotLevel` per frame, the adapter `property`/`state`/`tag`/`fluid` factories, `SC-MC-0006`…`0010`, and the H4 docs/counts/stress group | **implemented**; `HostDataScenarioTest` and the focused host-data units green |
 | T1–T3 | **Generic trait providers (D-34)**: `TraitProvider<T,H>`, `TraitHolder<H>`, `(trait, holder)` `TraitLookup`, `CapabilityTraitProvider<T,H,C>` + `CapabilityAccesses`, direct `IItemHandler`/`IEnergyStorage`/`IFluidHandler` values, NBT traits removed, standard providers split by holder | **implemented**; design at `11-trait-providers.md`, `TraitLookupTest`/`CapabilityTraitProviderTest`/`OccupantTraitsTest` and `TraitCaptureGameTest` green |
-| S5 (09 §16) | **Production set command**: `/cumulus set check` and `/cumulus set settle` (compile, root siting, placement), one set capture over the union bounds and union `Blueprint.reads()` policy with the root orientation, `StructureSetHost.check`, the built-in `set_root`/`set_wing`/`set_demo` documents (with `ServerState.findSet` builtin fallback), `SetCommand`, and the `StructureSetHostGameTest`/`SetCommandGameTest` real-level group | **implemented in the working tree after `9e363ad`**; focused adapter tests, full `check` and 69/69 GameTests green. Not the close-out's S5 evidence refresh; S6 (shared budget, `ContextStore` removal, same-siting rejection) stays out |
+| S5 (09 §16) | **Production set command**: `/cumulus set check` and `/cumulus set settle` (compile, root siting, placement), one set capture over the union bounds and union `Blueprint.reads()` policy with the root orientation, `StructureSetHost.check`, the built-in `set_root`/`set_wing`/`set_demo` documents (with `ServerState.findSet` builtin fallback), `SetCommand`, and the `StructureSetHostGameTest`/`SetCommandGameTest` real-level group | **implemented in the working tree after `9e363ad`**; focused adapter tests, full `check` and 69/69 GameTests green |
+| S6 (09 §16) | **Structure-set close-out**: `SC-SET-0008` same-siting at compile/placement/host, `ContextStore.remove` (`inMemory`, `SavedContexts`) and rollback invalidation of every formed attempt, one set budget shared by presence and every member attempt, D-35 and the count/docs refresh | **implemented in the working tree after `8ba240e`**; focused kernel/adapter tests, full `check` and 69/69 GameTests green |
 
 ## Acceptance
 
@@ -67,6 +70,7 @@ tests, 69/69 GameTests). Pending only: the performance/cost pass and fresh revie
 | H1–H4 | Met: `HostExpectationTest` (the bridge and caller-supplied absent code), `McAnchorsTest` (the captured anchor and `SC-MC-0010`), `SnapshotLevelTest`/`LevelSnapshotTest` (copied states, fluids, entities and typed dispatch), `AdapterExpectationsTest` (the four factories, waterlogged slab, JSON/Java parity) and `HostDataScenarioTest` (rotated structure set, nested child frame, waterlogged slab, missing snapshot). `Codes.all` is 64 and the decision record is 33. |
 | T1–T3 | Met: `TraitLookupTest` covers the generic provider, the holder pair, the duplicate pair, one trait on two holders, known-without-provider absence, unknown denial, throw/null/wrong-id refusals and the missing block entity; `CapabilityTraitProviderTest` covers one class for block and entity, direct value identity and the capture/actual inputs; `OccupantTraitsTest` covers the three direct capability keys and the absent NBT traits; `TraitCaptureGameTest` covers live `IItemHandler`/`IFluidHandler` handles, entity inventory, custom energy identity, the missing-block-entity refusal and the child frame. Block/entity capability absence, null block entity and malformed capability keep their states; plugin registration is the built-in parity path. Focused `check` (286 adapter unit tests, 258 kernel tests) and `runGameTestServer` (69/69) are green. |
 | S5 (09 §16) | Met: `StructureSetHostTest` (24 tests, two of them the check-only path), `StructureSetHostGameTest` (real capture, real ledger/contexts; check writes no row, settle writes the three cells, a failed member stops the settle) and `SetCommandGameTest` (dispatcher check/settle, exit codes, rows, `SC-SET-0001`) cover the command and the one capture; `CommandRouterTest` covers the two `set` paths. `Codes.all` stays 64 and no decision is added. Focused adapter tests (286), kernel tests (258) and `runGameTestServer` (69/69) are green on the S5 working tree. |
+| S6 (09 §16) | Met: `StructureSetCompilerTest`/`StructureSetPlanTest`/`StructureSetHostTest` cover same-siting (`SC-SET-0008`) and the allowed origin + non-identity orientation; `StructureSetRollbackStressTest` and `StructureSetHostTest` cover context removal including a failed release; `LogicalSubnetworkSetStressTest` covers the shared budget and a one-cell budget that cannot cover presence plus an attempt; `ContextTest`/`SavedContextsLifecycleTest` cover `remove`. `Codes.all` is 65 and the decision record is 35 (D-35). Focused adapter tests (292), kernel tests (261) and `runGameTestServer` (69/69) are green on the S6 working tree. |
 
 ## Owners
 
@@ -76,11 +80,12 @@ tests, 69/69 GameTests). Pending only: the performance/cost pass and fresh revie
 - C: `mc/document`, `mc/host`, `mc/command`, mod entry (M4).
 - D: GameTests and test resources.
 - E: build/CI, determinism, lease invalidation and the mark counter (M5/M5a).
-- M5d/M5e/S6 slices: mapping (`ac11d0c`), capture report (`28d0334`, with P1 at `56c632c`) and the
-  sited-root descriptor projection (D-29, now superseded by D-33); the docs amendment (S0) and the
-  evidence refresh (S5) are part of the same close-out. H1–H4: the typed host snapshot and the
-  adapter value factories (`HostDataScenarioTest`, `OrientationAuditGameTest`). T1–T3: trait-provider
-  refactor (`11-trait-providers.md`, D-34).
+- M5d/M5e slices: mapping (`ac11d0c`) and capture report (`28d0334`, with P1 at `56c632c`); the old
+  S6 label on the sited-root descriptor projection (D-29, now superseded by D-33) is not the 09 §16
+  S6. The docs amendment (S0) and the evidence refresh (S5) are part of the same close-out. H1–H4:
+  the typed host snapshot and the adapter value factories (`HostDataScenarioTest`,
+  `OrientationAuditGameTest`). T1–T3: trait-provider refactor (`11-trait-providers.md`, D-34).
+  09 §16 S6: the same-siting/removal/shared-budget close-out (D-35).
 
 ## Rules
 

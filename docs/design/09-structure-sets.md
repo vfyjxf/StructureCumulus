@@ -1,10 +1,10 @@
 # 09. Structure sets and satellites
 
-> Status: implemented (S1, S2, S3, S4 and S5); the H4 host-data round changes no set-layer rule. This
-> document remains the source of truth for the structure-set layer; the document IR, JSON
+> Status: implemented (S1, S2, S3, S4, S5 and S6); the H4 host-data round changes no set-layer rule.
+> This document remains the source of truth for the structure-set layer; the document IR, JSON
 > reader/dispatcher/writer, `StructureSetCompiler`, the host plan, the host orchestration, the SS4
-> stress suite and the S5 command/capture path are on the tree. Visual review stays last and was not
-> regenerated.
+> stress suite, the S5 command/capture path and the S6 close-out (same-siting, `ContextStore.remove`
+> and one shared set budget) are on the tree. Visual review stays last and was not regenerated.
 
 ## 1. Purpose
 
@@ -332,15 +332,17 @@ Entities, fluids, and nested bodies do not prove presence.
 
 ### 7.3 Reading and budget
 
-Presence is read through `WorldView.read`:
+The set carries **one** budget, shared by presence and every member attempt:
 
-- every cell is charged against the run budget's `cells` ceiling, which the host tracks separately
-  from the per-structure attempt budgets;
+- every presence cell is charged as a `(1, 0)` spend before it is read;
+- each structure attempt receives the set budget minus what presence and the earlier attempts spent;
+- an admitted attempt's `MatchOutcome.spend()` is added to the set spend;
 - an unreadable cell makes presence unprovable;
-- presence never bypasses the engine budget.
+- presence never bypasses the set budget.
 
-The host seeds one presence ceiling from `Budget.cells()`; each structure check is a separate kernel
-attempt and receives the full `Budget`, so a set's total reads can exceed `budget.cells()`
+Presence is read through `WorldView.read`. A budget-exhausted presence read is `SC-SET-0004`; a
+budget-exhausted attempt is the engine's `SC-ENG-0001` and stops the set, as any non-admitted check
+does. A set with `n` member attempts therefore cannot read more than `budget.cells()` cells in total
 (characterized in `06-verification.md` §3.3).
 
 ### 7.4 Required / optional
@@ -383,6 +385,12 @@ Compilation:
 
 - satellite ids are unique within the set; duplicate -> `SC-DOC-0004`;
 - `(at, orientation)` pairs are unique within the set; duplicate -> `SC-SET-0005`;
+- a satellite whose relative placement is the identity (`at = [0,0,0]`, `orientation = identity`)
+  would sit exactly on the root: the compiler rejects it with `SC-SET-0008`, `StructureSet.place`
+  reports `SC-SET-0008` for a hand-built set, and `StructureSetHost.run`/`check` re-checks a
+  hand-built plan before presence;
+- a satellite at the root origin with a non-identity orientation is allowed; its composed siting
+  differs from the root siting;
 - the same blueprint may appear several times with different ids/arguments;
 - different sitings may overlap in bounds; claims decide whether that is legal;
 - nested structure sets are not supported; a satellite must name a blueprint document.
@@ -420,13 +428,18 @@ Each settle is an independent kernel `settle`.
 If a settle fails:
 
 - release successfully settled structures in reverse order;
+- remove the `StructureContext` of every formed attempt through `ContextStore.remove(InstanceId)`,
+  regardless of the release verdict or a release throw; the removal returns the old context or
+  `null`;
 - report the original settle failure;
-- report rollback failures with `SC-SET-0007`;
+- report release and context-removal failures with `SC-SET-0007`; one failed release or removal does
+  not stop the remaining rollbacks;
 - do not auto-retry.
 
-`release(owner, siting)` is coarse and advances the ledger revision. Kernel context is not rolled
-back, and `ContextStore` has no removal operation: a rolled-back structure keeps its published
-context, so the host owns whatever invalidation policy it applies (`06-verification.md` §3.3).
+`release(owner, siting)` is coarse and advances the ledger revision. `ContextStore.remove` is the
+host-side invalidation the set needs: a formed structure's context is removed even when its release
+fails. `rolledBack` names only the attempts whose release answered `Settled`; the host owns any
+further invalidation policy (`06-verification.md` §3.3).
 
 ### 10.4 Result
 
@@ -448,9 +461,9 @@ including a structure later rolled back. `setFindings` holds the presence/link f
 check/settle result's findings (a formed structure's warnings included). `claims` holds the rows each `Formed` structure wrote,
 filtered by `(owner, siting, bay)`; the ledger row set is ledger-wide and a `Formed.claims()` may
 carry rows of other structures. `settled` is the settle order and `rolledBack` is the release
-order. Rollback releases claims only: the kernel context published by a rolled-back `settle` stays,
-and `ContextStore` exposes no removal, so the result names every id in `rolledBack` for the host's own
-invalidation policy.
+order. Rollback releases claims and removes the kernel context of every formed attempt: a failed
+release or a failed context removal stays in `rollbackFailures` as `SC-SET-0007`, and a failed
+release keeps its structure out of `rolledBack` while its context is still removed.
 
 ### 10.5 Production command and one capture (S5)
 
@@ -532,13 +545,16 @@ record StructureSetResult(Map<NamespacedId, MatchOutcome> outcomes, List<Finding
 ```
 
 `StructureSet.place` maps the root bounds, each satellite's composed siting, its world bounds and
-its world-space presence region; a mapping failure is `SC-SPC-0001`. The plan's structure keys are
+its world-space presence region; a mapping failure is `SC-SPC-0001`. A satellite whose composed
+siting equals the root siting is `SC-SET-0008`. The plan's structure keys are
 the root blueprint id and the satellite ids, so a satellite id equal to the root blueprint id is
 `SC-DOC-0004`. `StructureSetHost.run` takes the lease, owner, one budget and an instance supplier;
-the instances are allocated in check order root-first. `StructureSetHost.check` takes the same
+the instances are allocated in check order root-first, and that one budget is shared by presence and
+every member attempt. `StructureSetHost.check` takes the same
 arguments, runs the same presence/link/check sequence and stops before the settle pass: it returns
 outcomes and set findings only, with empty `settled`, `rolledBack`, `rollbackFailures` and `claims`.
-The existing `run` signature is preserved.
+The existing `run` signature is preserved. Rollback reaches the kernel store through
+`StructureKernel.contexts()` and calls `ContextStore.remove(instance)` for every formed attempt.
 
 ## 12. Document pipeline
 
@@ -549,14 +565,14 @@ The existing `run` signature is preserved.
 | compiler | `StructureSetCompiler`; resolves root/satellite documents, merges arguments, compiles blueprints, validates links/presence/duplicates |
 | writer | `StructureSetWriter`; canonical member order |
 | spans | set-member spans for findings |
-| adapter | host `StructureSet` plan (`StructureSet`, `StructureSet.Satellite`, `StructureSet.Placement`), presence/link/check/settle/rollback (`StructureSetHost`, `StructureSetResult`), `DatapackBlueprints` set loading and `ServerState` set compile, the built-in demo set (`set_root`/`set_wing`/`set_demo`), and the `/cumulus set check`/`set settle` command with its one set capture |
+| adapter | host `StructureSet` plan (`StructureSet`, `StructureSet.Satellite`, `StructureSet.Placement`), presence/link/check/settle/rollback under one shared budget (`StructureSetHost`, `StructureSetResult`), `DatapackBlueprints` set loading and `ServerState` set compile, the built-in demo set (`set_root`/`set_wing`/`set_demo`), and the `/cumulus set check`/`set settle` command with its one set capture |
 
 `JsonReader` remains blueprint-only. A small dispatcher reads `kind` and selects the reader.
 
 ## 13. Codes
 
-A `set` family was added to `FindingCode.Family` with seven entries in `Codes.all` (57 -> 64; the
-registry now has 64):
+A `set` family was added to `FindingCode.Family` with eight entries in `Codes.all` (57 -> 65; the
+registry now has 65):
 
 | Code | Meaning | Producer |
 | --- | --- | --- |
@@ -567,6 +583,7 @@ registry now has 64):
 | `SC-SET-0005` | duplicate satellite placement | compiler |
 | `SC-SET-0006` | duplicate parent face link | compiler |
 | `SC-SET-0007` | structure set rollback failed | host settle |
+| `SC-SET-0008` | root/satellite placement collision | compiler, placement, host check |
 
 Document errors reuse existing codes:
 
@@ -577,6 +594,7 @@ Document errors reuse existing codes:
 | missing root/satellite blueprint | `SC-DOC-0011` |
 | satellite names a structure_set | `SC-DOC-0002` |
 | invalid `at`/orientation/arguments | `SC-DOC-0002`/factory code |
+| satellite relative placement is the identity | `SC-SET-0008` |
 
 ## 14. Non-goals
 
@@ -584,13 +602,11 @@ Document errors reuse existing codes:
 - nested structure sets;
 - satellite-of-satellite;
 - automatic retry;
-- context rollback;
+- a kernel-owned context transaction (the host removes contexts, the kernel exposes the store);
 - world-coordinate placement in the document;
 - claim transaction across structures;
 - link direction beyond the six faces;
-- per-link arguments;
-- a shared budget across the members of one set, a `ContextStore` removal operation and same-siting
-  rejection at compile time (S6, out of this round).
+- per-link arguments.
 
 ## 15. Test obligations
 
@@ -601,9 +617,15 @@ Document errors reuse existing codes:
 - Duplicate parent face, wide satellite, multiple range fan-in.
 - Presence: block present, all air, unreadable, optional unknown, required absent.
 - Arguments shallow merge and per-instance compile.
-- Duplicate id/placement rejection.
-- Host check-all/settle-all/rollback, ledger-wide claims filtering; context stays published on
-  rollback because the kernel has no removal (06 §3.3).
+- Duplicate id/placement rejection; same-siting rejection at compile, placement and a hand-built host
+  set, while an origin satellite with a non-identity orientation is accepted.
+- Shared set budget: presence `(1, 0)` charges, an attempt sees the remainder, an admitted spend is
+  added, and an exhausted attempt stops the set.
+- `ContextStore.remove`: in-memory old-context return, `SavedContexts` removal and reload, absent
+  removal is a no-op.
+- Host check-all/settle-all/rollback, ledger-wide claims filtering; a rollback removes every formed
+  attempt's context, including a failed-release root, and reports a failed release or removal as
+  `SC-SET-0007`.
 - Command: compile/placement/capture findings, the set summary and first failure, the two exit
   codes, and a check that writes no row; one real capture over a root and a satellite with the real
   ledger and contexts.
@@ -620,6 +642,7 @@ Document errors reuse existing codes:
 | S3 | `StructureSet`/`SatelliteSpec`/`LinkSpec`/`PresenceSpec`, host placement/link/presence/check/settle/rollback, adapter result | focused adapter/kernel tests |
 | S4 | docs, counts, stress scenarios | docs + focused regression |
 | S5 | production `set check`/`set settle`, one set capture, check-only host path, built-in demo set, real-level GameTests | focused adapter tests + `check` + `runGameTestServer` |
+| S6 | same-siting `SC-SET-0008`, `ContextStore.remove`/rollback invalidation, shared set budget, docs and counts | focused kernel/adapter tests + `check` + `runGameTestServer` |
 
 ### 16.1 Progress
 
@@ -658,8 +681,17 @@ Document errors reuse existing codes:
   69 total). Counts on the S5 tree are **258 kernel tests (39 containers), 286 adapter unit tests (37
   containers), 69 `@GameTest` methods**; `Codes.all` stays 64 and the decision record 34. No kernel
   type and no visual changes.
-- **Out of this round (S6):** a shared budget across a set's members, a `ContextStore` removal
-  operation and same-siting rejection. The command and the one-capture executor are S5,
-  not S6.
+- **S6** is implemented in the working tree after `8ba240e`. It closes the three set-layer gaps:
+  `SC-SET-0008` (root/satellite placement collision) with the compiler, `StructureSet.place` and the
+  host's defensive check; `ContextStore.remove(InstanceId)` (interface, in-memory and
+  `SavedContexts`), `StructureKernel.contexts()`, and rollback invalidation of every formed attempt
+  independent of its release; and one set-scoped budget shared by presence and every member attempt.
+  The focused tests are two new `StructureSetCompilerTest` cases (15 total), two `StructureSetPlanTest`
+  cases (8), two `StructureSetHostTest` cases (26), the renamed/new budget cases in
+  `LogicalSubnetworkSetStressTest` (9), the updated `StructureSetRollbackStressTest` (6), plus
+  `ContextTest` (4) and `SavedContextsLifecycleTest` (6). Counts on the S6 tree are **261 kernel tests
+  (39 containers), 292 adapter unit tests (37 containers), 69 `@GameTest` methods**; `Codes.all` is 65
+  and the decision record 35 (D-35). The command and the one-capture executor remain S5.
+- The command and the one-capture executor are S5, not S6.
 
 Visual review stays last.

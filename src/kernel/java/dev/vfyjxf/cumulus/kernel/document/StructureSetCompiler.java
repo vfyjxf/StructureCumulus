@@ -210,6 +210,16 @@ public final class StructureSetCompiler {
         for (CompiledSatellite compiled : set.satellites()) {
             SatelliteSpec satellite = compiled.spec();
             Placement placement = new Placement(satellite.orientation(), satellite.at());
+            if (placement.equals(Placement.identity)) {
+                error(
+                    findings,
+                    Codes.rootPlacementCollision,
+                    "the satellite " + satellite.id().text() + " is placed exactly on the root",
+                    satellite.source(),
+                    cellLocus(satellite.at()),
+                    null
+                );
+            }
             SatelliteSpec previousPlacement = placements.putIfAbsent(placement, satellite);
             if (previousPlacement != null) {
                 error(

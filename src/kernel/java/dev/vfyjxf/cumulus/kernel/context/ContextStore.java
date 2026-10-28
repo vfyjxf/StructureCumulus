@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Comparator;
@@ -17,6 +18,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public interface ContextStore {
 
     StructureContext context(InstanceId instance);
+
+    /** Removes one instance context, returning the stored context or {@code null} when absent. */
+    @Nullable
+    StructureContext remove(InstanceId instance);
 
     StructureContext publish(
         InstanceId instance,
@@ -35,6 +40,12 @@ public interface ContextStore {
             public StructureContext context(InstanceId instance) {
                 Objects.requireNonNull(instance, "instance");
                 return contexts.computeIfAbsent(instance, StructureContext::empty);
+            }
+
+            @Override
+            public @Nullable StructureContext remove(InstanceId instance) {
+                Objects.requireNonNull(instance, "instance");
+                return contexts.remove(instance);
             }
 
             @Override

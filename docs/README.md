@@ -91,7 +91,7 @@ Then the module files, in dependency order:
   context, current attempt authoritative, no kernel writes or invalidation (`681c505`). D-32 adds the
   structure-set layer: the `structure_set` document IR/reader/writer/compiler (`9cf2794`,
   `00cf6c4`), the host `StructureSet` plan and `StructureSetHost` orchestration with rollback
-  (`93f5941`), and the seven `SC-SET` codes. SS4 adds the six-class/33-test structure-set stress
+  (`93f5941`), and the `SC-SET` codes. SS4 adds the six-class/33-test structure-set stress
   suite (`design/06-verification.md` §3.3). H1–H4 add the host-data round: `HostType`,
   `WorldView.get`, `Expectations.host` and `OccupantDescriptor(type, kind)`; one `SnapshotLevel` per
   frame with copied states, fluids, block entities and entities; the adapter
@@ -103,23 +103,24 @@ Then the module files, in dependency order:
   `IEnergyStorage`/`IFluidHandler` trait values and the NBT-trait removal. S5 of the 09 structure-set
   close-out adds the production set command (`/cumulus set check`, `/cumulus set settle`), its one
   union capture and check-only host path, the built-in `set_root`/`set_wing`/`set_demo` documents and
-  the real-level set GameTests (`design/06-verification.md` §3.5); S6 (shared budget,
-  `ContextStore` removal, same-siting rejection) stays out. The tree registers 258
-  kernel tests in 39 containers, 286 adapter unit tests in 37 containers and 69 `@GameTest` methods;
-  a full `./gradlew check` and `runGameTestServer` on the S5 working tree are both green (258
-  kernel tests, 286 adapter tests, 69/69 GameTests). Pending only: the
+  the real-level set GameTests (`design/06-verification.md` §3.5). S6 closes the set layer: the
+  `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
+  budget shared by presence and every member attempt (D-35). The tree registers 261
+  kernel tests in 39 containers, 292 adapter unit tests in 37 containers and 69 `@GameTest` methods;
+  a full `./gradlew check` and `runGameTestServer` on the S6 working tree are both green (261
+  kernel tests, 292 adapter tests, 69/69 GameTests). Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-29, S5 working tree): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 258 kernel JUnit 5 tests (39 test
-  containers), 286 adapter unit tests (37 containers) and 69 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (258 kernel tests, 286 adapter
-  tests, 69/69 GameTests, 0 failures, 0 skipped). `Codes.all` has 64 entries
-  and the decision record has 34 decisions (D-34; D-29 superseded).
+- Verification (2026-10-29, S6 working tree): the kernel compiles with
+  `javac --release 21` and JSpecify only. The tree registers 261 kernel JUnit 5 tests (39 test
+  containers), 292 adapter unit tests (37 containers) and 69 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (261 kernel tests, 292 adapter
+  tests, 69/69 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
+  and the decision record has 35 decisions (D-35; D-29 superseded).
 
 ## The one rule
 

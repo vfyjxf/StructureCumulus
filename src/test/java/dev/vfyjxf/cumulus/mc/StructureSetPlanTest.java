@@ -68,13 +68,7 @@ class StructureSetPlanTest {
     @Test
     void aRotatedRootRotatesTheWholeSatelliteFrame() {
         Siting root = Siting.of(LatticePoint.of(5, 0, 5), clockwise);
-        SatelliteSpec atOrigin = preheaterSatellite(
-            id("origin_satellite"),
-            LatticePoint.origin,
-            Orientation.identity,
-            false,
-            null
-        );
+        SatelliteSpec atOrigin = preheaterSatellite(id("origin_satellite"), LatticePoint.origin, half, false, null);
         SatelliteSpec turned = preheaterSatellite(
             id("turned_satellite"),
             LatticePoint.of(0, 0, -3),
@@ -94,7 +88,7 @@ class StructureSetPlanTest {
         StructureSet.Satellite turnedSatellite = placed.satellite(id("turned_satellite"));
         assertNotNull(originSatellite);
         assertNotNull(turnedSatellite);
-        assertEquals(Siting.of(LatticePoint.of(5, 0, 5), clockwise), originSatellite.siting());
+        assertEquals(Siting.of(LatticePoint.of(5, 0, 5), clockwise.compose(half)), originSatellite.siting());
         assertEquals(Siting.of(LatticePoint.of(8, 0, 5), half), turnedSatellite.siting());
     }
 
@@ -117,6 +111,36 @@ class StructureSetPlanTest {
         assertNotNull(right);
         assertEquals(left.worldBounds().asSet(), left.presenceCells());
         assertEquals(CuboidSet.of(Cuboid.of(LatticePoint.of(103, 10, 101))), right.presenceCells());
+    }
+
+    @Test
+    void aHandBuiltSatelliteOnTheRootSitingIsRejected() {
+        SatelliteSpec onRoot = preheaterSatellite(
+            id("on_the_root"),
+            LatticePoint.origin,
+            Orientation.identity,
+            false,
+            null
+        );
+        CompiledStructureSet set = compiled(compiled(onRoot, preheaterBlueprint()));
+        StructureSet.Placement placement = StructureSet.place(set, rootSiting());
+        assertNull(placement.set());
+        assertEquals(1, placement.findings().size());
+        assertEquals(Codes.rootPlacementCollision.code(), placement.findings().get(0).code());
+    }
+
+    @Test
+    void aSatelliteAtTheRootOriginWithANonIdentityOrientationIsAllowed() {
+        SatelliteSpec turned = preheaterSatellite(id("turned"), LatticePoint.origin, half, false, null);
+        CompiledStructureSet set = compiled(compiled(turned, preheaterBlueprint()));
+        StructureSet.Placement placement = StructureSet.place(set, rootSiting());
+        assertTrue(placement.succeeded(), () -> placement.findings().toString());
+        StructureSet placed = placement.set();
+        assertNotNull(placed);
+        StructureSet.Satellite satellite = placed.satellite(id("turned"));
+        assertNotNull(satellite);
+        assertEquals(half, satellite.siting().placement().orientation());
+        assertEquals(placed.rootSiting().origin(), satellite.siting().origin());
     }
 
     @Test

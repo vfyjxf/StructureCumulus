@@ -342,6 +342,7 @@ Validation after lowering:
 | a link cell is outside its blueprint bounds or outside every check's read scope | `SC-SET-0003` |
 | a face link is not face-adjacent, or a range link exceeds its distance/metric | `SC-SET-0002` |
 | two satellites share `(at, orientation)` | `SC-SET-0005` |
+| a satellite's relative placement is the identity (root/satellite siting collision) | `SC-SET-0008` |
 | two face links share a parent cell and face direction | `SC-SET-0006` |
 | a root or satellite id names no blueprint document | `SC-DOC-0011` |
 | a root or satellite id names a structure set | `SC-DOC-0002` |
@@ -381,9 +382,9 @@ canonical blueprint form.
 
 `StructureSetCompiler` reuses `SC-DOC-0002` for a malformed or nested set reference,
 `SC-DOC-0004` for a duplicate satellite id (raised by the reader) and `SC-DOC-0011` for a root or
-satellite that names no document. Its link, placement and parent-face failures use the `set` family
-(`SC-SET-0002`, `SC-SET-0003`, `SC-SET-0005`, `SC-SET-0006`); the family is defined in
-[design/09](../design/09-structure-sets.md) and [`finding`](finding.md).
+satellite that names no document. Its link, placement, same-siting and parent-face failures use the
+`set` family (`SC-SET-0002`, `SC-SET-0003`, `SC-SET-0005`, `SC-SET-0006`, `SC-SET-0008`); the family
+is defined in [design/09](../design/09-structure-sets.md) and [`finding`](finding.md).
 
 ## 6. Tests
 

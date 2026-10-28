@@ -540,6 +540,16 @@ public final class Codes {
                 + "the owner and the siting before retrying."
     );
 
+    public static final CodeEntry rootPlacementCollision = entry(
+        FindingCode.Family.set,
+        8,
+        Severity.error,
+        "A satellite is placed exactly on the root.",
+        "A satellite's relative placement is the identity: offset (0, 0, 0) with identity orientation, "
+                + "so its siting is the root siting. Give the satellite a non-zero offset or a "
+                + "non-identity orientation."
+    );
+
     public static final List<CodeEntry> all = List.of(
         locusUnmapped,
         cuboidOffLattice,
@@ -604,7 +614,8 @@ public final class Codes {
         presenceUnreadable,
         duplicatePlacement,
         duplicateFaceLink,
-        rollbackFailed
+        rollbackFailed,
+        rootPlacementCollision
     );
 
     private Codes() {}

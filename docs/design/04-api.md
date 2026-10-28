@@ -13,9 +13,9 @@
 | **Host** | `WorldCapture`, `WorldView`, `SnapshotLease`, `ClaimLedger`, `ContextStore`, `DocumentReader`, `DocumentWriter` | bind the kernel to a world, a store and a format |
 
 The facade is one final class, `StructureKernel`, with four pipeline operations (`compile`, `check`,
-`settle`, `derive`), three helpers (`solve`, `explain`, `explainOrFallback`) and three lookups
-(`document`, `ledger`, `catalogs`). Anchor resolution is host work (`McAnchors` in the adapter); the
-facade has no `siting` operation.
+`settle`, `derive`), three helpers (`solve`, `explain`, `explainOrFallback`) and four lookups
+(`document`, `ledger`, `contexts`, `catalogs`). Anchor resolution is host work (`McAnchors` in the
+adapter); the facade has no `siting` operation.
 
 ## 2. The author surface
 
@@ -354,6 +354,7 @@ public final class StructureKernel {
     public Catalogs catalogs();
     public @Nullable Document document(NamespacedId id);
     public @Nullable ClaimLedger ledger();
+    public ContextStore contexts();
 
     public CompileResult compile(Document document);
     public MatchResult check(MatchRequest request);
@@ -365,7 +366,9 @@ public final class StructureKernel {
 }
 ```
 
-Four pipeline operations, three helpers, three lookups. `settle` takes only the request and the
-admitted result; it finds its ledger in the kernel's `Host`. `create(catalogs)` is the no-host form
-for compile-only use; `check` with a lease works, `settle` reports `Undecided(ledgerUnavailable)`.
+Four pipeline operations, three helpers, four lookups. `settle` takes only the request and the
+admitted result; it finds its ledger in the kernel's `Host`. `contexts()` exposes the same host's
+per-instance store so a host can remove a rolled-back set member's context (D-35). `create(catalogs)`
+is the no-host form for compile-only use; `check` with a lease works, `settle` reports
+`Undecided(ledgerUnavailable)`.
 `McAnchors.resolve(...)` is the adapter's anchor operation, not a facade method.

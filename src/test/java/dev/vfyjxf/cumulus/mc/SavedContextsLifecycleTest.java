@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -95,6 +96,29 @@ class SavedContextsLifecycleTest {
         assertEquals("second", reloaded.context(second).get(label), "the second instance keeps its label");
         assertNull(reloaded.context(second).get(count), "the second instance has no first value");
         assertEquals(3, reloaded.allocateSerial(), "both instances advance the next serial");
+    }
+
+    @Test
+    void removeDropsTheInstanceFromTheStoreAndTheReload() {
+        SavedContexts contexts = new SavedContexts(world);
+        ContextKey<Long> count = longKey("count");
+        StructureContext published = contexts
+                .publish(instance, Map.of(count, 7L), FindingBundle.empty(), new Spend(2, 1));
+        SavedContexts loaded = SavedContexts.load(world, contexts.save(new CompoundTag(), RegistryAccess.EMPTY));
+        assertFalse(loaded.isDirty(), "a loaded store starts clean");
+
+        assertNull(loaded.remove(second), "removing an absent instance answers null");
+        assertFalse(loaded.isDirty(), "an absent remove changes nothing");
+        assertEquals(published, loaded.remove(instance), "remove returns the stored context");
+        assertTrue(loaded.isDirty(), "a remove dirties the store");
+        assertNull(loaded.remove(instance), "a second remove finds nothing");
+
+        CompoundTag saved = loaded.save(new CompoundTag(), RegistryAccess.EMPTY);
+        assertEquals(0, saved.getList("instances", Tag.TAG_COMPOUND).size(), "the removed instance is not written");
+        SavedContexts reloaded = SavedContexts.load(world, saved);
+        assertEquals(0, reloaded.context(instance).revision(), "the removed instance stays absent after reload");
+        assertNull(reloaded.context(instance).get(count), "the removed values are gone");
+        assertEquals(1, reloaded.allocateSerial(), "the removed serial is not stored again");
     }
 
     @Test

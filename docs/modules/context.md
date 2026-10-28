@@ -17,7 +17,7 @@
 | Type | Kind | Contract |
 | --- | --- | --- |
 | `StructureContext` | record | `(instance, revision, values, findings, spend)`, a `ContextView` |
-| `ContextStore` | interface | per-instance publish/read; `inMemory()` for tests and hosts |
+| `ContextStore` | interface | per-instance publish/read/remove; `inMemory()` for tests and hosts |
 | `CachedContext` | interface | host-owned read port: `<T> @Nullable T get(NamespacedId id, Class<T> type)` |
 | `Deriver<T>` | interface | context-only producer of one key |
 | `DeriveContext` | interface | what a deriver sees: base context, budget, findings |
@@ -45,6 +45,7 @@ public interface CachedContext {
 
 public interface ContextStore {
     StructureContext context(InstanceId instance);
+    @Nullable StructureContext remove(InstanceId instance);
     StructureContext publish(InstanceId instance, java.util.Map<ContextKey<?>, Object> values,
                              FindingBundle findings, Spend spend);
     static ContextStore inMemory();
@@ -108,6 +109,13 @@ derive, both on the server thread, and the host serialises them per instance. A 
 is a host contract violation, not a kernel outcome. A successful `settle` publishes the `instance`
 values once; a `derive` publishes its own batch once at `revision + 1`. There is no base-revision CAS
 and no stale-publish finding.
+
+**Removal.** `remove(instance)` returns the stored `StructureContext`, or `null` when the instance is
+absent; it never fabricates an empty context. After removal a later `context(instance)` reads the
+empty context at revision 0. The in-memory store removes the map entry; the adapter's `SavedContexts`
+also marks the SavedData dirty only when an entry was removed and persists the absence, so the next
+serial is restored from the remaining instances on reload. A set rollback is the shipped caller: it
+removes every formed attempt's context, including one whose claim release failed (09 §10.3).
 
 ### 4.3 Derivation
 
@@ -188,6 +196,8 @@ section computation returned `Missing` for a `Partial` slice. Producer: `engine.
 - `StructureContext`: sorted keys, typed get/require, empty, immutability.
 - Publish: merge semantics, revision growth, `match` rejection, cumulative spend, latest findings,
   one writer per instance.
+- Remove: the old context is returned, a second remove answers `null`, the instance reads empty at
+  revision 0 afterwards; the persisted store drops the entry and reloads it as absent.
 - Derive: order, requires, missing deriver, stale base, one batch, no partial publish.
 - Cached context: instance-only eligibility, the declared-dependency gate (check requires and
   computation inputs), lookup by `(id, type)` for a host-decoded key, the attempt value shadows the

@@ -27,6 +27,7 @@ import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.world;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Rollback, claim filtering and context bookkeeping for a checked reactor set. */
@@ -102,10 +103,8 @@ class StructureSetRollbackStressTest {
         assertEquals(1, result.claimsOf(firstId).size());
         assertTrue(codes(result).contains(Codes.ledgerMoved.code()));
         for (int index = 0; index < 3; index++) {
-            assertTrue(
-                fixture.contexts.context(fixture.instance(index)).revision() >= 1,
-                "a rolled-back settle keeps its context for the host to invalidate"
-            );
+            assertNull(fixture.contexts.remove(fixture.instance(index)), "a rolled-back settle removes its context");
+            assertEquals(0, fixture.contexts.context(fixture.instance(index)).revision());
         }
         assertEquals(0, fixture.contexts.context(fixture.instance(3)).revision());
     }
@@ -127,6 +126,12 @@ class StructureSetRollbackStressTest {
         assertEquals(3, fixture.ledger.releaseCalls, "the remaining releases still run");
         assertEquals(List.of(reactorId, firstId, secondId), result.settled());
         assertFalse(result.formed());
+        for (int index = 0; index < 3; index++) {
+            assertNull(
+                fixture.contexts.remove(fixture.instance(index)),
+                "every formed attempt is invalidated, including the failed-release root"
+            );
+        }
     }
 
     @Test

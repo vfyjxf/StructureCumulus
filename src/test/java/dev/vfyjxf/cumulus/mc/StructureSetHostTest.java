@@ -61,6 +61,7 @@ import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.world;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StructureSetHostTest {
@@ -597,10 +598,48 @@ class StructureSetHostTest {
         assertEquals(7, fixture.ledger.rows().size(), "the root release failed, so its rows remain");
         assertEquals(List.of(rootId, leftId), result.settled());
         assertEquals(2, fixture.ledger.releaseCalls);
+        assertNull(
+            fixture.contexts.remove(fixture.instance(0)),
+            "the failed-release root context is still invalidated"
+        );
     }
 
     @Test
-    void rollbackLeavesTheKernelContextForTheHostToInvalidate() {
+    void aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals() {
+        StructureSetTestSupport.RemoveFailingContexts contexts = new StructureSetTestSupport.RemoveFailingContexts();
+        StructureSetTestSupport.Fixture fixture = new StructureSetTestSupport.Fixture(
+            compiled(
+                compiled(leftSatellite(false, LinkSpec.face(leftParent, port)), preheaterBlueprint()),
+                compiled(rightSatellite(false, LinkSpec.face(rightParent, port)), preheaterBlueprint())
+            ),
+            StructureSetTestSupport.rootSiting(),
+            contexts
+        );
+        fillHappy(fixture);
+        StructureSet.Satellite right = fixture.plan.satellite(rightId);
+        assertNotNull(right);
+        fixture.ledger.movingSiting = right.siting();
+        contexts.allowedRemovals = 1;
+        StructureSetResult result = fixture.run();
+
+        assertFalse(result.formed());
+        assertEquals(List.of(leftId, rootId), result.rolledBack());
+        assertEquals(1, result.rollbackFailures().size());
+        assertEquals(Codes.rollbackFailed.code(), result.rollbackFailures().get(0).code());
+        assertTrue(
+            result.rollbackFailures().get(0).message().contains("context"),
+            () -> result.rollbackFailures().get(0).message()
+        );
+        assertEquals(2, contexts.removed().size(), "both formed attempts are invalidated");
+        assertEquals(0, contexts.context(fixture.instance(1)).revision(), "the left context was removed");
+        assertTrue(
+            contexts.context(fixture.instance(0)).revision() >= 1,
+            "the root removal failed, so its context stays for the host"
+        );
+    }
+
+    @Test
+    void rollbackRemovesTheKernelContextOfEveryFormedAttempt() {
         StructureSetTestSupport.Fixture fixture = fixture(
             compiled(
                 compiled(leftSatellite(false, LinkSpec.face(leftParent, port)), preheaterBlueprint()),
@@ -614,13 +653,31 @@ class StructureSetHostTest {
         StructureSetResult result = fixture.run();
 
         assertEquals(List.of(leftId, rootId), result.rolledBack());
-        assertTrue(fixture.contexts.context(fixture.instance(0)).revision() >= 1, "root context is not rolled back");
-        assertTrue(fixture.contexts.context(fixture.instance(1)).revision() >= 1, "left context is not rolled back");
+        assertNull(fixture.contexts.remove(fixture.instance(0)), "the rolled-back root context is removed");
+        assertNull(fixture.contexts.remove(fixture.instance(1)), "the rolled-back left context is removed");
+        assertEquals(0, fixture.contexts.context(fixture.instance(0)).revision());
+        assertEquals(0, fixture.contexts.context(fixture.instance(1)).revision());
         assertEquals(
             0,
             fixture.contexts.context(fixture.instance(2)).revision(),
             "the failed right settle published none"
         );
+    }
+
+    @Test
+    void aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence() {
+        SatelliteSpec onRoot = preheaterSatellite(leftId, LatticePoint.origin, Orientation.identity, true, null);
+        StructureSetTestSupport.Fixture fixture = new StructureSetTestSupport.Fixture(
+            StructureSetTestSupport.handBuiltOnRoot(compiled(compiled(onRoot, preheaterBlueprint())))
+        );
+        StructureSetResult result = fixture.check();
+
+        assertFalse(result.formed());
+        assertTrue(result.outcomes().isEmpty());
+        assertTrue(result.settled().isEmpty());
+        assertTrue(fixture.instances.isEmpty(), "the set is rejected before presence and before any check");
+        assertTrue(fixture.ledger.rows().isEmpty());
+        assertEquals(List.of(Codes.rootPlacementCollision.code()), codes(result.setFindings()));
     }
 
     @Test

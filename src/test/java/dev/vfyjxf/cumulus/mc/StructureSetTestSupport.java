@@ -9,12 +9,15 @@ import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
+import dev.vfyjxf.cumulus.kernel.context.StructureContext;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
+import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
+import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.core.Value;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.document.CompiledSatellite;
@@ -226,6 +229,24 @@ final class StructureSetTestSupport {
         return Objects.requireNonNull(placement.set(), () -> "placement failed: " + placement.findings());
     }
 
+    /**
+     * Builds a set whose every satellite sits exactly on the host root siting, bypassing
+     * {@link StructureSet#place} so the host's defensive rejection can be exercised.
+     */
+    static StructureSet handBuiltOnRoot(CompiledStructureSet compiled) {
+        Siting root = rootSiting();
+        Cuboid rootBounds = Objects.requireNonNull(root.toWorld(compiled.root().bounds()), "root bounds");
+        List<StructureSet.Satellite> satellites = new ArrayList<>();
+        for (CompiledSatellite candidate : compiled.satellites()) {
+            Cuboid worldBounds = Objects
+                    .requireNonNull(root.toWorld(candidate.blueprint().bounds()), "satellite bounds");
+            CuboidSet presence = Objects
+                    .requireNonNull(root.toWorld(candidate.blueprint().bounds().asSet()), "satellite presence");
+            satellites.add(new StructureSet.Satellite(candidate.spec().id(), candidate, root, worldBounds, presence));
+        }
+        return new StructureSet(compiled, root, rootBounds, satellites);
+    }
+
     static List<LatticePoint> bodyCells() {
         Cuboid bounds = Cuboid.of(0, 0, 0, 3, 1, 3);
         CuboidSet body = bounds.asSet().subtract(CuboidSet.of(Cuboid.of(leftParent), Cuboid.of(rightParent)));
@@ -271,7 +292,7 @@ final class StructureSetTestSupport {
 
         final TestView view = new TestView();
         final FakeLedger ledger = new FakeLedger();
-        final ContextStore contexts = ContextStore.inMemory();
+        final ContextStore contexts;
         final StructureKernel kernel;
         final StructureSet plan;
         final List<InstanceId> instances = new ArrayList<>();
@@ -281,10 +302,26 @@ final class StructureSetTestSupport {
         }
 
         Fixture(CompiledStructureSet compiled, Siting rootSiting) {
+            this(compiled, rootSiting, ContextStore.inMemory());
+        }
+
+        Fixture(CompiledStructureSet compiled, Siting rootSiting, ContextStore contexts) {
+            this.contexts = contexts;
             this.kernel = StructureKernel
                     .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, contexts, Map.of()));
             StructureSet.Placement placement = StructureSet.place(compiled, rootSiting);
             this.plan = Objects.requireNonNull(placement.set(), () -> "placement failed: " + placement.findings());
+        }
+
+        Fixture(StructureSet plan) {
+            this(plan, ContextStore.inMemory());
+        }
+
+        Fixture(StructureSet plan, ContextStore contexts) {
+            this.contexts = contexts;
+            this.plan = plan;
+            this.kernel = StructureKernel
+                    .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, contexts, Map.of()));
         }
 
         StructureSetResult run() {
@@ -636,6 +673,41 @@ final class StructureSetTestSupport {
 
         List<ClaimRow> rows() {
             return List.copyOf(rows);
+        }
+    }
+
+    static final class RemoveFailingContexts implements ContextStore {
+
+        private final ContextStore delegate = ContextStore.inMemory();
+        private final List<InstanceId> removed = new ArrayList<>();
+        int allowedRemovals = Integer.MAX_VALUE;
+
+        @Override
+        public StructureContext context(InstanceId instance) {
+            return delegate.context(instance);
+        }
+
+        @Override
+        public StructureContext publish(
+            InstanceId instance,
+            Map<ContextKey<?>, Object> values,
+            FindingBundle findings,
+            Spend spend
+        ) {
+            return delegate.publish(instance, values, findings, spend);
+        }
+
+        @Override
+        public @Nullable StructureContext remove(InstanceId instance) {
+            removed.add(instance);
+            if (removed.size() > allowedRemovals) {
+                throw new IllegalStateException("context removal refused by the test store");
+            }
+            return delegate.remove(instance);
+        }
+
+        List<InstanceId> removed() {
+            return List.copyOf(removed);
         }
     }
 }

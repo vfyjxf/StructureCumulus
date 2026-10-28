@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.spi;
 
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
+import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -64,6 +65,10 @@ public final class StructureKernel {
 
     public @Nullable ClaimLedger ledger() {
         return host.ledger();
+    }
+
+    public ContextStore contexts() {
+        return host.contexts();
     }
 
     public CompileResult compile(Document document) {

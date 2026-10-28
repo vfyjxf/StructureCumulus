@@ -81,6 +81,7 @@ class CodesTest {
             SC-SET-0005 ERROR
             SC-SET-0006 ERROR
             SC-SET-0007 ERROR
+            SC-SET-0008 ERROR
             """;
 
     private static Severity severity(String wire) {
@@ -100,7 +101,7 @@ class CodesTest {
                 rows.add(line);
             }
         }
-        assertEquals(64, rows.size());
+        assertEquals(65, rows.size());
         assertEquals(rows.size(), Codes.all.size());
 
         Set<FindingCode> seen = new HashSet<>();

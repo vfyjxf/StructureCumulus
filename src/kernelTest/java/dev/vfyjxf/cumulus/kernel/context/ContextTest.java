@@ -45,6 +45,22 @@ class ContextTest {
     }
 
     @Test
+    void removeReturnsTheStoredContextAndLeavesAnEmptyInstance() {
+        ContextKey<Long> key = ContextKeys.of(id("removed"), Long.class, Retention.instance);
+        ContextStore store = ContextStore.inMemory();
+        assertNull(store.remove(instance), "removing an absent instance answers null");
+
+        StructureContext published = store.publish(instance, Map.of(key, 1L), FindingBundle.empty(), new Spend(1, 1));
+        assertEquals(published, store.remove(instance), "remove returns the stored context");
+        assertNull(store.remove(instance), "a second remove finds nothing");
+
+        StructureContext after = store.context(instance);
+        assertEquals(0, after.revision(), "the removed revision does not survive");
+        assertTrue(after.keys().isEmpty(), "the removed values are gone");
+        assertEquals(Spend.zero, after.spend(), "the removed spend is gone");
+    }
+
+    @Test
     void matchValuesAreNeverPublished() {
         ContextKey<Long> match = ContextKeys.of(id("match"), Long.class, Retention.match);
         ContextStore store = ContextStore.inMemory();

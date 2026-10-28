@@ -591,6 +591,29 @@ class StructureSetCompilerTest {
     }
 
     @Test
+    void aSatellitePlacedExactlyOnTheRootIsRejected() {
+        StructureSetDocument set = set(List.of(satellite("on_the_root", LatticePoint.origin)));
+        StructureSetCompileResult result = compile(set, source(rootDocument(), preheaterDocument()));
+        assertNull(result.set());
+        assertEquals(
+            1,
+            result.findings().ofCode(Codes.rootPlacementCollision.code()).size(),
+            () -> result.findings().findings().toString()
+        );
+        assertTrue(result.findings().ofCode(Codes.duplicatePlacement.code()).isEmpty());
+    }
+
+    @Test
+    void aSatelliteAtTheRootOriginWithANonIdentityOrientationIsAllowed() {
+        StructureSetDocument set = set(
+            List.of(satellite("turned_on_the_root", LatticePoint.origin, half, Value.object(), List.of()))
+        );
+        StructureSetCompileResult result = compile(set, source(rootDocument(), preheaterDocument()));
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        assertTrue(result.succeeded());
+    }
+
+    @Test
     void duplicateParentFaceIsRejected() {
         StructureSetDocument set = set(
             List.of(

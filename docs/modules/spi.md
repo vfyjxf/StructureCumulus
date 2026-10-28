@@ -19,7 +19,7 @@
 | `Catalogs` | interface | six frozen families + `builtin()` + `builder()` |
 | `Catalogs.Builder` | interface | merge families over built-ins, then freeze |
 | `Host` | record | documents, ledger, context store, custom type registry |
-| `StructureKernel` | final class | the facade: four operations, three helpers, three lookups |
+| `StructureKernel` | final class | the facade: four operations, three helpers, four lookups |
 
 ## 3. Signatures
 
@@ -61,6 +61,7 @@ public final class StructureKernel {
     public Catalogs catalogs();
     public @Nullable Document document(NamespacedId id);
     public @Nullable ClaimLedger ledger();
+    public ContextStore contexts();
 
     public CompileResult compile(Document document);
     public MatchResult check(MatchRequest request);
@@ -130,7 +131,9 @@ created without a host can compile and check, but `settle` with claimable rows i
 - **`explain(code)`** looks up `structurecumulus:<code-text-lowercase>` in the code catalog; an addon
   code is not found, which is legal.
 - **`explainOrFallback(code)`** returns the registered explanation or a synthesised family-level one.
-- **`document(id)`** is the host's document source; **`ledger()`** is the host's ledger.
+- **`document(id)`** is the host's document source; **`ledger()`** is the host's ledger;
+  **`contexts()`** is the host's per-instance store (the set rollback removes a formed attempt's
+  context through it).
 
 The facade holds no thread, clock, cache or mutable registry. `create` is the only construction path.
 A kernel is safe for concurrent `compile`/`check`/`derive`/`solve`/`explain` given thread-safe ports;

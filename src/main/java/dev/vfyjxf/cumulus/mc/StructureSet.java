@@ -112,6 +112,16 @@ public record StructureSet(
                 );
                 continue;
             }
+            if (siting.equals(rootSiting)) {
+                findings.add(
+                    problem(
+                        Codes.rootPlacementCollision,
+                        "the satellite " + spec.id().text() + " is placed exactly on the root",
+                        Locus.local(candidate.blueprint().bounds().asSet())
+                    )
+                );
+                continue;
+            }
             Cuboid worldBounds = siting.toWorld(candidate.blueprint().bounds());
             if (worldBounds == null) {
                 findings.add(

@@ -20,6 +20,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -87,6 +88,17 @@ public final class SavedContexts extends SavedData implements ContextStore {
         requireWorld(instance);
         StructureContext context = contexts.get(instance);
         return context == null ? StructureContext.empty(instance) : context;
+    }
+
+    @Override
+    public @Nullable StructureContext remove(InstanceId instance) {
+        Objects.requireNonNull(instance, "instance");
+        requireWorld(instance);
+        StructureContext removed = contexts.remove(instance);
+        if (removed != null) {
+            setDirty();
+        }
+        return removed;
     }
 
     @Override

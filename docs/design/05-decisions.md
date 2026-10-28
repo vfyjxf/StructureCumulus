@@ -464,8 +464,8 @@ The four rulings this record fixes:
   `TooLarge` carry entries, `Unavailable` normally none because its own code already is its finding.
 - **Adapter-only codes are catalog codes.** The adapter registers `SC-MC-0001`…`0005` in its own code
   catalog through `Catalogs.Builder.codes`, so each carries a canonical severity and an explanation
-  and `/cumulus explain` resolves it. `Codes.all` stays kernel-only (64 entries after the
-  structure-set family, D-32); the kernel registry is not a host registry, and a host code never
+  and `/cumulus explain` resolves it. `Codes.all` stays kernel-only (65 entries after the
+  same-siting entry, D-35); the kernel registry is not a host registry, and a host code never
   enters it.
 - **The severities are the host's.** `SC-MC-0005` (refused root) is an ERROR; `SC-MC-0003` (cut) and
   `SC-MC-0004` (orientation mismatch) are WARNINGs, because a check can still pass over both, and a
@@ -639,7 +639,7 @@ The alternatives were rejected:
 - **World coordinates in the set document** would make it a placement record, not a portable graph;
   a satellite is exactly `rootSiting.compose(relativeSiting)`, and a null composition is a finding.
 - **A kernel context rollback** would hide the published value from the host that owns the instance;
-  release is claim-only and the result names every rolled-back id.
+  release is claim-only and the host removes the context through `ContextStore.remove` (D-35).
 - **Host-only JSON parsing without the document layer** would lose the shared schema, spans and the
   `(blueprint, effective arguments)` compile cache; the set document reuses the blueprint compiler.
 
@@ -648,16 +648,18 @@ The alternatives were rejected:
 `MatchOutcome` without weakening a kernel law, and it keeps the host responsible for the lifecycle it
 alone can observe.
 
-**Consequence:** set failures live in the `set` code family (`SC-SET-0001`…`0007`); presence and links
-are host work before any check; any failure before a settle means no settle; a settle failure releases
-the formed structures in reverse declaration order and reports a failed release as `SC-SET-0007`;
-`claims` is filtered by `(owner, siting, bay)` so a ledger-wide `ClaimSet` never leaks another
-structure's rows; a rolled-back structure keeps the context its settle published (`ContextStore` has
-no removal operation, so the host owns whatever it does with that `InstanceId`); nested sets,
+**Consequence:** set failures live in the `set` code family (`SC-SET-0001`…`0008`); presence and links
+are host work before any check; presence and the member attempts share one budget (D-35); any failure
+before a settle means no settle; a settle failure releases
+the formed structures in reverse declaration order and reports a failed release or context removal
+as `SC-SET-0007`; `claims` is filtered by `(owner, siting, bay)` so a ledger-wide `ClaimSet` never
+leaks another structure's rows; a rolled-back structure's context is removed through
+`ContextStore.remove` (D-35); a satellite may not share the root siting (D-35); nested sets,
 satellite-of-satellite, automatic retry, world-coordinate placement in the document and a
 command/capture executor for a set are out. **Status (SS4):** the document/compiler layer landed at
 `9cf2794`/`00cf6c4`, the host plan and orchestration at `93f5941`, and SS4 adds the six-class/33-test
-stress suite plus the counts and gap close-out (`06-verification.md` §3.3).
+stress suite plus the counts and gap close-out (`06-verification.md` §3.3). S6 closes the set layer
+(D-35).
 
 ### D-33 — Host payload is one typed snapshot read, never a descriptor projection
 
@@ -710,7 +712,7 @@ snapshot; `SC-MC-0004` remains the capability warning for a pose the observed st
 `SC-MC-0010` covers both a missing expectation value and a missing anchor state. D-29's projection
 and its test are retired; `OrientationAuditGameTest` covers the audit and `HostDataScenarioTest`
 covers the rotated set, nested child frame, waterlogged slab and missing snapshot. The record set was
-33 decisions at H4; `Codes.all` is unchanged at 64 entries because every `SC-MC-*` code is the
+33 decisions at H4; `Codes.all` was 64 entries then (65 after D-35) because every `SC-MC-*` code is the
 adapter's own. **Status (H4):** implemented; H1 added `HostType`/`WorldView.get`/`Expectations.host`,
 and H2/H3/H4 added no kernel type beyond those.
 
@@ -762,6 +764,58 @@ lifetime; a consumer must not retain it after the lease stops being current. The
 34 decisions (D-34); the kernel types `TraitKey`/`TraitSlot`/`Trait` are unchanged. **Status
 (T1–T3):** implemented; the focused trait tests and the full GameTest run are green.
 
+### D-35 — A set's siting, budget and context lifecycle close S6
+
+S6 closes the three structure-set gaps in one decision: a satellite may not share the root siting
+(A+), the set carries one budget across presence and every member attempt, and `ContextStore` gains a
+removal operation so a rollback can invalidate the contexts it formed.
+
+The contract:
+
+- **A+ same-siting.** A satellite whose relative placement is the identity
+  (`Placement.identity`: offset `LatticePoint.origin`, orientation `Orientation.identity`) would sit
+  exactly on the root. `StructureSetCompiler` rejects it with `SC-SET-0008`;
+  `StructureSet.place` reports the same code for a hand-built set whose composed siting equals the
+  root siting; `StructureSetHost.run`/`check` rejects a hand-built `StructureSet` whose satellite
+  siting equals `rootSiting` before presence or any check. `SC-SET-0005` remains the
+  satellite-satellite duplicate. A satellite at the root origin with a non-identity orientation is
+  allowed, because its composed siting differs from the root siting.
+- **One set budget.** `StructureSetHost` holds one mutable set budget seeded from `Budget`. Presence
+  charges `(1, 0)` per read; each attempt (root, then each present satellite) receives the remaining
+  `Budget`; an admitted outcome's `spend()` is subtracted. Presence exhaustion is `SC-SET-0004`; an
+  exhausted attempt is the engine's `SC-ENG-0001` and stops the set, as any non-admitted check does.
+- **Context removal.** `ContextStore.remove(InstanceId)` returns the removed `StructureContext` or
+  `null`; `SavedContexts` removes it and marks the SavedData dirty (an absent removal changes
+  nothing); `StructureKernel.contexts()` exposes the host store. `StructureSetHost` rollback calls
+  `remove` for every formed attempt regardless of the release verdict or a release throw; a removal
+  `RuntimeException` is a `SC-SET-0007` rollback failure and does not stop the other releases or
+  removals.
+
+The alternatives were rejected:
+
+- **Reusing `SC-SET-0005` for the root collision** would fold "a satellite repeats another
+  satellite" into "a satellite repeats the root", so an author could not tell which duplicate to
+  fix. `SC-SET-0008` names the root/satellite case.
+- **A per-structure full budget** (the pre-S6 behavior) lets a set read `n × budget`; the host
+  admitted one set, so the set is the unit that owns the ceiling.
+- **A separate presence ceiling** leaves a second budget with no owner and no cross-member
+  accounting, and cannot answer whether a later attempt is still affordable.
+- **Leaving contexts in place and letting the host invalidate them** leaves the shipped host without
+  an operation to do so; `remove` is the smallest store operation that expresses invalidation.
+- **Aborting rollback on the first failed release or removal** would leave the remaining formed
+  structures settled and their contexts published.
+
+**Why:** the root and its satellites are one placement graph and one host run; a satellite at the
+root siting cannot be placed or claimed independently, a set budget is the honest total, and a
+rollback that only releases claims leaves a context describing a structure that no longer exists.
+
+**Consequence:** `SC-SET-0008` joins the set family (`Codes.all` is 65); a hand-built `StructureSet`
+is defensively re-checked; the set's total reads never exceed `budget.cells()`; a successful
+rollback removes the `StructureContext` of every formed attempt (`rolledBack` still lists only the
+successful releases); a failed release does not skip the context removal; `SavedContexts` persists
+the removal. The record set is now 35 decisions (D-35). **Status (S6):** implemented; the focused
+kernel/adapter tests, the full `check` and `runGameTestServer` are green.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -796,13 +850,17 @@ lifetime; a consumer must not retain it after the lease stops being current. The
   D-29), the derived envelope (D-30), the cached-context port (D-31) and the structure-set host layer
   (D-32) are implemented, and the spec index is green; what remains is the performance/cost pass and
   fresh visual review screenshots (D-02, `07-regeneration.md` §7).
-- A structure set is not atomic across structures or context (D-32): a later settle failure releases
-  the earlier claim rows in reverse order, but the earlier kernel contexts stay published.
-  `StructureSetResult.rolledBack` is the host's list, and `ContextStore` has no removal operation; the
-  host must use a fresh instance or its own store if it needs invalidation.
-- Presence is charged to a ceiling seeded from the run budget's `cells`, while each structure attempt
-  still receives the full `Budget`; a set's total reads can therefore exceed `budget.cells()`
-  (`06-verification.md` §3.3).
+- A structure set is not atomic across structures (D-32): a later settle failure releases the
+  earlier claim rows in reverse order and removes their contexts through `ContextStore.remove`
+  (D-35). `StructureSetResult.rolledBack` names the releases that answered `Settled`; a failed
+  release or removal is a `SC-SET-0007` rollback failure, and a failed release does not skip the
+  context removal.
+- The set shares one `Budget` across presence and every member attempt (D-35): presence charges
+  `(1, 0)` per read, an attempt sees what remains, and an exhausted attempt stops the set. A host
+  that wants an independent ceiling per structure must run one set per budget.
+- A satellite may not share the root siting (D-35): the compiler, `StructureSet.place` and the host
+  each reject it with `SC-SET-0008`; a satellite at the root origin with a non-identity orientation
+  is legal.
 - `MatchRequest` carries an `InstanceId` before a match exists; a host that previews many candidates
   must allocate ids it never uses. This is a host counter, not a kernel resource.
 - `ContextStore.publish` is total and single-writer; a host that publishes from two threads violates

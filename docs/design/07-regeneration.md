@@ -23,7 +23,7 @@ compile/explain/claims); capture-revision lease invalidation landed at `0f0bf25`
 gate with `DeterminismTest`, the rotated-siting two-phase capture (P1) at `56c632c`, the
 event-edged watched-region mark counter (M5a) at `d1fa42f`, the 40 non-upright orientations (M5d) at
 `ac11d0c` and the capture report (M5e, D-28, `SC-MC-0003`/`0004`/`0005`) at `28d0334`. The sited-root
-descriptor projection (S6, D-29) was implemented and is superseded by the typed host snapshot (D-33,
+descriptor projection (the old S6 label, D-29) was implemented and is superseded by the typed host snapshot (D-33,
 `10-host-data.md`): `OccupantDescriptor` is `(type, kind)`, the projection is retired, and
 `OrientationAuditGameTest` covers the retained orientation audit. Kernel stress batch 1
 (`kernel-stress-batch-1`, `110e797`) adds 44 characterization scenarios in 12 `engine` classes
@@ -38,9 +38,11 @@ adds the adapter `property`/`state`/`tag`/`fluid` factories and `SC-MC-0006`…`
 documented counts and the adapter host-data stress group (§3.4). T1–T3 (D-34) then replace the
 `readBlock`/`readEntity` trait providers with the generic per-holder registry and direct capability
 values. S5 of the structure-set close-out adds the production `set check`/`set settle` command, its
-one union capture and the check-only host path (`09-structure-sets.md` §16). The tree registers
-**258 kernel tests in 39 containers, 286 adapter unit tests in 37 containers and 69 `@GameTest`
-methods**; `Codes.all` has 64 entries and the decision record has 34 decisions (D-34). Pending only:
+one union capture and the check-only host path (`09-structure-sets.md` §16). S6 closes the set layer:
+`SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
+budget shared by presence and every member attempt. The tree registers
+**261 kernel tests in 39 containers, 292 adapter unit tests in 37 containers and 69 `@GameTest`
+methods**; `Codes.all` has 65 entries and the decision record has 35 decisions (D-35). Pending only:
 the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
 There is no regeneration milestone.
 

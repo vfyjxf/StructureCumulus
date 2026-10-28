@@ -210,7 +210,29 @@ class LogicalSubnetworkSetStressTest {
     }
 
     @Test
-    void presenceAndEachStructureAttemptUseTheFullBudgetCeiling() {
+    void presenceAndEveryStructureAttemptShareOneBudgetCeiling() {
+        StructureSetTestSupport.Fixture fixture = new StructureSetTestSupport.Fixture(
+            new CompiledStructureSet(
+                StructureSetTestSupport.setId,
+                singleCell(StructureSetStressFixtures.networkId, StructureSetStressFixtures.networkController),
+                List.of(compiled(logicalSatellite(driveId, driveId, LatticePoint.of(20, 0, 20), true, null)))
+            )
+        );
+        fixture.view.put(world(fixture.plan.rootSiting(), origin), StructureSetStressFixtures.networkController);
+        fillAt(fixture, driveId, origin, drive);
+        StructureSetResult result = fixture.run(Budget.of(3, Integer.MAX_VALUE));
+
+        assertTrue(result.formed(), () -> result.setFindings().toString());
+        assertEquals(
+            List.of(StructureSetStressFixtures.networkId, driveId),
+            result.settled(),
+            "presence (1) + root (1) + satellite (1) exactly consume the three-cell set budget"
+        );
+        assertEquals(1 + 1, fixture.ledger.rows().size());
+    }
+
+    @Test
+    void aOneCellBudgetCannotCoverPresenceAndAnAttempt() {
         StructureSetTestSupport.Fixture fixture = new StructureSetTestSupport.Fixture(
             new CompiledStructureSet(
                 StructureSetTestSupport.setId,
@@ -222,13 +244,12 @@ class LogicalSubnetworkSetStressTest {
         fillAt(fixture, driveId, origin, drive);
         StructureSetResult result = fixture.run(Budget.of(1, Integer.MAX_VALUE));
 
-        assertTrue(result.formed(), () -> result.setFindings().toString());
-        assertEquals(
-            List.of(StructureSetStressFixtures.networkId, driveId),
-            result.settled(),
-            "presence consumes one read and each one-cell structure still checks under the full ceiling"
-        );
-        assertEquals(1 + 1, fixture.ledger.rows().size());
+        assertFalse(result.formed());
+        assertTrue(result.outcomes().isEmpty(), "the presence read leaves nothing for the root attempt");
+        assertTrue(result.settled().isEmpty());
+        assertEquals(1, fixture.instances.size(), "the root attempt is made and refused");
+        assertTrue(codes(result).contains(Codes.budgetExhausted.code()), () -> codes(result).toString());
+        assertEquals(0, fixture.ledger.rows().size());
     }
 
     private static CompiledSatellite compiled(SatelliteSpec spec) {

@@ -9,6 +9,7 @@ import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
+import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.document.DistanceMetric;
 import dev.vfyjxf.cumulus.kernel.document.LinkMode;
 import dev.vfyjxf.cumulus.kernel.document.LinkSpec;
@@ -46,8 +47,9 @@ import java.util.function.Supplier;
  * Host orchestration for one placed structure set: presence, links, check-all, settle-all and rollback.
  *
  * <p>The kernel still checks and settles one blueprint at a time; this class sequences those independent
- * attempts. It owns no kernel transaction and no context rollback: a rolled-back structure keeps its
- * published {@code StructureContext}, and the host must invalidate it.
+ * attempts under one set-scoped budget. It owns no kernel transaction: a rolled-back structure's
+ * published {@code StructureContext} is removed through {@code ContextStore.remove}, and a removal
+ * failure is reported as a rollback failure.
  */
 public final class StructureSetHost {
 
@@ -112,11 +114,28 @@ public final class StructureSetHost {
             );
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
+        boolean rootCollision = false;
+        for (StructureSet.Satellite satellite : set.satellites()) {
+            if (satellite.siting().equals(set.rootSiting())) {
+                setFindings.add(
+                    problem(
+                        Codes.rootPlacementCollision,
+                        "the satellite " + satellite.id().text() + " is placed exactly on the root",
+                        Locus.world(satellite.presenceCells()),
+                        Phase.check
+                    )
+                );
+                rootCollision = true;
+            }
+        }
+        if (rootCollision) {
+            return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
+        }
         WorldView view = lease.view();
-        PresenceBudget presenceBudget = new PresenceBudget(budget.cells());
+        SetBudget setBudget = new SetBudget(budget);
         Map<NamespacedId, Boolean> present = new LinkedHashMap<>();
         for (StructureSet.Satellite satellite : requiredFirst(set.satellites())) {
-            Presence probe = probe(satellite, view, presenceBudget);
+            Presence probe = probe(satellite, view, setBudget);
             if (probe.state() == PresenceState.unknown) {
                 setFindings.add(presenceUnreadable(satellite, probe.cell(), probe.budgetExhausted()));
                 return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
@@ -142,7 +161,7 @@ public final class StructureSetHost {
             set.root().id(),
             lease,
             owner,
-            budget,
+            setBudget,
             instances,
             setFindings,
             outcomes
@@ -162,7 +181,7 @@ public final class StructureSetHost {
                 satellite.id(),
                 lease,
                 owner,
-                budget,
+                setBudget,
                 instances,
                 setFindings,
                 outcomes
@@ -215,7 +234,7 @@ public final class StructureSetHost {
         NamespacedId key,
         SnapshotLease lease,
         OwnerId owner,
-        Budget budget,
+        SetBudget budget,
         Supplier<InstanceId> instances,
         List<Finding> setFindings,
         Map<NamespacedId, MatchOutcome> outcomes
@@ -223,10 +242,12 @@ public final class StructureSetHost {
         ClaimLedger ledger = kernel.ledger();
         @Nullable
         ClaimView claims = ledger == null ? null : ledger.read(worldBounds);
-        MatchRequest request = MatchRequest.of(blueprint, siting, lease, instances.get(), owner, budget, claims);
+        MatchRequest request = MatchRequest
+                .of(blueprint, siting, lease, instances.get(), owner, budget.remaining(), claims);
         MatchResult checked = kernel.check(request);
         if (checked instanceof MatchResult.Admitted admitted) {
             outcomes.put(key, admitted.outcome());
+            budget.spend(admitted.outcome().spend());
             return new Attempt(key, blueprint, siting, worldBounds, request, admitted);
         }
         setFindings.addAll(checked.findings().findings());
@@ -245,23 +266,30 @@ public final class StructureSetHost {
             if (ledger == null) {
                 // A Formed structure without a ledger wrote no rows; nothing is left to release.
                 rolledBack.add(attempt.key());
-                continue;
+            } else {
+                try {
+                    ClaimVerdict verdict = ledger.release(owner, attempt.siting());
+                    if (verdict instanceof ClaimVerdict.Settled) {
+                        rolledBack.add(attempt.key());
+                    } else {
+                        rollbackFailures.add(
+                            rollbackFailure(attempt, "release answered " + verdict.getClass().getSimpleName())
+                        );
+                    }
+                } catch (RuntimeException failure) {
+                    rollbackFailures.add(rollbackFailure(attempt, detail(failure)));
+                }
             }
             try {
-                ClaimVerdict verdict = ledger.release(owner, attempt.siting());
-                if (verdict instanceof ClaimVerdict.Settled) {
-                    rolledBack.add(attempt.key());
-                } else {
-                    rollbackFailures
-                            .add(rollbackFailure(attempt, "release answered " + verdict.getClass().getSimpleName()));
-                }
+                kernel.contexts().remove(attempt.request().instance());
             } catch (RuntimeException failure) {
-                String detail = failure.getMessage() == null
-                        ? failure.getClass().getSimpleName()
-                        : failure.getMessage();
-                rollbackFailures.add(rollbackFailure(attempt, detail));
+                rollbackFailures.add(rollbackFailure(attempt, "the context could not be removed: " + detail(failure)));
             }
         }
+    }
+
+    private static String detail(RuntimeException failure) {
+        return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
     }
 
     private static List<ClaimRow> claimsOf(MatchResult.Formed formed, Blueprint blueprint, OwnerId owner) {
@@ -274,13 +302,13 @@ public final class StructureSetHost {
         return List.copyOf(own);
     }
 
-    private static Presence probe(StructureSet.Satellite satellite, WorldView view, PresenceBudget budget) {
+    private static Presence probe(StructureSet.Satellite satellite, WorldView view, SetBudget budget) {
         for (Cuboid box : satellite.presenceCells().boxes()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {
                         LatticePoint cell = LatticePoint.of(x, y, z);
-                        if (!budget.charge()) {
+                        if (!budget.charge(new Spend(1, 0))) {
                             return new Presence(PresenceState.unknown, cell, true);
                         }
                         CellRead read = view.read(cell);
@@ -441,7 +469,7 @@ public final class StructureSetHost {
         boolean exhausted
     ) {
         String where = cell == null ? "its presence region" : "the cell " + cell;
-        String detail = exhausted ? " (the presence budget is exhausted)" : "";
+        String detail = exhausted ? " (the set budget is exhausted)" : "";
         String message = "the presence of " + satellite.id().text() + " is unreadable at " + where + detail;
         Locus locus = cell == null
                 ? Locus.world(satellite.presenceCells())
@@ -498,20 +526,32 @@ public final class StructureSetHost {
 
     private record Presence(PresenceState state, @Nullable LatticePoint cell, boolean budgetExhausted) {}
 
-    private static final class PresenceBudget {
+    private static final class SetBudget {
 
-        private long remaining;
+        private int cells;
+        private int sections;
 
-        private PresenceBudget(int cells) {
-            this.remaining = cells;
+        private SetBudget(Budget budget) {
+            this.cells = budget.cells();
+            this.sections = budget.sections();
         }
 
-        private boolean charge() {
-            if (remaining <= 0) {
+        private Budget remaining() {
+            return Budget.of(cells, sections);
+        }
+
+        private boolean charge(Spend spend) {
+            if (spend.cells() > cells || spend.sections() > sections) {
                 return false;
             }
-            remaining--;
+            cells -= spend.cells();
+            sections -= spend.sections();
             return true;
+        }
+
+        private void spend(Spend spend) {
+            cells = Math.max(0, cells - spend.cells());
+            sections = Math.max(0, sections - spend.sections());
         }
 
     }

@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S5 + H1–H4 + T1–T3)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S6 + H1–H4 + T1–T3)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -21,7 +21,10 @@
 > replace the M2c provider shape with generic per-holder providers and make the three capability
 > traits return the capability handle itself. S5 adds the production set driver:
 > `/cumulus set check`/`set settle`, one capture for the bounding box of the root and every satellite under
-> the union of their `Blueprint.reads()`, the check-only host path and a built-in demo set.
+> the union of their `Blueprint.reads()`, the check-only host path and a built-in demo set. S6 closes
+> the set layer: `SC-SET-0008` same-siting rejection, `ContextStore.remove` (the adapter's
+> `SavedContexts.remove`) used by rollback, and one set budget shared by presence and every member
+> attempt.
 
 ## 1. Position
 
@@ -49,13 +52,14 @@
   `CapabilityTraitProvider<T, H, C>` with `CapabilityAccesses.block`/`entity`/`entityVoid`, the
   three direct capability trait keys (`IItemHandler`, `IEnergyStorage`, `IFluidHandler`) and remove
   the NBT traits (D-34). S1–S4 add the structure-set
-  layer: `Siting.compose` and the seven `SC-SET` codes (`9cf2794`), the set document IR/reader/
+  layer: `Siting.compose` and the `SC-SET` codes (`9cf2794`), the set document IR/reader/
   writer/compiler (`00cf6c4`), the host `StructureSet` plan, `StructureSetHost` and `StructureSetResult`
   (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3). S5 adds `SetCommand` and the
   `set check`/`set settle` literals, `CommandSupport.rootSiting`/`policy(ReadScope)`,
   `StructureSetHost.check`, the built-in `set_root`/`set_wing`/`set_demo` documents with the
   `ServerState.findSet` builtin fallback, and the real-level `StructureSetHostGameTest`/`SetCommandGameTest`
-  (`06-verification.md` §3.5). H1 adds `HostType`,
+  (`06-verification.md` §3.5). S6 adds `SC-SET-0008` at compile/placement/host, the shared set budget
+  and rollback context invalidation through `ContextStore.remove` (D-35). H1 adds `HostType`,
   `WorldView.get` and `Expectations.host` and retires the descriptor properties; H2 adds the per-frame
   `SnapshotLevel`, the capture wiring, the typed `WorldView.get` dispatch, snapshot anchors and the
   digest content. H3 adds the `property`/`state`/`tag`/`fluid` expectation factories and catalog, the
@@ -109,7 +113,7 @@
 | `AdapterCodes` | final class, package-private | the adapter's `SC-MC-*` codes, their catalog `CodeEntry`s and the severity each finding carries |
 | `CaptureReports` | final class, package-private | the report site: one `CaptureReport` entry → one `Finding` (severity, world label, trust guard) |
 | `SavedClaims` | `ClaimLedger` | per-world `SavedData`, CAS on the server thread (M3) |
-| `SavedContexts` | `ContextStore` | per-instance values in `SavedData` (M3) |
+| `SavedContexts` | `ContextStore` | per-instance values in `SavedData`; `publish` and `remove` (M3, S6) |
 | `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
 | `JsonDocument` / `StructureSetReader` / `StructureSetWriter` | — | `kind` dispatcher; Gson tree ↔ `StructureSetDocument`; canonical set output (S2) |
 | `DatapackBlueprints` | `DocumentSource` | reload listener; blueprint and structure-set ids under `data/<ns>/cumulus/structure/` (M4b + S3); wins over `BuiltinDocuments` on an id collision |
@@ -279,7 +283,10 @@ re-reads the store on load. The `/cumulus settle` command drives this path on th
 value's type text is the `Class.getName()` and the host's codec table maps it; an unknown type is a
 load-time finding, not a crash. A `RuntimeState` type does not exist: the `StructureContext` is the
 persisted value. The finding codec writes the code text, not a registry ordinal, so a persisted
-`SC-OCC-0004` or relayed host code survives a reload.
+`SC-OCC-0004` or relayed host code survives a reload. `remove(instance)` returns the stored context
+(or `null`) and marks the SavedData dirty only when something was removed; an absent removal is a
+no-op, the removed entry is not written, and the next serial is restored from the remaining
+instances on reload (S6).
 
 ## 7. Traits
 
@@ -618,7 +625,7 @@ passing `SC-MC-0010` as the absent code (§3.2).
 The adapter registers its codes in its own code catalog through `Catalogs.Builder.codes`
 (`AdapterCodes` holds the ten codes and their entries), so each carries the canonical severity
 above and an explanation, and `/cumulus explain` resolves it. The catalog is the host's, not
-`Codes.all`: `Codes.all` stays at 64 entries, and a capture entry's code is never a kernel registry
+`Codes.all`: `Codes.all` has 65 entries, and a capture entry's code is never a kernel registry
 entry. `CaptureReports` is the only report site: it reads the code's `CodeEntry` (or answers `error`
 when the host registered none), relays the entry as a finding, and applies the kernel's trust guard —
 a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (`world` §4.1, §4.10).
@@ -634,16 +641,20 @@ satellite's relative siting (`rootSiting.compose(relativeSiting)`) and maps the 
 satellite's world bounds and its presence region into world space. The presence region is the
 satellite bounds unless `PresenceSpec` overrides it. A null mapping is `SC-SPC-0001`; a presence
 region outside the satellite bounds is `SC-DOC-0002`; a satellite id equal to the root blueprint id
-would collide with the result key and is `SC-DOC-0004`. The returned `StructureSet.Placement` is
+would collide with the result key and is `SC-DOC-0004`. A satellite whose composed siting equals the
+root siting is `SC-SET-0008` (the compiler rejects the relative identity first; this arm covers a
+hand-built set). The returned `StructureSet.Placement` is
 either the placed set or the findings, never a partially placed set.
 
 ### 13.2 Presence and budget
 
 Presence is probed for required satellites first and then optional ones, each group in declaration
-order. Presence is read through the lease's `WorldView.read`; every read cell is charged to a ceiling
-seeded from the run budget's `cells`. Each structure check is a separate kernel attempt and receives
-the full `Budget`, so the set's total reads can exceed `budget.cells()` (`06-verification.md` §3.3).
-A satellite is present when its presence region holds a non-air block-family
+order. Presence is read through the lease's `WorldView.read`; the set carries **one** budget, and
+every presence cell is charged `(1, 0)` before it is read. Each structure attempt then receives the
+set budget minus what presence and the earlier admitted attempts spent, and an admitted attempt's
+`outcome.spend()` is subtracted, so the set's total reads never exceed `budget.cells()`
+(`06-verification.md` §3.3, D-35). A budget-exhausted attempt is the engine's `SC-ENG-0001` and stops
+the set. A satellite is present when its presence region holds a non-air block-family
 occupant (`block` or `blockEntity`); entities, fluids and nested bodies do not prove presence. The
 first non-air block proves presence and stops the probe; an unreadable cell or budget exhaustion
 makes presence unknown. A present satellite is checked; an absent required satellite is
@@ -664,22 +675,24 @@ and a range fan-in to one parent cell are legal.
 ### 13.4 Check all, settle all and rollback
 
 `StructureSetHost.run(set, lease, owner, budget, instances)` refuses a stale lease with
-`SC-ENG-0002`, then runs the fixed order: presence, links, the root check, every present satellite
+`SC-ENG-0002`, rejects a hand-built set whose satellite siting equals the root siting with
+`SC-SET-0008`, then runs the fixed order: presence, links, the root check, every present satellite
 check, then the root and the satellites in declaration order. Each check is one `MatchRequest` with
 a fresh `ClaimView` read for that structure's world bounds; the instance supplier allocates one
 `InstanceId` per checked structure, root first. Any failure before a settle returns with no settle.
 
-A settle failure stops the settle pass and releases the already-settled structures in reverse order;
-a release that throws or answers anything except `Settled` is reported as `SC-SET-0007` in
-`rollbackFailures`, the remaining releases still run, and nothing is retried. `settled` is the
-successful settle order and `rolledBack` the successful release order. `setFindings` carries the
-presence and link findings, a rejected check or settle's findings, and every `Formed` structure's
-own findings (including warnings); `rollbackFailures` stays separate. `StructureSetResult.outcomes`
-holds every admitted check, including a structure later rolled back; `claims` filters
-`Formed.claims()` by `(owner, siting, bay)`, so a ledger-wide `ClaimSet` never leaks another
-structure's rows into a per-structure view. Kernel context is not rolled back: a rolled-back
-structure keeps the `StructureContext` its `Formed` settle published, and the host must invalidate
-the context of every id in `rolledBack`.
+A settle failure stops the settle pass, releases the already-settled structures in reverse order and
+removes the `StructureContext` of every formed attempt through `ContextStore.remove` (reached through
+`StructureKernel.contexts()`), regardless of the release verdict or a release throw. A release that
+throws or answers anything except `Settled` is reported as `SC-SET-0007` in `rollbackFailures`, as is
+a removal `RuntimeException`; the remaining releases and removals still run, and nothing is retried.
+`settled` is the successful settle order and `rolledBack` the successful release order. `setFindings`
+carries the presence and link findings, a rejected check or settle's findings, and every `Formed`
+structure's own findings (including warnings); `rollbackFailures` stays separate.
+`StructureSetResult.outcomes` holds every admitted check, including a structure later rolled back;
+`claims` filters `Formed.claims()` by `(owner, siting, bay)`, so a ledger-wide `ClaimSet` never leaks
+another structure's rows into a per-structure view. Rollback removes the context of every formed
+attempt, including the failed-release root; `rolledBack` still names only the successful releases.
 
 ### 13.5 The set command and its one capture (S5)
 
@@ -725,13 +738,15 @@ paths.
 There is no kernel multi-structure engine and no claim transaction across structures: the host plan
 and `StructureSetHost` remain a library entry point a host may drive without the command. Each settle
 is independent and a later satellite's CAS retry sees the earlier rows through the ledger. Rollback
-releases claims only; a rolled-back structure keeps its kernel context, and `ContextStore` has no
-removal operation, so `StructureSetResult.rolledBack` is the host's own invalidation list. A set has
-no shared budget: presence is charged to a private `cells` ceiling and each structure check receives
-the full `Budget` (09 §7.3). Same-siting rejection stays out (S6). The SS4 stress suite
+releases claims and removes the kernel context of every formed attempt through `ContextStore.remove`;
+`rolledBack` still names only the successful releases, and a failed release or removal is a
+`SC-SET-0007` rollback failure (D-35). A set has one shared budget: presence charges `(1, 0)` per
+read and each attempt receives the remainder, so the set's total reads stay within the run budget
+(09 §7.3). Same-siting is rejected (`SC-SET-0008`) in the compiler, in `StructureSet.place` and by
+the host's defensive check. The SS4 stress suite
 (`ImprovedBlastFurnaceSetStressTest`, `TepReactorSetStressTest`,
 `LogicalSubnetworkSetStressTest`, `PortEnvelopeSetStressTest`, `StructureSetRotationStressTest`,
-`StructureSetRollbackStressTest`; 33 tests) exercises these rules with fake views, leases and
+`StructureSetRollbackStressTest`; 34 tests) exercises these rules with fake views, leases and
 ledgers; S5 adds the two real-level GameTest classes above (four methods).
 
 ## 14. What is deliberately absent
