@@ -9,21 +9,23 @@ The kernel describes what an occupant is: its type and kind. It must not model b
 properties, tags, fluids, entity data, or any other host payload.
 
 Those are host data. They are **snapshotted in their original MC form**, not translated into a
-kernel model:
+kernel model and not merged into one "host snapshot" object:
 
-- copied `PalettedContainer<BlockState>` sections;
-- block entities;
-- entities;
-- heightmaps when a check needs them.
+- `BlockSnapshot`: copied `PalettedContainer<BlockState>` sections;
+- `FluidSnapshot`: copied fluid states;
+- `EntitySnapshot`: copied entities;
+- `BlockEntitySnapshot`: copied block entities, when requested.
 
-The reference implementation is
+Each is its own type, its own `HostType`, and its own capture request. A host can add a new snapshot
+type without touching the existing ones.
+
+The reference shape is
 [CachedLevel.java](https://github.com/khjxiaogu/Beecrasy/blob/master/src/main/java/com/khjxiaogu/beecrasy/utils/CachedLevel.java):
-it copies the section containers (or references them) and exposes the result through
-`BlockGetter`/`LevelReader`. This design follows the same shape: copy the vanilla data, then bridge
-one API.
+copy the vanilla section data, then bridge a typed read API. MBD2's structure debugger follows the
+same snapshot direction ([debugging docs](https://low-drag-mc.github.io/LowDragMC-Doc/en/multiblocked2/editor/debugging.html)).
 
-There is no per-cell `HostTable`, no `HostData` wrapper, no `McOccupant` union and no host-data
-mirror map.
+There is no per-cell `HostTable`, no `HostData` wrapper, no `McOccupant` union, no `McSnapshot`
+union and no live-world read from `WorldView.host`.
 
 ## 2. HostType
 
@@ -49,16 +51,25 @@ public record HostType<H>(NamespacedId id) implements Comparable<HostType<?>> {
 }
 ```
 
-- `H` is the host snapshot type; the kernel never names it;
+- `H` is one snapshot type; the kernel never names it;
 - no `Class<?>`;
 - no per-cell value type;
-- one `HostType` per host snapshot API.
+- one `HostType` per snapshot API.
 
-Adapter constant:
+Adapter constants:
 
 ```java
-public static final HostType<McSnapshot> MC_SNAPSHOT =
-    HostType.of(id("mc_snapshot"));
+public static final HostType<BlockSnapshot> BLOCK_SNAPSHOT =
+    HostType.of(id("block_snapshot"));
+
+public static final HostType<FluidSnapshot> FLUID_SNAPSHOT =
+    HostType.of(id("fluid_snapshot"));
+
+public static final HostType<EntitySnapshot> ENTITY_SNAPSHOT =
+    HostType.of(id("entity_snapshot"));
+
+public static final HostType<BlockEntitySnapshot> BLOCK_ENTITY_SNAPSHOT =
+    HostType.of(id("block_entity_snapshot"));
 ```
 
 ## 3. WorldView bridge
@@ -75,52 +86,95 @@ public interface WorldView {
 ```
 
 - no cell parameter;
-- returns the whole host snapshot, not a per-cell value;
+- returns one snapshot type, never a union;
 - default `null`;
-- `LevelSnapshot` overrides it for `MC_SNAPSHOT`;
+- `LevelSnapshot` overrides it for each captured snapshot type;
 - it never reads the live world;
 - it is total: missing means "not captured", not an exception.
 
-## 4. McSnapshot
+## 4. Snapshots
 
-`McSnapshot` is the adapter's immutable snapshot of the vanilla data:
+### 4.1 BlockSnapshot
 
 ```java
-public final class McSnapshot implements BlockGetter {
+public final class BlockSnapshot implements BlockGetter {
 
     private final Cuboid bounds;
     private final PalettedContainer<BlockState>[] sections;
-    private final Map<BlockPos, BlockEntity> blockEntities;
-    private final List<Entity> entities;
     private final HeightProvider[] heightmaps;
 
     public BlockState getBlockState(BlockPos pos);
+    public int getHeight(int x, int z);
+}
+```
+
+- copies `PalettedContainer<BlockState>` sections;
+- local coordinates;
+- out-of-bounds reads return air, like `CachedLevel`;
+- no live `Level` reference;
+- used by property, exact state, block tag and anchor.
+
+### 4.2 FluidSnapshot
+
+```java
+public final class FluidSnapshot {
+
+    private final Cuboid bounds;
+    private final PalettedContainer<FluidState>[] sections;
+
     public FluidState getFluidState(BlockPos pos);
-    public @Nullable BlockEntity getBlockEntity(BlockPos pos);
+}
+```
+
+- copies fluid states;
+- local coordinates;
+- out-of-bounds reads return `Fluids.EMPTY.defaultFluidState()`;
+- used by fluid and fluid tag checks.
+
+### 4.3 EntitySnapshot
+
+```java
+public final class EntitySnapshot {
+
+    private final Cuboid bounds;
+    private final List<Entity> entities;
+
     public List<Entity> entities();
 }
 ```
 
-- coordinates are **local** to the snapshot (the `CachedLevel` shape with a local origin);
-- block states are copied `PalettedContainer`s, not per-cell maps;
-- block entities are copied where needed;
-- entities are copied references/records for the snapshot;
-- out-of-bounds reads return air, like `CachedLevel`;
-- no live `Level` reference is retained for reads.
+- copies the captured entity references/records;
+- used by entity tag checks.
 
-`LevelSnapshot` holds one `McSnapshot` per frame and implements:
+### 4.4 BlockEntitySnapshot
 
 ```java
-@Override
-public <H> @Nullable H host(HostType<H> type) {
-    if (type.equals(McHostTypes.MC_SNAPSHOT)) {
-        @SuppressWarnings("unchecked")
-        H snapshot = (H) mcSnapshot;
-        return snapshot;
-    }
-    return null;
+public final class BlockEntitySnapshot {
+
+    private final Cuboid bounds;
+    private final Map<BlockPos, CompoundTag> blockEntities;
+
+    public @Nullable CompoundTag get(BlockPos pos);
 }
 ```
+
+- copies block entity data when requested;
+- used by future block-entity-specific checks;
+- no capability or live block entity is retained.
+
+### 4.5 No union
+
+There is no `McSnapshot`, no `HostData`, and no combined object. A check asks for exactly the
+snapshot type it needs:
+
+```java
+BlockSnapshot blocks = view.host(BLOCK_SNAPSHOT);
+FluidSnapshot fluids = view.host(FLUID_SNAPSHOT);
+EntitySnapshot entities = view.host(ENTITY_SNAPSHOT);
+```
+
+A host can add `ItemSnapshot`, `EnergySnapshot`, or any other type without changing the existing
+snapshots.
 
 ## 5. Capture
 
@@ -135,30 +189,29 @@ Set<HostType<?>> hostTypes
 with `withHostTypes` and union by id. `Blueprint.reads()` includes:
 
 - every check's host types;
-- the anchor host type when the blueprint has anchors.
+- `BLOCK_SNAPSHOT` when the blueprint has anchors.
 
 `CommandSupport.policy(blueprint)` passes them to the capture.
 
 ### 5.2 Capture path
 
-`LevelCapture` builds `McSnapshot` from the same section walk it already performs:
+`LevelCapture` builds only the requested snapshots from the same section walk:
 
-1. copy the relevant `PalettedContainer<BlockState>` sections;
-2. copy the block entities that fall inside the capture bounds;
-3. copy the entity candidates;
-4. copy the heightmaps if requested;
-5. wrap them in `McSnapshot`.
+1. if `BLOCK_SNAPSHOT` is requested: copy the relevant `PalettedContainer<BlockState>` sections and
+   heightmaps;
+2. if `FLUID_SNAPSHOT` is requested: copy the relevant fluid states;
+3. if `ENTITY_SNAPSHOT` is requested: copy the captured entities;
+4. if `BLOCK_ENTITY_SNAPSHOT` is requested: copy block entity data.
 
 The existing `OccupantSnapshot` capture stays as the kernel's type/kind/footprint view. It is not
 extended with host data.
 
-`FrameData`/`LevelSnapshot` carry the `McSnapshot` for the frame. Nested frames get their own
-snapshot.
+`FrameData`/`LevelSnapshot` carry the per-frame snapshot objects. Nested frames get their own
+snapshots.
 
 ### 5.3 No second read
 
-The snapshot is built during capture, not by `WorldView.host`. A check never reads the live level.
-The host snapshot is the frozen value for the attempt.
+Snapshots are built during capture, not by `WorldView.host`. A check never reads the live level.
 
 ## 6. Expectation bridge
 
@@ -183,12 +236,10 @@ Semantics:
 
 `reads()` adds `type` to `ReadScope.hostTypes`. No per-cell host data and no trait request.
 
-The predicate is supplied by the adapter. The kernel never constructs or interprets host data.
-
 ## 7. Adapter expectations
 
 The JSON document has no separate MC check type. A normal check whose expectation kind is one of the
-adapter factories is compiled into an `Expectations.host` predicate over `McSnapshot`.
+adapter factories is compiled into an `Expectations.host` predicate.
 
 ### 7.1 Property
 
@@ -198,8 +249,8 @@ adapter factories is compiled into an `Expectations.host` predicate over `McSnap
 
 ```java
 Expectations.host(
-    MC_SNAPSHOT,
-    (snapshot, cell) -> snapshot.getBlockState(pos(cell)).getValue(property).getName().equals(value),
+    BLOCK_SNAPSHOT,
+    (blocks, cell) -> blocks.getBlockState(pos(cell)).getValue(property).getName().equals(value),
     SC_MC_0006,
     "expected property ..."
 )
@@ -228,9 +279,9 @@ snapshotted state directly.
 
 The predicate uses `TagKey` directly:
 
-- block: `snapshot.getBlockState(pos).is(tag)`;
-- fluid: `snapshot.getFluidState(pos).is(tag)`;
-- entity: the snapshot's entity type holder `is(tag)`.
+- block: `blocks.getBlockState(pos).is(tag)`;
+- fluid: `fluids.getFluidState(pos).is(tag)`;
+- entity: the entity snapshot's type holder `is(tag)`.
 
 No descriptor tags and no `anyOf` expansion.
 
@@ -241,8 +292,9 @@ No descriptor tags and no `anyOf` expansion.
 ```
 
 ```java
-FluidState fluid = snapshot.getFluidState(pos);
-BlockState block = snapshot.getBlockState(pos);
+BlockState block = blocks.getBlockState(pos);
+FluidState fluid = fluids.getFluidState(pos);
+
 fluid.getType() == expected
     && block.getBlock() == fluid.createLegacyBlock().getBlock()
 ```
@@ -255,7 +307,7 @@ fluid.getType() == expected
 ## 8. Anchor
 
 The kernel `Anchors` and `StructureKernel.siting` are removed. The adapter resolves anchors from
-the captured snapshot:
+the captured `BlockSnapshot`:
 
 ```java
 public final class McAnchors {
@@ -265,11 +317,11 @@ public final class McAnchors {
         LatticePoint origin,
         WorldView view
     ) {
-        McSnapshot snapshot = view.host(McHostTypes.MC_SNAPSHOT);
-        if (snapshot == null) {
-            return failure(..., SC_MC_0010, "the anchor snapshot was not captured");
+        BlockSnapshot blocks = view.host(BLOCK_SNAPSHOT);
+        if (blocks == null) {
+            return failure(..., SC_MC_0010, "the anchor block snapshot was not captured");
         }
-        BlockState state = snapshot.getBlockState(pos(origin));
+        BlockState state = blocks.getBlockState(pos(origin));
         String value = state.getValue(property);
         if (!value.equalsIgnoreCase(spec.value())) {
             return failure(..., anchorInvalid, "anchor property does not equal the declared value");
@@ -281,7 +333,7 @@ public final class McAnchors {
 
 - `AnchorSpec` and `OrientationPolicy` remain kernel declarations;
 - `AnchorSpec.value` becomes a real constraint;
-- `CommandSupport` captures the anchor cell with `MC_SNAPSHOT` in the policy;
+- `CommandSupport` captures the anchor cell with `BLOCK_SNAPSHOT` in the policy;
 - no live world read.
 
 ## 9. Descriptor
@@ -308,7 +360,7 @@ Removed:
 
 - occupant refs;
 - descriptor type/kind;
-- the `McSnapshot` content for the section's cells.
+- the requested host snapshots for the section's cells.
 
 Test:
 
@@ -316,8 +368,6 @@ Test:
 same type, different BlockState
   -> different contentDigest
 ```
-
-The snapshot is the source of truth; there is no per-cell host table to keep in sync.
 
 ## 11. Codes
 
@@ -343,6 +393,7 @@ Adapter codes, not in `Codes.all`:
 
 ## 13. Non-goals
 
+- no `McSnapshot` union;
 - no `HostData` interface;
 - no `HostView` wrapper;
 - no `McOccupant` union;
@@ -368,8 +419,8 @@ Kernel:
 
 Adapter:
 
-- `McSnapshot` (copied sections, block entities, entities, heightmaps);
-- `HostType<McSnapshot>` constant;
+- `BlockSnapshot`, `FluidSnapshot`, `EntitySnapshot`, `BlockEntitySnapshot`;
+- four `HostType` constants;
 - `LevelCapture`/`FrameData`/`LevelSnapshot` snapshot wiring;
 - `McAnchors`;
 - adapter expectation factories;
@@ -382,7 +433,7 @@ Tests/docs:
 - anchor tests move to adapter;
 - `SitedDescriptorGameTest`/`WorldTest` migrate;
 - `DocumentCompilerTest` property checks move to adapter catalogs;
-- snapshot copy/read/digest tests;
+- snapshot copy/read/digest tests per type;
 - waterlogged distinction tests;
 - JSON/Java parity for property/state/tag/fluid.
 
@@ -391,7 +442,7 @@ Tests/docs:
 | Slice | Scope | Gate |
 | --- | --- | --- |
 | H1 | `HostType`, `ReadScope`/`SnapshotPolicy` host types, `WorldView.host`, `Expectations.host`; descriptor `(type, kind)`; remove property/anchors | focused kernel tests |
-| H2 | `McSnapshot`, `LevelCapture`/`FrameData`/`LevelSnapshot` snapshot copy/read, digest | focused adapter capture tests |
+| H2 | `BlockSnapshot`/`FluidSnapshot`/`EntitySnapshot`/`BlockEntitySnapshot`, capture wiring, digest | focused adapter capture tests |
 | H3 | adapter `property`/`state`/`tag`/`fluid` factories, `McAnchors`, `SC-MC-0006..0010`, JSON/Java parity | focused adapter tests |
 | H4 | docs, counts, stress scenarios | focused regression |
 
