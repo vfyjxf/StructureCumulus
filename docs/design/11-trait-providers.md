@@ -1,7 +1,8 @@
 # 11. Generic trait providers
 
 > Status: proposed, not implemented. This document replaces the `readBlock`/`readEntity` shape of
-> `TraitProvider` with one generic provider per holder type.
+> `TraitProvider`, removes the generic NBT traits, and makes capability traits return the capability
+> itself.
 
 ## 1. Problem
 
@@ -19,9 +20,18 @@ public interface TraitProvider<T> {
 
 Every provider therefore carries both methods, even when it only knows one subject. The defaults
 turn "this provider does not apply" into a hidden `Absent`, and a new subject type (block entity,
-item, capability proxy, …) cannot be added without editing the provider interface again.
+item, attachment proxy, …) cannot be added without editing the provider interface again.
 
-That is the same mistake the host-data round removed: a kernel/adapter interface pre-declares
+Two more problems are in the standard traits:
+
+- inventory is copied into a `List<ItemStack>`, fluid into a `List<FluidStack>`, and energy into an
+  `Integer`; each wrapper loses the real capability object and invents a second value model;
+- `blockEntityNbt` / `entityNbt` read data through full NBT serialization. That is not an API:
+  concrete block entities expose typed state, capabilities or attachments. A generic NBT trait
+  encourages callers to depend on serialized implementation details and to reimplement what the
+  owning API already models.
+
+This is the same mistake the host-data round removed: a kernel/adapter interface pre-declares
 subject kinds instead of making the subject a type token.
 
 ## 2. Shape
@@ -45,6 +55,9 @@ public interface TraitProvider<T, H> {
 
 A provider is registered for exactly one `(trait id, holder id)` pair. The same trait may have
 several providers, one per holder; inventory, energy and fluid naturally do.
+
+A trait value is the provider's real value, not a copy invented by the framework. For capability
+traits that means the capability object itself.
 
 ## 3. TraitHolder
 
@@ -141,7 +154,7 @@ registration interface.
 
 ## 6. Dispatch and absence
 
-`OccupantTraits` keeps the existing five trait ids and asks by holder:
+`OccupantTraits` keeps the stable trait ids and asks by holder:
 
 ```java
 private static <H> TraitSlot read(
@@ -175,31 +188,48 @@ private static <H> TraitSlot read(
 
 ## 7. Standard providers
 
-The five standard traits are split by holder; no class implements both block and entity reads.
+### 7.1 Three capability traits, direct values
+
+The standard trait set is exactly the three NeoForge capabilities. Their values are the capability
+objects; no list, integer or NBT wrapping:
+
+| Field | Id | Java type |
+| --- | --- | --- |
+| `inventory` | `structurecumulus:inventory` | `IItemHandler` |
+| `energy` | `structurecumulus:energy` | `IEnergyStorage` |
+| `fluid` | `structurecumulus:fluid` | `IFluidHandler` |
+
+A consumer that wants slot contents calls `getStackInSlot`; one that wants tank contents calls
+`getFluidInTank`; one that wants stored energy calls `getEnergyStored`. The trait system does not
+duplicate those APIs.
+
+The value is the live capability handle. The capture lease is the validity boundary: a consumer must
+not retain a handle after the lease stops being current. No copy is made, and no mutation goes
+through a second wrapper.
+
+### 7.2 Split by holder
 
 ```java
 public final class BlockTraitProviders {
-    public static final TraitProvider<List<ItemStack>, BlockTraitContext> inventory;
-    public static final TraitProvider<Integer, BlockTraitContext> energy;
-    public static final TraitProvider<List<FluidStack>, BlockTraitContext> fluid;
-    public static final TraitProvider<CompoundTag, BlockTraitContext> blockEntityNbt;
+    public static final TraitProvider<IItemHandler, BlockTraitContext> inventory;
+    public static final TraitProvider<IEnergyStorage, BlockTraitContext> energy;
+    public static final TraitProvider<IFluidHandler, BlockTraitContext> fluid;
 }
 
 public final class EntityTraitProviders {
-    public static final TraitProvider<List<ItemStack>, EntityTraitContext> inventory;
-    public static final TraitProvider<Integer, EntityTraitContext> energy;
-    public static final TraitProvider<List<FluidStack>, EntityTraitContext> fluid;
-    public static final TraitProvider<CompoundTag, EntityTraitContext> entityNbt;
+    public static final TraitProvider<IItemHandler, EntityTraitContext> inventory;
+    public static final TraitProvider<IEnergyStorage, EntityTraitContext> energy;
+    public static final TraitProvider<IFluidHandler, EntityTraitContext> fluid;
 }
 ```
 
 Each provider:
 
 ```java
-private static final class BlockInventory implements TraitProvider<List<ItemStack>, BlockTraitContext> {
+private static final class BlockInventory implements TraitProvider<IItemHandler, BlockTraitContext> {
 
     @Override
-    public TraitKey<List<ItemStack>> key() {
+    public TraitKey<IItemHandler> key() {
         return OccupantTraits.inventory;
     }
 
@@ -217,14 +247,54 @@ private static final class BlockInventory implements TraitProvider<List<ItemStac
             actual.blockEntity(),
             capture.capabilityContext()
         );
-        return handler == null ? new TraitSlot.Absent(key().id()) : present(key(), inventoryValue(handler));
+        return handler == null ? new TraitSlot.Absent(key().id()) : present(key(), handler);
     }
 }
 ```
 
-- block and entity NBT are now ordinary one-holder providers, not special cases;
-- value extraction helpers are shared as plain static functions, not through a mixed interface;
-- `BuiltinTraitPlugin` registers both groups through the same generic `TraitRegister`.
+- block and entity providers are separate classes; no class implements both;
+- the capability context is still passed to the five-argument block lookup;
+- a null capability is `Absent`;
+- a block entity state with a null block entity stays `Refused(notCaptured)`;
+- malformed capability access stays `Refused(failed)`.
+
+### 7.3 No generic NBT traits
+
+`blockEntityNbt` and `entityNbt` are removed. The framework does not serialize a block entity or an
+entity into a trait.
+
+If a host needs block-entity or entity data, it registers a concrete trait for the API that owns the
+data:
+
+```java
+public static final TraitKey<MyMachineState> machineState =
+    new TraitKey<>(id("machine_state"), MyMachineState.class);
+
+public final class MachineStateProvider
+    implements TraitProvider<MyMachineState, BlockTraitContext> {
+
+    @Override
+    public TraitKey<MyMachineState> key() {
+        return machineState;
+    }
+
+    @Override
+    public TraitHolder<BlockTraitContext> holder() {
+        return TraitHolders.block;
+    }
+
+    @Override
+    public TraitSlot get(BlockTraitContext actual, TraitCaptureContext capture) {
+        if (actual.blockEntity() instanceof MyMachineBlockEntity machine) {
+            return present(key(), machine.state());
+        }
+        return new TraitSlot.Absent(key().id());
+    }
+}
+```
+
+The same rule applies to attachments, data components, item handlers and any future host API: a
+typed provider over the owning API, not a generic serialization escape hatch.
 
 ## 8. Extensibility
 
@@ -240,7 +310,7 @@ No existing provider, registry method, or registration method changes.
 
 Adding a trait:
 
-1. define `TraitKey<T>`;
+1. define `TraitKey<T>` over the real API type;
 2. implement one provider per holder that can supply it;
 3. register;
 4. add the id to the capture policy.
@@ -252,7 +322,8 @@ not one interface with two defaults.
 
 Kernel:
 
-- none; `TraitKey`, `TraitSlot`, `Trait`, `SnapshotPolicy` are unchanged.
+- none; `TraitKey`, `TraitSlot`, `Trait`, `SnapshotPolicy` are unchanged. The concrete `TraitKey`
+  types change in the adapter, not the kernel type.
 
 Adapter:
 
@@ -262,6 +333,8 @@ Adapter:
 - `TraitLookup` keyed by `(trait, holder)`, adds `knows`;
 - `TraitRegister` becomes `<T, H> register(...)`;
 - `StandardTraitProviders` split into `BlockTraitProviders` / `EntityTraitProviders`;
+- `OccupantTraits` keys become `IItemHandler`, `IEnergyStorage`, `IFluidHandler`; the two NBT keys
+  are removed;
 - `OccupantTraits` generic dispatch;
 - plugin registration and tests updated.
 
@@ -276,7 +349,12 @@ No JSON, document, kernel or host-snapshot change.
 - known trait without a provider for the holder -> absent;
 - provider receives exactly the actual holder and capture;
 - provider throwing / returning wrong id -> failed;
-- block inventory/energy/fluid/NBT and entity inventory/energy/fluid/NBT preserve M2c semantics;
+- block/entity inventory returns the exact `IItemHandler` identity, not a copy;
+- block/entity energy returns the exact `IEnergyStorage`;
+- block/entity fluid returns the exact `IFluidHandler`;
+- no `blockEntityNbt` / `entityNbt` keys exist;
+- capability-absent -> absent; null block entity -> refused(notCaptured); malformed capability ->
+  refused(failed);
 - plugin registration and built-in lookup parity;
 - fake provider tests use `get`, not `readBlock`/`readEntity`.
 
@@ -286,6 +364,9 @@ No JSON, document, kernel or host-snapshot change.
 - no default `Absent` in the provider interface;
 - no provider implementing both current subject kinds;
 - no `Class<?>` in `TraitHolder`;
+- no `List<ItemStack>`, `List<FluidStack>` or `Integer` wrappers for capability traits;
+- no `blockEntityNbt` or `entityNbt`;
+- no generic serialization trait;
 - no kernel trait API change;
 - no merge of trait capture into the host snapshot.
 
@@ -294,7 +375,7 @@ No JSON, document, kernel or host-snapshot change.
 | Step | Change |
 | --- | --- |
 | T1 | `TraitHolder`, `TraitHolders`, generic `TraitProvider<T,H>`, `TraitRegister`, `TraitLookup` keying |
-| T2 | split standard providers, update `OccupantTraits` dispatch and contexts |
-| T3 | update tests/docs, `TraitCaptureGameTest` fake providers, `TraitLookupTest` |
+| T2 | split capability providers, change keys to direct capability types, remove NBT traits, update `OccupantTraits` dispatch and contexts |
+| T3 | update tests/docs, `TraitCaptureGameTest` fake providers, `TraitLookupTest`; remove NBT assertions |
 
 Implementation starts after this design is accepted.
