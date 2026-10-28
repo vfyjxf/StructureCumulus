@@ -7,8 +7,12 @@ import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.World;
+import dev.vfyjxf.cumulus.kernel.document.CompilerContext;
 import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetCompileResult;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetCompiler;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
@@ -23,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /** The server-side owner of the kernel and the per-level capture and persistence state. */
 @NullMarked
@@ -45,9 +50,17 @@ public final class ServerState {
         this.blueprints = DatapackBlueprints.attach();
         DocumentSource builtin = BuiltinDocuments.source();
         // A datapack document wins over the built-in document on an id collision.
-        this.documents = id -> {
-            Document document = blueprints.find(id);
-            return document != null ? document : builtin.find(id);
+        this.documents = new DocumentSource() {
+            @Override
+            public @Nullable Document find(NamespacedId id) {
+                Document document = blueprints.find(id);
+                return document != null ? document : builtin.find(id);
+            }
+
+            @Override
+            public @Nullable StructureSetDocument findSet(NamespacedId id) {
+                return blueprints.findSet(id);
+            }
         };
         this.kernel = StructureKernel.create(catalogs, new Host(documents, null, ContextStore.inMemory(), Map.of()));
         this.traitLookup = TraitLookup.load(StructureCumulus.logger);
@@ -98,6 +111,23 @@ public final class ServerState {
 
     DatapackBlueprints blueprints() {
         return blueprints;
+    }
+
+    @Nullable
+    StructureSetDocument structureSet(NamespacedId id) {
+        return documents.findSet(id);
+    }
+
+    StructureSetCompileResult compileSet(StructureSetDocument document) {
+        Objects.requireNonNull(document, "document");
+        CompilerContext context = new CompilerContext(
+            catalogs.focuses(),
+            catalogs.expectations(),
+            catalogs.computations(),
+            Map.of(),
+            documents
+        );
+        return StructureSetCompiler.compile(document, context);
     }
 
     StructureKernel kernel(ServerLevel level) {

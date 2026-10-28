@@ -4,8 +4,8 @@ import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.document.Document;
-import dev.vfyjxf.cumulus.kernel.document.DocumentReader;
 import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import net.minecraft.resources.ResourceLocation;
@@ -35,7 +35,6 @@ public final class DatapackBlueprints implements DocumentSource {
     private static final String directory = "cumulus/structure";
 
     private static final String extension = ".json";
-    private static final DocumentReader reader = new JsonReader();
 
     private static volatile Snapshot pending = Snapshot.empty();
 
@@ -78,6 +77,7 @@ public final class DatapackBlueprints implements DocumentSource {
         List<ResourceLocation> ordered = new ArrayList<>(resources.keySet());
         ordered.sort(Comparator.comparing(ResourceLocation::getNamespace).thenComparing(ResourceLocation::getPath));
         Map<NamespacedId, Loaded> loaded = new TreeMap<>();
+        Map<NamespacedId, LoadedSet> loadedSets = new TreeMap<>();
         List<Finding> findings = new ArrayList<>();
         for (ResourceLocation path : ordered) {
             NamespacedId source = sourceId(path);
@@ -93,20 +93,29 @@ public final class DatapackBlueprints implements DocumentSource {
                 continue;
             }
             List<Finding> errors = new ArrayList<>();
-            Document document = reader.read(source, new String(bytes, StandardCharsets.UTF_8), errors);
+            JsonDocument parsed = JsonDocument.read(source, new String(bytes, StandardCharsets.UTF_8), errors);
             findings.addAll(errors);
-            if (document == null) {
-                continue;
-            }
-            NamespacedId id = document.root().id();
-            Loaded previous = loaded.putIfAbsent(id, new Loaded(bytes, document, path));
-            if (previous != null && !Arrays.equals(previous.bytes(), bytes)) {
-                findings.add(duplicate(id, previous.path(), path));
+            if (parsed instanceof JsonDocument.Blueprint blueprint) {
+                Document document = blueprint.document();
+                NamespacedId id = document.root().id();
+                Loaded previous = loaded.putIfAbsent(id, new Loaded(bytes, document, path));
+                if (previous != null && !Arrays.equals(previous.bytes(), bytes)) {
+                    findings.add(duplicate(id, previous.path(), path));
+                }
+            } else if (parsed instanceof JsonDocument.StructureSet set) {
+                StructureSetDocument document = set.document();
+                NamespacedId id = document.spec().id();
+                LoadedSet previous = loadedSets.putIfAbsent(id, new LoadedSet(bytes, document, path));
+                if (previous != null && !Arrays.equals(previous.bytes(), bytes)) {
+                    findings.add(duplicateSet(id, previous.path(), path));
+                }
             }
         }
         Map<NamespacedId, Document> documents = new TreeMap<>();
         loaded.forEach((id, value) -> documents.put(id, value.document()));
-        return new Snapshot(documents, findings);
+        Map<NamespacedId, StructureSetDocument> sets = new TreeMap<>();
+        loadedSets.forEach((id, value) -> sets.put(id, value.document()));
+        return new Snapshot(documents, sets, findings);
     }
 
     static @Nullable NamespacedId sourceId(ResourceLocation location) {
@@ -131,8 +140,17 @@ public final class DatapackBlueprints implements DocumentSource {
         return snapshot.find(id);
     }
 
+    @Override
+    public @Nullable StructureSetDocument findSet(NamespacedId id) {
+        return snapshot.findSet(id);
+    }
+
     public Map<NamespacedId, Document> documents() {
         return snapshot.documents();
+    }
+
+    public Map<NamespacedId, StructureSetDocument> structureSets() {
+        return snapshot.sets();
     }
 
     public List<Finding> findings() {
@@ -170,18 +188,29 @@ public final class DatapackBlueprints implements DocumentSource {
                 .message("duplicate document id " + id.text() + ": " + first + " wins over " + duplicate).build();
     }
 
+    private static Finding duplicateSet(NamespacedId id, ResourceLocation first, ResourceLocation duplicate) {
+        return Finding.builder(Codes.documentDuplicate).phase(Phase.compile)
+                .message("duplicate structure-set id " + id.text() + ": " + first + " wins over " + duplicate).build();
+    }
+
     static final class Snapshot {
 
         private final Map<NamespacedId, Document> documents;
+        private final Map<NamespacedId, StructureSetDocument> sets;
         private final List<Finding> findings;
 
-        private Snapshot(Map<NamespacedId, Document> documents, List<Finding> findings) {
+        private Snapshot(
+            Map<NamespacedId, Document> documents,
+            Map<NamespacedId, StructureSetDocument> sets,
+            List<Finding> findings
+        ) {
             this.documents = Collections.unmodifiableMap(new TreeMap<>(documents));
+            this.sets = Collections.unmodifiableMap(new TreeMap<>(sets));
             this.findings = List.copyOf(findings);
         }
 
         static Snapshot empty() {
-            return new Snapshot(Map.of(), List.of());
+            return new Snapshot(Map.of(), Map.of(), List.of());
         }
 
         @Nullable
@@ -189,8 +218,17 @@ public final class DatapackBlueprints implements DocumentSource {
             return documents.get(id);
         }
 
+        @Nullable
+        StructureSetDocument findSet(NamespacedId id) {
+            return sets.get(id);
+        }
+
         Map<NamespacedId, Document> documents() {
             return documents;
+        }
+
+        Map<NamespacedId, StructureSetDocument> sets() {
+            return sets;
         }
 
         List<Finding> findings() {
@@ -199,6 +237,8 @@ public final class DatapackBlueprints implements DocumentSource {
     }
 
     private record Loaded(byte[] bytes, Document document, ResourceLocation path) {}
+
+    private record LoadedSet(byte[] bytes, StructureSetDocument document, ResourceLocation path) {}
 
     private static final class ReloadListener extends SimplePreparableReloadListener<Snapshot> {
 

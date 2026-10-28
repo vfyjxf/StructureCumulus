@@ -13,7 +13,8 @@
 `UndecidedReason`, `MatchEngine`, `ClaimPlanner`.
 
 **Does not own:** the blueprint's validity (`structure`), the ledger (`claim`), the context store
-(`context`), the document (`document`), scheduling, capture, dirty state (`host`).
+(`context`), the document (`document`), scheduling, capture, dirty state (`host`), structure-set
+orchestration (the adapter host, design 09).
 
 **Imports:** `core`, `space`, `finding`, `world`, `claim`, `structure`, `context`, `document`.
 
@@ -258,6 +259,10 @@ footprint lies inside the bay's world cells; for `oneSubject` the union equals t
 `IllegalArgumentException` carrying `SC-CLM-0004` if a nested or non-root subject reaches it; that is
 a proof failure, because check and settle already validated the bindings.
 
+A ledger is free to answer `Formed.claims()` with its whole row set rather than only the replacement
+rows. A host that runs several structures must therefore filter the set by `(owner, siting, bay)`
+before attributing rows to one structure; the engine never does that filtering.
+
 ### 7.6 Budget and determinism
 
 Charges: a section computation charges the slice volume plus one section per section run; a check
@@ -342,3 +347,14 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
 
 All kernel packages below rank 8. It does not import `remedy` or `spi`; the facade passes the
 catalogs, ledger and store in.
+
+## 11. Structure sets are host-sequenced
+
+A structure set is not an engine concept. The engine still runs one `check` and one `settle` per
+blueprint, each with its own `MatchRequest`, budget, instance and frozen `ClaimView`. The host places
+the root, composes each satellite's absolute siting, reads presence through the lease, validates the
+link cells, then sequences root-first independent attempts; a failed check stops before any settle,
+and a failed settle rolls the already-settled claims back with `release(owner, siting)` in reverse
+order (design 09 §10, `adapter` §13). The engine owns none of that order, no presence read, no link
+geometry and no multi-structure transaction. Rollback releases claims only; a `Formed` context stays
+published and the host must invalidate it.

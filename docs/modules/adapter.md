@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S3)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -81,8 +81,14 @@
 | `SavedClaims` | `ClaimLedger` | per-world `SavedData`, CAS on the server thread (M3) |
 | `SavedContexts` | `ContextStore` | per-instance values in `SavedData` (M3) |
 | `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
-| `DatapackBlueprints` | `DocumentSource` | reload listener; ids under `data/<ns>/cumulus/structure/` (M4b); wins over `BuiltinDocuments` on an id collision |
-| `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/contexts and capture cache |
+| `JsonDocument` / `StructureSetReader` / `StructureSetWriter` | — | `kind` dispatcher; Gson tree ↔ `StructureSetDocument`; canonical set output (S2) |
+| `DatapackBlueprints` | `DocumentSource` | reload listener; blueprint and structure-set ids under `data/<ns>/cumulus/structure/` (M4b + S3); wins over `BuiltinDocuments` on an id collision |
+| `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/contexts, capture cache, merged set lookup and set compile |
+| `StructureSet` | — | host plan: compiled set + host root siting + each satellite's composed siting, world bounds and world-space presence region; `place` reports mapping failures |
+| `StructureSet.Satellite` | record | one placed satellite: id, compiled satellite, absolute siting, world bounds, presence cells |
+| `StructureSet.Placement` | record | the placed set or the findings that prevented it |
+| `StructureSetHost` | — | presence/link/check-all/settle-all/rollback sequencing over the kernel facade |
+| `StructureSetResult` | record | per-structure outcomes and filtered claims, set findings, settled/rolled-back ids and rollback failures |
 | `CumulusCommand` | — | the five `/cumulus` subcommands (`check`, `compile`, `settle`, `explain`, `claims`) |
 | `FindingOutput` | — | human/JSON to chat, log or a file (absent; the commands print inline today) |
 | `MatchScheduler` | — | optional host execution: submit, coalesce, markDirty, tick (absent) |
@@ -400,12 +406,18 @@ from `wireName()`, `SC-*` codes take their family tag from the explicit table, a
 uppercase, while the document shape keeps its separate lowercase vocabulary (`every_cell`,
 `exclusive`, `identity`).
 
-`DatapackBlueprints` scans `data/<ns>/cumulus/structure/*.json` on reload, stores `Document`s and
-serves them through `DocumentSource.find`. A duplicate id with different bytes is a reload finding;
-the first file in path order wins and the duplicate is reported. The reader/writer (M4a) and the
-datapack reload (M4b) are committed. `ServerState` installs one merged `DocumentSource` in both the
-server-level and the per-level host: a datapack document wins over a `BuiltinDocuments` document on
-an id collision, and the built-in `structurecumulus:air_cell` remains the fallback.
+`DatapackBlueprints` scans `data/<ns>/cumulus/structure/*.json` on reload and dispatches on `kind`
+through `JsonDocument`: a kindless/`blueprint` file becomes a `Document`, a `structure_set` file
+becomes a `StructureSetDocument`. Both are served through `DocumentSource.find`/`findSet`; the two
+id namespaces are independent, so a blueprint and a set may share one id. A duplicate id with
+different bytes is a reload finding per namespace; the first file in path order wins and the
+duplicate is reported. The reader/writer (M4a) and the datapack reload (M4b) are committed. S3
+makes the scan accept set files instead of rejecting them; a malformed set is a located finding and
+never kills the reload. `ServerState` installs one merged `DocumentSource` in both the server-level
+and the per-level host: a datapack document wins over a `BuiltinDocuments` document on an id
+collision, the built-in `structurecumulus:air_cell` remains the fallback, `findSet` delegates to the
+datapack source, and `compileSet(StructureSetDocument)` compiles against the same merged source and
+catalogs. A blueprint document takes exactly the path it took before S3.
 
 ## 10. Orientation
 
@@ -500,7 +512,68 @@ a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (
 The capture report never enters a `MatchResult` bundle; the commands print it as their own block
 before the attempt's findings (§11).
 
-## 13. What is deliberately absent
+## 13. Structure sets
+
+### 13.1 Host plan
+
+`StructureSet.place(CompiledStructureSet, Siting)` composes the host's root siting with every
+satellite's relative siting (`rootSiting.compose(relativeSiting)`) and maps the root bounds, each
+satellite's world bounds and its presence region into world space. The presence region is the
+satellite bounds unless `PresenceSpec` overrides it. A null mapping is `SC-SPC-0001`; a presence
+region outside the satellite bounds is `SC-DOC-0002`; a satellite id equal to the root blueprint id
+would collide with the result key and is `SC-DOC-0004`. The returned `StructureSet.Placement` is
+either the placed set or the findings, never a partially placed set.
+
+### 13.2 Presence and budget
+
+Presence is probed for required satellites first and then optional ones, each group in declaration
+order. Presence is read through the lease's `WorldView.read`; every read cell is charged to the run
+budget's `cells` ceiling. A satellite is present when its presence region holds a non-air block-family
+occupant (`block` or `blockEntity`); entities, fluids and nested bodies do not prove presence. The
+first non-air block proves presence and stops the probe; an unreadable cell or budget exhaustion
+makes presence unknown. A present satellite is checked; an absent required satellite is
+`SC-SET-0001`; an absent optional satellite is skipped; unknown is always `SC-SET-0004`, even for an
+optional satellite, and is never treated as absent. All presence findings use phase `check`.
+
+### 13.3 Links
+
+The host maps `parent_cell` through the root siting and `satellite_cell` through the placed
+satellite's siting, then measures the pair. `face` requires Manhattan distance one; `range` compares
+squared integers under `chebyshev`/`manhattan`/`euclidean` against `max_distance`; `none` carries no
+cells and no distance. A wrong distance is `SC-SET-0002`. Coverage is re-checked defensively against
+each blueprint's check read scopes even though the compiler already validated it; an endpoint
+outside its blueprint or uncovered is `SC-SET-0003`, and a null world mapping is `SC-SPC-0001`.
+Every link of every satellite is validated independently, so a wide satellite's several face links
+and a range fan-in to one parent cell are legal.
+
+### 13.4 Check all, settle all and rollback
+
+`StructureSetHost.run(set, lease, owner, budget, instances)` refuses a stale lease with
+`SC-ENG-0002`, then runs the fixed order: presence, links, the root check, every present satellite
+check, then the root and the satellites in declaration order. Each check is one `MatchRequest` with
+a fresh `ClaimView` read for that structure's world bounds; the instance supplier allocates one
+`InstanceId` per checked structure, root first. Any failure before a settle returns with no settle.
+
+A settle failure stops the settle pass and releases the already-settled structures in reverse order;
+a release that throws or answers anything except `Settled` is reported as `SC-SET-0007` in
+`rollbackFailures`, the remaining releases still run, and nothing is retried. `settled` is the
+successful settle order and `rolledBack` the successful release order. `setFindings` carries the
+presence and link findings, a rejected check or settle's findings, and every `Formed` structure's
+own findings (including warnings); `rollbackFailures` stays separate. `StructureSetResult.outcomes`
+holds every admitted check, including a structure later rolled back; `claims` filters
+`Formed.claims()` by `(owner, siting, bay)`, so a ledger-wide `ClaimSet` never leaks another
+structure's rows into a per-structure view. Kernel context is not rolled back: a rolled-back
+structure keeps the `StructureContext` its `Formed` settle published, and the host must invalidate
+the context of every id in `rolledBack`.
+
+### 13.5 Boundaries
+
+There is no kernel multi-structure engine, no command that runs a set and no capture executor for a
+set in this slice: the host plan and `StructureSetHost` are a library entry point the host may drive.
+No claim transaction spans structures; each settle is independent and a later satellite's CAS retry
+sees the earlier rows through the ledger.
+
+## 14. What is deliberately absent
 
 No client overlay renderer, no network payload, no schematic importer, no GUI, no scheduler in this
 round. No built-in nested provider and no adapter-owned nested source registry. The overlay model is

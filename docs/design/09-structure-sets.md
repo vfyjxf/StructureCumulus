@@ -1,8 +1,9 @@
 # 09. Structure sets and satellites
 
-> Status: S1 and S2 implemented; S3 (host plan and orchestration) and S4 (counts, stress, docs
-> close-out) pending. This document remains the source of truth for the structure-set layer; the
-> document IR, JSON reader/dispatcher/writer and `StructureSetCompiler` are on the tree.
+> Status: S1, S2 and S3 implemented; S4 (counts, stress, docs close-out) pending. This document
+> remains the source of truth for the structure-set layer; the document IR, JSON
+> reader/dispatcher/writer, `StructureSetCompiler`, the host plan and the host orchestration are on
+> the tree.
 
 ## 1. Purpose
 
@@ -312,12 +313,14 @@ All pairs are validated independently.
 
 ### 7.1 Definition
 
-A satellite is present when its presence region contains at least one:
+A satellite is present when its presence region contains at least one non-air block-family
+occupant:
 
 ```text
-OccupantKind.block && !OccupantSnapshot.isAir()
+(OccupantKind.block || OccupantKind.blockEntity) && !OccupantSnapshot.isAir()
 ```
 
+`blockEntity` is a block that also carries a block entity; it is still a block for presence.
 Entities, fluids, and nested bodies do not prove presence.
 
 ### 7.2 Region
@@ -384,12 +387,17 @@ Compilation:
 
 The host checks, in order:
 
-1. presence of every required satellite;
+1. presence of every satellite, required ones first and each group in declaration order (an absent
+   required satellite is `SC-SET-0001`; an unreadable one is `SC-SET-0004`);
 2. link distance/coverage;
 3. root check;
 4. every present satellite check.
 
-Any failure means no settle.
+Any failure means no settle. The host maps both link cells through the composed sitings before
+measuring them: a null mapping is `SC-SPC-0001`, an endpoint outside its blueprint or outside every
+check's read scope is `SC-SET-0003` (re-checked defensively), and a wrong face/range distance is
+`SC-SET-0002`. Link validation covers every satellite, present or not; an absent optional
+satellite only skips its check and settle.
 
 ### 10.2 Settle all
 
@@ -423,60 +431,69 @@ record StructureSetResult(
     List<Finding> setFindings,
     List<NamespacedId> settled,
     List<NamespacedId> rolledBack,
-    List<Finding> rollbackFailures
+    List<Finding> rollbackFailures,
+    Map<NamespacedId, List<ClaimRow>> claims
 ) { }
 ```
 
-The host filters `Formed.claims()` by `(owner, siting, bay)`; the ledger row set is ledger-wide.
+`outcomes` is keyed by the root blueprint id and each satellite id; it holds every admitted check,
+including a structure later rolled back. `setFindings` holds the presence/link findings and every
+check/settle result's findings (a formed structure's warnings included). `claims` holds the rows each `Formed` structure wrote,
+filtered by `(owner, siting, bay)`; the ledger row set is ledger-wide and a `Formed.claims()` may
+carry rows of other structures. `settled` is the settle order and `rolledBack` is the release
+order. Rollback releases claims only: the kernel context published by a rolled-back `settle` stays,
+so the host must invalidate the context of every id in `rolledBack`.
 
 ## 11. Java API
 
-```java
-StructureSet.builder(id("blast_furnace_set"))
-    .root(id("blast_furnace"))
-    .satellite(SatelliteSpec.builder(id("left_preheater"), id("preheater"))
-        .at(-1, 0, 0)
-        .orientation(Orientation.identity())
-        .required(false)
-        .arguments(Value.object(Map.of("tier", new Value.NumberValue(2, null))))
-        .presence(PresenceSpec.cell(LatticePoint.origin))
-        .link(LinkSpec.face(LatticePoint.of(2, 0, 1), LatticePoint.of(0, 0, 1)))
-        .build())
-    .build();
-```
-
-Public records:
+The document-layer records live in `kernel.document` and are produced by `StructureSetCompiler`:
 
 ```java
-record StructureSet(NamespacedId id, Blueprint root, List<Satellite> satellites) { }
-
-record Satellite(
-    NamespacedId id,
-    Blueprint blueprint,
-    Siting relativeSiting,
-    boolean required,
-    Value arguments,
-    @Nullable PresenceSpec presence,
-    List<LinkSpec> links
-) { }
-
-record PresenceSpec(CuboidSet cells) { }
-
-record LinkSpec(
-    LinkMode mode,
-    @Nullable LatticePoint parentCell,
-    @Nullable LatticePoint satelliteCell,
-    int maxDistance,
-    DistanceMetric metric
-) { }
+record StructureSetDocument(int schemaVersion, StructureSetSpec spec, Map<String, Value> extensions) { }
+record StructureSetSpec(NamespacedId id, NamespacedId root, List<SatelliteSpec> satellites,
+                        @Nullable SourceSpan source) { }
+record SatelliteSpec(NamespacedId id, NamespacedId blueprint, LatticePoint at, Orientation orientation,
+                     boolean required, Value arguments, @Nullable PresenceSpec presence,
+                     List<LinkSpec> links, @Nullable SourceSpan source) { }
+record PresenceSpec(CuboidSet cells, @Nullable SourceSpan source) { }
+record LinkSpec(LinkMode mode, @Nullable LatticePoint parentCell,
+                @Nullable LatticePoint satelliteCell, int maxDistance, DistanceMetric metric,
+                @Nullable SourceSpan source) { }
+record CompiledStructureSet(NamespacedId id, Blueprint root, List<CompiledSatellite> satellites) { }
+record CompiledSatellite(SatelliteSpec spec, Blueprint blueprint) { public Siting relativeSiting(); }
 
 enum LinkMode { face, range, none }
-
 enum DistanceMetric { chebyshev, manhattan, euclidean }
 ```
 
-`StructureSet` lives outside `kernel.engine`; it is a document/host-layer plan. The kernel does not
-execute it.
+The host plan lives in the adapter (`mc`), outside `kernel.engine`; the kernel does not execute it:
+
+```java
+record StructureSet(CompiledStructureSet compiled, Siting rootSiting, Cuboid rootBounds,
+                    List<StructureSet.Satellite> satellites) {
+    record Satellite(NamespacedId id, CompiledSatellite compiled, Siting siting,
+                     Cuboid worldBounds, CuboidSet presenceCells) { }
+    record Placement(@Nullable StructureSet set, List<Finding> findings) { boolean succeeded(); }
+    static Placement place(CompiledStructureSet compiled, Siting rootSiting);
+}
+
+final class StructureSetHost {
+    StructureSetHost(StructureKernel kernel);
+    StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner,
+                           Budget budget, Supplier<InstanceId> instances);
+}
+
+record StructureSetResult(Map<NamespacedId, MatchOutcome> outcomes, List<Finding> setFindings,
+                          List<NamespacedId> settled, List<NamespacedId> rolledBack,
+                          List<Finding> rollbackFailures,
+                          Map<NamespacedId, List<ClaimRow>> claims) { boolean formed(); }
+```
+
+`StructureSet.place` maps the root bounds, each satellite's composed siting, its world bounds and
+its world-space presence region; a mapping failure is `SC-SPC-0001`. The plan's structure keys are
+the root blueprint id and the satellite ids, so a satellite id equal to the root blueprint id is
+`SC-DOC-0004`. `StructureSetHost.run` takes the lease, owner, one budget and an instance supplier;
+the instances are allocated in check order root-first.
 
 ## 12. Document pipeline
 
@@ -487,7 +504,7 @@ execute it.
 | compiler | `StructureSetCompiler`; resolves root/satellite documents, merges arguments, compiles blueprints, validates links/presence/duplicates |
 | writer | `StructureSetWriter`; canonical member order |
 | spans | set-member spans for findings |
-| adapter | host `StructureSet` execution, capture, check, settle, rollback |
+| adapter | host `StructureSet` plan (`StructureSet`, `StructureSet.Satellite`, `StructureSet.Placement`), presence/link/check/settle/rollback (`StructureSetHost`, `StructureSetResult`), `DatapackBlueprints` set loading and `ServerState` set compile |
 
 `JsonReader` remains blueprint-only. A small dispatcher reads `kind` and selects the reader.
 
@@ -499,7 +516,7 @@ Add a `set` family to `FindingCode.Family` and seven entries to `Codes.all` (57 
 | --- | --- | --- |
 | `SC-SET-0001` | required satellite is absent | host presence |
 | `SC-SET-0002` | satellite link distance is invalid | compiler/host link |
-| `SC-SET-0003` | link cell is outside its blueprint or not covered by a check | compiler |
+| `SC-SET-0003` | link cell is outside its blueprint or not covered by a check | compiler/host link |
 | `SC-SET-0004` | satellite presence is unreadable | host presence |
 | `SC-SET-0005` | duplicate satellite placement | compiler |
 | `SC-SET-0006` | duplicate parent face link | compiler |
@@ -554,7 +571,7 @@ Document errors reuse existing codes:
 
 - **S1** landed at `9cf2794`: `Siting.compose`, `FindingCode.Family.set`, the seven `Codes` entries
   (64 total).
-- **S2** is implemented in the working tree (uncommitted, based on `9cf2794`). `kernel.document` gains
+- **S2** landed at `00cf6c4` (based on `9cf2794`). `kernel.document` gains
   `StructureSetDocument`/`StructureSetSpec`/`SatelliteSpec`/`LinkSpec`/`PresenceSpec`/`LinkMode`/
   `DistanceMetric`, `StructureSetCompiler`/`StructureSetCompileResult`,
   `CompiledStructureSet`/`CompiledSatellite`, and `DocumentSource.findSet`; `mc` gains
@@ -562,9 +579,14 @@ Document errors reuse existing codes:
   `JsonValues` encoder. `JsonReader` accepts an optional `kind: "blueprint"`. The focused tests are
   `StructureSetCompilerTest` (13 tests) and `JsonStructureSetTest` (10 tests); `document.md` §4.5
   owns the set schema.
-- **Not in S2:** the host `StructureSet` plan and orchestration, presence reading, check/settle/
-  rollback and the adapter result (S3); `DatapackBlueprints` stays blueprint-only, so a set file in
-  the datapack folder is rejected with `SC-DOC-0002` until the host loads sets; the S4 counts,
-  stress scenarios and docs close-out.
+- **S3** is implemented in the working tree (uncommitted, based at `00cf6c4`). `mc` gains the host
+  plan `StructureSet`/`StructureSet.Satellite`/`StructureSet.Placement`, the orchestration
+  `StructureSetHost`, and `StructureSetResult`; the result adds the per-structure filtered `claims`
+  map to the five-field shape above. `DatapackBlueprints` loads `structure_set` files beside
+  blueprints and `ServerState` serves `findSet` and compiles a set. Focused tests are
+  `StructureSetPlanTest` (6 tests), `StructureSetHostTest` (22 tests) and
+  `DatapackStructureSetTest` (5 tests).
+- **Not in S3:** a command or capture executor that runs a set; the adapter result is a library
+  entry point only. The S4 counts, stress scenarios and docs close-out remain.
 
 Visual review stays last.

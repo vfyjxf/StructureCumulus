@@ -371,7 +371,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
 | `SC-SET-0001` | ERROR | – | a required satellite is absent | host presence |
 | `SC-SET-0002` | ERROR | – | a satellite link distance is invalid | compiler/host link |
-| `SC-SET-0003` | ERROR | – | a link cell is outside its blueprint or not covered by a check | compiler |
+| `SC-SET-0003` | ERROR | – | a link cell is outside its blueprint or not covered by a check | compiler, host re-check |
 | `SC-SET-0004` | ERROR | – | satellite presence is unreadable | host presence |
 | `SC-SET-0005` | ERROR | – | duplicate satellite placement | compiler |
 | `SC-SET-0006` | ERROR | – | duplicate parent face link | compiler |
