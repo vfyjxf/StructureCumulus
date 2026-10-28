@@ -92,6 +92,9 @@ public final class TraitHolders {
     public static final TraitHolder<EntityTraitContext> entity =
         TraitHolder.of(id("entity"));
 
+    public static final TraitHolder<ItemTraitContext> item =
+        TraitHolder.of(id("item"));
+
     private TraitHolders() {}
 }
 ```
@@ -112,6 +115,8 @@ public record BlockTraitContext(
 ) { }
 
 public record EntityTraitContext(Entity entity) { }
+
+public record ItemTraitContext(ItemStack stack) { }
 ```
 
 This keeps "what is being read" separate from "under which capture policy it is read".
@@ -207,58 +212,143 @@ The value is the live capability handle. The capture lease is the validity bound
 not retain a handle after the lease stops being current. No copy is made, and no mutation goes
 through a second wrapper.
 
-### 7.2 Split by holder
+### 7.2 One generic capability provider
+
+`BlockCapability`, `ItemCapability` and `EntityCapability` share `BaseCapability<T, C>`, and their
+get signatures are the normal ones:
+
+```java
+BlockCapability<T, C>  : capability.getCapability(level, pos, state, blockEntity, context)
+EntityCapability<T, C> : capability.getCapability(entity, context)
+ItemCapability<T, C>   : capability.getCapability(stack, context)
+```
+
+So there is one generic provider, not one class per capability:
+
+```java
+@FunctionalInterface
+public interface CapabilityAccess<H, C> {
+
+    <T> @Nullable T get(
+        BaseCapability<T, C> capability,
+        H actual,
+        TraitCaptureContext capture
+    );
+}
+
+public final class CapabilityTraitProvider<T, H, C> implements TraitProvider<T, H> {
+
+    private final TraitKey<T> key;
+    private final TraitHolder<H> holder;
+    private final BaseCapability<T, C> capability;
+    private final CapabilityAccess<H, C> access;
+
+    public static <T, H, C> CapabilityTraitProvider<T, H, C> of(
+        TraitKey<T> key,
+        TraitHolder<H> holder,
+        BaseCapability<T, C> capability,
+        CapabilityAccess<H, C> access
+    ) {
+        return new CapabilityTraitProvider<>(key, holder, capability, access);
+    }
+
+    @Override
+    public TraitKey<T> key() {
+        return key;
+    }
+
+    @Override
+    public TraitHolder<H> holder() {
+        return holder;
+    }
+
+    @Override
+    public TraitSlot get(H actual, TraitCaptureContext capture) {
+        T value = access.get(capability, actual, capture);
+        return value == null
+            ? new TraitSlot.Absent(key.id())
+            : present(key, value);
+    }
+}
+```
+
+- one provider class covers block, entity and item capabilities;
+- the capability object stays typed; no raw map or reflection;
+- a null capability value is `Absent`;
+- a throwing capability lookup is caught by `OccupantTraits` and becomes `Refused(failed)`, as today.
+
+### 7.3 Holder accessors
+
+The only subject-specific code is the accessor that calls the normal get signature:
+
+```java
+public final class CapabilityAccesses {
+
+    public static CapabilityAccess<BlockTraitContext, @Nullable Direction> block() {
+        return new CapabilityAccess<>() {
+            @Override
+            public <T> @Nullable T get(
+                BaseCapability<T, @Nullable Direction> capability,
+                BlockTraitContext actual,
+                TraitCaptureContext capture
+            ) {
+                @SuppressWarnings("unchecked")
+                BlockCapability<T, @Nullable Direction> block = (BlockCapability<T, @Nullable Direction>) capability;
+                return block.getCapability(
+                    actual.level(),
+                    actual.pos(),
+                    actual.state(),
+                    actual.blockEntity(),
+                    capture.capabilityContext()
+                );
+            }
+        };
+    }
+
+    public static CapabilityAccess<EntityTraitContext, @Nullable Direction> entity() { ... }
+
+    public static CapabilityAccess<ItemTraitContext, @Nullable Void> item() { ... }
+}
+```
+
+- block and entity pass `capture.capabilityContext()` (the nullable `Direction`);
+- item passes `null` (`Void` context);
+- the cast is inside the accessor, not in every provider;
+- adding a new capability subject means one accessor, not a new provider class.
+
+### 7.4 Standard providers are declarations
+
+The standard providers become declarations over the generic provider:
 
 ```java
 public final class BlockTraitProviders {
-    public static final TraitProvider<IItemHandler, BlockTraitContext> inventory;
-    public static final TraitProvider<IEnergyStorage, BlockTraitContext> energy;
-    public static final TraitProvider<IFluidHandler, BlockTraitContext> fluid;
+    public static final TraitProvider<IItemHandler, BlockTraitContext> inventory =
+        CapabilityTraitProvider.of(
+            OccupantTraits.inventory,
+            TraitHolders.block,
+            Capabilities.ItemHandler.BLOCK,
+            CapabilityAccesses.block()
+        );
+    public static final TraitProvider<IEnergyStorage, BlockTraitContext> energy = ...;
+    public static final TraitProvider<IFluidHandler, BlockTraitContext> fluid = ...;
 }
 
 public final class EntityTraitProviders {
-    public static final TraitProvider<IItemHandler, EntityTraitContext> inventory;
-    public static final TraitProvider<IEnergyStorage, EntityTraitContext> energy;
-    public static final TraitProvider<IFluidHandler, EntityTraitContext> fluid;
+    public static final TraitProvider<IItemHandler, EntityTraitContext> inventory = ...;
+    public static final TraitProvider<IEnergyStorage, EntityTraitContext> energy = ...;
+    public static final TraitProvider<IFluidHandler, EntityTraitContext> fluid = ...;
 }
 ```
 
-Each provider:
+- no `BlockInventory` / `EntityInventory` classes;
+- no duplicated capability lookup code;
+- block and entity standard traits are still separate registrations, so a trait can exist for one
+  holder without a fake default for the other;
+- item providers can use the same `CapabilityTraitProvider` with `TraitHolders.item` and
+  `CapabilityAccesses.item()` when an item holder is captured; no item trait is registered by
+  default because the current capture has no item occupant.
 
-```java
-private static final class BlockInventory implements TraitProvider<IItemHandler, BlockTraitContext> {
-
-    @Override
-    public TraitKey<IItemHandler> key() {
-        return OccupantTraits.inventory;
-    }
-
-    @Override
-    public TraitHolder<BlockTraitContext> holder() {
-        return TraitHolders.block;
-    }
-
-    @Override
-    public TraitSlot get(BlockTraitContext actual, TraitCaptureContext capture) {
-        IItemHandler handler = actual.level().getCapability(
-            Capabilities.ItemHandler.BLOCK,
-            actual.pos(),
-            actual.state(),
-            actual.blockEntity(),
-            capture.capabilityContext()
-        );
-        return handler == null ? new TraitSlot.Absent(key().id()) : present(key(), handler);
-    }
-}
-```
-
-- block and entity providers are separate classes; no class implements both;
-- the capability context is still passed to the five-argument block lookup;
-- a null capability is `Absent`;
-- a block entity state with a null block entity stays `Refused(notCaptured)`;
-- malformed capability access stays `Refused(failed)`.
-
-### 7.3 No generic NBT traits
+### 7.5 No generic NBT traits
 
 `blockEntityNbt` and `entityNbt` are removed. The framework does not serialize a block entity or an
 entity into a trait.
@@ -329,10 +419,12 @@ Adapter:
 
 - `TraitProvider<T>` -> `TraitProvider<T, H>`;
 - new `TraitHolder<H>` and `TraitHolders`;
-- `BlockTraitContext` / `EntityTraitContext` lose the `capture` field;
+- `BlockTraitContext` / `EntityTraitContext` lose the `capture` field; `ItemTraitContext` is added;
 - `TraitLookup` keyed by `(trait, holder)`, adds `knows`;
 - `TraitRegister` becomes `<T, H> register(...)`;
-- `StandardTraitProviders` split into `BlockTraitProviders` / `EntityTraitProviders`;
+- new generic `CapabilityTraitProvider<T,H,C>` and `CapabilityAccesses` for block/item/entity;
+- `StandardTraitProviders` becomes `BlockTraitProviders` / `EntityTraitProviders` declarations over
+  the generic capability provider;
 - `OccupantTraits` keys become `IItemHandler`, `IEnergyStorage`, `IFluidHandler`; the two NBT keys
   are removed;
 - `OccupantTraits` generic dispatch;
@@ -352,6 +444,9 @@ No JSON, document, kernel or host-snapshot change.
 - block/entity inventory returns the exact `IItemHandler` identity, not a copy;
 - block/entity energy returns the exact `IEnergyStorage`;
 - block/entity fluid returns the exact `IFluidHandler`;
+- `CapabilityTraitProvider` resolves a block, item and entity capability through the same class;
+- `CapabilityAccesses.block/entity/item` call the normal get signatures and map the capture context;
+- an item holder can be registered with `TraitHolders.item` without a new provider class;
 - no `blockEntityNbt` / `entityNbt` keys exist;
 - capability-absent -> absent; null block entity -> refused(notCaptured); malformed capability ->
   refused(failed);
@@ -363,6 +458,7 @@ No JSON, document, kernel or host-snapshot change.
 - no `readBlock`/`readEntity` on the generic provider;
 - no default `Absent` in the provider interface;
 - no provider implementing both current subject kinds;
+- no per-capability provider class (`BlockInventoryProvider`, `EntityEnergyProvider`, …);
 - no `Class<?>` in `TraitHolder`;
 - no `List<ItemStack>`, `List<FluidStack>` or `Integer` wrappers for capability traits;
 - no `blockEntityNbt` or `entityNbt`;
@@ -375,7 +471,7 @@ No JSON, document, kernel or host-snapshot change.
 | Step | Change |
 | --- | --- |
 | T1 | `TraitHolder`, `TraitHolders`, generic `TraitProvider<T,H>`, `TraitRegister`, `TraitLookup` keying |
-| T2 | split capability providers, change keys to direct capability types, remove NBT traits, update `OccupantTraits` dispatch and contexts |
-| T3 | update tests/docs, `TraitCaptureGameTest` fake providers, `TraitLookupTest`; remove NBT assertions |
+| T2 | add `CapabilityTraitProvider` / `CapabilityAccesses`, declare block/entity standard providers, change keys to direct capability types, remove NBT traits, update `OccupantTraits` dispatch and contexts |
+| T3 | update tests/docs, `TraitCaptureGameTest` fake providers, `TraitLookupTest`; remove NBT assertions; cover item holder |
 
 Implementation starts after this design is accepted.
