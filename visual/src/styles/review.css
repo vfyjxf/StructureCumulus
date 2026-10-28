@@ -810,7 +810,7 @@ code, kbd, pre { font-family: var(--mono); }
 .key-stack { display: flex; flex-direction: column; margin-top: 12px; }
 .key-stack div { display: grid; grid-template-columns: 74px 1fr; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 9px; }
 .key-stack .k { color: var(--muted); }
-.key-stack .v { color: var(--ink); }
+.key-stack .v { color: var(--ink); overflow-wrap: anywhere; }
 
 .findings-mini { margin-top: 14px; border-top: 1px solid var(--line); }
 

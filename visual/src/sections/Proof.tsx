@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { decisions, DECISION_COUNT } from '../data/decisions';
 import { TEST_GROUPS, TEST_COUNT, testClasses } from '../data/tests';
-import { DOCS, GATES } from '../data/site';
+import { DOCS, GATES, LAYERS } from '../data/site';
 import { DECISION_ZH } from '../data/decisions.zh';
-import { ZH_DOCS, ZH_GATES, ZH_GROUPS } from '../data/site.zh';
+import { ZH_DOCS, ZH_GATES, ZH_GROUPS, ZH_LAYERS } from '../data/site.zh';
 import { useLanguage } from '../i18n/Language';
 import { Reveal, SectionHead } from '../components/ui';
 
@@ -24,6 +24,11 @@ const FALSIFIERS = [
   { claim: 'A clipped entity is unreadable, not a clipped match', gate: 'aClippedEntityFootprintIsUnreadable', detail: 'no rows written' },
   { claim: 'A document build error keeps its specific code', gate: 'documentBuildErrorsKeepTheirSpecificCode', detail: 'overlapping exclusive bays → SC-BPT-0002' },
   { claim: 'A missing section contribution is CTX-0001, not CTX-0006', gate: 'aMissingSectionContributionIsAComputationFailure', detail: 'unreadable fold stays a different code' },
+  { claim: 'A host value missing from the snapshot is unreadable, not a mismatch', gate: 'aMissingHostValueIsUnreadableWithTheSuppliedAbsentCode', detail: 'missing snapshot value keeps the caller absent code' },
+  { claim: 'The current attempt shadows a cached context value', gate: 'theCurrentAttemptValueShadowsTheCachedValue', detail: 'D-31 cache is host-owned and secondary' },
+  { claim: 'A structure-set settle failure releases earlier structures in reverse order', gate: 'aSettleFailureReleasesInReverseOrder', detail: 'claims only; the published context stays' },
+  { claim: 'An envelope-only blueprint gets one derived bay and check', gate: 'anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck', detail: 'D-30; an empty set is a no-op' },
+  { claim: 'A capability trait is the live capability object', gate: 'chestInventoryIsTheLiveCapability', detail: 'GameTest: IItemHandler, no copy' },
 ];
 
 const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
@@ -33,12 +38,17 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
   aClippedEntityFootprintIsUnreadable: { claim: '被裁剪的 entity 是 unreadable，不是 clipped match', detail: '没有写入任何 row' },
   documentBuildErrorsKeepTheirSpecificCode: { claim: 'document 构建错误保留具体 code', detail: 'exclusive bays 重叠 → SC-BPT-0002' },
   aMissingSectionContributionIsAComputationFailure: { claim: '缺失 section contribution 是 CTX-0001，不是 CTX-0006', detail: 'unreadable fold 仍是另一个 code' },
+  aMissingHostValueIsUnreadableWithTheSuppliedAbsentCode: { claim: '缺失的 host 值是 unreadable，不是 mismatch', detail: '缺失快照值保留 caller 的 absent code' },
+  theCurrentAttemptValueShadowsTheCachedValue: { claim: '当前 attempt 会遮蔽 cached context 值', detail: 'D-31 缓存是 host 拥有且次级的' },
+  aSettleFailureReleasesInReverseOrder: { claim: 'set 的 settle 失败会按逆序释放已形成的结构', detail: '只释放 claims；已发布 context 保留' },
+  anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck: { claim: '只有 envelope 的 blueprint 得到一个推导 bay 和 check', detail: 'D-30；空集合是 no-op' },
+  chestInventoryIsTheLiveCapability: { claim: 'capability trait 就是 live capability 对象', detail: 'GameTest：IItemHandler，不做拷贝' },
 };
 
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
-  186 tests / 186 successful / 0 failed
+  258 tests / 258 successful / 0 failed
 $ python3 tools/spec-check.py
   spec-check: ok
 $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
@@ -85,13 +95,13 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、186 个 kernel 测试、141 个 adapter 单元测试、66 个 GameTests、56 个 code、29 条决策。六道 gate 全部通过。adapter 已完成到 S6：M2c 的 Model C、body identity、total read 和四态 traits；M2d 的 nested extents、frames 和 cuts；M3 的 <code>SavedClaims</code>/<code>SavedContexts</code> 在 <code>d4b6d82</code> 提交，兼容 Model C。M4a JSON reader/writer 在 <code>f2659c7</code> 提交；M4b 的 datapack reload 在 <code>76a8e5c</code> 提交；命令切片（settle 在 <code>4899d86</code>，另有 compile/explain/claims）已实现；M5a 的 watched-region mark counter、M5d 的非 upright pitch/roll mapping、M5e 的 capture report（D-28）和 S6 的 sited-root descriptor projection（D-29，siting-aware property expectation）已完成。第一批 stress 场景（12 个 class，110e797）和第二批（17 kernel + 11 adapter tests，3e60ed4）已落地；剩下：performance/cost pass 和 review screenshots。</> : <>Six gates, 186 kernel tests, 141 adapter unit tests, 66 GameTests, 56 codes and 29 decisions. All six gates are green. The adapter is complete through S6: M2c Model C, body identity, total read and four-state traits; M2d nested extents, frames and cuts; M3 <code>SavedClaims</code>/<code>SavedContexts</code> at <code>d4b6d82</code>, compatible with Model C. M4a JSON reader/writer at <code>f2659c7</code>; M4b datapack reload at <code>76a8e5c</code>; the command slice (settle at <code>4899d86</code>, plus compile, explain, claims); M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping, M5e's capture report (D-28) and S6's sited-root descriptor projection (D-29, siting-aware property expectation) are complete. The first stress batch (12 scenario classes at 110e797) and the second (17 kernel + 11 adapter tests at 3e60ed4) are on the tree; pending only a performance/cost pass and fresh review screenshots.</>}
+        note={zh ? <>六道 gate、258 个 kernel 测试（39 个 container）、284 个 adapter 单元测试（37 个 container）、65 个 GameTests、64 个 code、34 条决策。adapter 已实现到 H1–H4 和 T1–T3：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32）和按 holder 泛型的 trait provider（D-34）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在 <code>53652dd</code> 都是绿的。剩下 performance/cost pass 和新的 review screenshots。</> : <>Six gates, 258 kernel tests in 39 containers, 284 adapter unit tests in 37 containers, 65 GameTests, 64 codes and 34 decisions. The adapter is implemented through H1–H4 and T1–T3: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32) and per-holder trait providers (D-34). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green at <code>53652dd</code>. Pending only a performance/cost pass and fresh review screenshots.</>}
       />
 
       <Reveal>
         <div className="proof-top">
           <div className="proof-gates">
-            <div className="eyebrow">{zh ? '当前 gate 报告 / 2026.10.27' : 'Current gate report / 2026.10.27'}</div>
+            <div className="eyebrow">{zh ? '当前 gate 报告 / 2026.10.28' : 'Current gate report / 2026.10.28'}</div>
             <div className="gate-grid" style={{ marginTop: 12 }}>
               {GATES.map((gate) => {
                 const copy = zh ? ZH_GATES[gate.label] : gate;
@@ -114,7 +124,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · 33 JUnit containers
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '39 个 JUnit container · adapter 284 / 37 个 container · GameTests 65/65' : '39 JUnit containers · adapter 284 / 37 containers · GameTests 65/65'}
               </div>
             </div>
           </div>
@@ -127,9 +137,30 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 66/66 (M1–S6; rotated-siting property projection included).</div>
+            <div className="warn">check: ./gradlew check is green at 53652dd; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 65/65 (through T1–T3).</div>
             <div style={{ height: 14 }} />
-            <div className="cmd">{zh ? '下一个攻击点：performance/cost pass，以及更新的 review screenshots。' : 'Next attack: a performance/cost pass and fresh review screenshots.'}</div>
+            <div className="cmd">{zh ? '下一个攻击点：performance/cost pass，以及新的 review screenshots。' : 'Next attack: a performance/cost pass and fresh review screenshots.'}</div>
+          </div>
+        </div>
+      </Reveal>
+
+      <Reveal delay={40}>
+        <div style={{ marginTop: 26 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <div className="eyebrow">{zh ? '当前已实现的层 / D-30 … D-34' : 'Current implemented layers / D-30 … D-34'}</div>
+            <div className="mono muted">{zh ? 'host 层与 kernel 的边界' : 'the host boundary around the kernel'}</div>
+          </div>
+          <div className="gate-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
+            {LAYERS.map((layer) => {
+              const copy = zh ? ZH_LAYERS[layer.id] : layer;
+              return (
+                <div className="gate" key={layer.id}>
+                  <span className="v">{layer.id}</span>
+                  <span className="l">{copy.title}</span>
+                  <span className="n">{copy.text}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </Reveal>
@@ -138,7 +169,7 @@ export function Proof() {
         <div className="falsifiers">
           <div className="falsifiers-head">
             <div>
-              <div className="eyebrow">{zh ? 'Falsifier / 这个 review 可能错的六种方式' : 'Falsifiers / six ways this review could be wrong'}</div>
+              <div className="eyebrow">{zh ? 'Falsifier / 这个 review 可能错的方式' : 'Falsifiers / the ways this review could be wrong'}</div>
               <div className="mono muted" style={{ marginTop: 4 }}>{zh ? '每个主张都有一个测试；设计退化时它会大声失败。' : 'Each claim has a test that would fail loudly if the design regressed.'}</div>
             </div>
             <span className="stamp">{zh ? '全部通过' : 'all green'}</span>
@@ -218,7 +249,7 @@ export function Proof() {
 
         <div style={{ marginTop: 30 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <div className="eyebrow">{zh ? '读源文件 / 21 份文档' : 'Read the source / 21 documents'}</div>
+            <div className="eyebrow">{zh ? `读源文件 / ${DOCS.length} 份文档` : `Read the source / ${DOCS.length} documents`}</div>
             <div className="mono muted">{zh ? '点击复制路径 · 英文是唯一权威' : 'click to copy a path · English is the only authority'}</div>
           </div>
           <div className="doc-index">

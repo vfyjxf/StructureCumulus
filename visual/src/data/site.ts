@@ -17,11 +17,11 @@ export const MODULES: Module[] = [
   { id: 'core', rank: 0, x: 5.5, y: 50, owns: 'identity · phase · key · value · catalog', imports: [], law: 'No geometry. No report. No traversal.', doc: 'docs/modules/core.md' },
   { id: 'space', rank: 1, x: 15.5, y: 50, owns: 'lattice · cuboid set · orientation · siting', imports: ['core'], law: 'Geometry is a value; a siting maps local to world once.', doc: 'docs/modules/space.md' },
   { id: 'finding', rank: 2, x: 26.5, y: 27, owns: 'finding · bundle · code table · renderer', imports: ['core', 'space'], law: 'A finding is a value; a bundle is the only aggregator.', doc: 'docs/modules/finding.md' },
-  { id: 'world', rank: 2, x: 26.5, y: 73, owns: 'occupant · trait · section · capture lease', imports: ['core', 'space'], law: 'A snapshot is immutable; the lease is only isCurrent().', doc: 'docs/modules/world.md' },
+  { id: 'world', rank: 2, x: 26.5, y: 73, owns: 'occupant · typed host read · trait · section · capture lease', imports: ['core', 'space'], law: 'A snapshot is immutable; the lease is only isCurrent().', doc: 'docs/modules/world.md' },
   { id: 'claim', rank: 3, x: 37.5, y: 50, owns: 'row · sharing · footprint · ledger port', imports: ['core', 'space', 'finding'], law: 'One row per cell × owner × siting; one conflict predicate.', doc: 'docs/modules/claim.md' },
-  { id: 'structure', rank: 4, x: 48.5, y: 50, owns: 'bay · check · blueprint · focus · plan', imports: ['core', 'space', 'finding', 'world', 'claim'], law: 'A bay owns cells; a check is a focus × an expectation.', doc: 'docs/modules/structure.md' },
-  { id: 'context', rank: 5, x: 59.5, y: 50, owns: 'store · key semantics · fold · deriver', imports: ['core', 'space', 'finding', 'world', 'structure'], law: 'One key, two retentions, one publication.', doc: 'docs/modules/context.md' },
-  { id: 'document', rank: 6, x: 70.5, y: 50, owns: 'IR · compiler · reader/writer ports', imports: ['core', 'space', 'finding', 'claim', 'world', 'structure', 'context'], law: 'Data in; one blueprint or a finding bundle out.', doc: 'docs/modules/document.md' },
+  { id: 'structure', rank: 4, x: 48.5, y: 50, owns: 'bay · check · blueprint · focus · plan · envelope', imports: ['core', 'space', 'finding', 'world', 'claim'], law: 'A bay owns cells; a check is a focus × an expectation.', doc: 'docs/modules/structure.md' },
+  { id: 'context', rank: 5, x: 59.5, y: 50, owns: 'store · key semantics · fold · deriver · cached context', imports: ['core', 'space', 'finding', 'world', 'structure'], law: 'One key, two retentions, one publication.', doc: 'docs/modules/context.md' },
+  { id: 'document', rank: 6, x: 70.5, y: 50, owns: 'IR · compiler · reader/writer ports · structure set', imports: ['core', 'space', 'finding', 'claim', 'world', 'structure', 'context'], law: 'Data in; one blueprint or a finding bundle out.', doc: 'docs/modules/document.md' },
   { id: 'engine', rank: 7, x: 81.5, y: 50, owns: 'request · result · planner · pipeline bodies', imports: ['core', 'space', 'finding', 'world', 'claim', 'structure', 'context', 'document'], law: 'One attempt; no stage machine.', doc: 'docs/modules/engine.md' },
   { id: 'remedy', rank: 8, x: 91.5, y: 32, owns: 'repair · preview · edit plan · provider SPI', imports: ['core', 'space', 'finding', 'world', 'claim', 'structure', 'context', 'engine'], law: 'A remedy is a value, not an executor.', doc: 'docs/modules/remedy.md' },
   { id: 'spi', rank: 9, x: 91.5, y: 70, owns: 'catalogs · facade · host ports · built-ins', imports: ['core', 'space', 'finding', 'world', 'claim', 'structure', 'context', 'document', 'engine', 'remedy'], law: 'The only package that knows every package.', doc: 'docs/modules/spi.md' },
@@ -55,6 +55,12 @@ export const REMOVED = [
   { term: 'ReadSet', replacement: 'ReadScope', why: 'One closure of cells, keys and windows; no invalidation index.' },
   { term: 'Deferred', replacement: 'Undecided', why: 'A retry is a new call, not a stored token.' },
   { term: 'Augment', replacement: 'ContextKey', why: 'One typed key; values are not patched into a separate augmentation layer.' },
+  { term: 'HostData table', replacement: 'HostType + WorldView.get', why: 'One immutable snapshot, many typed reads; no per-cell host map and no union snapshot.' },
+  { term: 'Descriptor projection', replacement: 'Typed snapshot read', why: 'The descriptor is (type, kind). Property, state, tag and fluid checks read the captured value in its own frame.' },
+  { term: 'readBlock / readEntity', replacement: 'TraitProvider<T, H>', why: 'A provider names its holder once; a missing provider is absence, never a hidden default.' },
+  { term: 'blockEntityNbt / entityNbt', replacement: 'typed provider', why: 'A trait is the owning API value; serialization is not an API and no item holder exists.' },
+  { term: 'Structure-set transaction', replacement: 'StructureSetHost', why: 'Root, satellites and links are host orchestration; the kernel still checks and settles one blueprint.' },
+  { term: 'Kernel context rollback', replacement: 'host-owned invalidation', why: 'A set rollback releases claims; a published context has no removal operation.' },
 ];
 
 export const DOCS = [
@@ -67,6 +73,10 @@ export const DOCS = [
   { group: 'Design', file: 'docs/design/05-decisions.md', title: 'Decision ledger' },
   { group: 'Design', file: 'docs/design/06-verification.md', title: 'Verification' },
   { group: 'Design', file: 'docs/design/07-regeneration.md', title: 'Regeneration' },
+  { group: 'Design', file: 'docs/design/08-context-cache.md', title: 'Context cache' },
+  { group: 'Design', file: 'docs/design/09-structure-sets.md', title: 'Structure sets' },
+  { group: 'Design', file: 'docs/design/10-host-data.md', title: 'Host snapshot' },
+  { group: 'Design', file: 'docs/design/11-trait-providers.md', title: 'Trait providers' },
   { group: 'Modules', file: 'docs/modules/structure.md', title: 'structure' },
   { group: 'Modules', file: 'docs/modules/document.md', title: 'document' },
   { group: 'Modules', file: 'docs/modules/engine.md', title: 'engine' },
@@ -78,21 +88,29 @@ export const DOCS = [
   { group: 'Modules', file: 'docs/modules/space.md', title: 'space' },
   { group: 'Modules', file: 'docs/modules/remedy.md', title: 'remedy' },
   { group: 'Modules', file: 'docs/modules/spi.md', title: 'spi' },
-  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter (S6 complete)' },
+  { group: 'Modules', file: 'docs/modules/adapter.md', title: 'adapter' },
 ];
 
 export const HERO_STATS = [
-  { value: '186', label: 'tests', note: 'kernel JUnit 5 · adapter 141 · GameTests 66/66' },
-  { value: '56', label: 'codes', note: '12 kernel families + MC' },
+  { value: '258', label: 'tests', note: 'kernel JUnit 5 · adapter 284 · GameTests 65/65' },
+  { value: '64', label: 'codes', note: '13 kernel families · one Codes table' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
-  { value: '29', label: 'decisions', note: 'rulings, not preferences' },
+  { value: '34', label: 'decisions', note: 'rulings, not preferences' },
+];
+
+export const LAYERS = [
+  { id: 'D-30', title: 'Derived envelope', text: 'bounds minus declared cells becomes one reserved bay and check; a foreign occupant is SC-EXP-0006, an empty set is a no-op.' },
+  { id: 'D-31', title: 'Cached context', text: 'MatchRequest.cachedContext is a host-owned (id, type) cache for declared instance keys; the current attempt always wins.' },
+  { id: 'D-32', title: 'Structure sets', text: 'root + satellites + links + presence, sequenced by StructureSetHost; host rollback releases claims, never a published context, and the kernel has no set type.' },
+  { id: 'D-33', title: 'Typed host snapshot', text: 'one snapshot per frame, HostType reads and Expectations.host; OccupantDescriptor is (type, kind) and D-29 is superseded.' },
+  { id: 'D-34', title: 'Trait providers', text: 'TraitProvider<T, H>/TraitHolder per holder and one CapabilityTraitProvider class; capability traits return IItemHandler, IEnergyStorage and IFluidHandler. No NBT traits, no item holder.' },
 ];
 
 export const GATES = [
-  { label: 'Compile', value: 'PASS', note: 'javac 21 · gradlew check green' },
+  { label: 'Compile', value: 'PASS', note: 'gradlew check green at 53652dd' },
   { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
-  { label: 'Tests', value: '186/186', note: 'kernel JUnit 5 · 33 containers; adapter 141 · GameTests 66/66' },
-  { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 56 codes' },
+  { label: 'Tests', value: '258/258', note: 'kernel JUnit 5 · 39 containers; adapter 284 · GameTests 65/65' },
+  { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 64 codes' },
   { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
   { label: 'Determinism', value: 'PASS', note: 'DeterminismTest · canonical bytes, fixed point, compile runs' },
 ];
@@ -102,4 +120,5 @@ export const PRINCIPLES = [
   { n: '02', title: 'One publication', text: 'A successful settle publishes INSTANCE once. A derive publishes one batch once. Nothing else writes a context.' },
   { n: '03', title: 'One direction', text: 'A package may import only lower-ranked packages. The graph is checked; the table is the law.' },
   { n: '04', title: 'One predicate', text: 'ClaimMatrix.conflicts is the only conflict rule. A plan cannot encode a second one.' },
+  { n: '05', title: 'One host read', text: 'A host value is one typed read from one immutable snapshot. The descriptor stays (type, kind); the kernel never names or models the value.' },
 ];

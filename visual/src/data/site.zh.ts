@@ -15,11 +15,11 @@ export const ZH_MODULES: Record<ModuleId, { owns: string; law: string }> = {
   core: { owns: '标识 · 阶段 · 键 · 值 · 目录', law: '没有几何。没有报告。没有遍历。' },
   space: { owns: '格点 · 立方体集合 · 方向 · siting', law: '几何是值；siting 只做一次局部到世界的映射。' },
   finding: { owns: 'finding · bundle · code 表 · renderer', law: 'finding 是值；bundle 是唯一聚合器。' },
-  world: { owns: 'occupant · trait · section · capture lease', law: '快照不可变；lease 只有 isCurrent()。' },
+  world: { owns: 'occupant · 类型化 host 读取 · trait · section · capture lease', law: '快照不可变；lease 只有 isCurrent()。' },
   claim: { owns: 'row · sharing · footprint · ledger port', law: '每个 cell × owner × siting 一行；只有一个冲突谓词。' },
-  structure: { owns: 'bay · check · blueprint · focus · plan', law: 'bay 拥有 cells；check 是 focus × expectation。' },
-  context: { owns: 'store · key 语义 · fold · deriver', law: '一个 key，两种 retention，一次发布。' },
-  document: { owns: 'IR · compiler · reader/writer ports', law: '数据进；一个 blueprint 或一组 finding 出。' },
+  structure: { owns: 'bay · check · blueprint · focus · plan · envelope', law: 'bay 拥有 cells；check 是 focus × expectation。' },
+  context: { owns: 'store · key 语义 · fold · deriver · cached context', law: '一个 key，两种 retention，一次发布。' },
+  document: { owns: 'IR · compiler · reader/writer ports · structure set', law: '数据进；一个 blueprint 或一组 finding 出。' },
   engine: { owns: 'request · result · planner · pipeline bodies', law: '一次 attempt；没有 stage machine。' },
   remedy: { owns: 'repair · preview · edit plan · provider SPI', law: 'remedy 是值，不是执行器。' },
   spi: { owns: 'catalogs · facade · host ports · built-ins', law: '唯一知道所有 package 的 package。' },
@@ -30,6 +30,7 @@ export const ZH_PRINCIPLES: Record<string, { title: string; text: string }> = {
   '02': { title: '一次发布', text: '成功的 settle 只发布一次 INSTANCE；derive 只发布一个 batch 一次。没有别的地方写 context。' },
   '03': { title: '一个方向', text: 'package 只能 import rank 更低的 package。图会被检查；边表就是法律。' },
   '04': { title: '一个谓词', text: 'ClaimMatrix.conflicts 是唯一的冲突规则。plan 不能再编码第二个。' },
+  '05': { title: '一次 host 读取', text: '一个 host 值就是一次来自不可变快照的类型化读取。descriptor 始终是 (type, kind)；kernel 从不命名或建模这个值。' },
 };
 
 export const ZH_REMOVED: Record<string, string> = {
@@ -45,6 +46,12 @@ export const ZH_REMOVED: Record<string, string> = {
   ReadSet: '一个 ReadScope 闭包 cells、keys、windows；没有失效索引。',
   Deferred: 'retry 是一次新调用，不是存起来的 token。',
   Augment: '一个类型化 key；值不会被 patch 进单独的 augmentation 层。',
+  'HostData table': '一份不可变快照，多种类型化读取；没有 per-cell host map，也没有 union snapshot。',
+  'Descriptor projection': 'descriptor 是 (type, kind)。property、state、tag 和 fluid check 在它自己的 frame 里读取捕获值。',
+  'readBlock / readEntity': 'provider 只声明一次 holder；没有 provider 就是缺席，不是隐藏的 default。',
+  'blockEntityNbt / entityNbt': 'trait 就是所属 API 的值；序列化不是 API，也不存在 item holder。',
+  'Structure-set transaction': 'root、satellites 和 links 都是 host 编排；kernel 仍然一次只 check、settle 一个 blueprint。',
+  'Kernel context rollback': 'set rollback 释放 claims；已发布的 context 没有移除操作。',
 };
 
 export const ZH_DOCS: Record<string, string> = {
@@ -57,6 +64,10 @@ export const ZH_DOCS: Record<string, string> = {
   'docs/design/05-decisions.md': '决策账本',
   'docs/design/06-verification.md': '验证',
   'docs/design/07-regeneration.md': '重生',
+  'docs/design/08-context-cache.md': 'context 缓存',
+  'docs/design/09-structure-sets.md': '结构集合',
+  'docs/design/10-host-data.md': 'host 快照',
+  'docs/design/11-trait-providers.md': 'trait provider',
   'docs/modules/structure.md': 'structure',
   'docs/modules/document.md': 'document',
   'docs/modules/engine.md': 'engine',
@@ -68,7 +79,7 @@ export const ZH_DOCS: Record<string, string> = {
   'docs/modules/space.md': 'space',
   'docs/modules/remedy.md': 'remedy',
   'docs/modules/spi.md': 'spi',
-  'docs/modules/adapter.md': 'adapter（S6 完成）',
+  'docs/modules/adapter.md': 'adapter',
 };
 
 export const ZH_GROUPS: Record<string, string> = {
@@ -77,17 +88,40 @@ export const ZH_GROUPS: Record<string, string> = {
 };
 
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
-  Compile: { label: '编译', note: 'javac 21 · gradlew check 通过' },
+  Compile: { label: '编译', note: 'gradlew check 在 53652dd 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 33 个容器；adapter 141 · GameTests 66/66' },
-  'Spec index': { label: '规范索引', note: 'spec-check.py · 56 codes' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 39 个容器；adapter 284 · GameTests 65/65' },
+  'Spec index': { label: '规范索引', note: 'spec-check.py · 64 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 141 · GameTests 66/66' },
-  codes: { label: '代码', note: '12 个 kernel family + MC' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 284 · GameTests 65/65' },
+  codes: { label: '代码', note: '13 个 kernel family · 一张 Codes 表' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
   decisions: { label: '决策', note: 'ruling，不是偏好' },
+};
+
+export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
+  'D-30': {
+    title: '推导出的 envelope',
+    text: 'bounds 减去已声明的 cells，得到一个保留 bay 和一个 check；外来 occupant 是 SC-EXP-0006，空集合是 no-op。',
+  },
+  'D-31': {
+    title: 'cached context',
+    text: 'MatchRequest.cachedContext 是 host 拥有的 (id, type) 缓存，只服务已声明的 instance keys；当前 attempt 永远优先。',
+  },
+  'D-32': {
+    title: '结构集合',
+    text: 'root + satellites + links + presence，由 StructureSetHost 编排；host rollback 只释放 claims，从不回滚已发布 context；kernel 没有 set 类型。',
+  },
+  'D-33': {
+    title: '类型化 host 快照',
+    text: '每个 frame 一份快照，HostType 读取和 Expectations.host；OccupantDescriptor 是 (type, kind)，D-29 已被取代。',
+  },
+  'D-34': {
+    title: 'trait providers',
+    text: '每个 holder 一个 TraitProvider<T, H>/TraitHolder，一个 CapabilityTraitProvider 类；capability traits 直接返回 IItemHandler、IEnergyStorage 和 IFluidHandler。没有 NBT trait，也没有 item holder。',
+  },
 };

@@ -5,7 +5,15 @@ import { BundleLab } from '../components/BundleLab';
 import { CODE_ZH } from '../data/codes.zh';
 import { useLanguage } from '../i18n/Language';
 
-const FAMILY_ORDER = ['SPC', 'OCC', 'EXP', 'CLM', 'BPT', 'CHK', 'DOC', 'CTX', 'ENG', 'DIA', 'RMD', 'SPI'];
+const FAMILY_ORDER = ['SPC', 'OCC', 'EXP', 'CLM', 'BPT', 'CHK', 'DOC', 'CTX', 'ENG', 'DIA', 'RMD', 'SPI', 'SET'];
+
+const HOST_CODES = [
+  { code: 'SC-MC-0006', label: 'property mismatch', zh: 'property 不匹配' },
+  { code: 'SC-MC-0007', label: 'state mismatch', zh: 'state 不匹配' },
+  { code: 'SC-MC-0008', label: 'tag mismatch', zh: 'tag 不匹配' },
+  { code: 'SC-MC-0009', label: 'fluid mismatch', zh: 'fluid 不匹配' },
+  { code: 'SC-MC-0010', label: 'host value not captured', zh: 'host 值未捕获' },
+];
 
 function severityClass(severity: string) {
   if (severity === 'ERROR') return 'tag-accent';
@@ -97,7 +105,7 @@ export function CodeAtlas() {
                 <span><i style={{ background: 'var(--ochre)' }} />{zh ? '警告' : 'warning'}</span>
                 <span><i style={{ background: 'var(--blue)' }} />{zh ? '信息' : 'info'}</span>
               </div>
-              <span className="mono muted">{filtered.length} / {CODE_COUNT} {zh ? '个 code · 12 个 kernel family + MC' : 'codes · 12 kernel families + MC'}</span>
+              <span className="mono muted">{filtered.length} / {CODE_COUNT} {zh ? `个 code · ${FAMILY_ORDER.length} 个 kernel family` : `codes · ${FAMILY_ORDER.length} kernel families`}</span>
             </div>
 
             <div className="atlas-list">
@@ -149,6 +157,19 @@ export function CodeAtlas() {
                 {selectedCode.code} · {zh ? '永不复用，永不重编号' : 'never reused, never renumbered'}
               </div>
             </div>
+            <div className="aside-rule" />
+            <div className="eyebrow">{zh ? 'adapter host codes / 不在 Codes.all' : 'Adapter host codes / outside Codes.all'}</div>
+            <div className="key-stack" style={{ marginTop: 8 }}>
+              {HOST_CODES.map((entry) => (
+                <div key={entry.code}>
+                  <span className="k">{entry.code}</span>
+                  <span className="v">{zh ? entry.zh : entry.label}</span>
+                </div>
+              ))}
+            </div>
+            <p style={{ marginTop: 8, fontSize: 10, lineHeight: 1.5, color: 'var(--muted)' }}>
+              {zh ? <>这五个是 adapter 自己的 code，通过 <code>Expectations.host</code> 的 absent/mismatch code 传入；kernel 从不 mint。缺失值是 <code>SC-MC-0010</code>（unreadable），永远不是 mismatch。</> : <>These five are the adapter's own codes, passed to <code>Expectations.host</code> as mismatch or absent codes; the kernel never mints them. A missing value is <code>SC-MC-0010</code> (unreadable), never a mismatch.</>}
+            </p>
             <div className="aside-rule" />
             <div className="mono muted" style={{ lineHeight: 1.7, fontSize: 8 }}>
               {zh ? <>BUNDLE<br />ERROR 从不截断 · warning 可能省略<br />一条 SC-DIA-0001 截断尾巴<br />human 与 JSON 投影共享同一个值</> : <>THE BUNDLE<br />ERROR never capped · warnings may elide<br />one SC-DIA-0001 truncation tail<br />human and JSON projections share one value</>}

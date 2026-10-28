@@ -128,7 +128,7 @@ export default function App() {
         <div className="rail-meta">
           StructureCumulus<br />
           {zh ? '设计之书 / v1.2' : 'design of record / v1.2'}<br />
-          {zh ? '2026 年 10 月 27 日' : '27 oct 2026'}
+          {zh ? '2026 年 10 月 28 日' : '28 oct 2026'}
         </div>
         <nav className="rail-nav">
           {NAV.map((entry) => (
@@ -204,15 +204,15 @@ export default function App() {
               </h3>
               <div className="footer-meta">
                 StructureCumulus / {zh ? '设计 review 1.2' : 'design review 1.2'}<br />
-                {zh ? '8 份设计文件 · 11 个 kernel 模块 + adapter 规范' : '8 design files · 11 kernel modules + adapter spec'}<br />
+                {zh ? '12 份设计文档 · 11 个 kernel 模块 + adapter 规范' : '12 design documents · 11 kernel modules + adapter spec'}<br />
                 {zh ? <>kernel 11 个 package · {CODE_COUNT} 个 code · {TEST_COUNT} 个 kernel 测试</> : <>kernel 11 packages · {CODE_COUNT} codes · {TEST_COUNT} kernel tests</>}<br />
-                kernel commit cb06aa8
+                kernel commit 53652dd
               </div>
             </div>
             <div className="footer-rule rule" />
             <div className="footer-small">
               <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
-              <span>{zh ? 'Adapter M1–S6；S6 完成 · stress batch 2' : 'Adapter M1–S6; S6 complete · stress batch 2'}</span>
+              <span>{zh ? 'Adapter H1–H4 / T1–T3 · 65/65 GameTests' : 'Adapter H1–H4 / T1–T3 · 65/65 GameTests'}</span>
               <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>

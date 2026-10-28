@@ -11,7 +11,7 @@ VISUAL = Path(__file__).resolve().parent.parent
 ROOT = VISUAL.parent
 DATA = VISUAL / "src" / "data"
 
-KERNEL_FAMILIES = ("SPC", "OCC", "EXP", "CLM", "BPT", "CHK", "DOC", "CTX", "ENG", "DIA", "RMD", "SPI", "MC")
+KERNEL_FAMILIES = ("SPC", "OCC", "EXP", "CLM", "BPT", "CHK", "DOC", "CTX", "ENG", "DIA", "RMD", "SPI", "SET", "MC")
 SEVERITIES = ("ERROR", "WARNING", "INFO")
 CODE_PATTERN = re.compile(r"SC-([A-Z]{2,6})-(\d{4})\Z")
 ID_PATTERN = re.compile(r"[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\Z")

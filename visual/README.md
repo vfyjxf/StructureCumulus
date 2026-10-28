@@ -3,23 +3,31 @@
 An interactive, adversarial review of the kernel design. Not a feature tour: each chapter is a claim
 the kernel must survive — a frame mapping, a write, a conflict, a missing value, a finding.
 
-The design of record is [`../docs/README.md`](../docs/README.md). The adapter is complete through
-S6: M1 is the host, `/cumulus check <id> <origin>` and the capture-check path (`LevelCapture`,
-`LevelSnapshot`, `LevelLease`, block/block-entity descriptors, `ServerState`, in-memory
-`BuiltinDocuments`); M2a adds loaded-entity capture with policy windows, full footprint indexing and
-entity-vs-block precedence; M2b adds upright orientation mapping (`Heading`/`Direction`,
-`Turn`/`Rotation`, `Flip`/`Mirror`, mirror-then-rotate; M5d adds the non-upright capability remap at `ac11d0c`);
-M2c adds Model C — body identity, the total read with `SC-OCC-0004`, partial sections and four-state
-traits; M2d adds the nested capability (`NestedExtent`/`NestedExtents`, frames, cuts, child
-entities); M3 adds `SavedClaims`/`SavedContexts` at `d4b6d82`, compatible with Model C. M4a JSON
-(`JsonReader`/`JsonWriter`) is committed at `f2659c7`, M4b datapack reload at `76a8e5c`, and the
-command slice (settle at `4899d86`, plus compile, explain, claims) is green. M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping, M5e's capture report
-(D-28) and S6's sited-root descriptor projection (D-29, the siting-aware property expectation) are
-complete; the determinism gate (`DeterminismTest`) covers canonical bytes, the
-parse/write fixed point, equal compile runs and stable finding order, and capture-revision lease
-invalidation landed at `0f0bf25`. Pending only a performance/cost pass and fresh review screenshots.
-186 kernel tests (33 containers), 141 adapter unit tests and 66/66 GameTests are green. The second kernel stress batch (17 kernel + 11 adapter tests at `3e60ed4`) is on the tree. The UI opens in **中文**; the
-**EN** button in the top bar switches to the English reading layer. Technical identifiers, code,
+The design of record is [`../docs/README.md`](../docs/README.md). The adapter is complete through the
+H1–H4 host-data round and the T1–T3 trait-provider round. M1 is the host, `/cumulus check <id> <origin>`
+and the capture-check path (`LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity
+occupant descriptors, `ServerState`, in-memory `BuiltinDocuments`); M2a adds loaded-entity capture with policy
+windows, full footprint indexing and entity-vs-block precedence; M2b adds upright orientation mapping
+(`Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror`, mirror-then-rotate); M2c adds Model C —
+body identity, the total read with `SC-OCC-0004`, partial sections and four-state traits; M2d adds the
+nested capability (`NestedExtent`/`NestedExtents`, frames, cuts, child entities); M3 adds
+`SavedClaims`/`SavedContexts` at `d4b6d82`. M4a JSON (`JsonReader`/`JsonWriter`) is at `f2659c7`, M4b
+datapack reload at `76a8e5c`, and the command slice (settle at `4899d86`, plus compile, explain,
+claims) is green. M5a's watched-region mark counter, M5d's non-upright pitch/roll mapping and M5e's
+capture report (D-28) are complete, and the determinism gate (`DeterminismTest`) covers canonical
+bytes, the parse/write fixed point, equal compile runs and stable finding order.
+
+The current layers are the typed host snapshot (D-33, implemented as H1–H4, superseding S6's
+descriptor projection D-29), the derived envelope (D-30), the host-owned cached-context port (D-31),
+the structure-set layer (D-32: root/satellites, links, presence, host rollback) and the generic trait
+providers (D-34: `TraitProvider<T, H>`, `TraitHolder`, `CapabilityTraitProvider`, direct
+`IItemHandler`/`IEnergyStorage`/`IFluidHandler`; `blockEntityNbt`/`entityNbt` are removed and there is
+no item holder). `OccupantDescriptor` is `(type, kind)` and carries no properties or tags; a
+property/state/tag/fluid check is an adapter factory over `Expectations.host`.
+
+258 kernel tests (39 containers), 284 adapter unit tests (37 containers) and 65/65 GameTests are green
+at `53652dd`; a full `./gradlew check` and `runGameTestServer` pass there. The UI opens in **中文**;
+the **EN** button in the top bar switches to the English reading layer. Technical identifiers, code,
 JSON, Java and finding codes stay in their original form in both languages.
 
 ## Run
@@ -37,19 +45,20 @@ network request.
 
 ## What is inside
 
-186 kernel tests, 141 adapter unit tests, 66 GameTests, 56 codes, 29 decisions and 11 ranked kernel
-packages. One complete document and a Java builder excerpt target the same IR.
+258 kernel tests in 39 containers, 284 adapter unit tests in 37 containers, 65 GameTests, 64 codes,
+34 decisions and 11 ranked kernel packages. One complete document and a Java builder excerpt build
+the same campfire blueprint.
 
 | Chapter | What you can do |
 | --- | --- |
-| **00 / Thesis** | Read the four laws; click a deleted concept to see its replacement. |
+| **00 / Thesis** | Read the five laws; click a deleted concept to see its replacement. |
 | **01 / Lattice** | Trace a package's imports through the rank graph; inspect its law and source file. |
-| **02 / Object** | Walk `WorldView → Bay → Check → Blueprint → MatchOutcome`; switch a key between `MATCH` and `INSTANCE`. |
-| **03 / Workbench** | Inspect the campfire shell/hollow/fire, switch bays, explode/assemble, step `COMPILE → CHECK → SETTLE` (then the derive aftermath), toggle JSON/Java, and move the siting through origin and quarter turns. |
-| **04 / Ledger** | Move two owners' bays, change `EXCLUSIVE`/`SHARED`, settle, race the revision, and see the conflict matrix and rows. |
-| **05 / Fold** | Refuse a section, change `sum`/`max`, toggle `whenAbsent`, and see the key become absent and a derive skip. |
-| **06 / Codes** | Search/filter all 56 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail. |
-| **07 / Proof** | Read the gate report, the falsifiers, the 29 decisions, the regeneration protocol and the document index. |
+| **02 / Object** | Walk `WorldView → Bay → Check → Blueprint → MatchOutcome`; see the typed host read (`HostType`/`WorldView.get`) and switch a key between `MATCH` and `INSTANCE`. |
+| **03 / Workbench** | Inspect the campfire shell/hollow/fire, switch bays, explode/assemble, step `COMPILE → CHECK → SETTLE` (then the derive aftermath), toggle JSON/Java, and move the siting through origin and quarter turns; the `property` leaf reads the typed snapshot. |
+| **04 / Ledger** | Move two owners' bays, change `EXCLUSIVE`/`SHARED`, settle, race the revision, and see the conflict matrix and rows; the set card records host orchestration and rollback (D-32). |
+| **05 / Fold** | Refuse a section, change `sum`/`max`, toggle `whenAbsent`, and see the key become absent and a derive skip; the cached-context card records the host port (D-31). |
+| **06 / Codes** | Search/filter all 64 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail; the side panel lists the adapter-only `SC-MC-0006`…`0010` codes. |
+| **07 / Proof** | Read the gate report, the falsifiers, the 34 decisions, the current D-30…D-34 layers, the regeneration protocol and the document index. |
 
 Press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> for the index. Use **EN / 中文** in the top bar to switch languages. The **NIGHT** switch flips the same
 information to a dark instrument palette. The layout is responsive down to 390 px.
@@ -59,18 +68,22 @@ information to a dark instrument palette. The layout is responsive down to 390 p
 `codes`, `decisions` and `tests` are projected from the design set and the kernel test sources:
 
 ```bash
-python3 scripts/extract-review-data.py
+cd visual
+npm run data
 ```
 
-`campfire.ts` is the curated worked example (3×3×3, 27 cells, 27 claims, spend 28 reads / 4 sections, derive capacity
-10). The numbers match the JUnit scenario.
+The generated counts are 64 codes (13 kernel families, including `SET`), 34 decisions (D-34) and 258
+kernel tests in 39 containers. `campfire.ts` is the curated worked example (3×3×3, 27 cells, 27
+claims, spend 28 reads / 4 sections, derive capacity 10). The numbers match the JUnit scenario.
 
 ## Historical note
 
 This replaces the 2026-10-21 NASA-punk atlas. That atlas documented design v0.2 and is kept in git
-history; this app documents design v1.2 and is the one to run.
+history; this app documents design v1.2 and the 08–11 extension documents, and is the one to run.
 
 ## Caveat
 
-The review app, the kernel’s direct `javac`/JUnit harness, `./gradlew check`, the adapter’s 141 unit
-tests and its 66 GameTests (`runGameTestServer` 66/66) are green.
+The review app, the kernel's direct `javac`/JUnit harness, `./gradlew check`, the adapter's 284 unit
+tests and its 65 GameTests (`runGameTestServer` 65/65) are green at `53652dd`. The PNGs under
+[`review/`](review/) were captured before this copy update; the repository ships no screenshot
+tooling, so they were not regenerated.

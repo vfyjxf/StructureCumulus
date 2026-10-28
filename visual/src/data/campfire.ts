@@ -297,7 +297,10 @@ Blueprint campfire = Blueprint.builder(id("campfire"))
                 Focuses.occupant(LatticePoint.of(1, 0, 1)),
                 Expectations.allOf(
                         Expectations.block(mc("campfire")),
-                        Expectations.property("lit", "true"))))
+                        Expectations.host(HostTypes.blockState,
+                                (state, cell) -> state.getValue(CampfireBlock.LIT),
+                                Codes.expected.code(), Codes.unreadableRead.code(),
+                                "expected lit=true"))))
         .computation(Computations.air(air, hollow.cells()))
         .derive(capacitySpec)
         .build();`;

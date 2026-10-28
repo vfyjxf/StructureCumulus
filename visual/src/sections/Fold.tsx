@@ -60,7 +60,7 @@ export function Fold() {
         no="05"
         kicker={zh ? 'context / 折叠' : 'Context / the fold'}
         title={zh ? <>缺席是一个<em>值</em>。它不是 null。</> : <>Absence is a <em>value</em>. It is not a null.</>}
-        note={zh ? <>第二个样本：四个 slice（3/5/2/4），capacity 140；营火的单 cell air 区是同一个 key 的微缩版。拒绝一个 slice——或让四个都 empty——这个 key 对本次 attempt 就是 absent。</> : <>A second specimen: four slices (3/5/2/4) and a capacity of 140; the campfire's one-cell air region is the same key in miniature. Refuse a slice — or empty all four — and the key is absent for the attempt.</>}
+        note={zh ? <>第二个样本：四个 slice（3/5/2/4），capacity 140；营火的单 cell air 区是同一个 key 的微缩版。拒绝一个 slice——或让四个都 empty——这个 key 对本次 attempt 就是 absent。D-31 只给 host 一个只读缓存 port，kernel 仍然不缓存。</> : <>A second specimen: four slices (3/5/2/4) and a capacity of 140; the campfire's one-cell air region is the same key in miniature. Refuse a slice — or empty all four — and the key is absent for the attempt. D-31 adds only a read-only host cache port; the kernel still caches nothing.</>}
       />
 
       <Reveal>
@@ -156,6 +156,17 @@ export function Fold() {
               <div className="mono muted" style={{ marginTop: 8, fontSize: 8, lineHeight: 1.5 }}>
                 {zh ? '营火：air = 1 → capacity 10。这个样本：14 → 140。' : 'campfire: air = 1 → capacity 10. this specimen: 14 → 140.'}
               </div>
+            </div>
+            <div className="aside-rule" />
+            <div className="eyebrow">{zh ? 'cached context / D-31' : 'Cached context / D-31'}</div>
+            <p style={{ marginTop: 8, fontSize: 10, lineHeight: 1.55, color: 'var(--muted)' }}>
+              {zh ? <>host 可以给 <code>MatchRequest.cachedContext</code> 一个只读的 <code>(id, type)</code> 查询。当前 attempt 的值永远优先；只有 plan 声明为 instance dependency 的 key 才查缓存；缺失或类型错误就是 absent。</> : <>A host may pass <code>MatchRequest.cachedContext</code>, a read-only <code>(id, type)</code> lookup. The current attempt always wins; only instance keys the plan declares are eligible; a missing or wrong-typed value stays absent.</>}
+            </p>
+            <div className="key-stack" style={{ marginTop: 10 }}>
+              <div><span className="k">port</span><span className="v">CachedContext.get(id, type)</span></div>
+              <div><span className="k">eligible</span><span className="v">{zh ? 'plan 声明的 instance key' : 'instance key declared by the plan'}</span></div>
+              <div><span className="k">priority</span><span className="v">{zh ? '当前 attempt → cache → absent' : 'current attempt → cache → absent'}</span></div>
+              <div><span className="k">owner</span><span className="v">{zh ? 'host（写入 / 驱逐 / freshness）' : 'host (write, evict, freshness)'}</span></div>
             </div>
             <div className="aside-rule" />
             <p style={{ fontSize: 10, lineHeight: 1.55, color: 'var(--muted)' }}>

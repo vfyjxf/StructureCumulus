@@ -7,12 +7,13 @@ const CHAIN = [
     id: 'world',
     title: 'WorldView',
     role: 'one immutable read face',
-    detail: 'The world is not a mutable level. It is a frozen, recursive view with a snapshot id, a frame, a section grid and a lease that answers one question: is it still current?',
+    detail: 'The world is not a mutable level. It is a frozen, recursive view with a snapshot id, a frame, a section grid, typed host reads and a lease that answers one question: is it still current?',
     signature: `SnapshotId snapshotId();
 int frame();
 LatticePoint origin();
-@Nullable OccupantSnapshot occupant(LatticePoint cell);`,
-    side: 'A nested view is the same type with a unique frame. A section key answers only its own frame.',
+@Nullable OccupantSnapshot occupant(LatticePoint cell);
+@Nullable <H> H get(LatticePoint cell, HostType<H> type);`,
+    side: 'A nested view is the same type with a unique frame. HostType reads one snapshot; the descriptor is (type, kind) and carries no properties or tags.',
   },
   {
     id: 'bay',
@@ -45,7 +46,7 @@ LatticePoint origin();
     .computation(...)
     .derive(...)
     .build();`,
-    side: 'A blueprint is the value document compilation targets. A bad document returns findings; it never constructs a partial blueprint.',
+    side: 'A blueprint is the value document compilation targets. A bad document returns findings; it never constructs a partial blueprint. envelope() derives the closed world from bounds; a foreign occupant is SC-EXP-0006.',
   },
   {
     id: 'outcome',
@@ -79,7 +80,7 @@ const ZH_CHAIN: Record<string, { role: string; detail: string; side: string }> =
   blueprint: {
     role: '完整声明',
     detail: 'builder 一次校验 coverage、overlap、footprint、plan、anchor 和 derivation。结果是不可变的，并携带缓存 Plan：先 sections，再拓扑 aggregate 顺序，最后 checks。',
-    side: 'blueprint 是 document 编译的目标值。坏 document 返回 findings；它从不构造半成品 blueprint。',
+    side: 'blueprint 是 document 编译的目标值。坏 document 返回 findings；它从不构造半成品 blueprint。envelope() 从 bounds 推导闭合世界；外来 occupant 是 SC-EXP-0006。',
   },
   outcome: {
     role: 'values、bindings、spend',
@@ -175,6 +176,20 @@ export function ObjectModel() {
                 ? (zh ? '由 settle 或 derive 发布一次' : 'published once by settle or derive')
                 : (zh ? 'attempt 局部；从不发布' : 'attempt-local; never published')}
             </div>
+            <div className="aside-rule" />
+            <div className="eyebrow">{zh ? 'host payload / D-33' : 'Host payload / D-33'}</div>
+            <div className="key-stack" style={{ marginTop: 10 }}>
+              <div><span className="k">read</span><span className="v">WorldView.get(pos, type)</span></div>
+              <div><span className="k">bridge</span><span className="v">Expectations.host</span></div>
+              <div><span className="k">descriptor</span><span className="v">(type, kind)</span></div>
+              <div><span className="k">traits</span><span className="v">TraitProvider&lt;T, H&gt;</span></div>
+              <div><span className="k">D-29</span><span className="v">{zh ? '已被取代' : 'superseded'}</span></div>
+            </div>
+            <p style={{ marginTop: 10 }}>
+              {zh
+                ? <>一份不可变快照、多种类型化读取。descriptor 不再有 properties/tags；property、state、tag、fluid 是 adapter 在 <code>Expectations.host</code> 上的 leaf。capability trait 直接返回 <code>IItemHandler</code> / <code>IEnergyStorage</code> / <code>IFluidHandler</code>。</>
+                : <>One immutable snapshot, many typed reads. The descriptor has no properties or tags; property, state, tag and fluid are adapter leaves over <code>Expectations.host</code>. Capability traits return <code>IItemHandler</code>, <code>IEnergyStorage</code> and <code>IFluidHandler</code> directly.</>}
+            </p>
             <div className="aside-rule" />
             <div className="eyebrow">{zh ? '关于缺席' : 'A note on absence'}</div>
             <p style={{ marginTop: 8 }}>

@@ -46,6 +46,10 @@ export function Thesis() {
                 <dt>{zh ? '一个方向' : 'One direction'}</dt>
                 <dd>{zh ? 'package 图有 rank，并且会被检查。向上 import 是设计变更，不是重构。' : 'The package graph is ranked and checked. An upward import is a design change, not a refactor.'}</dd>
               </div>
+              <div>
+                <dt>{zh ? '一次 host 读取' : 'One host read'}</dt>
+                <dd>{zh ? <><code>HostType&lt;H&gt;</code> + <code>WorldView.get</code> 从一份快照读取；descriptor 仍是 <code>(type, kind)</code>，property/state/tag/fluid 是 adapter leaf。</> : <><code>HostType&lt;H&gt;</code> + <code>WorldView.get</code> read one snapshot. The descriptor stays <code>(type, kind)</code>; property, state, tag and fluid are adapter leaves.</>}</dd>
+              </div>
             </div>
             <div className="big-rule" />
             <blockquote className="thesis-quote">
@@ -55,7 +59,7 @@ export function Thesis() {
           </div>
 
           <aside className="thesis-side">
-            <h4>{zh ? '这套 review 反复回到的四条法' : 'The four laws this review keeps returning to'}</h4>
+            <h4>{zh ? '这套 review 反复回到的五条法' : 'The five laws this review keeps returning to'}</h4>
             <div className="principles">
               {PRINCIPLES.map((principle) => {
                 const copy = zh ? ZH_PRINCIPLES[principle.n] : principle;

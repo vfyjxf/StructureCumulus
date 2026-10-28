@@ -426,12 +426,13 @@ export function Workbench() {
               <div className="wb-kicker">{zh ? 'siting / frame · D-22' : 'siting / frame · D-22'}</div>
               <h3>{zh ? ZH_SITING.title : 'The blueprint stays local.'}</h3>
               <p>
-                {zh ? <>Bays、checks 和 computations 都是 local cells。每个 focus、section、aggregate 参数都会在读取前由 request 的 <code>Siting</code> 映射一次，所以 document 从不携带 world 坐标。</> : <>Bays, checks and computations are local cells. Every focus, section and aggregate argument is mapped once by the request&rsquo;s <code>Siting</code> before the read, so the document never carries a world coordinate.</>}
+                {zh ? <>Bays、checks 和 computations 都是 local cells。每个 focus、section、aggregate 参数都会在读取前由 request 的 <code>Siting</code> 映射一次，所以 document 从不携带 world 坐标。capture 是 world frame 的一份不可变快照（D-33）：<code>property</code> / <code>state</code> check 通过 <code>HostType</code> 读取捕获值，descriptor 仍是 <code>(type, kind)</code>。</> : <>Bays, checks and computations are local cells. Every focus, section and aggregate argument is mapped once by the request&rsquo;s <code>Siting</code> before the read, so the document never carries a world coordinate. The capture is one immutable world-frame snapshot (D-33): a <code>property</code> or <code>state</code> check reads the captured value through a <code>HostType</code>, and the descriptor stays <code>(type, kind)</code>.</>}
               </p>
               <div className="wb-siting-tags">
                 <span>{zh ? 'local 固定' : 'local fixed'}</span>
                 <span>{zh ? 'world 图' : 'world image'}</span>
                 <span>{zh ? '每次读取映射一次' : 'one mapping per read'}</span>
+                <span>{zh ? '一份类型化快照' : 'one typed snapshot'}</span>
               </div>
             </div>
 
@@ -538,6 +539,8 @@ export function Workbench() {
                 <div><dt>{zh ? 'quarter turns' : 'quarter turns'}</dt><dd>{quarter} / 4</dd></div>
                 <div><dt>{zh ? 'world fire' : 'world fire'}</dt><dd>({image.x}, {image.y}, {image.z})</dd></div>
                 <div><dt>{zh ? 'mapping' : 'mapping'}</dt><dd>origin + o(local)</dd></div>
+                <div><dt>{zh ? 'host read' : 'host read'}</dt><dd>HostType&lt;H&gt;</dd></div>
+                <div><dt>{zh ? 'descriptor' : 'descriptor'}</dt><dd>(type, kind)</dd></div>
               </dl>
               <p>{zh ? '仿射、每次读取检查一次；只有 image 移动。' : 'Affine and checked once per read; only the image moves.'}</p>
             </aside>
@@ -562,7 +565,7 @@ export function Workbench() {
               />
               <div className="wb-source-foot">
                 <span>{zh ? '3 个 bay · 3 个 check · 1 个 computation' : '3 bays · 3 checks · 1 computation'}</span>
-                <span>{zh ? '预测 27 行 · 一个 blueprint' : '27 predicted rows · one blueprint'}</span>
+                <span>{zh ? 'property 是 adapter 的 host leaf · descriptor 是 (type, kind)' : 'property is an adapter host leaf · descriptor is (type, kind)'}</span>
               </div>
             </div>
 
