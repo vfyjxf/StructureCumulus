@@ -60,6 +60,16 @@ class CommandSupportTest {
     }
 
     @Test
+    void theAnchorCellIsTheOneCellCaptureRegion() {
+        assertEquals(Cuboid.of(3, 4, 5, 4, 5, 6), CommandSupport.anchorCell(LatticePoint.of(3, 4, 5)));
+    }
+
+    @Test
+    void theLastLatticeCornerHasNoAnchorCell() {
+        assertNull(CommandSupport.anchorCell(LatticePoint.of(LatticePoint.maxXz, 0, 0)));
+    }
+
+    @Test
     void rotatesSitedBoundsThroughTheSiting() {
         Blueprint blueprint = boundsBlueprint();
         LatticePoint origin = LatticePoint.of(10, 0, 10);

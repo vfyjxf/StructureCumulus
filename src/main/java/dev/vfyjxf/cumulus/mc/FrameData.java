@@ -8,6 +8,7 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,8 +29,23 @@ record FrameData(
     Map<SectionKey, SectionSlot> sections,
     List<OccupantSnapshot> entities,
     List<OccupantSnapshot> nestedBodies,
-    Map<LatticePoint, FrameData> children
+    Map<LatticePoint, FrameData> children,
+    @Nullable SnapshotLevel hostSnapshot
 ) {
+
+    FrameData(
+        SnapshotId snapshot,
+        int frame,
+        int depth,
+        LatticePoint origin,
+        Cuboid bounds,
+        Map<SectionKey, SectionSlot> sections,
+        List<OccupantSnapshot> entities,
+        List<OccupantSnapshot> nestedBodies,
+        Map<LatticePoint, FrameData> children
+    ) {
+        this(snapshot, frame, depth, origin, bounds, sections, entities, nestedBodies, children, null);
+    }
 
     FrameData {
         Objects.requireNonNull(snapshot, "snapshot");
@@ -41,6 +57,14 @@ record FrameData(
         Objects.requireNonNull(children, "children");
         if (frame < 0 || depth < 0) {
             throw new IllegalArgumentException("frame and depth >= 0");
+        }
+        if (hostSnapshot != null) {
+            if (!hostSnapshot.bounds().equals(bounds)) {
+                throw new IllegalArgumentException("the host snapshot belongs to another frame bounds");
+            }
+            if (!hostSnapshot.origin().equals(origin)) {
+                throw new IllegalArgumentException("the host snapshot belongs to another frame origin");
+            }
         }
         TreeMap<SectionKey, SectionSlot> sortedSections = new TreeMap<>();
         for (Map.Entry<SectionKey, SectionSlot> entry : sections.entrySet()) {

@@ -28,8 +28,14 @@ import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import org.jspecify.annotations.NullMarked;
@@ -138,6 +144,65 @@ public final class CaptureGameTest {
             if (!(result instanceof MatchResult.Admitted)) {
                 helper.fail("check did not admit: " + result);
                 return;
+            }
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void capturesTheTypedSnapshot(GameTestHelper helper) {
+        BlockPos waterCell = new BlockPos(0, 1, 0);
+        BlockPos chestCell = new BlockPos(1, 1, 0);
+        helper.setBlock(waterCell, Blocks.WATER);
+        helper.setBlock(chestCell, Blocks.CHEST);
+        helper.spawnWithNoFreeWill(EntityType.CHICKEN, new Vec3(0.5, 2.0, 0.5));
+        BlockPos origin = helper.absolutePos(waterCell);
+        Cuboid bounds = Cuboid.of(
+            origin.getX(),
+            origin.getY(),
+            origin.getZ(),
+            origin.getX() + 2,
+            origin.getY() + 2,
+            origin.getZ() + 2
+        );
+        SnapshotPolicy policy = new SnapshotPolicy(1_000_000, 0, Set.of(OccupantKind.entity), Set.of(), List.of());
+        CaptureResult result = new LevelCapture(helper.getLevel()).capture(new CaptureRequest(bounds, policy));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("typed capture did not succeed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView view = lease.view();
+            LatticePoint water = LatticePoint.of(origin.getX(), origin.getY(), origin.getZ());
+            BlockState state = view.get(water, HostTypes.blockState);
+            if (state == null || state.getBlock() != Blocks.WATER) {
+                helper.fail("the water block state was not captured");
+                return;
+            }
+            FluidState fluid = view.get(water, HostTypes.fluidState);
+            if (fluid == null || !fluid.getType().isSame(Fluids.WATER)) {
+                helper.fail("the water fluid state was not captured");
+                return;
+            }
+            LatticePoint chest = LatticePoint.of(origin.getX() + 1, origin.getY(), origin.getZ());
+            BlockEntity blockEntity = view.get(chest, HostTypes.blockEntity);
+            if (!(blockEntity instanceof ChestBlockEntity)) {
+                helper.fail("the chest block entity was not captured");
+                return;
+            }
+            if (blockEntity.getLevel() != null) {
+                helper.fail("the block entity copy keeps a live level");
+                return;
+            }
+            Entity entity = view.get(Objects.requireNonNull(water.offset(0, 1, 0), "entity cell"), HostTypes.entity);
+            if (entity == null || entity.getType() != EntityType.CHICKEN) {
+                helper.fail("the chicken entity was not captured");
+                return;
+            }
+            BlockState outside = view
+                    .get(LatticePoint.of(origin.getX() + 2, origin.getY(), origin.getZ()), HostTypes.blockState);
+            if (outside == null || !outside.isAir()) {
+                helper.fail("an out-of-bounds cell is not air");
             }
         }
         helper.succeed();

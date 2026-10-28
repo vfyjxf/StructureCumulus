@@ -21,6 +21,7 @@ import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
+import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.BlockPos;
@@ -127,12 +128,13 @@ final class CommandSupport {
         CommandSourceStack source,
         NamespacedId id,
         Blueprint blueprint,
-        LatticePoint origin
+        LatticePoint origin,
+        WorldView view
     ) {
         if (blueprint.anchors().isEmpty()) {
             return Siting.of(origin, Orientation.identity);
         }
-        SitingResult resolved = McAnchors.resolve(blueprint, origin, source.getLevel());
+        SitingResult resolved = McAnchors.resolve(blueprint, origin, view);
         if (resolved.outcome() instanceof Outcome.Found<Siting> found) {
             return found.value();
         }
@@ -144,11 +146,10 @@ final class CommandSupport {
         return siting.toWorld(blueprint.bounds());
     }
 
-    static @Nullable Cuboid anchorCell(LatticePoint origin, CommandSourceStack source) {
+    static @Nullable Cuboid anchorCell(LatticePoint origin) {
         try {
             return Cuboid.of(origin);
         } catch (IllegalArgumentException failure) {
-            source.sendFailure(Component.literal("the anchor cell leaves the lattice at " + origin));
             return null;
         }
     }
@@ -170,8 +171,9 @@ final class CommandSupport {
                     ? null
                     : new Attempt(bounds, Siting.of(origin, Orientation.identity), captured.lease(), captured.report());
         }
-        Cuboid anchorCell = anchorCell(origin, source);
+        Cuboid anchorCell = anchorCell(origin);
         if (anchorCell == null) {
+            source.sendFailure(Component.literal("the anchor cell leaves the lattice at " + origin));
             return null;
         }
         Captured anchorCaptured = capture(state, source, id, anchorCell, SnapshotPolicy.minimal(), null);
@@ -180,7 +182,7 @@ final class CommandSupport {
         }
         Siting siting;
         try (SnapshotLease phase1 = anchorCaptured.lease()) {
-            siting = siting(source, id, blueprint, origin);
+            siting = siting(source, id, blueprint, origin, phase1.view());
             if (siting == null) {
                 return null;
             }

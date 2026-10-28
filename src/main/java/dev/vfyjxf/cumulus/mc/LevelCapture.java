@@ -33,10 +33,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntitySelector;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -44,9 +47,11 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -197,6 +202,11 @@ public final class LevelCapture implements WorldCapture {
         private final boolean root;
         private final boolean nestedEnabled;
         private final Map<SectionKey, SectionSlot> sections = new TreeMap<>();
+        private final Map<SectionKey, Cuboid> digestRegions = new TreeMap<>();
+        private final Map<Long, PalettedContainer<BlockState>> snapshotStates = new HashMap<>();
+        private final Map<Long, FluidState[]> snapshotFluids = new HashMap<>();
+        private final Map<BlockPos, BlockEntity> snapshotBlockEntities = new HashMap<>();
+        private final Set<Long> copiedSections = new HashSet<>();
         private final Map<LatticePoint, NestedExtent> blockExtents = new TreeMap<>();
         private final LevelWatch.WatchRegion watch = new LevelWatch.WatchRegion();
 
@@ -228,6 +238,8 @@ public final class LevelCapture implements WorldCapture {
                 watch.entity(candidate.id(), candidate.type(), candidate.anchor(), candidate.footprint());
             }
             List<OccupantSnapshot> entities = entityBodies(candidates);
+            SnapshotLevel host = snapshot(candidates);
+            Map<SectionKey, SectionSlot> digested = digestSections(host);
             Map<LatticePoint, NestedExtent> declarations = nestedDeclarations(candidates);
             List<OccupantSnapshot> nestedBodies = new ArrayList<>();
             Map<LatticePoint, FrameData> children = new TreeMap<>();
@@ -253,11 +265,64 @@ public final class LevelCapture implements WorldCapture {
                 depth,
                 origin,
                 bounds,
-                sections,
+                digested,
                 entities,
                 nestedBodies,
-                children
+                children,
+                host
             );
+        }
+
+        private SnapshotLevel snapshot(List<EntityCandidate> candidates) {
+            List<SnapshotLevel.CapturedEntity> capturedEntities = new ArrayList<>();
+            for (EntityCandidate candidate : candidates) {
+                LatticePoint anchor = local(candidate.anchor());
+                Cuboid footprint = local(candidate.footprint());
+                if (anchor == null || footprint == null) {
+                    continue;
+                }
+                capturedEntities.add(
+                    new SnapshotLevel.CapturedEntity(candidate.id(), candidate.type(), footprint, candidate.entity())
+                );
+            }
+            return new SnapshotLevel(
+                origin,
+                bounds,
+                level.getMinBuildHeight(),
+                level.getHeight(),
+                snapshotStates,
+                snapshotFluids,
+                snapshotBlockEntities,
+                capturedEntities
+            );
+        }
+
+        private Map<SectionKey, SectionSlot> digestSections(SnapshotLevel host) {
+            Map<SectionKey, SectionSlot> digested = new TreeMap<>();
+            for (Map.Entry<SectionKey, SectionSlot> entry : sections.entrySet()) {
+                SectionKey key = entry.getKey();
+                SectionSlot slot = entry.getValue();
+                Cuboid region = digestRegions.get(key);
+                if (region == null) {
+                    digested.put(key, slot);
+                    continue;
+                }
+                switch (slot) {
+                    case SectionSlot.Present present ->
+                        digested.put(key, new SectionSlot.Present(withHostDigest(present.section(), host, region)));
+                    case SectionSlot.Partial partial -> digested.put(
+                        key,
+                        new SectionSlot.Partial(withHostDigest(partial.section(), host, region), partial.unreadable())
+                    );
+                    default -> digested.put(key, slot);
+                }
+            }
+            return digested;
+        }
+
+        private static SectionSnapshot withHostDigest(SectionSnapshot section, SnapshotLevel host, Cuboid region) {
+            return SectionSnapshot
+                    .of(section.key(), section.occupants(), contentDigest(section.contentDigest(), host, region));
         }
 
         private @Nullable FrameData child(NestedExtent extent, LatticePoint localAnchor, List<NestedKey> path) {
@@ -424,10 +489,16 @@ public final class LevelCapture implements WorldCapture {
                             continue;
                         }
                         LevelChunkSection chunkSection = chunk.getSection(sectionIndex);
-                        if (chunkSection.hasOnlyAir()) {
-                            continue;
+                        long worldSection = SnapshotLevel.worldSectionKey(worldX, worldY, worldZ);
+                        if (copiedSections.add(worldSection) && !chunkSection.hasOnlyAir()) {
+                            PalettedContainer<BlockState> states = chunkSection.getStates().copy();
+                            snapshotStates.put(worldSection, states);
+                            snapshotFluids.put(worldSection, copyFluids(states));
                         }
-                        BlockState state = chunkSection.getBlockState(worldX & 15, worldY & 15, worldZ & 15);
+                        PalettedContainer<BlockState> sectionStates = snapshotStates.get(worldSection);
+                        BlockState state = sectionStates == null
+                                ? Blocks.AIR.defaultBlockState()
+                                : sectionStates.get(worldX & 15, worldY & 15, worldZ & 15);
                         if (state.isAir()) {
                             continue;
                         }
@@ -451,6 +522,10 @@ public final class LevelCapture implements WorldCapture {
                                 : OccupantDescriptors.blockEntity(context.snapshot(), frame, cell, blockEntity, traits);
                         occupants.put(cell, occupant);
                         if (blockEntity != null) {
+                            BlockEntity copied = copyBlockEntity(blockEntity, new BlockPos(x, y, z), state);
+                            if (copied != null) {
+                                snapshotBlockEntities.put(new BlockPos(x, y, z), copied);
+                            }
                             watch.blockEntity(worldPos, blockEntity, level.registryAccess());
                         }
                         if (nestedEnabled && (!state.hasBlockEntity() || blockEntity != null)) {
@@ -462,12 +537,15 @@ public final class LevelCapture implements WorldCapture {
                     }
                 }
             }
+            Cuboid digestRegion = Cuboid.of(minX, readMinY, minZ, maxX, readMaxY, maxZ);
             if (!unreadable.isEmpty()) {
+                digestRegions.put(key, digestRegion);
                 return new SectionSlot.Partial(SectionSnapshot.of(key, occupants, digest(occupants)), unreadable);
             }
             if (occupants.isEmpty()) {
                 return new SectionSlot.Air(0);
             }
+            digestRegions.put(key, digestRegion);
             return new SectionSlot.Present(SectionSnapshot.of(key, occupants, digest(occupants)));
         }
 
@@ -577,6 +655,29 @@ public final class LevelCapture implements WorldCapture {
         }
     }
 
+    private @Nullable BlockEntity copyBlockEntity(BlockEntity source, BlockPos localPos, BlockState state) {
+        try {
+            return BlockEntity
+                    .loadStatic(localPos, state, source.saveWithId(level.registryAccess()), level.registryAccess());
+        } catch (RuntimeException failure) {
+            StructureCumulus.logger.warn("block entity copy failed at {}", localPos, failure);
+            return null;
+        }
+    }
+
+    private static FluidState[] copyFluids(PalettedContainer<BlockState> states) {
+        FluidState[] fluids = new FluidState[cellSize * cellSize * cellSize];
+        int index = 0;
+        for (int y = 0; y < cellSize; y++) {
+            for (int z = 0; z < cellSize; z++) {
+                for (int x = 0; x < cellSize; x++) {
+                    fluids[index++] = states.get(x, y, z).getFluidState();
+                }
+            }
+        }
+        return fluids;
+    }
+
     private boolean chunksLoaded(Cuboid localBounds, LatticePoint origin) {
         int minY = Math.max(localBounds.min().y() + origin.y(), level.getMinBuildHeight());
         int maxY = Math.min(localBounds.max().y() + origin.y(), level.getMaxBuildHeight());
@@ -653,6 +754,10 @@ public final class LevelCapture implements WorldCapture {
             return null;
         }
         return Cuboid.of(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    static long contentDigest(long occupantDigest, SnapshotLevel host, Cuboid region) {
+        return occupantDigest * 31L + host.contentDigest(region);
     }
 
     private static long digest(Map<LatticePoint, OccupantSnapshot> occupants) {

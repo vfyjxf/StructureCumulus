@@ -18,8 +18,7 @@ import dev.vfyjxf.cumulus.kernel.structure.AnchorSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.structure.SitingResult;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
+import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import org.jspecify.annotations.NullMarked;
@@ -28,11 +27,11 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 import java.util.Locale;
 
-/** Resolves the anchor siting from the live anchor cell. */
+/** Resolves the anchor siting from the captured anchor cell. */
 @NullMarked
 public final class McAnchors {
 
-    public static SitingResult resolve(Blueprint blueprint, LatticePoint origin, ServerLevel level) {
+    public static SitingResult resolve(Blueprint blueprint, LatticePoint origin, WorldView view) {
         OrientationPolicy policy = blueprint.orientation();
         if (policy == null) {
             return failure(origin, Codes.anchorInvalid, "the blueprint has no orientation policy");
@@ -41,11 +40,10 @@ public final class McAnchors {
         if (spec == null) {
             return failure(origin, Codes.anchorInvalid, "the primary role has no anchor");
         }
-        BlockPos position = new BlockPos(origin.x(), origin.y(), origin.z());
-        if (level.getChunkSource().getChunkNow(position.getX() >> 4, position.getZ() >> 4) == null) {
-            return failure(origin, AdapterCodes.notCapturedEntry, "the anchor chunk is not loaded");
+        BlockState state = view.get(origin, HostTypes.blockState);
+        if (state == null) {
+            return failure(origin, AdapterCodes.notCapturedEntry, "the anchor block state was not captured");
         }
-        BlockState state = level.getBlockState(position);
         if (state.isAir()) {
             return failure(origin, Codes.anchorInvalid, "the anchor cell is air");
         }

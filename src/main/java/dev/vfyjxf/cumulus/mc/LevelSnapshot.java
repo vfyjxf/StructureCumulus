@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import dev.vfyjxf.cumulus.kernel.world.CellRead;
+import dev.vfyjxf.cumulus.kernel.world.HostType;
 import dev.vfyjxf.cumulus.kernel.world.OccupantFilter;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
@@ -257,6 +258,12 @@ public final class LevelSnapshot implements WorldView {
     @Override
     public @Nullable WorldView nested(LatticePoint cell) {
         return children.get(cell);
+    }
+
+    @Override
+    public <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+        SnapshotLevel host = data.hostSnapshot();
+        return host == null ? null : host.get(pos, type);
     }
 
     @Override

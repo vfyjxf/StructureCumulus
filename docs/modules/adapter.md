@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S4)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S4 + H1/H2)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -42,7 +42,8 @@
   `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`. S1–S4 add the structure-set
   layer: `Siting.compose` and the seven `SC-SET` codes (`9cf2794`), the set document IR/reader/
   writer/compiler (`00cf6c4`), the host `StructureSet` plan, `StructureSetHost` and `StructureSetResult`
-  (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3).
+  (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3). H2 adds the per-frame `SnapshotLevel`,
+  the capture wiring, the typed `WorldView.get` dispatch, snapshot anchors and the digest content.
 - **Implemented (S6, revised by host-data H1).** A capture carrying a siting orientation audits
   every root block state through the inverse orientation and reports an unrepresentable state as
   `SC-MC-0004` (§3, §10). The definition-frame descriptor projection is retired: the kernel
@@ -58,12 +59,14 @@
 | Type | Implements | Role |
 | --- | --- | --- |
 | `LevelCapture` | `WorldCapture` | server-thread capture into a `LevelSnapshot`; the sited orientation audit; nested extents as declarations only |
-| `LevelSnapshot` | `WorldView` | one immutable view over every frame; `read`, `bounds`, `policy`, `nested`; `get` joins in H2 |
-| `FrameData` | — | package-private per-frame sections, entities, nested bodies/extents and children |
+| `LevelSnapshot` | `WorldView` | one immutable view over every frame; `read`, `bounds`, `policy`, `nested`, typed `get` |
+| `FrameData` | — | package-private per-frame sections, entities, nested bodies/extents, children and the frame snapshot |
+| `SnapshotLevel` | `BlockGetter` | package-private; one frame's immutable host snapshot: copied section states, fluids, detached block entities and captured entities, in local coordinates |
+| `HostTypes` | — | public final class; the four typed host-read tokens (`blockState`, `fluidState`, `entity`, `blockEntity`) |
 | `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value → `(type, kind)` descriptor; entity body identity; nested body |
-| `McAnchors` | — | temporary anchor read from the live anchor cell; the snapshot read replaces it in H2 |
+| `McAnchors` | — | anchor siting from the captured anchor `BlockState`; no live read |
 | `OccupantTraits` | — | the five stable trait keys and generic provider dispatch into four-state slots |
 | `TraitLookup` | final class (`trait`) | immutable registry; `builtin()` and sequential plugin-loaded `load(Logger)`; `provider(id)` |
 | `TraitProvider<T>` | interface (`trait`) | one typed provider: `key()`, block/entity reads defaulting to `Absent` |
@@ -107,8 +110,9 @@ The rules below are implemented.
 
 - One server-thread call. `ServerChunkCache.getChunkNow`; never `Level.getChunk`, never a chunk load.
   A nested child uses the same rule: an unloaded chunk is a cut, never a load.
-- Sections are copied per captured cell; an all-air section is `Air(revision)`; an unloaded root
-  chunk is `CaptureResult.Unavailable(notCaptured, SC-MC-0001)`. A section is never lazily resolved.
+- The section walk visits every captured cell and reads its state from a per-frame copied section
+  container; an all-air section is `Air(revision)`; an unloaded root chunk is
+  `CaptureResult.Unavailable(notCaptured, SC-MC-0001)`. A section is never lazily resolved.
 - Block entities are read `saveWithoutMetadata`; the state and block entity are read **once** and
   passed to capability queries. If `state.hasBlockEntity()` and the already-read block entity is
   `null`, the cell is a plain block and no block capability is queried; the adapter never re-fetches
@@ -136,6 +140,10 @@ The rules below are implemented.
   carries one `SC-MC-0003` entry per cut and one `SC-MC-0004` entry per unrepresentable state group
   (§10). An empty report is the normal case and `Unavailable` carries one only when the host has
   extra detail; its own `SC-MC-0001` code already is its finding.
+- H2 copies host data from the same walk (§3.1): each world section's `PalettedContainer<BlockState>`
+  is copied once, the fluids are filled from the copy, block entities are detached copies and the
+  captured entity candidates keep their local footprints. The per-cell occupant walk reads the state
+  from the copy, so no cell is read twice.
 - The orientation audit runs inside the sited capture, in the same loop that already read each
   `BlockState`, so it needs no chunk load and no second traversal. `LevelCapture` exposes an
   adapter-only overload `capture(CaptureRequest, @Nullable Orientation orientation)`; the orientation
@@ -149,6 +157,30 @@ The rules below are implemented.
   is `(type, kind)` and the actual state still feeds the block-entity lookup, the trait capabilities,
   the nested capability and the watch fingerprints. Child/nested frames and the phase-1 anchor
   capture are not audited: a child extent is an absolute structure (§8).
+
+### 3.1 Snapshot and typed reads
+
+`SnapshotLevel` is the one host snapshot per frame. It implements `BlockGetter` in **local** frame
+coordinates: `getBlockState`, `getFluidState`, `getBlockEntity` and the typed `get(pos, HostType)`.
+Out-of-bounds reads answer air / empty fluid / null; a missing section answers the same without a
+world read. No `Level` is retained.
+
+- `LevelCapture` copies each world section's `PalettedContainer<BlockState>` once per frame
+  (`PalettedContainer.copy()`), keyed by world section coordinates; the occupant walk reads its
+  `BlockState` from the copy. A section's fluids are copied into a 16³ `FluidState` array from the
+  copied states.
+- Block entities are copied at capture (`saveWithId` then `BlockEntity.loadStatic`) into detached
+  snapshot instances keyed by the local cell; `getLevel()` is null on every one of them.
+- The captured entity candidates are kept with their local footprints; `get(cell, entity)` answers the
+  narrowest captured entity covering the cell.
+- `FrameData` carries the snapshot per frame; nested frames build and carry their own.
+- `LevelSnapshot.get(pos, type)` dispatches to the frame snapshot; `get(ref, type)` uses the ref's
+  anchor. A `LevelSnapshot` built without a snapshot answers null. No typed read touches the level.
+- The section digest composes the occupant digest with `SnapshotLevel.contentDigest(region)`, which
+  hashes the captured block states, fluid states and entities of the section. A same-type occupant
+  with a different `BlockState` therefore changes `contentDigest`.
+- Heightmaps are not captured: no request path exists in H2 (the design's "when requested" has no
+  kernel field yet).
 
 ## 4. Lease and gate
 
@@ -449,7 +481,7 @@ load, no second traversal, no `ReadRefusal`. The orientation comes from the two-
 the capture report is the only trace of the capability; the check's own value expectations return
 with the H3 host factories, which read the snapshot rather than a descriptor. The projection is the
 inverse-orientation `OrientationMapping.transform` result described above; `FocusContext.siting()` is
-unchanged. The definition origin's anchor property is read from the live anchor `BlockState` (the
+unchanged. The definition origin's anchor property is read from the captured anchor `BlockState` (the
 phase-1 capture is not audited), and `SC-MC-0004` never becomes a `ReadRefusal`.
 
 ## 11. Commands and lifecycle
@@ -459,11 +491,11 @@ All five subcommands run on the server thread. `check` returns 1 whenever it rea
 - `/cumulus check <id> <origin>` — capture, siting, read the per-level claims view for the captured
   bounds, then `check`; print the result and findings. The claims read and the check write nothing.
   An anchored blueprint captures twice (P1, `56c632c`): the anchor cell is captured, `McAnchors`
-  resolves the siting from the live anchor cell, and the sited bounds are the capture the orientation
-  audit runs on. The live anchor read is temporary; H2 moves `McAnchors` onto the snapshot. The
-  temporary resolver keeps the heading-only rule (the anchor property selects the orientation) and
-  does not compare `AnchorSpec.value`; the declared-value constraint, and the frame it is compared
-  in, land with H3.
+  resolves the siting from that captured view (`view.get(origin, HostTypes.blockState)`), and the
+  sited bounds are the capture the orientation audit runs on. The phase-1 view is closed after
+  resolution. H2 keeps the heading-only rule (the anchor property selects the orientation) and does
+  not compare `AnchorSpec.value`; the declared-value constraint, the missing-state `SC-MC-0010` code
+  and the frame it is compared in land with H3.
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
   findings.
 - `/cumulus settle <id> <origin>` — capture once, `check`, then `settle` with the same request; print

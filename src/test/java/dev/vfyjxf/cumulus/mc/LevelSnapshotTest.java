@@ -9,6 +9,7 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import dev.vfyjxf.cumulus.kernel.world.CellRead;
+import dev.vfyjxf.cumulus.kernel.world.HostType;
 import dev.vfyjxf.cumulus.kernel.world.OccupantDescriptor;
 import dev.vfyjxf.cumulus.kernel.world.OccupantFilter;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
@@ -20,8 +21,24 @@ import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.SectionSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Marker;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.RotatedPillarBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -451,6 +468,164 @@ class LevelSnapshotTest {
         );
 
         assertThrows(IllegalArgumentException.class, () -> new LevelSnapshot(snapshot, SnapshotPolicy.minimal(), root));
+    }
+
+    @Test
+    void typedReadsDispatchToTheFrameSnapshot() {
+        SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 14);
+        Cuboid bounds = Cuboid.of(0, 0, 0, 2, 2, 2);
+        LatticePoint anchor = LatticePoint.origin;
+        SectionKey key = SectionKey.of(snapshot.world(), 0, anchor, 16);
+        BlockState water = Blocks.WATER.defaultBlockState();
+        OccupantSnapshot block = occupant(snapshot, anchor, "water");
+        SectionSnapshot section = SectionSnapshot.of(key, Map.of(anchor, block), 7L);
+        BlockEntity chest = BlockEntityType.CHEST.create(new BlockPos(0, 0, 0), Blocks.CHEST.defaultBlockState());
+        Marker marker = new Marker(EntityType.MARKER, null);
+        SnapshotLevel host = hostSnapshot(bounds, water, chest, marker);
+        FrameData data = new FrameData(
+            snapshot,
+            0,
+            0,
+            LatticePoint.origin,
+            bounds,
+            Map.of(key, new SectionSlot.Present(section)),
+            List.of(),
+            List.of(),
+            Map.of(),
+            host
+        );
+        LevelSnapshot view = new LevelSnapshot(snapshot, SnapshotPolicy.minimal(), data);
+
+        assertSame(water, view.get(anchor, HostTypes.blockState));
+        assertSame(water, view.get(block.ref(), HostTypes.blockState));
+        assertEquals(water.getFluidState(), view.get(anchor, HostTypes.fluidState));
+        assertSame(chest, view.get(anchor, HostTypes.blockEntity));
+        assertSame(marker, view.get(anchor, HostTypes.entity));
+        assertNull(view.get(anchor, HostType.of(NamespacedId.of("test", "unknown"))));
+        assertTrue(Objects.requireNonNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockState), "air").isAir());
+        assertEquals(Fluids.EMPTY.defaultFluidState(), view.get(LatticePoint.of(2, 0, 0), HostTypes.fluidState));
+        assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.entity));
+        assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockEntity));
+    }
+
+    @Test
+    void aViewWithoutAHostSnapshotAnswersNull() {
+        SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 15);
+        LevelSnapshot view = new LevelSnapshot(snapshot, Cuboid.of(0, 0, 0, 2, 2, 2), Map.of());
+
+        assertNull(view.get(LatticePoint.origin, HostTypes.blockState));
+        assertNull(view.get(LatticePoint.origin, HostTypes.fluidState));
+        assertNull(view.get(LatticePoint.origin, HostTypes.entity));
+        assertNull(view.get(LatticePoint.origin, HostTypes.blockEntity));
+    }
+
+    @Test
+    void nestedFramesReadTheirOwnSnapshot() {
+        SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 16);
+        LatticePoint anchor = LatticePoint.origin;
+        LatticePoint childCell = LatticePoint.of(1, 0, 0);
+        Cuboid bounds = Cuboid.of(0, 0, 0, 2, 2, 2);
+        NamespacedId nestedType = NamespacedId.of("test", "nested");
+        BlockState stone = Blocks.STONE.defaultBlockState();
+        BlockState log = Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X);
+        SectionKey rootKey = SectionKey.of(snapshot.world(), 0, anchor, 16);
+        OccupantSnapshot block = occupant(snapshot, anchor, "stone");
+        SectionSnapshot rootSection = SectionSnapshot.of(rootKey, Map.of(anchor, block), 7L);
+        OccupantSnapshot nested = OccupantDescriptors.nested(snapshot, 0, anchor, nestedType, bounds);
+
+        LatticePoint childOrigin = LatticePoint.of(10, 20, 30);
+        SectionKey childKey = SectionKey.of(snapshot.world(), 1, childCell, 16);
+        OccupantSnapshot dirt = occupant(snapshot, 1, childCell, "dirt");
+        SectionSnapshot childSection = SectionSnapshot.of(childKey, Map.of(childCell, dirt), 9L);
+        FrameData childData = new FrameData(
+            snapshot,
+            1,
+            1,
+            childOrigin,
+            bounds,
+            Map.of(childKey, new SectionSlot.Present(childSection)),
+            List.of(),
+            List.of(),
+            Map.of(),
+            hostSnapshot(childOrigin, bounds, log, null, null, childCell)
+        );
+        FrameData rootData = new FrameData(
+            snapshot,
+            0,
+            0,
+            LatticePoint.origin,
+            bounds,
+            Map.of(rootKey, new SectionSlot.Present(rootSection)),
+            List.of(),
+            List.of(nested),
+            Map.of(anchor, childData),
+            hostSnapshot(LatticePoint.origin, bounds, stone, null, null, anchor)
+        );
+        SnapshotPolicy policy = new SnapshotPolicy(64, 1, Set.of(OccupantKind.nested), Set.of(), List.of());
+        LevelSnapshot view = new LevelSnapshot(snapshot, policy, rootData);
+        WorldView child = Objects.requireNonNull(view.nested(anchor), "child view");
+
+        assertSame(stone, view.get(anchor, HostTypes.blockState));
+        assertTrue(Objects.requireNonNull(child.get(LatticePoint.origin, HostTypes.blockState), "child air").isAir());
+        assertSame(log, child.get(childCell, HostTypes.blockState));
+        assertTrue(Objects.requireNonNull(view.get(childCell, HostTypes.blockState), "root air").isAir());
+    }
+
+    private static SnapshotLevel hostSnapshot(
+        Cuboid bounds,
+        BlockState state,
+        @Nullable BlockEntity blockEntity,
+        @Nullable Entity entity
+    ) {
+        return hostSnapshot(LatticePoint.origin, bounds, state, blockEntity, entity, LatticePoint.origin);
+    }
+
+    private static SnapshotLevel hostSnapshot(
+        LatticePoint origin,
+        Cuboid bounds,
+        BlockState state,
+        @Nullable BlockEntity blockEntity,
+        @Nullable Entity entity,
+        LatticePoint cell
+    ) {
+        int worldX = origin.x() + cell.x();
+        int worldY = origin.y() + cell.y();
+        int worldZ = origin.z() + cell.z();
+        PalettedContainer<BlockState> states = new PalettedContainer<>(
+            Block.BLOCK_STATE_REGISTRY,
+            Blocks.AIR.defaultBlockState(),
+            PalettedContainer.Strategy.SECTION_STATES
+        );
+        states.set(worldX & 15, worldY & 15, worldZ & 15, state);
+        FluidState[] fluids = new FluidState[SnapshotLevel.sectionSize
+                * SnapshotLevel.sectionSize
+                * SnapshotLevel.sectionSize];
+        Arrays.fill(fluids, Fluids.EMPTY.defaultFluidState());
+        fluids[SnapshotLevel.fluidIndex(worldX, worldY, worldZ)] = state.getFluidState();
+        long key = SnapshotLevel.worldSectionKey(worldX, worldY, worldZ);
+        Map<BlockPos, BlockEntity> blockEntities = blockEntity == null
+                ? Map.of()
+                : Map.of(new BlockPos(cell.x(), cell.y(), cell.z()), blockEntity);
+        List<SnapshotLevel.CapturedEntity> entities = entity == null
+                ? List.of()
+                : List.of(
+                    new SnapshotLevel.CapturedEntity(
+                        entity.getUUID(),
+                        NamespacedId.of("minecraft", "marker"),
+                        Cuboid.of(cell),
+                        entity
+                    )
+                );
+        return new SnapshotLevel(
+            origin,
+            bounds,
+            -64,
+            384,
+            Map.of(key, states),
+            Map.of(key, fluids),
+            blockEntities,
+            entities
+        );
     }
 
     private static OccupantSnapshot entity(SnapshotId snapshot, LatticePoint anchor, String type, Cuboid footprint) {
