@@ -329,9 +329,27 @@ public final class BlockTraitProviders {
 }
 
 public final class EntityTraitProviders {
-    public static final TraitProvider<IItemHandler, EntityTraitContext> inventory = ...;
-    public static final TraitProvider<IEnergyStorage, EntityTraitContext> energy = ...;
-    public static final TraitProvider<IFluidHandler, EntityTraitContext> fluid = ...;
+    public static final TraitProvider<IItemHandler, EntityTraitContext> inventory =
+        CapabilityTraitProvider.of(
+            OccupantTraits.inventory,
+            TraitHolders.entity,
+            Capabilities.ItemHandler.ENTITY,
+            CapabilityAccesses.entityVoid()
+        );
+    public static final TraitProvider<IEnergyStorage, EntityTraitContext> energy =
+        CapabilityTraitProvider.of(
+            OccupantTraits.energy,
+            TraitHolders.entity,
+            Capabilities.EnergyStorage.ENTITY,
+            CapabilityAccesses.entity()
+        );
+    public static final TraitProvider<IFluidHandler, EntityTraitContext> fluid =
+        CapabilityTraitProvider.of(
+            OccupantTraits.fluid,
+            TraitHolders.entity,
+            Capabilities.FluidHandler.ENTITY,
+            CapabilityAccesses.entity()
+        );
 }
 ```
 
@@ -439,7 +457,8 @@ No JSON, document, kernel or host-snapshot change.
 - block/entity energy returns the exact `IEnergyStorage`;
 - block/entity fluid returns the exact `IFluidHandler`;
 - `CapabilityTraitProvider` resolves both block and entity capabilities through the same class;
-- `CapabilityAccesses.block/entity` call the normal get signatures and map the capture context;
+- `CapabilityAccesses.block/entity/entityVoid` call the normal get signatures and map the capture
+  context; entity inventory uses the `Void` accessor, energy/fluid use the sided accessor;
 - no `blockEntityNbt` / `entityNbt` keys exist;
 - capability-absent -> absent; null block entity -> refused(notCaptured); malformed capability ->
   refused(failed);
