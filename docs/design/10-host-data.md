@@ -1,67 +1,45 @@
-# 10. Host data and MC-specific checks
+# 10. Host snapshots and MC-specific checks
 
-> Status: proposed, not implemented. This document is the source of truth for host data capture,
-> the generic host-data read face, and MC-specific property/state/tag/fluid checks.
+> Status: proposed, not implemented. This document is the source of truth for host snapshots, the
+> generic host bridge, and MC-specific property/state/tag/fluid checks.
 
 ## 1. Purpose
 
 The kernel describes what an occupant is: its type and kind. It must not model block states,
-properties, tags, fluids, entity data, or any other host-specific payload.
+properties, tags, fluids, entity data, or any other host payload.
 
-Those are host data:
+Those are host data. They are **snapshotted in their original MC form**, not translated into a
+kernel model:
 
-- a block state;
-- a fluid state;
-- an entity;
-- a block entity;
-- any future host payload.
+- copied `PalettedContainer<BlockState>` sections;
+- block entities;
+- entities;
+- heightmaps when a check needs them.
 
-They are captured by the host, stored in the capture, and read by host-specific checks through one
-generic typeclass. The kernel never imports a host type and never translates host data into a
-kernel model.
+The reference implementation is
+[CachedLevel.java](https://github.com/khjxiaogu/Beecrasy/blob/master/src/main/java/com/khjxiaogu/beecrasy/utils/CachedLevel.java):
+it copies the section containers (or references them) and exposes the result through
+`BlockGetter`/`LevelReader`. This design follows the same shape: copy the vanilla data, then bridge
+one API.
 
-## 2. Problem
+There is no per-cell `HostTable`, no `HostData` wrapper, no `McOccupant` union and no host-data
+mirror map.
 
-The current model mixes two different things in `OccupantDescriptor`:
+## 2. HostType
 
-```java
-(type, kind, properties, tags)
-```
-
-- `type` and `kind` are identity;
-- `properties` and `tags` are host data.
-
-That forces the adapter to translate MC block state into strings and tag lists, and it makes the
-kernel carry data it cannot interpret. It also makes exact-state and fluid checks impossible without
-adding more host data to the kernel.
-
-The fix is:
-
-```text
-descriptor = (type, kind)
-host data  = captured separately, read by HostType<H>
-```
-
-## 3. HostType
-
-`HostType<H>` is the type token. It carries no host class object and no host data.
+`HostType<H>` is the type token for one host snapshot API:
 
 ```java
 package dev.vfyjxf.cumulus.kernel.world;
 
-public record HostType<H>(
-    NamespacedId id,
-    Set<OccupantKind> kinds
-) implements Comparable<HostType<?>> {
+public record HostType<H>(NamespacedId id) implements Comparable<HostType<?>> {
 
     public HostType {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(kinds, "kinds");
-        kinds = Set.copyOf(new TreeSet<>(kinds));
     }
 
-    public static <H> HostType<H> of(NamespacedId id, OccupantKind... kinds) {
-        return new HostType<>(id, Set.of(kinds));
+    public static <H> HostType<H> of(NamespacedId id) {
+        return new HostType<>(id);
     }
 
     @Override
@@ -71,190 +49,125 @@ public record HostType<H>(
 }
 ```
 
-- `H` is the host payload type; the kernel never names it.
-- `kinds` declares which occupant kinds can carry the payload.
-- equality and ordering are by `id`; ids are unique per host.
-- no `Class<?>`.
-- no reflection.
+- `H` is the host snapshot type; the kernel never names it;
+- no `Class<?>`;
+- no per-cell value type;
+- one `HostType` per host snapshot API.
 
-Adapter constants:
+Adapter constant:
 
 ```java
-public static final HostType<BlockState> BLOCK_STATE =
-    HostType.of(id("block_state"), OccupantKind.block, OccupantKind.blockEntity);
-
-public static final HostType<FluidState> FLUID_STATE =
-    HostType.of(id("fluid_state"), OccupantKind.block, OccupantKind.blockEntity);
-
-public static final HostType<Entity> ENTITY =
-    HostType.of(id("entity"), OccupantKind.entity);
+public static final HostType<McSnapshot> MC_SNAPSHOT =
+    HostType.of(id("mc_snapshot"));
 ```
 
-## 4. Read face
+## 3. WorldView bridge
 
 `WorldView` gains one generic method:
 
 ```java
 public interface WorldView {
 
-    <H> @Nullable H host(HostType<H> type, LatticePoint cell);
-
-    default <H> @Nullable H host(HostType<H> type, OccupantRef ref) {
-        return host(type, ref.anchor());
+    default <H> @Nullable H host(HostType<H> type) {
+        return null;
     }
 }
 ```
 
-- the default implementation returns `null`;
-- the adapter's `LevelSnapshot` implements it from captured host tables;
+- no cell parameter;
+- returns the whole host snapshot, not a per-cell value;
+- default `null`;
+- `LevelSnapshot` overrides it for `MC_SNAPSHOT`;
 - it never reads the live world;
-- it is total: a missing value is `null`, not an exception;
-- it does not use traits, ids, `ReadScope.traits()`, or any generic slot container.
+- it is total: missing means "not captured", not an exception.
 
-`null` means one of:
+## 4. McSnapshot
 
-1. the host type was not captured;
-2. the cell has no occupant of a kind the type supports;
-3. the host genuinely has no value for that cell.
-
-Checks that require the data must treat `null` as a host-data refusal, not as a mismatch. The exact
-code is `SC-MC-0010` (see §10).
-
-## 5. Capture policy
-
-Host data is captured only when the plan asks for it.
-
-### 5.1 ReadScope
-
-`ReadScope` gains:
+`McSnapshot` is the adapter's immutable snapshot of the vanilla data:
 
 ```java
-Set<HostType<?>> hostTypes
+public final class McSnapshot implements BlockGetter {
+
+    private final Cuboid bounds;
+    private final PalettedContainer<BlockState>[] sections;
+    private final Map<BlockPos, BlockEntity> blockEntities;
+    private final List<Entity> entities;
+    private final HeightProvider[] heightmaps;
+
+    public BlockState getBlockState(BlockPos pos);
+    public FluidState getFluidState(BlockPos pos);
+    public @Nullable BlockEntity getBlockEntity(BlockPos pos);
+    public List<Entity> entities();
+}
 ```
 
-with:
+- coordinates are **local** to the snapshot (the `CachedLevel` shape with a local origin);
+- block states are copied `PalettedContainer`s, not per-cell maps;
+- block entities are copied where needed;
+- entities are copied references/records for the snapshot;
+- out-of-bounds reads return air, like `CachedLevel`;
+- no live `Level` reference is retained for reads.
 
-```java
-ReadScope withHostTypes(Set<HostType<?>> extra);
-```
-
-`union` merges host types by id. `Expectations.host` adds its own type and the type's kinds.
-
-### 5.2 SnapshotPolicy
-
-`SnapshotPolicy` gains:
-
-```java
-Set<HostType<?>> hostTypes
-```
-
-and:
-
-```java
-SnapshotPolicy withHostTypes(Set<HostType<?>> extra);
-```
-
-`CommandSupport.policy(blueprint)` passes `blueprint.reads().hostTypes()`.
-
-### 5.3 Blueprint.reads
-
-`Blueprint.reads()` is the union of:
-
-- every check's `ReadScope`;
-- every computation region;
-- the anchor host type when the blueprint has anchors.
-
-The anchor capture policy in `CommandSupport` includes `BLOCK_STATE` so the anchor cell can be read
-from the captured view.
-
-## 6. Capture
-
-### 6.1 Storage
-
-`FrameData` gains one field:
-
-```java
-Map<HostType<?>, HostTable<?>> hostData
-```
-
-`HostTable<H>` is an internal adapter record:
-
-```java
-record HostTable<H>(
-    Map<OccupantRef, H> byRef,
-    Map<LatticePoint, H> byCell
-) { }
-```
-
-- one table per captured host type per frame;
-- both maps are sorted and immutable;
-- no public `HostData` interface;
-- no host type in the kernel.
-
-`LevelSnapshot` implements `WorldView.host` by looking up the frame's table and casting through the
-type token:
+`LevelSnapshot` holds one `McSnapshot` per frame and implements:
 
 ```java
 @Override
-public <H> @Nullable H host(HostType<H> type, LatticePoint cell) {
-    HostTable<?> table = data.hostData().get(type);
-    if (table == null) {
-        return null;
+public <H> @Nullable H host(HostType<H> type) {
+    if (type.equals(McHostTypes.MC_SNAPSHOT)) {
+        @SuppressWarnings("unchecked")
+        H snapshot = (H) mcSnapshot;
+        return snapshot;
     }
-    @SuppressWarnings("unchecked")
-    HostTable<H> typed = (HostTable<H>) table;
-    return typed.byCell().get(cell);
+    return null;
 }
 ```
 
-The same lookup exists by `OccupantRef`; it is the primary lookup for expectation subjects because
-multi-cell bodies share one anchor cell.
+## 5. Capture
 
-### 6.2 What is captured
+### 5.1 Policy
 
-For each captured block or block-entity occupant:
+`ReadScope` and `SnapshotPolicy` gain:
 
-- `BLOCK_STATE` → the **projected** `BlockState` used by the descriptor;
-- `FLUID_STATE` → `projectedState.getFluidState()`;
-- `ENTITY` → not present for blocks.
-
-For each captured entity:
-
-- `ENTITY` → the entity;
-- block/fluid tables have no entry.
-
-For nested bodies and air:
-
-- no host data.
-
-The root frame uses the projected state (`context.project(state, cell)`); child frames use the raw
-state. This keeps host checks consistent with the descriptor the check sees.
-
-### 6.3 Capture order
-
-Host data is captured in the same loop as the occupant:
-
-```text
-state -> projected state -> occupant -> host tables
+```java
+Set<HostType<?>> hostTypes
 ```
 
-There is no second world read. The captured host value is the value the snapshot represents.
+with `withHostTypes` and union by id. `Blueprint.reads()` includes:
 
-### 6.4 Partial and refused sections
+- every check's host types;
+- the anchor host type when the blueprint has anchors.
 
-- a refused section captures no host data;
-- a partial section captures host data only for cells whose occupant was captured;
-- an unreadable cell has no host data, and a host check reports `SC-MC-0010` rather than a false
-  mismatch.
+`CommandSupport.policy(blueprint)` passes them to the capture.
 
-## 7. Expectations.host
+### 5.2 Capture path
 
-The kernel provides one generic expectation:
+`LevelCapture` builds `McSnapshot` from the same section walk it already performs:
+
+1. copy the relevant `PalettedContainer<BlockState>` sections;
+2. copy the block entities that fall inside the capture bounds;
+3. copy the entity candidates;
+4. copy the heightmaps if requested;
+5. wrap them in `McSnapshot`.
+
+The existing `OccupantSnapshot` capture stays as the kernel's type/kind/footprint view. It is not
+extended with host data.
+
+`FrameData`/`LevelSnapshot` carry the `McSnapshot` for the frame. Nested frames get their own
+snapshot.
+
+### 5.3 No second read
+
+The snapshot is built during capture, not by `WorldView.host`. A check never reads the live level.
+The host snapshot is the frozen value for the attempt.
+
+## 6. Expectation bridge
+
+The kernel provides one generic host expectation:
 
 ```java
 public static <H> Expectation<OccupantSnapshot> host(
     HostType<H> type,
-    Predicate<H> test,
+    BiPredicate<H, LatticePoint> test,
     FindingCode mismatchCode,
     String description
 );
@@ -262,50 +175,37 @@ public static <H> Expectation<OccupantSnapshot> host(
 
 Semantics:
 
-- read `ctx.view().host(type, ctx.subject().ref())`;
-- `null` → `Unreadable` with `SC-MC-0010`;
-- predicate true → `Match`;
-- predicate false → `Mismatch` with `mismatchCode` and `description`.
+- read `H host = ctx.view().host(type)`;
+- `null` -> `Unreadable` with `SC-MC-0010`;
+- apply `test.test(host, subject.ref().anchor())`;
+- true -> `Match`;
+- false -> `Mismatch` with `mismatchCode` and `description`.
 
-`reads()` returns:
+`reads()` adds `type` to `ReadScope.hostTypes`. No per-cell host data and no trait request.
 
-```java
-ReadScope.none()
-    .withHostTypes(Set.of(type))
-    .withKinds(type.kinds());
-```
+The predicate is supplied by the adapter. The kernel never constructs or interprets host data.
 
-The predicate is supplied by the adapter. The kernel never constructs a host value and never
-interprets one.
-
-## 8. Adapter checks
+## 7. Adapter expectations
 
 The JSON document has no separate MC check type. A normal check whose expectation kind is one of the
-adapter factories is compiled by the adapter into an `Expectations.host` predicate.
+adapter factories is compiled into an `Expectations.host` predicate over `McSnapshot`.
 
-### 8.1 Factories
-
-Adapter `ExpectationFactory` entries:
-
-| JSON kind | Host type | Predicate |
-| --- | --- | --- |
-| `property` | `BLOCK_STATE` | `state.getValue(property).getName().equals(value)` |
-| `state` | `BLOCK_STATE` | `state.equals(expectedState)` |
-| `tag` | `BLOCK_STATE` / `FLUID_STATE` / `ENTITY` | `state.is(tag)` / `fluid.is(tag)` / `entityType.is(tag)` |
-| `fluid` | `FLUID_STATE` + `BLOCK_STATE` | actual fluid block check |
-
-### 8.2 Property
+### 7.1 Property
 
 ```json
 {"kind": "property", "key": "lit", "value": "true"}
 ```
 
-- `property` is an MC property name;
-- the adapter resolves it against the captured `BlockState`;
-- missing property → mismatch;
-- no string map in the kernel.
+```java
+Expectations.host(
+    MC_SNAPSHOT,
+    (snapshot, cell) -> snapshot.getBlockState(pos(cell)).getValue(property).getName().equals(value),
+    SC_MC_0006,
+    "expected property ..."
+)
+```
 
-### 8.3 Exact state
+### 7.2 Exact state
 
 ```json
 {
@@ -315,12 +215,10 @@ Adapter `ExpectationFactory` entries:
 }
 ```
 
-- the adapter resolves `block + properties` to a `BlockState` at compile time;
-- the predicate compares the captured state directly;
-- extra or missing properties fail;
-- no property-map translation in the kernel.
+The adapter resolves `block + properties` to a `BlockState` at compile time and compares the
+snapshotted state directly.
 
-### 8.4 Tag
+### 7.3 Tag
 
 ```json
 {"kind": "tag", "registry": "block", "id": "minecraft:logs"}
@@ -328,34 +226,36 @@ Adapter `ExpectationFactory` entries:
 {"kind": "tag", "registry": "entity", "id": "minecraft:undead"}
 ```
 
-- `registry` selects the MC tag registry;
-- the predicate uses `TagKey` directly;
-- tags are not stored in the descriptor;
-- tags are not expanded to `anyOf`;
-- a datapack tag change is visible on the next capture.
+The predicate uses `TagKey` directly:
 
-### 8.5 Fluid
+- block: `snapshot.getBlockState(pos).is(tag)`;
+- fluid: `snapshot.getFluidState(pos).is(tag)`;
+- entity: the snapshot's entity type holder `is(tag)`.
+
+No descriptor tags and no `anyOf` expansion.
+
+### 7.4 Fluid
 
 ```json
 {"kind": "fluid", "id": "minecraft:water"}
 ```
 
-- read `FLUID_STATE` and `BLOCK_STATE`;
-- actual fluid block:
-
 ```java
+FluidState fluid = snapshot.getFluidState(pos);
+BlockState block = snapshot.getBlockState(pos);
 fluid.getType() == expected
     && block.getBlock() == fluid.createLegacyBlock().getBlock()
 ```
 
 - real water matches;
-- a waterlogged slab does **not** match;
+- a waterlogged slab does not match;
 - waterlogged is a block state: use `property("waterlogged", "true")` or `state`;
 - lava and modded fluids use the MC fluid registry.
 
-## 9. Anchor
+## 8. Anchor
 
-`Anchors` leaves the kernel. The adapter owns anchor resolution:
+The kernel `Anchors` and `StructureKernel.siting` are removed. The adapter resolves anchors from
+the captured snapshot:
 
 ```java
 public final class McAnchors {
@@ -365,28 +265,61 @@ public final class McAnchors {
         LatticePoint origin,
         WorldView view
     ) {
-        BlockState state = view.host(BLOCK_STATE, origin);
-        if (state == null) {
-            return failure(..., SC_MC_0010, "the anchor block state was not captured");
+        McSnapshot snapshot = view.host(McHostTypes.MC_SNAPSHOT);
+        if (snapshot == null) {
+            return failure(..., SC_MC_0010, "the anchor snapshot was not captured");
         }
+        BlockState state = snapshot.getBlockState(pos(origin));
         String value = state.getValue(property);
         if (!value.equalsIgnoreCase(spec.value())) {
             return failure(..., anchorInvalid, "anchor property does not equal the declared value");
         }
-        Heading heading = heading(value);
         ...
     }
 }
 ```
 
-- the anchor cell is captured with `BLOCK_STATE` in the policy;
-- `AnchorSpec.value` is a real constraint;
-- the kernel `AnchorSpec` and `OrientationPolicy` remain declarations;
-- `StructureKernel.siting` is removed;
-- `CommandSupport` calls `McAnchors.resolve`;
-- no live world read at check time.
+- `AnchorSpec` and `OrientationPolicy` remain kernel declarations;
+- `AnchorSpec.value` becomes a real constraint;
+- `CommandSupport` captures the anchor cell with `MC_SNAPSHOT` in the policy;
+- no live world read.
 
-## 10. Codes
+## 9. Descriptor
+
+`OccupantDescriptor` becomes:
+
+```java
+(type, kind)
+```
+
+Removed:
+
+- `properties`;
+- `tags`;
+- `property(...)`.
+
+`OccupantRef` remains the occupant identity. `OccupantFilter` still uses type/kind.
+
+`Expectations.property` is removed from the kernel; the adapter registers the `property` factory.
+
+## 10. Digest
+
+`SectionSnapshot.contentDigest` is adapter-computed. The digest includes:
+
+- occupant refs;
+- descriptor type/kind;
+- the `McSnapshot` content for the section's cells.
+
+Test:
+
+```text
+same type, different BlockState
+  -> different contentDigest
+```
+
+The snapshot is the source of truth; there is no per-cell host table to keep in sync.
+
+## 11. Codes
 
 Adapter codes, not in `Codes.all`:
 
@@ -396,45 +329,27 @@ Adapter codes, not in `Codes.all`:
 | `SC-MC-0007` | exact state mismatch |
 | `SC-MC-0008` | tag mismatch |
 | `SC-MC-0009` | fluid mismatch |
-| `SC-MC-0010` | host data was not captured |
+| `SC-MC-0010` | host snapshot was not captured |
 
-`SC-MC-0010` is `Unreadable`, never a mismatch. The kernel `SC-EXP-0001` remains for kernel leaves.
-
-## 11. Digest
-
-`SectionSnapshot.contentDigest` is adapter-computed. When a section captures host data, the digest
-includes:
-
-- occupant refs;
-- descriptor type/kind;
-- every captured host value for the section's cells.
-
-Test obligation:
-
-```text
-same occupant type, different BlockState
-  -> different contentDigest
-```
-
-This is a capture-cache correctness requirement.
+`SC-MC-0010` is `Unreadable`, never a mismatch. `SC-EXP-0001` remains for kernel leaves.
 
 ## 12. JSON
 
-- no `mc_checks` member;
+- no `mc_checks`;
 - no separate JSON type;
 - normal `checks` use adapter expectation kinds;
-- the adapter catalogs register `property`, `state`, `tag`, `fluid`;
-- the kernel document reader stays blueprint-only;
-- an adapter check is still a normal `Check` with `Expectations.host` and an adapter predicate.
+- adapter catalogs register `property`, `state`, `tag`, `fluid`;
+- the kernel document reader stays blueprint-only.
 
 ## 13. Non-goals
 
 - no `HostData` interface;
 - no `HostView` wrapper;
 - no `McOccupant` union;
+- no per-cell `HostTable`;
 - no `Class<?>` tokens;
 - no trait reuse for block/fluid/entity data;
-- no live world read inside `WorldView.host`;
+- no live world read in `WorldView.host`;
 - no MC type in the kernel;
 - no property map or tag list in `OccupantDescriptor`.
 
@@ -446,17 +361,16 @@ Kernel:
 - `Expectations.property` is removed;
 - `Anchors` and `StructureKernel.siting` are removed;
 - `ReadScope`/`SnapshotPolicy` gain `hostTypes`;
-- `Blueprint.reads()` includes anchor host type;
+- `Blueprint.reads()` includes the anchor host type;
 - `WorldView` gains `host`;
 - `Expectations.host` is added;
 - `Expectations.Property` is removed.
 
 Adapter:
 
-- `HostType` constants;
-- `HostTable` and `FrameData` host data;
-- `LevelCapture` capture;
-- `LevelSnapshot.host`;
+- `McSnapshot` (copied sections, block entities, entities, heightmaps);
+- `HostType<McSnapshot>` constant;
+- `LevelCapture`/`FrameData`/`LevelSnapshot` snapshot wiring;
 - `McAnchors`;
 - adapter expectation factories;
 - `SC-MC-0006..0010`;
@@ -468,7 +382,7 @@ Tests/docs:
 - anchor tests move to adapter;
 - `SitedDescriptorGameTest`/`WorldTest` migrate;
 - `DocumentCompilerTest` property checks move to adapter catalogs;
-- host data capture/read/digest tests;
+- snapshot copy/read/digest tests;
 - waterlogged distinction tests;
 - JSON/Java parity for property/state/tag/fluid.
 
@@ -477,7 +391,7 @@ Tests/docs:
 | Slice | Scope | Gate |
 | --- | --- | --- |
 | H1 | `HostType`, `ReadScope`/`SnapshotPolicy` host types, `WorldView.host`, `Expectations.host`; descriptor `(type, kind)`; remove property/anchors | focused kernel tests |
-| H2 | `HostTable`, `FrameData`/`LevelCapture`/`LevelSnapshot` capture/read, digest | focused adapter capture tests |
+| H2 | `McSnapshot`, `LevelCapture`/`FrameData`/`LevelSnapshot` snapshot copy/read, digest | focused adapter capture tests |
 | H3 | adapter `property`/`state`/`tag`/`fluid` factories, `McAnchors`, `SC-MC-0006..0010`, JSON/Java parity | focused adapter tests |
 | H4 | docs, counts, stress scenarios | focused regression |
 
