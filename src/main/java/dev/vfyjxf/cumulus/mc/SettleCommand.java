@@ -51,8 +51,7 @@ final class SettleCommand {
         LatticePoint origin
     ) {
         StructureKernel kernel = state.kernel(level);
-        CommandSupport.Attempt attempt = CommandSupport
-                .attempt(state, source, kernel, blueprint.id(), blueprint, origin);
+        CommandSupport.Attempt attempt = CommandSupport.attempt(state, source, blueprint.id(), blueprint, origin);
         if (attempt == null) {
             return null;
         }

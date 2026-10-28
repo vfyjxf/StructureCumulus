@@ -403,17 +403,12 @@ class ReadModelTest {
     }
 
     private static OccupantSnapshot traitOccupant(TraitSlot... slots) {
-        return TestWorld.block(mc("stone_bricks"), LatticePoint.origin, Map.of(), List.of(slots));
+        return TestWorld.block(mc("stone_bricks"), LatticePoint.origin, List.of(slots));
     }
 
     private static OccupantSnapshot occupant(OccupantKind kind, int frame, NamespacedId type) {
         OccupantRef ref = new OccupantRef(TestWorld.snapshot, frame, type, kind, LatticePoint.origin);
-        return new OccupantSnapshot(
-            ref,
-            new OccupantDescriptor(type, kind, Map.of(), List.of()),
-            Cuboid.of(LatticePoint.origin),
-            List.of()
-        );
+        return new OccupantSnapshot(ref, new OccupantDescriptor(type, kind), Cuboid.of(LatticePoint.origin), List.of());
     }
 
     private static Focus<OccupantSnapshot> bind(LatticePoint cell) {

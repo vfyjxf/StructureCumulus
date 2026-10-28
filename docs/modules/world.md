@@ -6,7 +6,7 @@
 
 ## 1. Scope
 
-**Owns:** `OccupantKind`, `OccupantRef`, `OccupantDescriptor`, `TraitKey<T>`, `Trait<T>`,
+**Owns:** `OccupantKind`, `OccupantRef`, `OccupantDescriptor`, `HostType<H>`, `TraitKey<T>`, `Trait<T>`,
 `TraitSlot`, `OccupantSnapshot`, `OccupantFilter`, `ReadStatus`, `ReadRefusal`, `CellRead`,
 `SectionSlot`, `SectionSnapshot`, `WorldView`, `SnapshotPolicy`, `CaptureRequest`, `CaptureResult`,
 `CaptureReport`, `CaptureReport.Entry`, `WorldCapture`, `SnapshotLease`, `OccupantResolver<R>`,
@@ -23,7 +23,8 @@ capture implementation (`mc`), dirty tracking or scheduling (host).
 | --- | --- | --- |
 | `OccupantKind` | record | open family id with constants `block`, `blockEntity`, `entity`, `nested` |
 | `OccupantRef` | record | `(snapshot, frame, type, kind, anchor, @Nullable body)`; identity within one capture and frame, including the body |
-| `OccupantDescriptor` | record | `(type, kind, properties, tags)`; ids and strings only |
+| `OccupantDescriptor` | record | `(type, kind)`; identity only, no host payload |
+| `HostType<H>` | record | `(id)`; a typed host-read token; the kernel never names `H` |
 | `TraitKey<T>` | record | `(id, Class<T>)`; a key is typed, a trait is identified by its id |
 | `Trait<T>` | record | `(key, @Nullable value)`; present-with-null is a fact |
 | `TraitSlot` | sealed | `Present(trait)`, `Absent(id)`, `Refused(id, refusal)`; one slot per trait id |
@@ -69,10 +70,11 @@ public record OccupantRef(SnapshotId snapshot, int frame, NamespacedId type, Occ
     @Override public int compareTo(OccupantRef other);
 }
 
-public record OccupantDescriptor(NamespacedId type, OccupantKind kind,
-                                 java.util.Map<String, String> properties,
-                                 java.util.List<NamespacedId> tags) {
-    public @Nullable String property(String key);
+public record OccupantDescriptor(NamespacedId type, OccupantKind kind) { }
+
+public record HostType<H>(NamespacedId id) implements Comparable<HostType<?>> {
+    public static <H> HostType<H> of(NamespacedId id);
+    @Override public int compareTo(HostType<?> other);
 }
 
 public record TraitKey<T>(NamespacedId id, Class<T> type) { }
@@ -159,6 +161,8 @@ public interface WorldView {
     default @Nullable ReadRefusal refusalAt(LatticePoint cell);
     default ReadStatus statusOf(LatticePoint cell);
     @Nullable OccupantSnapshot occupant(OccupantRef ref);
+    default <H> @Nullable H get(LatticePoint pos, HostType<H> type);         // null
+    default <H> @Nullable H get(OccupantRef ref, HostType<H> type);          // the anchor
     java.util.List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
     @Nullable WorldView nested(LatticePoint cell);
     long contentDigest(SectionKey key);
@@ -357,18 +361,10 @@ the trait reports an unreadable trait, never a mismatch. The same rule holds for
 
 ### 4.7 Traits and descriptors
 
-`OccupantDescriptor` is version-independent: four id/string components, no state id, ordinal or class
-name. Properties are a sorted immutable map; tags are sorted and deduped. `property(k)` returns
-`null` when the host published nothing, never `false`.
-
-A descriptor is published in the frame the host captured it in, and the kernel's property leaf
-compares a descriptor property to the declaration's literal without transforming it (`structure`
-§4). Publishing a sited root's properties in the **definition frame** is the host's job: the shipped
-adapter projects each root-frame state through the inverse siting orientation (the pose that recovers
-the definition-frame state from the observed world state) before building the descriptor, and a state
-the orientation cannot express keeps its raw (world-frame) properties and is reported as `SC-MC-0004`
-(`adapter` §10, D-29). A host that publishes world-frame descriptors is legal; it fixes the frame its
-checks are written in, and the kernel never guesses one.
+`OccupantDescriptor` is version-independent identity only: `(type, kind)`, no state id, ordinal,
+class name, property map or tag list. Block states, properties, tags, fluids and entity data are not
+descriptor components; the host exposes them through a `HostType` and `WorldView.get` (§4.11). A
+trait remains the separate typed extension for a value a provider chose to copy (§4.6).
 
 `OccupantSnapshot.traits` is one `TraitSlot` per trait id, sorted by id. The four states are
 exhaustive:
@@ -454,6 +450,25 @@ just took (or refused). The kernel carries the report and never interprets it.
 A capture report is the host's, so its codes are the host's: none is a kernel code, and the kernel's
 producer table (`finding` §6) lists the `SC-MC-*` family as adapter-only.
 
+### 4.11 Typed host reads
+
+`HostType<H>` is the host-read token: a `NamespacedId`, ordered by id, with `H` a compile-time
+parameter the kernel never names and never inspects. The adapter owns the constants and the values
+behind them.
+
+`WorldView.get(pos, type)` is a field extension of the snapshot, not a wrapper object: one snapshot,
+many typed reads. The default answers `null`; `get(ref, type)` reads `ref.anchor()`. A missing value
+means "not in this snapshot", never an exception and never a substitute. The kernel never reads a
+live world: an implementation answers from the captured snapshot. Host reads add nothing to
+`ReadScope`, because one snapshot carries every host payload.
+
+`Expectations.host(type, test, mismatchCode, absentCode, description)` is the one kernel bridge
+(`structure` §4.6): it reads the subject's anchor once, answers `Unreadable` with the caller's
+`absentCode` when the value is absent, `Match` when `test` passes, and
+`Mismatch(mismatchCode, description)` when it does not. The kernel mints no MC code: `absentCode` is
+a parameter, the kernel never declares `SC-MC-0010`, and the adapter passes its `SC-MC-0010` in H3
+(§6).
+
 ## 5. Pipeline role
 
 - `compile`: a document names occupant kinds/traits; no view.
@@ -478,8 +493,8 @@ for a relayed code that is already a kernel code. Producer: `WorldView.read`, `F
 
 A host code in a `ReadRefusal` or in a `CaptureReport` entry is relayed by the report site and is not
 part of `Codes.all`; the kernel never branches on it and never mints an adapter code (§4.1, §4.10).
-The kernel produces no `SC-MC` code: a cut child, an over-cap root and an orientation mismatch are
-the host's findings (`adapter` §12).
+The kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value code from the caller
+(§4.11), and every `SC-MC` finding is the host's (`adapter` §12).
 
 ## 7. Tests
 
@@ -498,10 +513,12 @@ the host's findings (`adapter` §12).
   `world = origin + local`; `occupant(ref)` rejects a foreign frame or body; `nested(cell)` is
   anchor-only.
 - `SectionSnapshot`: canonical occupant order, `contentDigest`, box query.
-- Descriptor: properties/tags immutable, sorted; trait find/has/absent.
-- Descriptor frame: a descriptor's properties are the view's frame and the kernel's property leaf
-  never transforms them; a host that projects a sited root publishes definition-frame properties, and
-  an unrepresentable state keeps its raw properties (D-29, `adapter` §10).
+- Descriptor: exactly `(type, kind)`; equality; trait find/has/absent.
+- Host reads: the default `get` is `null`, `get(ref, type)` reads the anchor, and a bridge answers
+  only its declared `HostType`s.
+- Host expectation: a captured value matches; a predicate failure is `Mismatch` with the supplied
+  code and description; an absent value is `Unreadable` with the supplied absent code, never a
+  mismatch; no `ReadScope` entry; the meta carries the supplied mismatch code.
 - Lease gate: `isCurrent` false after the host invalidates; `check` returns `Dropped`.
 - `EntityWindow.of` inflation and lattice clamp; `maxEntitySpan` rejection.
 - `SnapshotPolicy`: `traits` is a set of ids; a non-empty set stays non-empty; duplicate ids collapse

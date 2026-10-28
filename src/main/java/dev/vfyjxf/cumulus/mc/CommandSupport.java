@@ -21,7 +21,6 @@ import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
-import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.BlockPos;
@@ -125,17 +124,15 @@ final class CommandSupport {
     }
 
     static @Nullable Siting siting(
-        StructureKernel kernel,
         CommandSourceStack source,
         NamespacedId id,
         Blueprint blueprint,
-        LatticePoint origin,
-        WorldView view
+        LatticePoint origin
     ) {
         if (blueprint.anchors().isEmpty()) {
             return Siting.of(origin, Orientation.identity);
         }
-        SitingResult resolved = kernel.siting(blueprint, origin, view);
+        SitingResult resolved = McAnchors.resolve(blueprint, origin, source.getLevel());
         if (resolved.outcome() instanceof Outcome.Found<Siting> found) {
             return found.value();
         }
@@ -159,7 +156,6 @@ final class CommandSupport {
     static @Nullable Attempt attempt(
         ServerState state,
         CommandSourceStack source,
-        StructureKernel kernel,
         NamespacedId id,
         Blueprint blueprint,
         LatticePoint origin
@@ -184,7 +180,7 @@ final class CommandSupport {
         }
         Siting siting;
         try (SnapshotLease phase1 = anchorCaptured.lease()) {
-            siting = siting(kernel, source, id, blueprint, origin, phase1.view());
+            siting = siting(source, id, blueprint, origin);
             if (siting == null) {
                 return null;
             }

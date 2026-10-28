@@ -247,7 +247,8 @@ its own code catalog (§4.5), which is where its severity and explanation live; 
 untouched. A `ReadRefusal` or a `CaptureReport` entry may carry an opaque host code; the kernel
 relays it at the report site (it never branches on it, mints it or allocates it) unless the code is
 already in `Codes.all`, in which case the site substitutes `SC-OCC-0004` and adds a note (`world`
-§4.1, §4.10).
+§4.1, §4.10). `Expectations.host` takes its absent-value code from the caller (`world` §4.11), so
+the kernel mints no host code even there.
 
 ### 4.2 Finding validation
 
@@ -376,7 +377,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-SET-0005` | ERROR | – | duplicate satellite placement | compiler |
 | `SC-SET-0006` | ERROR | – | duplicate parent face link | compiler |
 | `SC-SET-0007` | ERROR | – | structure set rollback failed | host settle |
-| `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; a host code may be relayed from a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10) | adapter |
+| `SC-MC-*` | — | — | adapter-only; never minted by the kernel, never in `Codes.all`; `Expectations.host` takes its absent-value code from the caller (`world` §4.11), and other host codes are relayed from a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10) | adapter |
 
 `Codes.all` has 64 entries in this revision, matching the registry; the capture-report channel adds
 none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot express the siting

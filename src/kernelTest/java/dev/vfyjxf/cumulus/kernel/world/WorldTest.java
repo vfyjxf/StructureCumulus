@@ -44,19 +44,13 @@ class WorldTest {
         OccupantRef ref = new OccupantRef(snapshot, 0, NamespacedId.of("m"), OccupantKind.block, LatticePoint.origin);
         OccupantSnapshot occupant = new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(
-                NamespacedId.of("m"),
-                OccupantKind.block,
-                Map.of("lit", "true"),
-                List.of(NamespacedId.of("tag"))
-            ),
+            new OccupantDescriptor(NamespacedId.of("m"), OccupantKind.block),
             Cuboid.of(LatticePoint.origin),
             List.of(new TraitSlot.Present(Trait.of(energy, 7L)))
         );
         assertEquals(7L, occupant.trait(energy));
         assertTrue(occupant.has(energy));
-        assertEquals("true", occupant.descriptor().property("lit"));
-        assertEquals(List.of(NamespacedId.of("tag")), occupant.descriptor().tags());
+        assertEquals(new OccupantDescriptor(NamespacedId.of("m"), OccupantKind.block), occupant.descriptor());
     }
 
     @Test
@@ -250,7 +244,7 @@ class WorldTest {
         OccupantRef ref = new OccupantRef(snapshot, 0, NamespacedId.of("m"), OccupantKind.block, LatticePoint.origin);
         return new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(NamespacedId.of("m"), OccupantKind.block, Map.of(), List.of()),
+            new OccupantDescriptor(NamespacedId.of("m"), OccupantKind.block),
             Cuboid.of(LatticePoint.origin),
             traits
         );
@@ -261,7 +255,7 @@ class WorldTest {
             OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.block, cell);
             return new OccupantSnapshot(
                 ref,
-                new OccupantDescriptor(type, OccupantKind.block, Map.of(), List.of()),
+                new OccupantDescriptor(type, OccupantKind.block),
                 Cuboid.of(cell),
                 List.of()
             );

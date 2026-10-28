@@ -134,7 +134,7 @@ class JsonDocumentTest {
                 {"id": "lit", "bay": "fire", "focus": {"kind": "occupant", "cell": [1,0,1]},
                  "expect": {"kind": "all_of", "children": [
                    {"kind": "block", "id": "minecraft:campfire"},
-                   {"kind": "property", "key": "lit", "value": "true"}]}}
+                   {"kind": "any_occupant"}]}}
               ],
               "computations": [
                 {"id": "air_cells", "kind": "air", "region": [[1,1,1,1,1,1]],

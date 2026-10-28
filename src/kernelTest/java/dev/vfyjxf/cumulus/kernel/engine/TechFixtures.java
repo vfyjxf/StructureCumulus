@@ -199,16 +199,6 @@ final class TechFixtures {
         view.put(TestWorld.block(type, world(siting, local)));
     }
 
-    static void put(
-        TestWorld.View view,
-        Siting siting,
-        LatticePoint local,
-        NamespacedId type,
-        Map<String, String> properties
-    ) {
-        view.put(TestWorld.block(type, world(siting, local), properties, List.of()));
-    }
-
     static void air(TestWorld.View view, Siting siting, LatticePoint local) {
         view.air(world(siting, local));
     }
@@ -261,7 +251,7 @@ final class TechFixtures {
 
     static OccupantSnapshot entity(NamespacedId type, LatticePoint anchor, Cuboid footprint) {
         OccupantRef ref = new OccupantRef(TestWorld.snapshot, 0, type, OccupantKind.entity, anchor);
-        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity, Map.of(), List.of());
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity);
         return new OccupantSnapshot(ref, descriptor, footprint, List.of());
     }
 

@@ -9,7 +9,6 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /** The immutable read model of one occupant. */
@@ -50,12 +49,7 @@ public record OccupantSnapshot(
 
     public static OccupantSnapshot air(SnapshotId snapshot, int frame, LatticePoint cell) {
         OccupantRef ref = new OccupantRef(snapshot, frame, air, OccupantKind.block, cell);
-        return new OccupantSnapshot(
-            ref,
-            new OccupantDescriptor(air, OccupantKind.block, Map.of(), List.of()),
-            Cuboid.of(cell),
-            List.of()
-        );
+        return new OccupantSnapshot(ref, new OccupantDescriptor(air, OccupantKind.block), Cuboid.of(cell), List.of());
     }
 
     public boolean isAir() {

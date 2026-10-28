@@ -65,10 +65,8 @@ class DocumentCompilerTest {
         Value airElement = Value.object(Map.of("kind", Value.string("air")));
         Value campfireBlock = Value
                 .object(Map.of("kind", Value.string("block"), "id", Value.string("minecraft:campfire")));
-        Value litProperty = Value.object(
-            Map.of("kind", Value.string("property"), "key", Value.string("lit"), "value", Value.string("true"))
-        );
-        Value allOf = Value.object(Map.of("children", Value.array(List.of(campfireBlock, litProperty))));
+        Value anyOccupant = Value.object(Map.of("kind", Value.string("any_occupant")));
+        Value allOf = Value.object(Map.of("children", Value.array(List.of(campfireBlock, anyOccupant))));
         Value occupantCell = Value
                 .object(Map.of("cell", Value.array(List.of(Value.number(1), Value.number(0), Value.number(1)))));
 
@@ -161,7 +159,7 @@ class DocumentCompilerTest {
                         id("lit"),
                         fire,
                         Focuses.occupant(LatticePoint.of(1, 0, 1)),
-                        Expectations.allOf(Expectations.block(campfire), Expectations.property("lit", "true"))
+                        Expectations.allOf(Expectations.block(campfire), Expectations.anyOccupant())
                     )
                 ).computation(Computations.air(air, hollowCells)).build();
         assertEquals(javaBlueprint, compiled);

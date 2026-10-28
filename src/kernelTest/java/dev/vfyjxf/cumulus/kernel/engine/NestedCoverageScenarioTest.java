@@ -31,7 +31,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -158,11 +157,6 @@ class NestedCoverageScenarioTest {
     private static OccupantSnapshot nestedOccupant(LatticePoint cell, int frame) {
         NamespacedId type = MagicFixtures.id("nested/body");
         OccupantRef ref = new OccupantRef(TestWorld.snapshot, frame, type, OccupantKind.nested, cell);
-        return new OccupantSnapshot(
-            ref,
-            new OccupantDescriptor(type, OccupantKind.nested, Map.of(), List.of()),
-            Cuboid.of(cell),
-            List.of()
-        );
+        return new OccupantSnapshot(ref, new OccupantDescriptor(type, OccupantKind.nested), Cuboid.of(cell), List.of());
     }
 }

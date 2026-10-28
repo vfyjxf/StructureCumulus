@@ -19,7 +19,7 @@
 | `Catalogs` | interface | six frozen families + `builtin()` + `builder()` |
 | `Catalogs.Builder` | interface | merge families over built-ins, then freeze |
 | `Host` | record | documents, ledger, context store, custom type registry |
-| `StructureKernel` | final class | the facade: five operations, three helpers, three lookups |
+| `StructureKernel` | final class | the facade: five operations, two helpers, three lookups |
 
 ## 3. Signatures
 
@@ -63,7 +63,6 @@ public final class StructureKernel {
     public @Nullable ClaimLedger ledger();
 
     public CompileResult compile(Document document);
-    public SitingResult siting(Blueprint blueprint, LatticePoint origin, WorldView view);
     public MatchResult check(MatchRequest request);
     public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted);
     public StructureContext derive(MatchResult.Formed formed,
@@ -90,7 +89,7 @@ Six frozen families, each a `Catalog<T>` keyed by `NamespacedId` and insertion-o
 | `structurecumulus:codes` | `CodeEntry` | `explain` |
 | `structurecumulus:remedies` | `RemedyProvider` | `solve` |
 
-`builtin()` ships the leaf factories (`block`, `air`, `property`, `trait`, `any_occupant`), the focus
+`builtin()` ships the leaf factories (`block`, `air`, `trait`, `any_occupant`), the focus
 factories (`occupant`, `bay`, `all_cells`, `entity`, `nested`, `door`, `context`), the computations
 (`count`, `volume`, `air`), every shipped `CodeEntry`, no deriver and no remedy provider. The
 structural expectation forms (`all_of`, `any_of`, `not`, `sequence`, `at_least`, `at_most`, `exactly`,
@@ -119,8 +118,6 @@ created without a host can compile and check, but `settle` with claimable rows i
 
 - **`compile(document)`** builds a `CompilerContext` from the catalogs, the host's types and the
   host's documents, then calls `DocumentCompiler.compile`. It never throws for bad data.
-- **`siting(blueprint, origin, view)`** calls `Anchors.resolve`; a null policy is
-  `SitingResult(Outcome.Missing, SC-BPT-0006)`.
 - **`check(request)`** calls `MatchEngine.check`. The request carries its own frozen `ClaimView`; the
   facade's ledger is not read.
 - **`settle(request, admitted)`** calls `MatchEngine.settle` with the host's ledger and context
@@ -152,7 +149,6 @@ A kernel is safe for concurrent `compile`/`check`/`derive`/`solve`/`explain` giv
 | focus `context` | `key: id` | `Focuses.context` (via `FactoryContext.keys`) |
 | expectation `block` | `id: id` | `Expectations.block` |
 | expectation `air` | `{}` | `Expectations.air` |
-| expectation `property` | `key: string, value: string` | `Expectations.property` |
 | expectation `trait` | `id: id` | `Expectations.trait` (presence) |
 | expectation `any_occupant` | `{}` | `Expectations.anyOccupant` |
 | computation `count` | `{}` | `Computations.count` |

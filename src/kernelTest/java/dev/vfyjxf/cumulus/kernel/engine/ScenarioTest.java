@@ -118,7 +118,7 @@ class ScenarioTest {
                         id("lit"),
                         fire,
                         Focuses.occupant(LatticePoint.of(1, 0, 1)),
-                        Expectations.allOf(Expectations.block(TestWorld.campfire), Expectations.property("lit", "true"))
+                        Expectations.block(TestWorld.campfire)
                     )
                 ).computation(Computations.air(air, hollow.cells())).derive(capacitySpec).build();
 
@@ -127,7 +127,7 @@ class ScenarioTest {
             view.put(entry.getValue());
         }
         view.air(LatticePoint.of(1, 1, 1));
-        view.put(TestWorld.block(TestWorld.campfire, LatticePoint.of(1, 0, 1), Map.of("lit", "true"), List.of()));
+        view.put(TestWorld.block(TestWorld.campfire, LatticePoint.of(1, 0, 1)));
         TestWorld.Lease lease = new TestWorld.Lease(view);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
         MatchRequest request = MatchRequest
@@ -428,7 +428,7 @@ class ScenarioTest {
         OccupantRef ref = new OccupantRef(TestWorld.snapshot, 0, mc("cow"), OccupantKind.entity, LatticePoint.origin);
         OccupantSnapshot cow = new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(mc("cow"), OccupantKind.entity, Map.of(), List.of()),
+            new OccupantDescriptor(mc("cow"), OccupantKind.entity),
             Cuboid.of(0, 0, 0, 2, 1, 1),
             List.of()
         );
@@ -660,7 +660,7 @@ class ScenarioTest {
         );
         OccupantSnapshot wrong = new OccupantSnapshot(
             foreignRef,
-            new OccupantDescriptor(mc("barrel"), OccupantKind.block, Map.of(), List.of()),
+            new OccupantDescriptor(mc("barrel"), OccupantKind.block),
             Cuboid.of(LatticePoint.origin),
             List.of()
         );
@@ -784,7 +784,7 @@ class ScenarioTest {
         OccupantRef ref = new OccupantRef(TestWorld.snapshot, 0, mc("cow"), OccupantKind.entity, LatticePoint.origin);
         OccupantSnapshot cow = new OccupantSnapshot(
             ref,
-            new OccupantDescriptor(mc("cow"), OccupantKind.entity, Map.of(), List.of()),
+            new OccupantDescriptor(mc("cow"), OccupantKind.entity),
             Cuboid.of(0, 0, 0, 2, 1, 1),
             List.of()
         );

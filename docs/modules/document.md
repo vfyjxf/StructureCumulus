@@ -232,11 +232,13 @@ root; a definition may not declare anchors (they would be duplicated or ambiguou
 A check names a bay by its merged id. Focus and expectation objects are `Value` trees; the `kind`
 member selects the factory and the rest are its args. Kind ids are lowercase snake_case: the
 built-in structural forms are `all_of`, `any_of`, `sequence`, `not`, `each_cell`, `at_least`,
-`at_most`, `exactly`; the built-in leaves are `block`, `air`, `property`, `trait`, `trait_absent`,
+`at_most`, `exactly`; the built-in leaves are `block`, `air`, `trait`, `trait_absent`,
 `any_occupant`; the built-in focuses are `occupant`, `bay`, `all_cells`, `entity`, `nested`, `door`,
 `context`. A built-in kind may be written without a namespace and resolves in `structurecumulus`; a
-custom kind is `namespace:path`. A computation names its output key by id and either a bay (region =
-that bay's cells) or a `region` box array.
+custom kind is `namespace:path`. A host payload check (`property`, `state`, `tag`, `fluid`) is a host
+catalog entry that lowers to `Expectations.host`, not a kernel kind
+([design/10](../design/10-host-data.md) §7). A computation names its output key by id and either a
+bay (region = that bay's cells) or a `region` box array.
 
 A `trait`/`trait_absent` declaration names a trait by `NamespacedId` and adds that id to the
 expectation's `ReadScope.traits`; the factory builds a `TraitKey<Object>` so the capture's typed

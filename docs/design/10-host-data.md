@@ -1,7 +1,7 @@
 # 10. Host snapshot and typed reads
 
-> Status: proposed, not implemented. This document is the source of truth for the world snapshot,
-> the typed host-read bridge, and MC-specific property/state/tag/fluid checks.
+> Status: H1 implemented; H2–H4 proposed. This document is the source of truth for the world
+> snapshot, the typed host-read bridge, and MC-specific property/state/tag/fluid checks.
 
 ## 1. Purpose
 
@@ -186,6 +186,7 @@ public static <H> Expectation<OccupantSnapshot> host(
     HostType<H> type,
     BiPredicate<H, LatticePoint> test,
     FindingCode mismatchCode,
+    FindingCode absentCode,
     String description
 );
 ```
@@ -193,11 +194,13 @@ public static <H> Expectation<OccupantSnapshot> host(
 Semantics:
 
 - `H host = ctx.view().get(subject.ref().anchor(), type)`;
-- `null` -> `Unreadable` with `SC-MC-0010`;
+- `null` -> `Unreadable` with `absentCode`, the caller's code;
 - `test.test(host, cell)` true -> `Match`;
 - false -> `Mismatch` with `mismatchCode` and `description`.
 
-The predicate is supplied by the adapter. The kernel never constructs or interprets host data.
+The predicate and both codes are supplied by the adapter. The kernel mints no MC code: it never
+declares `SC-MC-0010` and never interprets host data. The adapter passes its `SC-MC-0010` as
+`absentCode` in H3.
 
 ## 7. Adapter expectations
 
@@ -215,6 +218,7 @@ Expectations.host(
     BLOCK_STATE,
     (state, cell) -> state.getValue(property).getName().equals(value),
     SC_MC_0006,
+    SC_MC_0010,
     "expected property ..."
 )
 ```
@@ -343,7 +347,8 @@ Adapter codes, not in `Codes.all`:
 | `SC-MC-0009` | fluid mismatch |
 | `SC-MC-0010` | host snapshot value was not captured |
 
-`SC-MC-0010` is `Unreadable`, never a mismatch. `SC-EXP-0001` remains for kernel leaves.
+`SC-MC-0010` is `Unreadable`, never a mismatch. It is the adapter's code, passed as the `absentCode`
+of `Expectations.host` in H3; the kernel never mints it. `SC-EXP-0001` remains for kernel leaves.
 
 ## 12. JSON
 
@@ -404,7 +409,14 @@ Tests/docs:
 | --- | --- | --- |
 | H1 | `HostType`, `WorldView.get`, `Expectations.host`; descriptor `(type, kind)`; remove property/anchors | focused kernel tests |
 | H2 | `SnapshotLevel`, capture wiring, digest | focused adapter capture tests |
-| H3 | adapter `property`/`state`/`tag`/`fluid` factories, `McAnchors`, `SC-MC-0006..0010`, JSON/Java parity | focused adapter tests |
+| H3 | adapter `property`/`state`/`tag`/`fluid` factories, `McAnchors`, `SC-MC-0006..0010` (the absent code passed to `Expectations.host`), JSON/Java parity | focused adapter tests |
 | H4 | docs, counts, stress scenarios | focused regression |
+
+H1 is implemented: `HostType`, `WorldView.get`, `Expectations.host`, `OccupantDescriptor(type, kind)`,
+the removed `Expectations.property`/`Anchors`/`StructureKernel.siting` and the removed descriptor
+properties/tags, plus a temporary `McAnchors` that reads the live anchor cell. The snapshot read,
+`AnchorSpec.value`'s declared-value constraint and the adapter's `SC-MC-0010` catalog entry arrive
+with H2/H3; the adapter passes that code as `Expectations.host`'s absent code in H3. H2–H4 are not
+started.
 
 Visual review stays last.

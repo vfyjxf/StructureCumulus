@@ -33,7 +33,6 @@ import org.jspecify.annotations.NullMarked;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -117,16 +116,6 @@ final class MagicFixtures {
 
     static void put(TestWorld.View view, Siting siting, LatticePoint local, NamespacedId type) {
         view.put(TestWorld.block(type, world(siting, local)));
-    }
-
-    static void put(
-        TestWorld.View view,
-        Siting siting,
-        LatticePoint local,
-        NamespacedId type,
-        Map<String, String> properties
-    ) {
-        view.put(TestWorld.block(type, world(siting, local), properties, List.of()));
     }
 
     static void air(TestWorld.View view, Siting siting, LatticePoint local) {

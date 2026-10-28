@@ -17,8 +17,6 @@ import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -43,7 +41,7 @@ class AstralAltarScenarioTest {
         TestWorld.Ledger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
-            MagicFixtures.settle(tierTwo, siting, view(tierTwoBounds, true, "top"), ledger)
+            MagicFixtures.settle(tierTwo, siting, view(tierTwoBounds, true), ledger)
         );
         assertEquals(54, formed.claims().rows().size(), "fifty-four claim rows");
         assertEquals(54, ledger.all().size(), "the ledger holds fifty-four rows");
@@ -56,26 +54,11 @@ class AstralAltarScenarioTest {
         MatchResult result = MagicFixtures.settle(
             blueprint("astral/tier_two_missing_relay", tierTwoBounds),
             siting,
-            view(tierTwoBounds, false, "top"),
+            view(tierTwoBounds, false),
             ledger
         );
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "the relay cell is air");
         assertTrue(MagicFixtures.hasCode(failed, Codes.expected), "the missing relay is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
-    }
-
-    @Test
-    void aWrongSlabPropertyFails() {
-        Siting siting = MagicFixtures.identity(LatticePoint.origin);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
-        MatchResult result = MagicFixtures.settle(
-            blueprint("astral/tier_two_wrong_slab", tierTwoBounds),
-            siting,
-            view(tierTwoBounds, true, "bottom"),
-            ledger
-        );
-        MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "the slab type is wrong");
-        assertTrue(MagicFixtures.hasCode(failed, Codes.expected), "the wrong slab is SC-EXP-0001");
         assertEquals(0, ledger.all().size(), "a failed check writes no rows");
     }
 
@@ -86,14 +69,14 @@ class AstralAltarScenarioTest {
         Blueprint tierTwo = blueprint("astral/tier_two_growth", tierTwoBounds);
         assertInstanceOf(
             MatchResult.Formed.class,
-            MagicFixtures.settle(tierTwo, siting, view(tierTwoBounds, true, "top"), ledger),
+            MagicFixtures.settle(tierTwo, siting, view(tierTwoBounds, true), ledger),
             "the tier II claim settles first"
         );
         assertEquals(54, ledger.all().size(), "the first tier holds fifty-four rows");
         assertEquals(1L, ledger.revision(), "one settlement revision");
 
         Blueprint tierThree = blueprint("astral/tier_three_growth", tierThreeBounds);
-        TestWorld.View tierThreeView = view(tierThreeBounds, true, "top");
+        TestWorld.View tierThreeView = view(tierThreeBounds, true);
         ClaimView claims = ledger.read(MagicFixtures.worldBounds(tierThree, siting));
         MatchRequest request = MagicFixtures.request(tierThree, siting, tierThreeView, claims);
         MatchResult checked = MatchEngine.check(request);
@@ -130,24 +113,19 @@ class AstralAltarScenarioTest {
             MagicFixtures.occupant(MagicFixtures.id(path + "_relay"), bay, relayCell, Expectations.block(relay))
         );
         builder.check(
-            MagicFixtures.occupant(
-                MagicFixtures.id(path + "_slab"),
-                bay,
-                slabCell,
-                Expectations.allOf(Expectations.block(slab), Expectations.property("type", "top"))
-            )
+            MagicFixtures.occupant(MagicFixtures.id(path + "_slab"), bay, slabCell, Expectations.block(slab))
         );
         return builder.build();
     }
 
-    private static TestWorld.View view(Cuboid bounds, boolean relayPresent, String slabType) {
+    private static TestWorld.View view(Cuboid bounds, boolean relayPresent) {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
         TestWorld.View view = MagicFixtures.view();
         MagicFixtures.fill(view, siting, CuboidSet.of(bounds), base);
         if (relayPresent) {
             MagicFixtures.put(view, siting, relayCell, relay);
         }
-        MagicFixtures.put(view, siting, slabCell, slab, Map.of("type", slabType));
+        MagicFixtures.put(view, siting, slabCell, slab);
         return view;
     }
 }

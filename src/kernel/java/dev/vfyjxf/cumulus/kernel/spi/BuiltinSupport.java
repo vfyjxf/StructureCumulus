@@ -49,15 +49,6 @@ final class BuiltinSupport {
         return LatticePoint.of((int) x, (int) y, (int) z);
     }
 
-    static @Nullable String string(Value args, String key, FactoryContext ctx) {
-        Value value = args.get(key);
-        String text = value instanceof Value.StringValue string ? string.value() : null;
-        if (text == null) {
-            report(ctx, Codes.documentField, "expected a string at " + key);
-        }
-        return text;
-    }
-
     static void report(FactoryContext ctx, CodeEntry entry, String message) {
         Finding.Builder builder = Finding.builder(entry).phase(Phase.compile).message(message);
         if (ctx.source() != null) {

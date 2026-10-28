@@ -12,6 +12,7 @@ import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.world.CellRead;
+import dev.vfyjxf.cumulus.kernel.world.HostType;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -44,8 +46,14 @@ public final class Expectations {
         return new Air(code(6), id("envelope_air"));
     }
 
-    public static Expectation<OccupantSnapshot> property(String key, String value) {
-        return new Property(key, value);
+    public static <H> Expectation<OccupantSnapshot> host(
+        HostType<H> type,
+        BiPredicate<H, LatticePoint> test,
+        FindingCode mismatchCode,
+        FindingCode absentCode,
+        String description
+    ) {
+        return new Host<>(type, test, mismatchCode, absentCode, description);
     }
 
     public static Expectation<OccupantSnapshot> trait(TraitKey<?> key) {
@@ -204,21 +212,37 @@ public final class Expectations {
         }
     }
 
-    private record Property(String key, String value) implements Expectation<OccupantSnapshot> {
+    private record Host<H>(
+        HostType<H> type,
+        BiPredicate<H, LatticePoint> test,
+        FindingCode mismatchCode,
+        FindingCode absentCode,
+        String description
+    ) implements Expectation<OccupantSnapshot> {
+
+        private Host {
+            Objects.requireNonNull(type, "type");
+            Objects.requireNonNull(test, "test");
+            Objects.requireNonNull(mismatchCode, "mismatchCode");
+            Objects.requireNonNull(absentCode, "absentCode");
+            Objects.requireNonNull(description, "description");
+        }
 
         @Override
         public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
-            String found = ctx.subject().descriptor().property(key);
-            if (Objects.equals(value, found)) {
+            OccupantSnapshot subject = ctx.subject();
+            LatticePoint cell = subject.ref().anchor();
+            H host = ctx.view().get(cell, type);
+            if (host == null) {
+                String message = "host value " + type.id() + " was not captured";
+                Finding finding = Finding.builder(absentCode, Severity.error).phase(ctx.phase()).message(message)
+                        .label(Label.primary(locusOf(ctx, subject), message)).build();
+                return Reply.unreadable(FindingBundle.of(List.of(finding)));
+            }
+            if (test.test(host, cell)) {
                 return Reply.match();
             }
-            return mismatch(
-                problem(
-                    ctx,
-                    ctx.subject(),
-                    "expected " + key + "=" + value + ", found " + (found == null ? "nothing" : found)
-                )
-            );
+            return mismatch(problem(ctx, subject, mismatchCode, description));
         }
 
         @Override
@@ -228,7 +252,7 @@ public final class Expectations {
 
         @Override
         public ExpectationMeta meta() {
-            return ExpectationMeta.of(id("property"), 10, code(1));
+            return ExpectationMeta.of(id("host"), 10, mismatchCode);
         }
     }
 

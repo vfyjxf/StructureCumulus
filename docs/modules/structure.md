@@ -9,7 +9,7 @@
 **Owns:** `Bay`, `Coverage`, `Check`, `CheckResult`, `Focus`, `FocusResult`, `FocusContext`,
 `Focuses`, `Expectation`, `ExpectationContext`, `ExpectationMeta`, `Expectations`, `Reply`,
 `ReadScope`, `BayView`, `DoorView`, `Seam`, `SeamId`, `SeamKind`, `AnchorSpec`, `AnchorRoles`,
-`OrientationPolicy`, `Anchors`, `DerivationSpec`, `Blueprint`, `BlueprintBuilder`, `Plan`,
+`OrientationPolicy`, `DerivationSpec`, `Blueprint`, `BlueprintBuilder`, `Plan`,
 `Computation`, `SectionComputation`, `AggregateComputation`, `SectionContext`, `AggregateContext`,
 `Computations`, `FocusFactory`, `ExpectationFactory`, `ComputationFactory`, `FactoryContext`,
 `SitingResult`.
@@ -38,11 +38,10 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `BayView` | record | a bay's own read face; total `read` |
 | `DoorView` | record | the two halves of a door + its bay |
 | `Focuses` | final class | the shipped focus kinds |
-| `Expectations` | final class | the shipped expectation combinators, leaves and the typed context test |
+| `Expectations` | final class | the shipped combinators, leaves, the host bridge and the typed context test |
 | `Seam` / `SeamId` / `SeamKind` | record / record / enum | a declared connectable edge |
-| `AnchorSpec` / `AnchorRoles` | record / final class | one property at the definition origin |
+| `AnchorSpec` / `AnchorRoles` | record / final class | one declared property value at the definition origin |
 | `OrientationPolicy` | record | allowed orientations + primary role + upright promise |
-| `Anchors` | final class | the one anchor read |
 | `DerivationSpec` | record | deriver id + args + output key id + order |
 | `Blueprint` | final class | immutable compiled template with a cached plan |
 | `BlueprintBuilder` | final class | fluent construction; validates at `build()`; `.envelope()` derives the closed-world air pair |
@@ -199,7 +198,9 @@ public final class Expectations {
     public static Expectation<OccupantSnapshot> block(NamespacedId type);
     public static Expectation<OccupantSnapshot> air();
     public static Expectation<OccupantSnapshot> envelopeAir();
-    public static Expectation<OccupantSnapshot> property(String key, String value);
+    public static <H> Expectation<OccupantSnapshot> host(
+        HostType<H> type, java.util.function.BiPredicate<H, LatticePoint> test,
+        FindingCode mismatchCode, FindingCode absentCode, String description);
     public static Expectation<OccupantSnapshot> trait(TraitKey<?> key);
     public static <T> Expectation<OccupantSnapshot> trait(TraitKey<T> key,
                                                           java.util.function.Predicate<T> test);
@@ -256,11 +257,6 @@ public record OrientationPolicy(NamespacedId primaryRole, java.util.List<Orienta
 
 public record SitingResult(Outcome<Siting> outcome, FindingBundle findings) {
     public boolean succeeded();
-}
-
-public final class Anchors {
-    public static SitingResult resolve(Blueprint blueprint, LatticePoint origin, WorldView view);
-    private Anchors() {}
 }
 
 public record DerivationSpec(NamespacedId deriver, Value arguments, NamespacedId output, int order) {
@@ -498,6 +494,9 @@ the larger depth and appends the windows in declaration order with equal windows
 `withKeys`/`withTraits`/`withKinds`/`withWindows` union their argument and `withDepth` keeps the
 larger value, so a narrowed copy can never lower a requirement. `none()` is empty with depth `0`.
 
+A host expectation (§4.6) adds no scope entry: one snapshot carries every host payload, so the
+declared cells already bound which anchor the read sees.
+
 `Check.reads()` is `focus.reads(bay.cells()) ∪ expectation.reads()` plus
 `expectation.meta().requires()`. `Blueprint.reads()` is the union of every check's `reads()` and every
 computation's `ReadScope.cells(region)`: computations contribute cells only, because a `Computation`
@@ -550,6 +549,14 @@ the cached instance values, and a cached key is composed only when the plan decl
 instance dependency — in a check's `ExpectationMeta.requires()` or a computation's `inputs()`. The
 cache itself is the host `CachedContext` port, looked up by `(id, type)`.
 
+`Expectations.host(type, test, mismatchCode, absentCode, description)` is the one bridge for host
+payload. It reads `ctx.view().get(subject.ref().anchor(), type)` once: an absent value is
+`Unreadable` with the caller's `absentCode` (never a mismatch), a passing `test(host, cell)` is
+`Match`, and a failing test is `Mismatch(mismatchCode, description)`. The kernel never constructs or
+interprets the host value, never declares a host type in `ReadScope`, never mints `SC-MC-0010`, and
+`meta().mismatchCode()` is the supplied code. The adapter passes its own absent code (`world` §4.11,
+`adapter` §12).
+
 ### 4.7 Blueprint
 
 `Blueprint` is a final class with a package-private constructor. The builder is the only public
@@ -601,12 +608,14 @@ The anchor cell is the definition origin, supplied by the caller. `OrientationPo
 `o.apply(Heading.north) == anchorHeading`; `null` means no admissible pose. `allowed` is non-empty,
 duplicate-free and in canonical order; `uprightOnly` is a build-time promise (`o.apply(up) == up`),
 not a match-time filter. A blueprint with no anchor has a null orientation policy and takes a
-`Siting` directly; `Anchors.resolve` is only for anchored blueprints.
+`Siting` directly.
 
-`Anchors.resolve` reads exactly one cell (`origin`): an unreadable cell is reported with the
-refusal's code (`SC-OCC-0004` as the kernel default, or a relayed host code); an air cell, a
-missing property, a value that is not a heading, no admissible orientation, or a null policy is
-`SC-BPT-0006`. There is no fallback heading and no search.
+`AnchorSpec` and `OrientationPolicy` are declarations, not a kernel read. The host resolves the
+anchor cell against its snapshot and answers a `SitingResult`; `AnchorSpec.value` is a declaration
+for the host, compared in the frame the host publishes. The kernel has no `Anchors` resolver and no
+live anchor read: an air cell, a missing property, a value that is not a heading, no admissible
+orientation and a null policy are the host's `SC-BPT-0006` finding, and an uncaptured anchor cell is
+the host's unreadable answer. There is no fallback heading and no search (`adapter` §3, §11).
 
 ### 4.10 Computations
 
@@ -700,7 +709,10 @@ in `Codes.all`.
 - Build: every row of §4.8; duplicate ids; overlapping exclusive bays; shared overlap allowed;
   derivation/check read conflict; `Plan` order and cycle; `Blueprint.reads()` equals the union of
   checks and computation regions.
-- Anchors: one-cell read; missing/air/bad heading; upright policy; identity for no anchor.
+- Anchors: `OrientationPolicy.select` order and upright promise; a no-anchor blueprint takes a
+  `Siting` directly; the host owns the anchor-cell read.
+- Host expectation: captured/false/absent; supplied mismatch code and description; the supplied
+  absent code for an absent value; no `ReadScope` entry.
 - Computations: section/aggregate split; count/volume/air; `Missing` → absent key; a partial section
   makes `count`/`air` Missing, never a short sum; `volume` stays total.
 - Envelope: empty `E` no-op and equality with the plain build; uncovered cells and declared

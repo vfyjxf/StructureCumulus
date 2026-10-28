@@ -51,6 +51,14 @@ public interface WorldView {
     @Nullable
     OccupantSnapshot occupant(OccupantRef ref);
 
+    default <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+        return null;
+    }
+
+    default <H> @Nullable H get(OccupantRef ref, HostType<H> type) {
+        return get(ref.anchor(), type);
+    }
+
     List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
 
     @Nullable

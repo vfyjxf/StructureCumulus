@@ -456,12 +456,7 @@ class LevelSnapshotTest {
     private static OccupantSnapshot entity(SnapshotId snapshot, LatticePoint anchor, String type, Cuboid footprint) {
         NamespacedId id = NamespacedId.of("test", type);
         OccupantRef ref = new OccupantRef(snapshot, 0, id, OccupantKind.entity, anchor);
-        return new OccupantSnapshot(
-            ref,
-            new OccupantDescriptor(id, OccupantKind.entity, Map.of(), List.of()),
-            footprint,
-            List.of()
-        );
+        return new OccupantSnapshot(ref, new OccupantDescriptor(id, OccupantKind.entity), footprint, List.of());
     }
 
     private static OccupantSnapshot occupant(SnapshotId snapshot, LatticePoint cell, String type) {
@@ -471,11 +466,6 @@ class LevelSnapshotTest {
     private static OccupantSnapshot occupant(SnapshotId snapshot, int frame, LatticePoint cell, String type) {
         NamespacedId id = NamespacedId.of("test", type);
         OccupantRef ref = new OccupantRef(snapshot, frame, id, OccupantKind.block, cell);
-        return new OccupantSnapshot(
-            ref,
-            new OccupantDescriptor(id, OccupantKind.block, Map.of(), List.of()),
-            Cuboid.of(cell),
-            List.of()
-        );
+        return new OccupantSnapshot(ref, new OccupantDescriptor(id, OccupantKind.block), Cuboid.of(cell), List.of());
     }
 }

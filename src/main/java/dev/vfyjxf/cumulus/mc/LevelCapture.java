@@ -106,9 +106,9 @@ public final class LevelCapture implements WorldCapture {
     }
 
     /**
-     * Adapter-only: capture with the siting orientation. Root-frame descriptors are projected into the definition
-     * frame by the inverse orientation; a state that cannot be projected keeps the raw descriptor and is grouped into
-     * an {@code SC-MC-0004} report entry. Child frames and unoriented captures stay world-frame.
+     * Adapter-only: capture with the siting orientation, whose inverse audits every root block state. A state the
+     * inverse cannot express is grouped into an {@code SC-MC-0004} report entry; child frames and unoriented captures
+     * are not audited.
      */
     public CaptureResult capture(CaptureRequest request, @Nullable Orientation orientation) {
         if (closed) {
@@ -432,7 +432,9 @@ public final class LevelCapture implements WorldCapture {
                             continue;
                         }
                         LatticePoint cell = LatticePoint.of(x, y, z);
-                        BlockState descriptorState = root ? context.project(state, cell) : state;
+                        if (root) {
+                            context.audit(state, cell);
+                        }
                         BlockPos worldPos = new BlockPos(worldX, worldY, worldZ);
                         BlockEntity blockEntity = state.hasBlockEntity() ? chunk.getBlockEntity(worldPos) : null;
                         List<TraitSlot> traits = OccupantTraits.block(
@@ -445,15 +447,8 @@ public final class LevelCapture implements WorldCapture {
                             blockEntity
                         );
                         OccupantSnapshot occupant = blockEntity == null
-                                ? OccupantDescriptors.block(context.snapshot(), frame, cell, descriptorState, traits)
-                                : OccupantDescriptors.blockEntity(
-                                    context.snapshot(),
-                                    frame,
-                                    cell,
-                                    descriptorState,
-                                    blockEntity,
-                                    traits
-                                );
+                                ? OccupantDescriptors.block(context.snapshot(), frame, cell, state, traits)
+                                : OccupantDescriptors.blockEntity(context.snapshot(), frame, cell, blockEntity, traits);
                         occupants.put(cell, occupant);
                         if (blockEntity != null) {
                             watch.blockEntity(worldPos, blockEntity, level.registryAccess());
@@ -700,7 +695,7 @@ public final class LevelCapture implements WorldCapture {
         private final SnapshotId snapshot;
         private final SnapshotPolicy policy;
         private final @Nullable Orientation orientation;
-        private final @Nullable Orientation definitionOrientation;
+        private final @Nullable Orientation auditOrientation;
         private final List<Cut> cuts = new ArrayList<>();
         private final Map<AuditKey, CuboidSet> audits = new TreeMap<>();
         private long spent;
@@ -716,23 +711,22 @@ public final class LevelCapture implements WorldCapture {
             this.policy = policy;
             this.spent = spent;
             this.orientation = orientation;
-            this.definitionOrientation = orientation == null ? null : orientation.inverse();
+            this.auditOrientation = orientation == null ? null : orientation.inverse();
         }
 
-        /** The definition-frame descriptor state, or the raw state when the projection is unrepresentable. */
-        private BlockState project(BlockState state, LatticePoint cell) {
-            Orientation projection = definitionOrientation;
+        /** Records a root-frame state the inverted siting cannot express. */
+        private void audit(BlockState state, LatticePoint cell) {
+            Orientation projection = auditOrientation;
             if (projection == null) {
-                return state;
+                return;
             }
             OrientationMapping.MappingResult result = OrientationMapping.transform(projection, state);
-            if (result instanceof OrientationMapping.MappingResult.Mapped mapped) {
-                return mapped.state();
+            if (result instanceof OrientationMapping.MappingResult.Mapped) {
+                return;
             }
             var unrepresentable = (OrientationMapping.MappingResult.Unrepresentable) result;
             AuditKey key = new AuditKey(blockType(state), unrepresentable.property(), unrepresentable.value());
             audits.merge(key, CuboidSet.of(Cuboid.of(cell)), CuboidSet::union);
-            return state;
         }
 
         private void cut(String reason, NestedExtent extent, LatticePoint anchor, int frame, boolean root) {

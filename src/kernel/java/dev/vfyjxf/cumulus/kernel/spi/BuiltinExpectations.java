@@ -37,11 +37,6 @@ final class BuiltinExpectations {
             return type == null ? null : Expectations.block(type);
         }));
         builder.put(id("air"), new Factory(id("air"), (args, ctx) -> Expectations.air()));
-        builder.put(id("property"), new Factory(id("property"), (args, ctx) -> {
-            String key = BuiltinSupport.string(args, "key", ctx);
-            String value = BuiltinSupport.string(args, "value", ctx);
-            return key == null || value == null ? null : Expectations.property(key, value);
-        }));
         builder.put(id("trait"), new Factory(id("trait"), (args, ctx) -> {
             NamespacedId type = BuiltinSupport.id(args, "id", ctx);
             return type == null ? null : Expectations.trait(new TraitKey<Object>(type, Object.class));

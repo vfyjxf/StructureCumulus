@@ -4,7 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 
 import java.util.Objects;
 
-/** One property read at the definition origin. */
+/** One declared property value at the definition origin. */
 public record AnchorSpec(NamespacedId role, String property, String value) {
 
     public AnchorSpec {

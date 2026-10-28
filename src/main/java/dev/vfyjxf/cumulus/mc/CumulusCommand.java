@@ -100,8 +100,7 @@ public final class CumulusCommand {
         Blueprint blueprint,
         LatticePoint origin
     ) {
-        CommandSupport.Attempt attempt = CommandSupport
-                .attempt(state, source, state.kernel(), blueprint.id(), blueprint, origin);
+        CommandSupport.Attempt attempt = CommandSupport.attempt(state, source, blueprint.id(), blueprint, origin);
         if (attempt == null) {
             return null;
         }

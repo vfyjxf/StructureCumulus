@@ -59,17 +59,12 @@ final class TestWorld {
     private TestWorld() {}
 
     static OccupantSnapshot block(NamespacedId type, LatticePoint cell) {
-        return block(type, cell, Map.of(), List.of());
+        return block(type, cell, List.of());
     }
 
-    static OccupantSnapshot block(
-        NamespacedId type,
-        LatticePoint cell,
-        Map<String, String> properties,
-        List<TraitSlot> traits
-    ) {
+    static OccupantSnapshot block(NamespacedId type, LatticePoint cell, List<TraitSlot> traits) {
         OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.block, cell);
-        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.block, properties, List.of());
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.block);
         return new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), traits);
     }
 

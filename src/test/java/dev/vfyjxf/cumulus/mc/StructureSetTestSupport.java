@@ -323,21 +323,21 @@ final class StructureSetTestSupport {
 
         TestView put(LatticePoint cell, NamespacedId type) {
             OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.block, cell);
-            OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.block, Map.of(), List.of());
+            OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.block);
             occupants.put(cell, new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), List.of()));
             return this;
         }
 
         TestView putBlockEntity(LatticePoint cell, NamespacedId type) {
             OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.blockEntity, cell);
-            OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.blockEntity, Map.of(), List.of());
+            OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.blockEntity);
             occupants.put(cell, new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), List.of()));
             return this;
         }
 
         TestView putEntity(LatticePoint cell, NamespacedId type) {
             OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.entity, cell);
-            OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity, Map.of(), List.of());
+            OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity);
             occupants.put(cell, new OccupantSnapshot(ref, descriptor, Cuboid.of(cell), List.of()));
             return this;
         }

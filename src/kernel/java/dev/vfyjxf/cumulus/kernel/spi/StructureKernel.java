@@ -22,12 +22,7 @@ import dev.vfyjxf.cumulus.kernel.remedy.Remedy;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyContext;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
 import dev.vfyjxf.cumulus.kernel.remedy.SolveResult;
-import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import dev.vfyjxf.cumulus.kernel.structure.Anchors;
-import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
-import dev.vfyjxf.cumulus.kernel.structure.SitingResult;
-import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -38,7 +33,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
-/** The facade: five pipeline operations, three helpers and three lookups. */
+/** The facade: five pipeline operations, two helpers and three lookups. */
 public final class StructureKernel {
 
     private final Catalogs catalogs;
@@ -80,10 +75,6 @@ public final class StructureKernel {
             host.documents()
         );
         return DocumentCompiler.compile(document, context);
-    }
-
-    public SitingResult siting(Blueprint blueprint, LatticePoint origin, WorldView view) {
-        return Anchors.resolve(blueprint, origin, view);
     }
 
     public MatchResult check(MatchRequest request) {

@@ -31,7 +31,6 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
@@ -171,7 +170,7 @@ class ComputationsCountTest {
 
     private static OccupantSnapshot entity(NamespacedId type, LatticePoint anchor, Cuboid footprint, String body) {
         OccupantRef ref = new OccupantRef(TestWorld.snapshot, 0, type, OccupantKind.entity, anchor, id(body));
-        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity, Map.of(), List.of());
+        OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity);
         return new OccupantSnapshot(ref, descriptor, footprint, List.of());
     }
 

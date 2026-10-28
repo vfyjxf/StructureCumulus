@@ -117,7 +117,7 @@ class AggregateContextTest {
                 LatticePoint.of(3, 0, 0),
                 MagicFixtures.id("wide_body")
             ),
-            new OccupantDescriptor(type, OccupantKind.entity, Map.of(), List.of()),
+            new OccupantDescriptor(type, OccupantKind.entity),
             Cuboid.of(3, 0, 0, 5, 1, 1),
             List.of()
         );
