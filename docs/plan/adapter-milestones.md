@@ -25,11 +25,11 @@ structure-set slices (`a5f7084`, `681c505`, `9cf2794`, `00cf6c4`, `93f5941`) and
 follow, and the H1–H4 host-data round closes the adapter's typed-snapshot work. S6's descriptor
 projection is superseded by the typed host snapshot (D-33): the descriptor has no properties, the
 projection is retired and the orientation audit remains (`OrientationAuditGameTest`). Current counts
-(2026-10-28, H4 close-out): **258 kernel tests in 39 containers, 276 adapter unit tests in 36
-containers, 64 registered GameTests**, `Codes.all` 64 entries, 33 decisions (D-33; D-29 superseded).
-A full `./gradlew check` and `runGameTestServer` pass at `d70ecd7` (258 kernel tests, 276 adapter
-tests, 64/64 GameTests). The T1–T3 trait-provider refactor is the next working slice; after it the
-counts are refreshed. Pending after T1–T3: the performance/cost pass and fresh review screenshots.
+(2026-10-28, after T1–T3): **258 kernel tests in 39 containers, 284 adapter unit tests in 37
+containers, 65 registered GameTests**, `Codes.all` 64 entries, 34 decisions (D-34; D-29 superseded).
+A full `./gradlew check` and `runGameTestServer` pass on the T1–T3 working tree (258 kernel tests,
+284 adapter tests, 65/65 GameTests). Pending only: the performance/cost pass and fresh review
+screenshots.
 
 | Milestone | Deliverable | State |
 | --- | --- | --- |
@@ -47,7 +47,7 @@ counts are refreshed. Pending after T1–T3: the performance/cost pass and fresh
 | M5e | **Capture report (D-28)**: `world.CaptureReport` on every `CaptureResult` arm, `SC-MC-0005` over-cap, `SC-MC-0003` cut, the sited-capture `SC-MC-0004` audit, the host code catalog, `CaptureReports` + the command report block | **implemented at `28d0334`** (P1's two-phase capture at `56c632c`) |
 | S6 | **Sited-root descriptor projection (D-29)**: root-frame `BlockState` properties projected into the definition frame before `OccupantDescriptors`; unrepresentable states keep the raw descriptor and report `SC-MC-0004`; child/nested frames and the phase-1 anchor capture stay world-frame | **superseded by D-33 (H1)**; the projection is retired and the audit stays as `OrientationAuditGameTest` |
 | H1–H4 | **Host snapshot and typed reads (D-33)**: `HostType`, `WorldView.get`, `Expectations.host`, `OccupantDescriptor(type, kind)`, one `SnapshotLevel` per frame, the adapter `property`/`state`/`tag`/`fluid` factories, `SC-MC-0006`…`0010`, and the H4 docs/counts/stress group | **implemented**; `HostDataScenarioTest` and the focused host-data units green |
-| T1–T3 | **Generic trait providers (D-34)**: `TraitProvider<T,H>`, `TraitHolder<H>`, `(trait, holder)` `TraitLookup`, `CapabilityTraitProvider<T,H,C>` + `CapabilityAccesses`, direct `IItemHandler`/`IEnergyStorage`/`IFluidHandler` values, NBT traits removed, standard providers split by holder | **in progress**; design at `11-trait-providers.md` |
+| T1–T3 | **Generic trait providers (D-34)**: `TraitProvider<T,H>`, `TraitHolder<H>`, `(trait, holder)` `TraitLookup`, `CapabilityTraitProvider<T,H,C>` + `CapabilityAccesses`, direct `IItemHandler`/`IEnergyStorage`/`IFluidHandler` values, NBT traits removed, standard providers split by holder | **implemented**; design at `11-trait-providers.md`, `TraitLookupTest`/`CapabilityTraitProviderTest`/`OccupantTraitsTest` and `TraitCaptureGameTest` green |
 
 ## Acceptance
 
@@ -63,7 +63,7 @@ counts are refreshed. Pending after T1–T3: the performance/cost pass and fresh
 | M5e | Met: `CaptureReportTest` covers the payload and the compatibility constructors; `CaptureReportsTest` covers severity, the trust guard, the world label and notes; `NestedCaptureGameTest` covers the over-cap entry and a cut reason with the unchanged `nested(cell) == null`; `CaptureAuditGameTest` covers the grouped orientation audit and no chunk load; `CommandCaptureReportGameTest` covers the print order and the `SC-MC-0005` command surfacing. `Codes.all` is 64 and the focused gates are green. |
 | S6 | Superseded by H1/D-33. The retained audit is `OrientationAuditGameTest`: an upright siting reports nothing, an unrepresentable state reports one grouped `SC-MC-0004` entry, and child frames are not audited. `world` §4.7 owns the typed-read law; the kernel keeps no transform. |
 | H1–H4 | Met: `HostExpectationTest` (the bridge and caller-supplied absent code), `McAnchorsTest` (the captured anchor and `SC-MC-0010`), `SnapshotLevelTest`/`LevelSnapshotTest` (copied states, fluids, entities and typed dispatch), `AdapterExpectationsTest` (the four factories, waterlogged slab, JSON/Java parity) and `HostDataScenarioTest` (rotated structure set, nested child frame, waterlogged slab, missing snapshot). `Codes.all` is 64 and the decision record is 33. |
-| T1–T3 | Met when: generic provider/holder registry tests pass; the capability provider covers block and entity through one class; standard traits return direct capabilities; NBT traits are absent; block/entity capability absence, null block entity and malformed capability keep their old states; plugin and built-in lookup parity; focused `check` and GameTest regressions green. |
+| T1–T3 | Met: `TraitLookupTest` covers the generic provider, the holder pair, the duplicate pair, one trait on two holders, known-without-provider absence, unknown denial, throw/null/wrong-id refusals and the missing block entity; `CapabilityTraitProviderTest` covers one class for block and entity, direct value identity and the capture/actual inputs; `OccupantTraitsTest` covers the three direct capability keys and the absent NBT traits; `TraitCaptureGameTest` covers live `IItemHandler`/`IFluidHandler` handles, entity inventory, custom energy identity, the missing-block-entity refusal and the child frame. Block/entity capability absence, null block entity and malformed capability keep their states; plugin registration is the built-in parity path. Focused `check` (284 adapter unit tests, 258 kernel tests) and `runGameTestServer` (65/65) are green. |
 
 ## Owners
 

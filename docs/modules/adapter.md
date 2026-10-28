@@ -1,4 +1,4 @@
-# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S4 + H1–H4)
+# Module `dev.vfyjxf.cumulus.mc` (adapter, M1 + M2a/M2b/M2c/M2d + M3 + M4 + M5a/M5d/M5e + S1–S4 + H1–H4 + T1–T3)
 
 > The only code allowed to name Minecraft. M1 implements the host, the command and the capture-check
 > path: `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the
@@ -7,16 +7,19 @@
 > capture with policy windows, full footprint indexing and entity-vs-block precedence (`world.md`
 > §4.3). M2b adds `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror` and an upright
 > mirror-then-rotate `BlockState` transform.
-> M2c (`cb06aa8`/`64d04ce`) implements Model C, body identity, the total read and the five trait
-> keys. M2d (`f3e0338`/`d6aefc2`) implements `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
-> package-private `FrameData`, child frames and cuts. M3 is committed at `d4b6d82`; `SavedClaims`/
+> M2c (`cb06aa8`/`64d04ce`) implements Model C, body identity, the total read and its five trait
+> keys (now three capability keys after T1–T3). M2d (`f3e0338`/`d6aefc2`) implements
+> `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with package-private `FrameData`, child frames
+> and cuts. M3 is committed at `d4b6d82`; `SavedClaims`/
 > `SavedContexts` are compatible with Model C. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
 > (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
 > implemented; capture-revision lease invalidation landed at `0f0bf25`. M5a adds the event-edged
 > watched-region mark counter with lazy entity and block-entity fingerprints (`d1fa42f`); P1 fixes the
 > rotated-siting capture bounds with the two-phase anchored capture (`56c632c`); M5d adds the
 > non-upright orientation remap (`ac11d0c`); M5e adds the capture report the adapter answers with
-> (`SC-MC-0003`/`0004`/`0005`) plus the report site the commands print (`28d0334`).
+> (`SC-MC-0003`/`0004`/`0005`) plus the report site the commands print (`28d0334`). T1–T3 (D-34)
+> replace the M2c provider shape with generic per-holder providers and make the three capability
+> traits return the capability handle itself.
 
 ## 1. Position
 
@@ -39,7 +42,11 @@
   capture so the sited world bounds are captured under the resolved siting (`56c632c`). M5d: the
   non-upright orientation remap with `MappingResult.Unrepresentable` (`ac11d0c`). M5e: the capture
   report (over-cap `SC-MC-0005`, cut `SC-MC-0003`, the sited-capture `SC-MC-0004` audit, the
-  `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`. S1–S4 add the structure-set
+  `AdapterCodes` catalog and the `CaptureReports` relay) at `28d0334`. T1–T3 add the generic
+  `TraitProvider<T, H>`/`TraitHolder<H>`/`TraitLookup` pair registry, the one
+  `CapabilityTraitProvider<T, H, C>` with `CapabilityAccesses.block`/`entity`/`entityVoid`, the
+  three direct capability trait keys (`IItemHandler`, `IEnergyStorage`, `IFluidHandler`) and remove
+  the NBT traits (D-34). S1–S4 add the structure-set
   layer: `Siting.compose` and the seven `SC-SET` codes (`9cf2794`), the set document IR/reader/
   writer/compiler (`00cf6c4`), the host `StructureSet` plan, `StructureSetHost` and `StructureSetResult`
   (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3). H1 adds `HostType`,
@@ -73,15 +80,17 @@
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value → `(type, kind)` descriptor; entity body identity; nested body |
 | `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the declared `AnchorSpec.value` is compared at the definition origin; a missing state is `SC-MC-0010`; no live read |
-| `OccupantTraits` | — | the five stable trait keys and generic provider dispatch into four-state slots |
-| `TraitLookup` | final class (`trait`) | immutable registry; `builtin()` and sequential plugin-loaded `load(Logger)`; `provider(id)` |
-| `TraitProvider<T>` | interface (`trait`) | one typed provider: `key()`, block/entity reads defaulting to `Absent` |
-| `TraitPlugin` / `BuiltinTraitPlugin` | interface / final class (`trait`) | plugin contribution point; the built-in plugin registers the five standard providers |
-| `TraitRegister` | interface (`trait`) | the typed registration face a plugin receives |
+| `OccupantTraits` | — | the three stable capability trait keys and generic provider dispatch into four-state slots |
+| `TraitLookup` | final class (`trait`) | immutable registry keyed by `(trait id, holder id)`; `builtin()` and sequential plugin-loaded `load(Logger)`; `provider(id, holder)`, `knows(id)` |
+| `TraitProvider<T, H>` | interface (`trait`) | one typed provider: `key()`, `holder()`, `get(actual, capture)` |
+| `TraitHolder<H>` / `TraitHolders` | record / final class (`trait`) | typed holder id token (never a `Class<?>`); the adapter's `block` and `entity` declarations |
+| `TraitPlugin` / `BuiltinTraitPlugin` | interface / final class (`trait`) | plugin contribution point; the built-in plugin registers the standard block and entity providers |
+| `TraitRegister` | interface (`trait`) | the generic `<T, H>` registration face a plugin receives |
 | `TraitContextKey<T>` / `TraitContext` | record / final class (`trait`) | typed immutable host context with duplicate-id and wrong-type rejection |
 | `TraitCaptureContext` | record (`trait`) | capture-wide nullable `Direction` capability context plus the typed host context (`empty()`) |
-| `BlockTraitContext` / `EntityTraitContext` | records (`trait`) | immutable provider inputs: level/pos/state/block entity or entity, plus the capture context |
-| `StandardTraitProviders` | final class (`trait`) | inventory/energy/fluid/blockEntityNbt/entityNbt providers preserving M2c semantics |
+| `BlockTraitContext` / `EntityTraitContext` | records (`trait`) | immutable provider inputs: level/pos/state/block entity or entity; the capture is a `get` parameter |
+| `BlockTraitProviders` / `EntityTraitProviders` | final classes (`trait`) | the six standard providers as `CapabilityTraitProvider` declarations (inventory/energy/fluid per holder) |
+| `CapabilityAccess<H, C>` / `CapabilityTraitProvider<T, H, C>` / `CapabilityAccesses` | functional interface / final class / final class (`trait`) | one generic capability provider; `block()`/`entity()`/`entityVoid()` map a holder to its normal capability get signature |
 | `ModPlugin` / `PluginDependency` | interface / record (`plugin`) | plugin id, `before`/`after`/`none` order and `required`/`optional`/`optionalRequired` constraints |
 | `PluginLookup<T>` / `AnnotationPluginLookup<T>` / `SpiPluginLookup<T>` | interface / final classes (`plugin`) | plugin discovery; NeoForge annotation scan and Java SPI |
 | `PluginLoader` / `PluginLoadingException` | final class / exception (`plugin`) | deterministic Kahn loading; fatal missing/duplicate/cycle and warning/skip failures |
@@ -267,21 +276,21 @@ persisted value. The finding codec writes the code text, not a registry ordinal,
 
 ## 7. Traits
 
-### 7.1 The five stable keys
+### 7.1 The three stable keys
 
-`OccupantTraits` declares exactly five public `TraitKey`s; the ids use the mod id:
+`OccupantTraits` declares exactly three public `TraitKey`s; the ids use the mod id and the values are
+the live capabilities:
 
 | Field | Id | Java type |
 | --- | --- | --- |
-| `inventory` | `structurecumulus:inventory` | `List<ItemStack>` |
-| `energy` | `structurecumulus:energy` | `Integer` |
-| `fluid` | `structurecumulus:fluid` | `List<FluidStack>` |
-| `blockEntityNbt` | `structurecumulus:block_entity_nbt` | `CompoundTag` |
-| `entityNbt` | `structurecumulus:entity_nbt` | `CompoundTag` |
+| `inventory` | `structurecumulus:inventory` | `IItemHandler` |
+| `energy` | `structurecumulus:energy` | `IEnergyStorage` |
+| `fluid` | `structurecumulus:fluid` | `IFluidHandler` |
 
-The inventory list copies every `IItemHandler` slot in slot order; the fluid list copies every
-`IFluidHandler` tank in tank order; energy is `IEnergyStorage.getEnergyStored()`. All copies are
-immutable snapshots: mutating the live handler or stack after capture never reaches the view.
+The value is the provider's real value, not a copy the framework invents: a consumer calls
+`getStackInSlot`, `getEnergyStored` or `getFluidInTank` on the capability itself. The capture lease
+is the validity boundary; a consumer must not retain a handle after the lease stops being current.
+No list, integer or NBT wrapper exists.
 
 ### 7.2 Slot rules
 
@@ -290,31 +299,38 @@ stays readable regardless of trait outcome.
 
 | Trait | Block occupant | Entity occupant |
 | --- | --- | --- |
-| `inventory`/`energy`/`fluid` | capability present → `Present`; capability absent → `Absent`; `state.hasBlockEntity()` with a `null` block entity → `Refused(notCaptured)` | capability present → `Present`; absent → `Absent` |
-| `blockEntityNbt` | block entity present → `Present(saved copy)`; block entity state with a `null` block entity → `Refused(notCaptured)`; no block entity → `Absent` | `Absent` |
-| `entityNbt` | `Absent` | `Present(entity.saveWithoutId(copy))` |
+| `inventory`/`energy`/`fluid` | capability present → `Present`; capability absent → `Absent`; `state.hasBlockEntity()` with a `null` captured block entity → `Refused(notCaptured)` | capability present → `Present`; absent → `Absent` |
 | unknown requested id | `Refused(denied)` | `Refused(denied)` |
 
-A capability read that throws, or a handler that reports a malformed slot/tank count, is
-`Refused(failed)`. Every refusing slot carries `ReadRefusal(status, SC-MC-0002)`. A positive absence
-is `TraitSlot.Absent`, never a default and never `Refused`. A trait failure never makes the
-containing section `Partial` and never refuses the cell: `SectionSlot.Partial` is reserved for cell
-reads (build-height/unloaded-cell cases), not for traits. The four-state expectation rules are in
-`structure.md` §4.6; `not(trait(...))` leaves a refused slot `Unreadable`.
+A provider that throws, returns `null` or answers a different trait id, and a capability lookup that
+throws, is `Refused(failed)`. Every refusing slot carries `ReadRefusal(status, SC-MC-0002)`. A
+positive absence is `TraitSlot.Absent`, never a default and never `Refused`. A trait failure never
+makes the containing section `Partial` and never refuses the cell: `SectionSlot.Partial` is reserved
+for cell reads (build-height/unloaded-cell cases), not for traits. The four-state expectation rules
+are in `structure.md` §4.6; `not(trait(...))` leaves a refused slot `Unreadable`.
 
 ### 7.3 Providers and relay
 
-The production path is the public `dev.vfyjxf.cumulus.mc.trait.TraitLookup` registry. `OccupantTraits`
-keeps the five keys and dispatches every requested id through `TraitLookup.provider(id)` into a
-`TraitProvider<T>`: a missing provider is `Refused(denied)`, and a provider that throws, returns
-`null` or answers a different trait id is `Refused(failed)`. Each standard provider implements both
-`readBlock`/`readEntity`; the opposite kind defaults to `Absent`. The five standard providers are
-registered by `BuiltinTraitPlugin` through `TraitRegister`: inventory, energy and fluid query the
-five-argument block capability with `context.capture().capabilityContext()` (the nullable `Direction`
-capability context) and entity capabilities with `null`; the two NBT providers copy
-`saveWithoutMetadata`/`saveWithoutId`. The `state.hasBlockEntity()` + `null` block entity case stays
-`Refused(notCaptured)`, a null capability stays `Absent`, and malformed handler slot/tank counts stay
-`Refused(failed)`.
+The production path is the public `dev.vfyjxf.cumulus.mc.trait.TraitLookup` registry, keyed by
+`(trait id, holder id)`. `OccupantTraits` keeps the three keys and dispatches every requested id
+through `TraitLookup.provider(id, TraitHolders.block)` or `provider(id, TraitHolders.entity)` into a
+generic `TraitProvider<T, H>`:
+
+- an unknown trait id is `Refused(denied)`;
+- a known trait without a provider for this holder is `Absent`, preserving the old default;
+- a block state that has a block entity but whose captured block entity is `null` is
+  `Refused(notCaptured)` before a provider reads it, so a capability lookup never falls back to a
+  live block-entity lookup;
+- a provider that throws, returns `null` or answers a different trait id is `Refused(failed)`.
+
+The standard providers are declarations, not per-capability classes. `BlockTraitProviders` and
+`EntityTraitProviders` build the six `CapabilityTraitProvider` values from
+`CapabilityAccesses.block()`/`entity()`/`entityVoid()`: block providers pass
+`capture.capabilityContext()` (the nullable `Direction` context) to the five-argument block get,
+entity inventory uses the `Void` accessor with a `null` item-handler context, and entity energy and
+fluid use the sided accessor. `BuiltinTraitPlugin` registers both groups through `TraitRegister`.
+There is no NBT provider: a host that needs block-entity or entity data registers a typed provider
+over the owning API (`11-trait-providers.md` §7.5).
 
 The `SC-MC-0002` code is not in `Codes.all`; the kernel's `Check.relay` therefore keeps it and emits
 an `Unreadable` finding with the host code plus a `refusal: <status>` note. If a host code were
@@ -336,13 +352,13 @@ plugin overrides its dependencies to empty. `TraitLookup.builtin()` registers th
 directly; `TraitLookup.load(StructureCumulus.logger)` discovers `TraitPlugin`s with
 `AnnotationPluginLookup.of(TraitPlugin.class)`, ensures the built-in plugin is present, runs
 `PluginLoader.loadPlugin`, and calls each `registerTraits` once against the immutable builder; a
-duplicate trait id is fatal.
+duplicate `(trait id, holder id)` pair is fatal.
 
 `TraitCaptureContext(capabilityContext, hostContext)` is the approved A+B context: the nullable
-`Direction` capability context is passed to standard block capability queries, while the typed
-`TraitContext` host context is available to every provider. `TraitContext` is built with typed
-`TraitContextKey<T>` entries; a duplicate id, null key/value are rejected at build time and a
-wrong-type `get` throws `IllegalArgumentException`. `LevelCapture` defaults to
+`Direction` capability context is passed to the block and sided entity capability accessors, while
+the typed `TraitContext` host context is a `get` parameter available to every provider. `TraitContext`
+is built with typed `TraitContextKey<T>` entries; a duplicate id, null key/value are rejected at
+build time and a wrong-type `get` throws `IllegalArgumentException`. `LevelCapture` defaults to
 `TraitLookup.builtin()` with `TraitCaptureContext.empty()`; the public
 `LevelCapture(ServerLevel, TraitLookup, TraitCaptureContext)` injects both, and the existing
 constructors are preserved.

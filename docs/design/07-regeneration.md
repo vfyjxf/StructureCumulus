@@ -35,11 +35,12 @@ Neither batch changes a type or a decision. M3 persistence is compatible with Mo
 The host-data round closes with H4: H1 adds `HostType`, `WorldView.get`, `Expectations.host` and
 `OccupantDescriptor(type, kind)`; H2 adds one `SnapshotLevel` per frame and the capture wiring; H3
 adds the adapter `property`/`state`/`tag`/`fluid` factories and `SC-MC-0006`…`0010`; H4 adds the
-documented counts and the adapter host-data stress group (§3.4). The tree registers **258 kernel
-tests in 39 containers, 276 adapter unit tests in 36 containers and 64 `@GameTest` methods**;
-`Codes.all` has 64 entries and the decision record has 33 decisions (D-33). Pending only: the
-performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots. There
-is no regeneration milestone.
+documented counts and the adapter host-data stress group (§3.4). T1–T3 (D-34) then replace the
+`readBlock`/`readEntity` trait providers with the generic per-holder registry and direct capability
+values. The tree registers **258 kernel tests in 39 containers, 284 adapter unit tests in 37
+containers and 65 `@GameTest` methods**; `Codes.all` has 64 entries and the decision record has 34
+decisions (D-34). Pending only: the performance/cost pass (block-entity-lazy and entity sweep) and
+fresh visual review screenshots. There is no regeneration milestone.
 
 ## 2. The order
 

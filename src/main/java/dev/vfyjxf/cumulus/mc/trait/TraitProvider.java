@@ -4,17 +4,13 @@ import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import org.jspecify.annotations.NullMarked;
 
-/** One typed trait provider: a key and its block/entity reads. */
+/** One typed trait provider for exactly one trait id and one holder id. */
 @NullMarked
-public interface TraitProvider<T> {
+public interface TraitProvider<T, H> {
 
     TraitKey<T> key();
 
-    default TraitSlot readBlock(BlockTraitContext context) {
-        return new TraitSlot.Absent(key().id());
-    }
+    TraitHolder<H> holder();
 
-    default TraitSlot readEntity(EntityTraitContext context) {
-        return new TraitSlot.Absent(key().id());
-    }
+    TraitSlot get(H actual, TraitCaptureContext capture);
 }

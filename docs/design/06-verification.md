@@ -33,13 +33,15 @@ document/compiler (S2, `00cf6c4`) and the host set layer (S3, `93f5941`, D-32) a
 adds the six-class/33-test structure-set stress batch (§3.3). The host-data round closes with H4:
 H1 adds `HostType`/`WorldView.get`/`Expectations.host` and `OccupantDescriptor(type, kind)`; H2 adds
 one `SnapshotLevel` per frame and the capture wiring; H3 adds the adapter host expectation factories
-and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). At
-`d70ecd7` a full `./gradlew check` and `runGameTestServer` both pass: 258 kernel tests (39 containers),
-276 adapter unit tests (36 containers), 64/64 `@GameTest` methods, 0 failures, 0 skipped.
+and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). The
+T1–T3 trait-provider slice (D-34) then replaces the provider shape and the trait values. On the
+T1–T3 working tree a full `./gradlew check` and `runGameTestServer` both pass: 258 kernel tests (39
+containers), 284 adapter unit tests (37 containers), 65/65 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
-`Codes.all` has 64 entries and the decision record has 33 decisions (D-33). Model C, body identity,
-trait capture, the nested capability, the mark counter, the capture-report channel, the typed host
-snapshot, the cached-context port and the structure-set layer are implemented, not pending. The
+`Codes.all` has 64 entries and the decision record has 34 decisions (D-34). Model C, body identity,
+trait capture, the generic trait providers, the nested capability, the mark counter, the
+capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
+are implemented, not pending. The
 determinism gate is implemented (`DeterminismTest`): canonical bytes across member order, the
 parse/write fixed point, equal compile runs and stable finding order.
 
@@ -355,9 +357,10 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 64 `@GameTest` methods; the
-  last recorded full `runGameTestServer` is 64/64 at `d70ecd7`. The registered set covers M1 capture/host, M2a entity precedence,
-  M2b orientation, M3 claims, M2c traits, M2d nested frames/cuts, capture-revision lease invalidation
+- The rest of the NeoForge adapter and its GameTests. The tree registers 65 `@GameTest` methods; the
+  T1–T3 full `runGameTestServer` is 65/65 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
+  M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
+  (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
   rotated-siting two-phase capture
   (`RotatedSitingGameTest`), the M4 command surface (`SettleCommandGameTest`, `CommandGameTest`), the
@@ -367,7 +370,11 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   reports one grouped entry, and a child frame is not audited). Unit evidence: `HostExpectationTest`
   for the typed bridge and absent codes, `SnapshotLevelTest` for the copied states/fluids/entities,
   `LevelSnapshotTest` for
-  body/precedence/partial reads, `OccupantTraitsTest` for the five trait keys, `NestedExtentTest` for
+  body/precedence/partial reads, `TraitLookupTest` for the `(trait, holder)` registry, the duplicate
+  pair, the same trait on two holders, known-without-provider absence, unknown denial and the
+  throw/null/wrong-id refusals, `CapabilityTraitProviderTest` for the one generic capability provider
+  and the direct value identity, `OccupantTraitsTest` for the three direct capability keys and the
+  absent NBT traits, `NestedExtentTest` for
   the capability declaration, `SavedClaimsTest`/`SavedContextsTest` for persistence,
   `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
   parse/write fixed point and equal compile runs, `ServerStateDocumentSourceTest`/

@@ -27,7 +27,8 @@ Core kernel + document compiler + thin remedy SPI. The v1 round scoped the NeoFo
 renderer, no schematic importer, no client code. This kept the first regeneration small enough to
 prove, while the ports make the adapter a later, independent exercise. Current status (2026-10-28):
 M1 (host + command + capture-check), M2a (loaded-entity capture), M2b (upright orientation), M2c
-(Model C, body identity, total read, four-state traits and the five adapter trait keys), M2d (nested
+(Model C, body identity, total read, four-state traits and its five adapter trait keys, three after
+T1–T3), M2d (nested
 extents, frames, cuts, child entities) and M3 (`d4b6d82`: `SavedClaims`, `SavedContexts`, CAS
 settle/release and reload codecs) are committed. M4a/M4b and the command slice (`settle` at
 `4899d86`, plus `compile`, `explain`, `claims`) are implemented, and capture-revision lease
@@ -38,11 +39,13 @@ descriptor projection (S6, D-29) was implemented and is superseded by the host s
 H1–H4): `OccupantDescriptor` carries no properties, so there is nothing to project, and the retained
 orientation audit is `OrientationAuditGameTest`. The host-data round adds `HostType`,
 `WorldView.get`, `Expectations.host`, one snapshot per frame and the adapter `property`/`state`/`tag`/
-`fluid` factories. Pending only: the performance/cost pass (block-entity-lazy and entity sweep) and
-fresh visual review screenshots. There is no regeneration milestone.
+`fluid` factories. T1–T3 (D-34) replace the `readBlock`/`readEntity` trait providers with the generic
+`TraitProvider<T, H>`/`TraitHolder<H>` pair registry and direct capability values. Pending only: the
+performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+There is no regeneration milestone.
 
 **Consequence:** the kernel tests use an in-memory `WorldView`, `ClaimLedger` and `ContextStore`; the
-adapter is implemented through H4. The spec index is green at v1.2: the M5e amendment was applied
+adapter is implemented through T1–T3. The spec index is green at v1.2: the M5e amendment was applied
 docs-first (`world` §4.10, D-28) and its carrier landed; D-29 added no public type, and D-33 keeps
 the host bridge to `HostType`, `WorldView.get` and `Expectations.host`. No pending signature is ever
 documented as implemented (`06-verification.md` §1).
@@ -284,6 +287,7 @@ between `13` and `15`. A test asserts the table is bijective with the producers.
 | Q24 `MatchSession` | Package-private; no public members; not a resumable session. |
 | Q25 nested view | Same `WorldView`, distinct frame; no separate nested type (D-10). |
 | Q26 per-cell status | `WorldView.statusOf(cell)` default over `read`; `CellRead` is the read primitive, not a second status type. |
+| Q27 trait providers | Generic `TraitProvider<T, H>` keyed by `(trait id, holder id)`; the three capability values are the live handles (D-34). |
 
 ### D-21 — Documents: definitions are geometry, kinds are snake_case
 
@@ -705,10 +709,58 @@ registry. The frame is the host's because only the host knows which pose it capt
 snapshot; `SC-MC-0004` remains the capability warning for a pose the observed state cannot express;
 `SC-MC-0010` covers both a missing expectation value and a missing anchor state. D-29's projection
 and its test are retired; `OrientationAuditGameTest` covers the audit and `HostDataScenarioTest`
-covers the rotated set, nested child frame, waterlogged slab and missing snapshot. The record set is
-now 33 decisions; `Codes.all` is unchanged at 64 entries because every `SC-MC-*` code is the
+covers the rotated set, nested child frame, waterlogged slab and missing snapshot. The record set was
+33 decisions at H4; `Codes.all` is unchanged at 64 entries because every `SC-MC-*` code is the
 adapter's own. **Status (H4):** implemented; H1 added `HostType`/`WorldView.get`/`Expectations.host`,
 and H2/H3/H4 added no kernel type beyond those.
+
+### D-34 — Trait providers are generic per holder, and capability traits carry the capability
+
+T1–T3 replace the `readBlock`/`readEntity` provider interface with `TraitProvider<T, H>`, key the
+registry by `(trait id, holder id)`, and make the three standard traits return the live NeoForge
+capability (`IItemHandler`, `IEnergyStorage`, `IFluidHandler`) instead of list, integer or NBT
+copies. The generic NBT traits are removed. `11-trait-providers.md` is the design.
+
+The contract:
+
+- `TraitHolder<H>` is an id token, never a `Class<?>`; `TraitHolders` declares `block` and `entity`
+  and is the only adapter code naming a subject kind;
+- the actual holder records (`BlockTraitContext`, `EntityTraitContext`) carry no capture; the
+  capture is a `get(actual, capture)` parameter;
+- `TraitLookup` keys by `(trait id, holder id)`: a duplicate pair is rejected, the same trait with a
+  different holder is a second registration, and `knows(id)` distinguishes an unknown trait from a
+  known trait without a provider for this holder;
+- `TraitRegister` is one generic `<T, H> register(...)`;
+- `CapabilityTraitProvider<T, H, C>` is the only capability provider class; `CapabilityAccess<H, C>`
+  is the subject-specific get signature and `CapabilityAccesses.block()`/`entity()`/`entityVoid()`
+  cover the current holders (entity inventory is `Void`, block and sided entity use the nullable
+  `Direction`);
+- a null capability is `Absent`; a throwing lookup is the dispatcher's `Refused(failed)`; a block
+  state whose block entity was not captured is `Refused(notCaptured)` before the capability call,
+  so `BlockCapability.getCapability` never falls back to a live `Level.getBlockEntity`;
+- the standard providers are six declarations (`BlockTraitProviders`, `EntityTraitProviders`) over
+  the generic provider; there is no per-capability class and no item holder.
+
+The alternatives were rejected:
+
+- **Keeping the block/entity defaults** would turn a missing provider into a hidden absence and
+  re-open the provider interface for every new subject.
+- **A per-capability provider class** (`BlockInventoryProvider`, `EntityEnergyProvider`, …) would
+  duplicate the capability get and defeat the generic provider.
+- **A `Class<?>` holder token** would smuggle a reflective type into the provider identity.
+- **List/`Integer`/NBT values** would invent a second value model and lose the real handle.
+- **An item holder or item accessor** would be dead API: the current capture has no item subject.
+
+**Why:** a trait is a typed read of one real API value from one subject; the subject must be a type
+token and the value must be the API object. The pair key keeps one trait available on several
+holders without a fake default for the other.
+
+**Consequence:** `StandardTraitProviders` is replaced by `BlockTraitProviders` and
+`EntityTraitProviders`; the NBT keys disappear, so a host that needs serialized block-entity or
+entity data registers a typed provider over the owning API. The trait value is live for the lease's
+lifetime; a consumer must not retain it after the lease stops being current. The record set is now
+34 decisions (D-34); the kernel types `TraitKey`/`TraitSlot`/`Trait` are unchanged. **Status
+(T1–T3):** implemented; the focused trait tests and the full GameTest run are green.
 
 ## 3. Consequences a reviewer should attack
 
@@ -757,3 +809,10 @@ and H2/H3/H4 added no kernel type beyond those.
   the contract. The in-memory store synchronises, but a `SavedData` store must be server-thread-only.
 - The document schema's `Value` arguments are untyped at the boundary; a factory is the only place a
   type is enforced. A bad argument is `SC-DOC-0002`, not a compile-time error.
+- A trait capability value is the live handle, not a snapshot (D-34): a consumer that keeps an
+  `IItemHandler`/`IEnergyStorage`/`IFluidHandler` past the lease's validity boundary observes later
+  world mutations. The lease is the only validity boundary the framework offers; a check that needs
+  captured contents must copy them itself inside the lease.
+- A block state whose block entity was not captured answers every registered block trait with
+  `Refused(notCaptured)` (D-34), even a custom trait that reads only `BlockState`; that is the price
+  of never letting `BlockCapability.getCapability` fall back to a live `Level.getBlockEntity`.

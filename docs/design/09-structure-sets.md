@@ -596,9 +596,9 @@ Document errors reuse existing codes:
   `StructureSetHostTest` (22 tests) and `DatapackStructureSetTest` (5 tests).
 - **S4** is implemented in the working tree after `93f5941`: six adapter stress classes (33 tests) in
   `src/test/.../mc` cover IE preheaters, TEP range fan-in, AE2 logical subnetworks, controller/port
-  envelopes, rotation and rollback (`06-verification.md` §3.3). The counts at H4 (2026-10-28) are
-  **258 kernel tests (39 containers), 276 adapter unit tests (36 containers), 64 `@GameTest`
-  methods**, `Codes.all` 64 and 33 decisions (D-33; D-29 is superseded). S4 adds no kernel type and
+  envelopes, rotation and rollback (`06-verification.md` §3.3). The counts at H4 (2026-10-28,
+  before T1–T3) are **258 kernel tests (39 containers), 276 adapter unit tests (36 containers), 64
+  `@GameTest` methods**, `Codes.all` 64 and 33 decisions (D-33; D-29 is superseded). S4 adds no kernel type and
   regenerates no visual; the H4 host-data group (`06-verification.md` §3.4) touches the same
   adapter unit suite and changes no set-layer type or rule.
 - **Not in the set layer:** a command or capture executor that runs a set; the adapter result is a

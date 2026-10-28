@@ -1,6 +1,6 @@
 # 11. Generic trait providers
 
-> Status: proposed, not implemented. This document replaces the `readBlock`/`readEntity` shape of
+> Status: implemented (T1–T3, D-34). This document replaces the `readBlock`/`readEntity` shape of
 > `TraitProvider`, removes the generic NBT traits, and makes capability traits return the capability
 > itself.
 
@@ -182,6 +182,9 @@ private static <H> TraitSlot read(
 
 - unknown trait id -> `Refused(denied)`, as today;
 - known trait, no provider for this holder -> `Absent`, preserving the old default behavior;
+- a block state that has a block entity but whose captured block entity is `null` is
+  `Refused(notCaptured)` before a provider reads it, so a capability lookup never falls back to a
+  live block-entity lookup;
 - provider throws or returns a wrong id -> `Refused(failed)`, as today.
 
 `blockSlot` and `entitySlot` are thin wrappers that pass `TraitHolders.block` or
@@ -486,4 +489,4 @@ No JSON, document, kernel or host-snapshot change.
 | T2 | add `CapabilityTraitProvider` / `CapabilityAccesses`, declare block/entity standard providers, change keys to direct capability types, remove NBT traits, update `OccupantTraits` dispatch and contexts |
 | T3 | update tests/docs, `TraitCaptureGameTest` fake providers, `TraitLookupTest`; remove NBT assertions |
 
-Implementation starts after this design is accepted.
+Implementation landed as T1–T3 (D-34); the migration table records the slices.

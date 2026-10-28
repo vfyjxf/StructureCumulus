@@ -13,50 +13,58 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
+import dev.vfyjxf.cumulus.kernel.world.Trait;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import dev.vfyjxf.cumulus.mc.trait.BlockTraitContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitHolder;
+import dev.vfyjxf.cumulus.mc.trait.TraitHolders;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import dev.vfyjxf.cumulus.mc.trait.TraitProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LayeredCauldronBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+import net.neoforged.neoforge.items.IItemHandler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Set;
 
-/** GameTests for the five stable trait keys and the four-state trait slots. */
+/** GameTests for the three stable trait keys and the four-state trait slots. */
 @NullMarked
 @GameTestHolder(Constants.modId)
 @PrefixGameTestTemplate(false)
 public final class TraitCaptureGameTest {
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void chestInventoryIsPresentAndCopied(GameTestHelper helper) {
+    public void chestInventoryIsTheLiveCapability(GameTestHelper helper) {
         BlockPos chestPos = new BlockPos(0, 1, 0);
         helper.setBlock(chestPos, Blocks.CHEST);
         ChestBlockEntity chest = helper.getBlockEntity(chestPos);
         chest.setItem(0, new ItemStack(Items.DIAMOND, 3));
-        ItemStack live = chest.getItem(0);
         BlockPos world = helper.absolutePos(chestPos);
 
         CaptureResult.Captured captured = capture(
@@ -69,14 +77,13 @@ public final class TraitCaptureGameTest {
             helper.assertValueEqual(OccupantKind.blockEntity, occupant.descriptor().kind(), "the chest kind");
             helper.assertValueEqual(NamespacedId.of("minecraft", "chest"), occupant.descriptor().type(), "chest type");
             helper.assertValueEqual(1, occupant.traits().size(), "one requested trait");
-            List<ItemStack> items = inventory(occupant);
-            helper.assertValueEqual(27, items.size(), "the chest slot count");
-            ItemStack capturedStack = items.get(0);
-            helper.assertTrue(capturedStack.is(Items.DIAMOND), "the diamond is captured");
-            helper.assertValueEqual(3, capturedStack.getCount(), "the stack size is captured");
-            helper.assertTrue(capturedStack != live, "the captured stack is a copy");
-            live.setCount(64);
-            helper.assertValueEqual(3, capturedStack.getCount(), "the chest mutation does not reach the capture");
+            IItemHandler handler = inventory(occupant);
+            helper.assertValueEqual(27, handler.getSlots(), "the chest slot count");
+            helper.assertTrue(handler.getStackInSlot(0).is(Items.DIAMOND), "the diamond is captured");
+            helper.assertValueEqual(3, handler.getStackInSlot(0).getCount(), "the stack size is captured");
+            chest.setItem(0, new ItemStack(Items.EMERALD, 5));
+            helper.assertTrue(handler.getStackInSlot(0).is(Items.EMERALD), "the trait is the live capability");
+            helper.assertValueEqual(5, handler.getStackInSlot(0).getCount(), "the live stack size");
             helper.assertTrue(occupant.has(OccupantTraits.inventory), "has sees the present trait");
         }
         helper.succeed();
@@ -99,13 +106,8 @@ public final class TraitCaptureGameTest {
             helper.assertTrue(occupant.slot(OccupantTraits.inventory.id()) == null, "an unasked trait has no slot");
         }
 
-        List<NamespacedId> requested = List.of(
-            OccupantTraits.inventory.id(),
-            OccupantTraits.energy.id(),
-            OccupantTraits.fluid.id(),
-            OccupantTraits.blockEntityNbt.id(),
-            OccupantTraits.entityNbt.id()
-        );
+        List<NamespacedId> requested = List
+                .of(OccupantTraits.inventory.id(), OccupantTraits.energy.id(), OccupantTraits.fluid.id());
         CaptureResult.Captured captured = capture(
             new LevelCapture(helper.getLevel()),
             box(world),
@@ -142,51 +144,38 @@ public final class TraitCaptureGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void blockEntityNbtIsPresentAndCopied(GameTestHelper helper) {
-        BlockPos chestPos = new BlockPos(0, 1, 0);
-        helper.setBlock(chestPos, Blocks.CHEST);
-        ChestBlockEntity chest = helper.getBlockEntity(chestPos);
-        chest.setItem(0, new ItemStack(Items.DIAMOND, 3));
-        BlockPos world = helper.absolutePos(chestPos);
+    public void blockFluidIsTheLiveCapability(GameTestHelper helper) {
+        BlockPos cauldronPos = new BlockPos(0, 1, 0);
+        helper.setBlock(cauldronPos, Blocks.WATER_CAULDRON.defaultBlockState().setValue(LayeredCauldronBlock.LEVEL, 3));
+        BlockPos world = helper.absolutePos(cauldronPos);
 
         CaptureResult.Captured captured = capture(
             new LevelCapture(helper.getLevel()),
             box(world),
-            policy(Set.of(OccupantTraits.blockEntityNbt.id(), OccupantTraits.entityNbt.id()))
+            policy(Set.of(OccupantTraits.fluid.id()))
         );
         try (SnapshotLease lease = captured.lease()) {
             OccupantSnapshot occupant = occupant(lease.view(), point(world));
-            helper.assertValueEqual(OccupantKind.blockEntity, occupant.descriptor().kind(), "the chest kind");
-            if (!(occupant.slot(OccupantTraits.blockEntityNbt.id()) instanceof TraitSlot.Present)) {
-                helper.fail("the block entity nbt is not present");
-                return;
-            }
-            CompoundTag tag = occupant.trait(OccupantTraits.blockEntityNbt);
-            if (tag == null) {
-                helper.fail("the typed block entity nbt is missing");
-                return;
-            }
-            helper.assertValueEqual(1, tag.getList("Items", Tag.TAG_COMPOUND).size(), "the captured item list");
-            helper.assertTrue(
-                occupant.slot(OccupantTraits.entityNbt.id()) instanceof TraitSlot.Absent,
-                "a block entity has no entity nbt"
-            );
-            chest.setItem(1, new ItemStack(Items.EMERALD, 2));
+            IFluidHandler handler = fluid(occupant);
+            helper.assertValueEqual(Fluids.WATER, handler.getFluidInTank(0).getFluid(), "the cauldron fluid");
+            helper.assertValueEqual(1000, handler.getFluidInTank(0).getAmount(), "the cauldron amount");
+            helper.setBlock(cauldronPos, Blocks.LAVA_CAULDRON);
             helper.assertValueEqual(
-                1,
-                tag.getList("Items", Tag.TAG_COMPOUND).size(),
-                "the chest mutation does not reach the captured nbt"
+                Fluids.LAVA,
+                handler.getFluidInTank(0).getFluid(),
+                "the trait is the live capability"
             );
         }
         helper.succeed();
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void entityNbtIsPresent(GameTestHelper helper) {
+    public void entityInventoryIsTheLiveCapability(GameTestHelper helper) {
         BlockPos floor = new BlockPos(0, 1, 0);
         helper.setBlock(floor, Blocks.STONE);
         helper.setBlock(new BlockPos(0, 2, 0), Blocks.AIR);
-        Entity zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(0.5, 1.5, 0.5));
+        Zombie zombie = helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(0.5, 1.5, 0.5));
+        zombie.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_SWORD));
         BlockPos world = helper.absolutePos(floor);
         Cuboid bounds = Cuboid
                 .of(world.getX(), world.getY(), world.getZ(), world.getX() + 1, world.getY() + 2, world.getZ() + 1);
@@ -194,7 +183,7 @@ public final class TraitCaptureGameTest {
         CaptureResult.Captured captured = capture(
             new LevelCapture(helper.getLevel()),
             bounds,
-            entityPolicy(Set.of(OccupantTraits.entityNbt.id(), OccupantTraits.blockEntityNbt.id()))
+            entityPolicy(Set.of(OccupantTraits.inventory.id(), OccupantTraits.energy.id(), OccupantTraits.fluid.id()))
         );
         try (SnapshotLease lease = captured.lease()) {
             List<OccupantSnapshot> entities = lease.view()
@@ -206,16 +195,18 @@ public final class TraitCaptureGameTest {
                 occupant.descriptor().type(),
                 "entity type"
             );
-            CompoundTag tag = occupant.trait(OccupantTraits.entityNbt);
-            if (tag == null) {
-                helper.fail("the entity nbt is not present");
-                return;
-            }
-            helper.assertTrue(tag.getUUID("UUID").equals(zombie.getUUID()), "the captured entity uuid");
-            helper.assertTrue(tag.contains("Pos"), "the captured entity position");
+            IItemHandler handler = inventory(occupant);
+            helper.assertValueEqual(6, handler.getSlots(), "the hands and armor slots");
+            helper.assertTrue(handler.getStackInSlot(0).is(Items.DIAMOND_SWORD), "the main hand is captured");
+            zombie.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.EMERALD));
+            helper.assertTrue(handler.getStackInSlot(0).is(Items.EMERALD), "the trait is the live capability");
             helper.assertTrue(
-                occupant.slot(OccupantTraits.blockEntityNbt.id()) instanceof TraitSlot.Absent,
-                "an entity has no block entity nbt"
+                occupant.slot(OccupantTraits.energy.id()) instanceof TraitSlot.Absent,
+                "an entity without an energy capability is absent"
+            );
+            helper.assertTrue(
+                occupant.slot(OccupantTraits.fluid.id()) instanceof TraitSlot.Absent,
+                "an entity without a fluid capability is absent"
             );
         }
         helper.succeed();
@@ -224,29 +215,25 @@ public final class TraitCaptureGameTest {
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void failingTraitReadIsRefusedAndKeepsTheCellReadable(GameTestHelper helper) {
         BlockPos absentPos = new BlockPos(0, 1, 0);
-        BlockPos malformedPos = new BlockPos(1, 1, 0);
-        BlockPos throwingPos = new BlockPos(2, 1, 0);
+        BlockPos throwingPos = new BlockPos(1, 1, 0);
+        BlockPos wrongIdPos = new BlockPos(2, 1, 0);
         helper.setBlock(absentPos, Blocks.STONE);
-        helper.setBlock(malformedPos, Blocks.STONE);
         helper.setBlock(throwingPos, Blocks.STONE);
+        helper.setBlock(wrongIdPos, Blocks.STONE);
         BlockPos absent = helper.absolutePos(absentPos);
-        BlockPos malformed = helper.absolutePos(malformedPos);
         BlockPos throwing = helper.absolutePos(throwingPos);
+        BlockPos wrongId = helper.absolutePos(wrongIdPos);
         Cuboid bounds = Cuboid.of(
             absent.getX(),
             absent.getY(),
             absent.getZ(),
-            throwing.getX() + 1,
-            throwing.getY() + 1,
-            throwing.getZ() + 1
+            wrongId.getX() + 1,
+            wrongId.getY() + 1,
+            wrongId.getZ() + 1
         );
 
         CaptureResult.Captured captured = capture(
-            new LevelCapture(
-                helper.getLevel(),
-                NestedExtentLookup.capabilities(),
-                fakeTraitLookup(malformed, throwing)
-            ),
+            new LevelCapture(helper.getLevel(), NestedExtentLookup.capabilities(), fakeTraitLookup(throwing, wrongId)),
             bounds,
             policy(Set.of(OccupantTraits.inventory.id()))
         );
@@ -254,10 +241,10 @@ public final class TraitCaptureGameTest {
             WorldView view = lease.view();
             helper.assertTrue(
                 occupant(view, point(absent)).slot(OccupantTraits.inventory.id()) instanceof TraitSlot.Absent,
-                "a null capability is a positive absence"
+                "a provider that answers absent is a positive absence"
             );
-            assertRefused(helper, view, point(malformed));
             assertRefused(helper, view, point(throwing));
+            assertRefused(helper, view, point(wrongId));
         }
         helper.succeed();
     }
@@ -305,13 +292,66 @@ public final class TraitCaptureGameTest {
             OccupantSnapshot chestOccupant = occupant(child, localChest);
             helper.assertValueEqual(OccupantKind.blockEntity, chestOccupant.descriptor().kind(), "the child chest");
             helper.assertValueEqual(1, chestOccupant.traits().size(), "the child captures the requested trait");
-            List<ItemStack> items = inventory(chestOccupant);
-            helper.assertTrue(items.get(0).is(Items.DIAMOND), "the child inventory is captured");
-            helper.assertValueEqual(3, items.get(0).getCount(), "the child stack size");
+            IItemHandler handler = inventory(chestOccupant);
+            helper.assertTrue(
+                handler.getStackInSlot(0).is(Items.DIAMOND),
+                "the child inventory is the live capability"
+            );
+            helper.assertValueEqual(3, handler.getStackInSlot(0).getCount(), "the child stack size");
             helper.assertTrue(
                 occupant(lease.view(), point(worldAnchor))
                         .slot(OccupantTraits.inventory.id()) instanceof TraitSlot.Absent,
                 "the root stone has no inventory"
+            );
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aCustomEnergyProviderCarriesTheDirectValue(GameTestHelper helper) {
+        BlockPos stonePos = new BlockPos(0, 1, 0);
+        helper.setBlock(stonePos, Blocks.STONE);
+        BlockPos world = helper.absolutePos(stonePos);
+        IEnergyStorage blockStorage = new FakeEnergyStorage(42);
+
+        CaptureResult.Captured blockCaptured = capture(
+            new LevelCapture(
+                helper.getLevel(),
+                TraitLookup.builder().add(energyProvider(TraitHolders.block, blockStorage)).build(),
+                TraitCaptureContext.empty()
+            ),
+            box(world),
+            policy(Set.of(OccupantTraits.energy.id()))
+        );
+        try (SnapshotLease lease = blockCaptured.lease()) {
+            OccupantSnapshot occupant = occupant(lease.view(), point(world));
+            helper.assertTrue(
+                occupant.trait(OccupantTraits.energy) == blockStorage,
+                "the block energy trait is the provider's exact value"
+            );
+        }
+
+        helper.setBlock(new BlockPos(0, 2, 0), Blocks.AIR);
+        helper.spawnWithNoFreeWill(EntityType.ZOMBIE, new Vec3(0.5, 1.5, 0.5));
+        Cuboid bounds = Cuboid
+                .of(world.getX(), world.getY(), world.getZ(), world.getX() + 1, world.getY() + 2, world.getZ() + 1);
+        IEnergyStorage entityStorage = new FakeEnergyStorage(7);
+        CaptureResult.Captured entityCaptured = capture(
+            new LevelCapture(
+                helper.getLevel(),
+                TraitLookup.builder().add(energyProvider(TraitHolders.entity, entityStorage)).build(),
+                TraitCaptureContext.empty()
+            ),
+            bounds,
+            entityPolicy(Set.of(OccupantTraits.energy.id()))
+        );
+        try (SnapshotLease lease = entityCaptured.lease()) {
+            List<OccupantSnapshot> entities = lease.view()
+                    .occupants(bounds, OccupantFilter.ofKind(OccupantKind.entity));
+            helper.assertValueEqual(1, entities.size(), "one captured entity");
+            helper.assertTrue(
+                entities.get(0).trait(OccupantTraits.energy) == entityStorage,
+                "the entity energy trait is the provider's exact value"
             );
         }
         helper.succeed();
@@ -354,16 +394,24 @@ public final class TraitCaptureGameTest {
         return occupant;
     }
 
-    private static List<ItemStack> inventory(OccupantSnapshot occupant) {
-        TraitSlot slot = occupant.slot(OccupantTraits.inventory.id());
-        if (!(slot instanceof TraitSlot.Present)) {
-            throw new GameTestAssertException("the inventory is not present: " + slot);
+    private static IItemHandler inventory(OccupantSnapshot occupant) {
+        IItemHandler handler = occupant.trait(OccupantTraits.inventory);
+        if (handler == null) {
+            throw new GameTestAssertException(
+                "the inventory trait is not present: " + occupant.slot(OccupantTraits.inventory.id())
+            );
         }
-        List<ItemStack> items = occupant.trait(OccupantTraits.inventory);
-        if (items == null) {
-            throw new GameTestAssertException("the typed inventory trait is missing");
+        return handler;
+    }
+
+    private static IFluidHandler fluid(OccupantSnapshot occupant) {
+        IFluidHandler handler = occupant.trait(OccupantTraits.fluid);
+        if (handler == null) {
+            throw new GameTestAssertException(
+                "the fluid trait is not present: " + occupant.slot(OccupantTraits.fluid.id())
+            );
         }
-        return items;
+        return handler;
     }
 
     private static void assertRefused(GameTestHelper helper, WorldView view, LatticePoint cell) {
@@ -378,6 +426,50 @@ public final class TraitCaptureGameTest {
         helper.assertValueEqual(ReadStatus.readable, view.statusOf(cell), "the cell stays readable");
         helper.assertTrue(view.read(cell) instanceof CellRead.Found, "the occupant stays readable");
         helper.assertValueEqual(1, occupant.traits().size(), "only the requested trait has a slot");
+    }
+
+    private static <H> TraitProvider<IEnergyStorage, H> energyProvider(TraitHolder<H> holder, IEnergyStorage storage) {
+        return new TraitProvider<>() {
+            @Override
+            public TraitKey<IEnergyStorage> key() {
+                return OccupantTraits.energy;
+            }
+
+            @Override
+            public TraitHolder<H> holder() {
+                return holder;
+            }
+
+            @Override
+            public TraitSlot get(H actual, TraitCaptureContext capture) {
+                return new TraitSlot.Present(Trait.of(OccupantTraits.energy, storage));
+            }
+        };
+    }
+
+    private static TraitLookup fakeTraitLookup(BlockPos throwing, BlockPos wrongId) {
+        return TraitLookup.builder().add(new TraitProvider<IItemHandler, BlockTraitContext>() {
+            @Override
+            public TraitKey<IItemHandler> key() {
+                return OccupantTraits.inventory;
+            }
+
+            @Override
+            public TraitHolder<BlockTraitContext> holder() {
+                return TraitHolders.block;
+            }
+
+            @Override
+            public TraitSlot get(BlockTraitContext actual, TraitCaptureContext capture) {
+                if (actual.pos().equals(throwing)) {
+                    throw new IllegalStateException("fake trait capability");
+                }
+                if (actual.pos().equals(wrongId)) {
+                    return new TraitSlot.Present(Trait.absent(OccupantTraits.energy));
+                }
+                return new TraitSlot.Absent(OccupantTraits.inventory.id());
+            }
+        }).build();
     }
 
     private record SingleExtentLookup(BlockPos pos, NestedExtent extent) implements NestedExtentLookup {
@@ -398,23 +490,42 @@ public final class TraitCaptureGameTest {
         }
     }
 
-    private static TraitLookup fakeTraitLookup(BlockPos malformed, BlockPos throwing) {
-        return TraitLookup.builder().add(new TraitProvider<List<ItemStack>>() {
-            @Override
-            public TraitKey<List<ItemStack>> key() {
-                return OccupantTraits.inventory;
-            }
+    private static final class FakeEnergyStorage implements IEnergyStorage {
 
-            @Override
-            public TraitSlot readBlock(BlockTraitContext context) {
-                if (context.pos().equals(throwing)) {
-                    throw new IllegalStateException("fake trait capability");
-                }
-                if (context.pos().equals(malformed)) {
-                    throw new IllegalStateException("malformed fake trait capability");
-                }
-                return new TraitSlot.Absent(OccupantTraits.inventory.id());
-            }
-        }).build();
+        private final int stored;
+
+        private FakeEnergyStorage(int stored) {
+            this.stored = stored;
+        }
+
+        @Override
+        public int receiveEnergy(int amount, boolean simulate) {
+            return 0;
+        }
+
+        @Override
+        public int extractEnergy(int amount, boolean simulate) {
+            return 0;
+        }
+
+        @Override
+        public int getEnergyStored() {
+            return stored;
+        }
+
+        @Override
+        public int getMaxEnergyStored() {
+            return stored;
+        }
+
+        @Override
+        public boolean canExtract() {
+            return false;
+        }
+
+        @Override
+        public boolean canReceive() {
+            return false;
+        }
     }
 }

@@ -11,16 +11,17 @@ import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.mc.trait.BlockTraitContext;
 import dev.vfyjxf.cumulus.mc.trait.EntityTraitContext;
 import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitHolders;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import dev.vfyjxf.cumulus.mc.trait.TraitProvider;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.items.IItemHandler;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -31,14 +32,11 @@ import java.util.List;
 @NullMarked
 public final class OccupantTraits {
 
-    public static final TraitKey<List<ItemStack>> inventory = new TraitKey<>(id("inventory"), listClass());
-    public static final TraitKey<Integer> energy = new TraitKey<>(id("energy"), Integer.class);
-    public static final TraitKey<List<FluidStack>> fluid = new TraitKey<>(id("fluid"), listClass());
-    public static final TraitKey<CompoundTag> blockEntityNbt = new TraitKey<>(
-        id("block_entity_nbt"),
-        CompoundTag.class
-    );
-    public static final TraitKey<CompoundTag> entityNbt = new TraitKey<>(id("entity_nbt"), CompoundTag.class);
+    public static final TraitKey<IItemHandler> inventory = new TraitKey<>(id("inventory"), IItemHandler.class);
+
+    public static final TraitKey<IEnergyStorage> energy = new TraitKey<>(id("energy"), IEnergyStorage.class);
+
+    public static final TraitKey<IFluidHandler> fluid = new TraitKey<>(id("fluid"), IFluidHandler.class);
 
     private static final FindingCode unreadableTrait = FindingCode.of(FindingCode.Family.mc, 2);
 
@@ -86,16 +84,14 @@ public final class OccupantTraits {
         BlockState state,
         @Nullable BlockEntity blockEntity
     ) {
-        TraitProvider<?> provider = lookup.provider(id);
+        TraitProvider<?, BlockTraitContext> provider = lookup.provider(id, TraitHolders.block);
         if (provider == null) {
-            return refused(id, ReadStatus.denied);
+            return absentOrDenied(lookup, id);
         }
-        try {
-            TraitSlot slot = provider.readBlock(new BlockTraitContext(level, pos, state, blockEntity, capture));
-            return slot == null || !slot.id().equals(id) ? refused(id, ReadStatus.failed) : slot;
-        } catch (RuntimeException failure) {
-            return refused(id, ReadStatus.failed);
+        if (state.hasBlockEntity() && blockEntity == null) {
+            return refused(id, ReadStatus.notCaptured);
         }
+        return read(provider, id, new BlockTraitContext(level, pos, state, blockEntity), capture);
     }
 
     private static TraitSlot entitySlot(
@@ -104,16 +100,29 @@ public final class OccupantTraits {
         TraitCaptureContext capture,
         Entity entity
     ) {
-        TraitProvider<?> provider = lookup.provider(id);
+        TraitProvider<?, EntityTraitContext> provider = lookup.provider(id, TraitHolders.entity);
         if (provider == null) {
-            return refused(id, ReadStatus.denied);
+            return absentOrDenied(lookup, id);
         }
+        return read(provider, id, new EntityTraitContext(entity), capture);
+    }
+
+    private static <H> TraitSlot read(
+        TraitProvider<?, H> provider,
+        NamespacedId id,
+        H actual,
+        TraitCaptureContext capture
+    ) {
         try {
-            TraitSlot slot = provider.readEntity(new EntityTraitContext(entity, capture));
+            TraitSlot slot = provider.get(actual, capture);
             return slot == null || !slot.id().equals(id) ? refused(id, ReadStatus.failed) : slot;
         } catch (RuntimeException failure) {
             return refused(id, ReadStatus.failed);
         }
+    }
+
+    private static TraitSlot absentOrDenied(TraitLookup lookup, NamespacedId id) {
+        return lookup.knows(id) ? new TraitSlot.Absent(id) : refused(id, ReadStatus.denied);
     }
 
     private static TraitSlot refused(NamespacedId id, ReadStatus status) {
@@ -122,11 +131,6 @@ public final class OccupantTraits {
 
     private static NamespacedId id(String path) {
         return NamespacedId.of(Constants.modId, path);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> Class<List<T>> listClass() {
-        return (Class<List<T>>) (Class<?>) List.class;
     }
 
     private OccupantTraits() {}

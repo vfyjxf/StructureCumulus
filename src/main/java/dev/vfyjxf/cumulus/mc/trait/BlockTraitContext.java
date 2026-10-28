@@ -11,17 +11,10 @@ import java.util.Objects;
 
 /** The immutable input of one block trait read. */
 @NullMarked
-public record BlockTraitContext(
-    ServerLevel level,
-    BlockPos pos,
-    BlockState state,
-    @Nullable BlockEntity blockEntity,
-    TraitCaptureContext capture
-) {
+public record BlockTraitContext(ServerLevel level, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity) {
 
     public BlockTraitContext {
         Objects.requireNonNull(pos, "pos");
         Objects.requireNonNull(state, "state");
-        Objects.requireNonNull(capture, "capture");
     }
 }

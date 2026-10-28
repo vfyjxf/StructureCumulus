@@ -47,12 +47,14 @@ Then the module files, in dependency order:
 ## Status
 
 - Design revision: **v1.2**, 2026-10-27, plus the [08 context-cache](design/08-context-cache.md),
-  [09 structure-set](design/09-structure-sets.md) and [10 host-data](design/10-host-data.md) extension
-  documents. The v1.1 round specified Model C (body identity, the narrowest-read refusal, four-state
-  traits) and the nested capability; v1.2 records them as implemented, and its M5a/M5d/M5e slices
-  close the adapter round. 08/09 specify the host-owned cached-context port (D-31) and the
-  root/satellite set layer (D-32); 10 specifies the typed host snapshot (D-33), implemented as H1–H4
-  and superseding the descriptor projection (D-29).
+  [09 structure-set](design/09-structure-sets.md), [10 host-data](design/10-host-data.md) and
+  [11 trait-providers](design/11-trait-providers.md) extension documents. The v1.1 round specified
+  Model C (body identity, the narrowest-read refusal, four-state traits) and the nested capability;
+  v1.2 records them as implemented, and its M5a/M5d/M5e slices close the adapter round. 08/09
+  specify the host-owned cached-context port (D-31) and the root/satellite set layer (D-32); 10
+  specifies the typed host snapshot (D-33), implemented as H1–H4 and superseding the descriptor
+  projection (D-29); 11 specifies the generic per-holder trait providers and direct capability
+  values (D-34), implemented as T1–T3.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -95,22 +97,25 @@ Then the module files, in dependency order:
   frame with copied states, fluids, block entities and entities; the adapter
   `property`/`state`/`tag`/`fluid` factories and `SC-MC-0006`…`0010`; and the `HostDataScenarioTest`
   group (§3.4) over a rotated structure set, a nested child frame, a waterlogged slab and a missing
-  snapshot. The tree registers 258 kernel tests in 39 containers, 276 adapter unit tests in 36
-  containers and 64 `@GameTest` methods; the host-data close-out at `d70ecd7` ran a full
-  `./gradlew check` and `runGameTestServer`, both green (258 kernel tests, 276 adapter tests,
-  64/64 GameTests). Pending only: the
+  snapshot. T1–T3 (D-34, `design/11-trait-providers.md`) replace the `readBlock`/`readEntity` trait
+  providers with the generic `TraitProvider<T, H>`/`TraitHolder<H>` pair registry, one
+  `CapabilityTraitProvider<T, H, C>` with block/entity accessors, the direct `IItemHandler`/
+  `IEnergyStorage`/`IFluidHandler` trait values and the NBT-trait removal. The tree registers 258
+  kernel tests in 39 containers, 284 adapter unit tests in 37 containers and 65 `@GameTest` methods;
+  a full `./gradlew check` and `runGameTestServer` on the T1–T3 working tree are both green (258
+  kernel tests, 284 adapter tests, 65/65 GameTests). Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-28, HEAD `d70ecd7`): the kernel compiles with
+- Verification (2026-10-28, T1–T3 working tree): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 258 kernel JUnit 5 tests (39 test
-  containers), 276 adapter unit tests (36 containers) and 64 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (258 kernel tests, 276 adapter
-  tests, 64/64 GameTests, 0 failures, 0 skipped). `Codes.all` has 64 entries
-  and the decision record has 33 decisions (D-33; D-29 superseded).
+  containers), 284 adapter unit tests (37 containers) and 65 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (258 kernel tests, 284 adapter
+  tests, 65/65 GameTests, 0 failures, 0 skipped). `Codes.all` has 64 entries
+  and the decision record has 34 decisions (D-34; D-29 superseded).
 
 ## The one rule
 

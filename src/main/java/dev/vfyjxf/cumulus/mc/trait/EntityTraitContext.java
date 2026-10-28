@@ -7,10 +7,9 @@ import java.util.Objects;
 
 /** The immutable input of one entity trait read. */
 @NullMarked
-public record EntityTraitContext(Entity entity, TraitCaptureContext capture) {
+public record EntityTraitContext(Entity entity) {
 
     public EntityTraitContext {
         Objects.requireNonNull(entity, "entity");
-        Objects.requireNonNull(capture, "capture");
     }
 }

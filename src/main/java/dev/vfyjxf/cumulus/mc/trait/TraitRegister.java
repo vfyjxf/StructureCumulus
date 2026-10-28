@@ -7,5 +7,5 @@ import org.jspecify.annotations.NullMarked;
 @FunctionalInterface
 public interface TraitRegister {
 
-    <T> void register(TraitProvider<T> provider);
+    <T, H> void register(TraitProvider<T, H> provider);
 }

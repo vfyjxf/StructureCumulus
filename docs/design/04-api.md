@@ -127,7 +127,7 @@ the leaves' `SC-MC-0009`.
 ```java
 final class HatchExpectation implements Expectation<OccupantSnapshot> {
     static final NamespacedId id = id("hatch");
-    static final TraitKey<Inventory> inventory = new TraitKey<>(id("inventory"), Inventory.class);
+    static final TraitKey<IItemHandler> inventory = new TraitKey<>(id("inventory"), IItemHandler.class);
 
     @Override public Class<OccupantSnapshot> subject() { return OccupantSnapshot.class; }
     @Override public ExpectationMeta meta() {
@@ -159,6 +159,11 @@ final class HatchExpectation implements Expectation<OccupantSnapshot> {
 ```
 
 One interface, one catalog registration, no engine access. `ctx.phase()` is always `check`.
+
+The standard `structurecumulus:inventory` trait value is the live `IItemHandler` itself, so the check
+above reads `((IItemHandler) present.trait().value()).getStackInSlot(0)` when it needs slot contents;
+there is no copied slot list. The same rule holds for `energy` (`IEnergyStorage`) and `fluid`
+(`IFluidHandler`): a trait carries the owning API object, never a framework wrapper.
 
 ## 5. The document surface
 

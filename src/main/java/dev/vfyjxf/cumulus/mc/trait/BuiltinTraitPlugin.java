@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
 
 import java.util.Set;
 
-/** The built-in plugin that registers the five standard providers. */
+/** The built-in plugin that registers the standard block and entity providers. */
 @NullMarked
 @PluginMarker
 public final class BuiltinTraitPlugin implements TraitPlugin, ModPlugin {
@@ -27,6 +27,7 @@ public final class BuiltinTraitPlugin implements TraitPlugin, ModPlugin {
 
     @Override
     public void registerTraits(TraitRegister register) {
-        StandardTraitProviders.registerAll(register);
+        BlockTraitProviders.registerAll(register);
+        EntityTraitProviders.registerAll(register);
     }
 }
