@@ -95,22 +95,20 @@ Then the module files, in dependency order:
   `property`/`state`/`tag`/`fluid` factories and `SC-MC-0006`…`0010`; and the `HostDataScenarioTest`
   group (§3.4) over a rotated structure set, a nested child frame, a waterlogged slab and a missing
   snapshot. The tree registers 258 kernel tests in 39 containers, 276 adapter unit tests in 36
-  containers and 64 `@GameTest` methods; the last full green `./gradlew check` is at `3e60ed4` (186
-  kernel tests in 33 containers, 141 adapter tests) and the last recorded `runGameTestServer` is
-  66/66 at `6263414`. Slices after `3e60ed4` report focused runs only. Pending only: the
+  containers and 64 `@GameTest` methods; the host-data close-out at `d70ecd7` ran a full
+  `./gradlew check` and `runGameTestServer`, both green (258 kernel tests, 276 adapter tests,
+  64/64 GameTests). Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): the kernel compiles with
+- Verification (2026-10-28, HEAD `d70ecd7`): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 258 kernel JUnit 5 tests (39 test
-  containers), 276 adapter unit tests (36 containers) and 64 `@GameTest` methods; the last full
-  `./gradlew check` is at `3e60ed4` (186/141) and the last recorded `runGameTestServer` is 66/66 at
-  `6263414`, so no full-suite or GameTest result is claimed for this revision. H4's focused gates are
-  `compileKernelTestJava`, `compileTestJava`, the `HostDataScenarioTest` `test` selection,
-  `spotlessCheck`, `tools/spec-check.py` and `git diff --check`, all green. `Codes.all` has 64 entries
+  containers), 276 adapter unit tests (36 containers) and 64 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (258 kernel tests, 276 adapter
+  tests, 64/64 GameTests, 0 failures, 0 skipped). `Codes.all` has 64 entries
   and the decision record has 33 decisions (D-33; D-29 superseded).
 
 ## The one rule

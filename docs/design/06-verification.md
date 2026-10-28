@@ -33,12 +33,10 @@ document/compiler (S2, `00cf6c4`) and the host set layer (S3, `93f5941`, D-32) a
 adds the six-class/33-test structure-set stress batch (§3.3). The host-data round closes with H4:
 H1 adds `HostType`/`WorldView.get`/`Expectations.host` and `OccupantDescriptor(type, kind)`; H2 adds
 one `SnapshotLevel` per frame and the capture wiring; H3 adds the adapter host expectation factories
-and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). The
-last full `./gradlew check` is at `3e60ed4`: 186 kernel tests (33 containers), 141 adapter unit tests,
-0 failures, 0 skipped, and the last recorded `runGameTestServer` is 66/66 at `6263414`. The tree now
-registers **258 kernel tests in 39 containers, 276 adapter unit tests in 36 containers and 64
-`@GameTest` methods**; the slices after `3e60ed4` report focused runs only in this design set, so no
-full-suite or GameTest result is claimed for this revision. `tools/spec-check.py` is clean.
+and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). At
+`d70ecd7` a full `./gradlew check` and `runGameTestServer` both pass: 258 kernel tests (39 containers),
+276 adapter unit tests (36 containers), 64/64 `@GameTest` methods, 0 failures, 0 skipped.
+`tools/spec-check.py` is clean.
 `Codes.all` has 64 entries and the decision record has 33 decisions (D-33). Model C, body identity,
 trait capture, the nested capability, the mark counter, the capture-report channel, the typed host
 snapshot, the cached-context port and the structure-set layer are implemented, not pending. The
@@ -358,8 +356,7 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 ## 7. What is not verified in this round
 
 - The rest of the NeoForge adapter and its GameTests. The tree registers 64 `@GameTest` methods; the
-  last recorded full `runGameTestServer` is 66/66 at `6263414`, before the later stress batches and
-  slices, and SS4 ran no GameTest. The registered set covers M1 capture/host, M2a entity precedence,
+  last recorded full `runGameTestServer` is 64/64 at `d70ecd7`. The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, M2c traits, M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
   rotated-siting two-phase capture
