@@ -62,5 +62,6 @@ export const CODE_ZH: Record<string, { summary: string; body: string }> = {
   'SC-SET-0004': { summary: 'satellite 的 presence 读不出来。', body: '某个 presence cell 读不出来，所以 presence 未知。检查 capture bounds、budget 和 presence region。' },
   'SC-SET-0005': { summary: '两个 satellite 共用同一个 placement。', body: 'set 里两个 satellite 声明了相同的相对 offset 和 orientation。给每个 satellite 一个不同的 placement。' },
   'SC-SET-0006': { summary: '两个 face link 共用同一个 parent cell 和 face。', body: '这个 parent cell 在同一个方向上已经有 face link。检查 link 对，移动或删除重复项。' },
-  'SC-SET-0007': { summary: '结构集合 rollback 失败。', body: '后面的结构 settle 失败后，已经 settle 的结构无法释放。retry 前检查 ledger、owner 和 siting。' },
+  'SC-SET-0007': { summary: '结构集合 rollback 失败。', body: '后面的结构 settle 失败后，已经 settle 的结构无法释放，或已形成的 context 无法移除。retry 前检查 ledger、owner、siting 和 store。' },
+  'SC-SET-0008': { summary: 'satellite 正好被放在 root 上。', body: 'satellite 的相对 placement 是 identity：offset (0, 0, 0) 且 orientation 也是 identity，所以它的 siting 等于 root siting。给 satellite 一个非零 offset，或一个非 identity orientation。' },
 };

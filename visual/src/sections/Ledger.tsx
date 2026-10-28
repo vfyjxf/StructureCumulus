@@ -73,7 +73,7 @@ export function Ledger() {
         no="04"
         kicker={zh ? 'claim / 写入路径' : 'Claims / the write path'}
         title={zh ? <>一行就是一个 cell。<em>plan 不是类型。</em></> : <>A row is a cell. <em>A plan is not a type.</em></>}
-        note={zh ? <>移动两个 bay、改变 sharing。矩阵是唯一的冲突规则；ledger 只比较一次 revision，只写一次。结构集合（D-32）增加的是 host 编排，不是 kernel 事务。</> : <>Move the two bays and change their sharing. The matrix is the only conflict rule; the ledger compares one revision and writes once. Structure sets (D-32) add host orchestration, not a kernel transaction.</>}
+        note={zh ? <>移动两个 bay、改变 sharing。矩阵是唯一的冲突规则；ledger 只比较一次 revision，只写一次。结构集合（D-32）增加的是 host 编排和 S5 的 set 命令，不是 kernel 事务；S6 给 set 一个共享 budget，并让 rollback 通过 <code>ContextStore.remove</code> 失效 context（D-35）。</> : <>Move the two bays and change their sharing. The matrix is the only conflict rule; the ledger compares one revision and writes once. Structure sets (D-32) add host orchestration and the S5 set command, not a kernel transaction; S6 gives the set one shared budget and lets rollback invalidate contexts through <code>ContextStore.remove</code> (D-35).</>}
       />
 
       <Reveal>
@@ -204,18 +204,21 @@ export function Ledger() {
               <CodeBlock code={SNIPPET} language="java" />
             </div>
             <div className="aside-rule" />
-            <div className="eyebrow">{zh ? '结构集合 / D-32' : 'Structure sets / D-32'}</div>
+            <div className="eyebrow">{zh ? '结构集合 / D-32 → D-35' : 'Structure sets / D-32 → D-35'}</div>
             <h4 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 24, letterSpacing: '-.03em', marginTop: 7 }}>
               {zh ? 'root + satellites，由 host 编排。' : 'Root + satellites, sequenced by the host.'}
             </h4>
             <p style={{ marginTop: 10, fontSize: 11, lineHeight: 1.55, color: 'var(--muted)' }}>
-              {zh ? 'kernel 仍然一次只 check、settle 一个 blueprint。StructureSetHost 负责 presence、link 校验、check-all、settle-all 和 release；任何 settle 前的错误都不会 settle。' : 'The kernel still checks and settles one blueprint at a time. StructureSetHost owns presence, link validation, check-all, settle-all and release; any failure before a settle settles nothing.'}
+              {zh ? <>kernel 仍然一次只 check、settle 一个 blueprint。<code>StructureSetHost</code> 负责 presence、link 校验、check-all、settle-all 和 release；S5 增加 <code>/cumulus set check|settle</code> 和一次 union capture，S6 让 presence 与每个成员 attempt 共享一个 budget，并在 rollback 时移除每个已形成的 context。</> : <>The kernel still checks and settles one blueprint at a time. <code>StructureSetHost</code> owns presence, link validation, check-all, settle-all and release; S5 adds <code>/cumulus set check|settle</code> over one union capture, and S6 shares one budget across presence and every member attempt and removes each formed context on rollback.</>}
             </p>
             <div className="key-stack" style={{ marginTop: 12 }}>
               <div><span className="k">order</span><span className="v">presence → links → check-all → settle-all → release</span></div>
-              <div><span className="k">{zh ? '回滚' : 'rollback'}</span><span className="v">{zh ? '逆序；失败是 SC-SET-0007' : 'reverse order; failure is SC-SET-0007'}</span></div>
+              <div><span className="k">command</span><span className="v">/cumulus set check|settle · one union capture</span></div>
+              <div><span className="k">budget</span><span className="v">{zh ? 'presence + 每个 attempt 共享一个 set budget' : 'one set budget: presence + every attempt'}</span></div>
+              <div><span className="k">siting</span><span className="v">{zh ? 'satellite 不得与 root 同 siting · SC-SET-0008' : 'no satellite on the root siting · SC-SET-0008'}</span></div>
+              <div><span className="k">{zh ? '回滚' : 'rollback'}</span><span className="v">{zh ? '逆序；release + ContextStore.remove；失败是 SC-SET-0007' : 'reverse order; release + ContextStore.remove; failure is SC-SET-0007'}</span></div>
               <div><span className="k">claims</span><span className="v">{zh ? '按 (owner, siting, bay) 过滤' : 'filtered by (owner, siting, bay)'}</span></div>
-              <div><span className="k">context</span><span className="v">{zh ? '保持已发布；kernel 无 rollback' : 'stays published; no kernel rollback'}</span></div>
+              <div><span className="k">context</span><span className="v">{zh ? 'rollback 时由 store 移除' : 'removed by the store on rollback'}</span></div>
             </div>
             <div className="figure-label">
               <span>{zh ? '图 04 — 两个 owner，一个 cell' : 'Fig. 04 — two owners, one cell'}</span>

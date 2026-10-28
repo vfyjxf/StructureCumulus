@@ -7,10 +7,10 @@ export type TestClass = {
 
 export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/claim/ClaimTest.java", "package": "claim", "className": "ClaimTest", "count": 5},
-  {"file": "dev/vfyjxf/cumulus/kernel/context/ContextTest.java", "package": "context", "className": "ContextTest", "count": 3},
+  {"file": "dev/vfyjxf/cumulus/kernel/context/ContextTest.java", "package": "context", "className": "ContextTest", "count": 4},
   {"file": "dev/vfyjxf/cumulus/kernel/core/CoreTest.java", "package": "core", "className": "CoreTest", "count": 9},
   {"file": "dev/vfyjxf/cumulus/kernel/document/DocumentCompilerTest.java", "package": "document", "className": "DocumentCompilerTest", "count": 8},
-  {"file": "dev/vfyjxf/cumulus/kernel/document/StructureSetCompilerTest.java", "package": "document", "className": "StructureSetCompilerTest", "count": 13},
+  {"file": "dev/vfyjxf/cumulus/kernel/document/StructureSetCompilerTest.java", "package": "document", "className": "StructureSetCompilerTest", "count": 15},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/Ae2CpuScenarioTest.java", "package": "engine", "className": "Ae2CpuScenarioTest", "count": 5},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AggregateContextTest.java", "package": "engine", "className": "AggregateContextTest", "count": 7},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AstralAltarScenarioTest.java", "package": "engine", "className": "AstralAltarScenarioTest", "count": 3},
@@ -49,9 +49,9 @@ export const testClasses: TestClass[] = [
 
 export const TEST_GROUPS = [
   {"name": "claim", "count": 5},
-  {"name": "context", "count": 3},
+  {"name": "context", "count": 4},
   {"name": "core", "count": 9},
-  {"name": "document", "count": 21},
+  {"name": "document", "count": 23},
   {"name": "engine", "count": 121},
   {"name": "finding", "count": 35},
   {"name": "space", "count": 18},
@@ -59,4 +59,4 @@ export const TEST_GROUPS = [
   {"name": "world", "count": 19},
 ];
 
-export const TEST_COUNT = 258;
+export const TEST_COUNT = 261;

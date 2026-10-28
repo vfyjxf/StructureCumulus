@@ -27,7 +27,7 @@ export const ZH_MODULES: Record<ModuleId, { owns: string; law: string }> = {
 
 export const ZH_PRINCIPLES: Record<string, { title: string; text: string }> = {
   '01': { title: '一个 key', text: 'ContextKey<T> 是 context value 的唯一身份。同一个 id、不同的 Java 类型，就是两个 key。' },
-  '02': { title: '一次发布', text: '成功的 settle 只发布一次 INSTANCE；derive 只发布一个 batch 一次。没有别的地方写 context。' },
+  '02': { title: '一次发布', text: '成功的 settle 只发布一次 INSTANCE；derive 只发布一个 batch 一次。set rollback 通过 ContextStore.remove 移除已形成的 context；没有别的地方写或移除 context。' },
   '03': { title: '一个方向', text: 'package 只能 import rank 更低的 package。图会被检查；边表就是法律。' },
   '04': { title: '一个谓词', text: 'ClaimMatrix.conflicts 是唯一的冲突规则。plan 不能再编码第二个。' },
   '05': { title: '一次 host 读取', text: '一个 host 值就是一次来自不可变快照的类型化读取。descriptor 始终是 (type, kind)；kernel 从不命名或建模这个值。' },
@@ -51,7 +51,8 @@ export const ZH_REMOVED: Record<string, string> = {
   'readBlock / readEntity': 'provider 只声明一次 holder；没有 provider 就是缺席，不是隐藏的 default。',
   'blockEntityNbt / entityNbt': 'trait 就是所属 API 的值；序列化不是 API，也不存在 item holder。',
   'Structure-set transaction': 'root、satellites 和 links 都是 host 编排；kernel 仍然一次只 check、settle 一个 blueprint。',
-  'Kernel context rollback': 'set rollback 释放 claims；已发布的 context 没有移除操作。',
+  'Per-attempt set budget': 'presence 和每个成员 attempt 从同一个上限读取；set 才是 host 准入的单位。',
+  'Kernel context rollback': 'set rollback 释放 claims，并通过 store 移除每个已形成的 StructureContext；kernel 仍然没有事务。',
 };
 
 export const ZH_DOCS: Record<string, string> = {
@@ -88,16 +89,16 @@ export const ZH_GROUPS: Record<string, string> = {
 };
 
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
-  Compile: { label: '编译', note: 'gradlew check 在 53652dd 通过' },
+  Compile: { label: '编译', note: 'gradlew check 在 58e97b8 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 39 个容器；adapter 284 · GameTests 65/65' },
-  'Spec index': { label: '规范索引', note: 'spec-check.py · 64 codes' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 39 个容器；adapter 292 · GameTests 69/69' },
+  'Spec index': { label: '规范索引', note: 'spec-check.py · 65 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 284 · GameTests 65/65' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 292 · GameTests 69/69' },
   codes: { label: '代码', note: '13 个 kernel family · 一张 Codes 表' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
   decisions: { label: '决策', note: 'ruling，不是偏好' },
@@ -114,7 +115,7 @@ export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
   },
   'D-32': {
     title: '结构集合',
-    text: 'root + satellites + links + presence，由 StructureSetHost 编排；host rollback 只释放 claims，从不回滚已发布 context；kernel 没有 set 类型。',
+    text: 'root + satellites + links + presence，由 StructureSetHost 编排；S5 提供 /cumulus set check|settle 和一次 union capture；kernel 仍然没有 set 类型。',
   },
   'D-33': {
     title: '类型化 host 快照',
@@ -123,5 +124,9 @@ export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
   'D-34': {
     title: 'trait providers',
     text: '每个 holder 一个 TraitProvider<T, H>/TraitHolder，一个 CapabilityTraitProvider 类；capability traits 直接返回 IItemHandler、IEnergyStorage 和 IFluidHandler。没有 NBT trait，也没有 item holder。',
+  },
+  'D-35': {
+    title: 'set 收束',
+    text: 'SC-SET-0008 拒绝与 root 同 siting 的 satellite（compiler、StructureSet.place、host check）；presence 和每个 attempt 共享一个 set budget；rollback 通过 ContextStore.remove 移除已形成的 context。',
   },
 };
