@@ -641,6 +641,53 @@ class StructureSetHostTest {
         assertEquals(List.of(Codes.snapshotStale.code()), codes(result.setFindings()));
     }
 
+    @Test
+    void aCheckOnlyRunAdmitsEveryStructureAndWritesNothing() {
+        StructureSetTestSupport.Fixture fixture = fixture(
+            compiled(
+                compiled(leftSatellite(false, LinkSpec.face(leftParent, port)), preheaterBlueprint()),
+                compiled(rightSatellite(false, LinkSpec.face(rightParent, port)), preheaterBlueprint())
+            )
+        );
+        fillHappy(fixture);
+        StructureSetResult result = fixture.check();
+
+        assertFalse(result.formed());
+        assertTrue(result.setFindings().isEmpty(), () -> result.setFindings().toString());
+        assertEquals(List.of(rootId, leftId, rightId), new ArrayList<>(result.outcomes().keySet()));
+        assertTrue(result.settled().isEmpty());
+        assertTrue(result.rolledBack().isEmpty());
+        assertTrue(result.rollbackFailures().isEmpty());
+        assertTrue(result.claims().isEmpty());
+        assertEquals(0, fixture.ledger.rows().size());
+        assertEquals(0, fixture.ledger.settleCalls);
+        assertEquals(3, fixture.instances.size());
+    }
+
+    @Test
+    void aCheckOnlyRunStopsAtTheFailedMember() {
+        StructureSetTestSupport.Fixture fixture = fixture(
+            compiled(
+                compiled(leftSatellite(false, LinkSpec.face(leftParent, port)), preheaterBlueprint()),
+                compiled(rightSatellite(false, LinkSpec.face(rightParent, port)), preheaterBlueprint())
+            )
+        );
+        fillHappy(fixture);
+        StructureSet.Satellite left = fixture.plan.satellite(leftId);
+        assertNotNull(left);
+        fixture.view.put(world(left.siting(), LatticePoint.origin), StructureSetTestSupport.wrong);
+        StructureSetResult result = fixture.check();
+
+        assertFalse(result.formed());
+        assertTrue(result.settled().isEmpty());
+        assertTrue(result.claims().isEmpty());
+        assertEquals(List.of(rootId), new ArrayList<>(result.outcomes().keySet()));
+        assertEquals(2, fixture.instances.size());
+        assertEquals(0, fixture.ledger.rows().size());
+        assertEquals(0, fixture.ledger.settleCalls);
+        assertTrue(codes(result.setFindings()).contains(Codes.expected.code()), () -> result.setFindings().toString());
+    }
+
     private static StructureSetTestSupport.Fixture fixture(CompiledStructureSet compiled) {
         return new StructureSetTestSupport.Fixture(compiled);
     }

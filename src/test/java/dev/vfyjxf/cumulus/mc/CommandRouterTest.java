@@ -32,5 +32,13 @@ class CommandRouterTest {
         assertNotNull(claims, "the claims subcommand");
         assertNotNull(claims.getChild("from"), "claims takes a from corner");
         assertNotNull(claims.getChild("from").getChild("to"), "claims takes a to corner");
+        CommandNode<CommandSourceStack> set = cumulus.getChild("set");
+        assertNotNull(set, "the set subcommand group");
+        for (String path : new String[]{"check", "settle"}) {
+            CommandNode<CommandSourceStack> verb = set.getChild(path);
+            assertNotNull(verb, "set takes a " + path + " path");
+            assertNotNull(verb.getChild("id"), path + " takes an id");
+            assertNotNull(verb.getChild("id").getChild("origin"), path + " takes an origin");
+        }
     }
 }

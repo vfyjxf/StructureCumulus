@@ -79,7 +79,10 @@ final class CommandSupport {
     }
 
     static SnapshotPolicy policy(Blueprint blueprint) {
-        ReadScope reads = blueprint.reads();
+        return policy(blueprint.reads());
+    }
+
+    static SnapshotPolicy policy(ReadScope reads) {
         return new SnapshotPolicy(maxElements, reads.depth(), reads.kinds(), reads.traits(), reads.windows());
     }
 
@@ -154,6 +157,34 @@ final class CommandSupport {
         }
     }
 
+    /**
+     * Resolves the siting of an anchorless blueprint as identity at the origin and of an anchored one
+     * from the minimal anchor capture, closing that capture before the caller captures the sited bounds.
+     */
+    static @Nullable Siting rootSiting(
+        ServerState state,
+        CommandSourceStack source,
+        NamespacedId id,
+        Blueprint blueprint,
+        LatticePoint origin
+    ) {
+        if (blueprint.anchors().isEmpty()) {
+            return Siting.of(origin, Orientation.identity);
+        }
+        Cuboid anchorCell = anchorCell(origin);
+        if (anchorCell == null) {
+            source.sendFailure(Component.literal("the anchor cell leaves the lattice at " + origin));
+            return null;
+        }
+        Captured anchor = capture(state, source, id, anchorCell, SnapshotPolicy.minimal(), null);
+        if (anchor == null) {
+            return null;
+        }
+        try (SnapshotLease phase1 = anchor.lease()) {
+            return siting(source, id, blueprint, origin, phase1.view());
+        }
+    }
+
     static @Nullable Attempt attempt(
         ServerState state,
         CommandSourceStack source,
@@ -171,21 +202,9 @@ final class CommandSupport {
                     ? null
                     : new Attempt(bounds, Siting.of(origin, Orientation.identity), captured.lease(), captured.report());
         }
-        Cuboid anchorCell = anchorCell(origin);
-        if (anchorCell == null) {
-            source.sendFailure(Component.literal("the anchor cell leaves the lattice at " + origin));
+        Siting siting = rootSiting(state, source, id, blueprint, origin);
+        if (siting == null) {
             return null;
-        }
-        Captured anchorCaptured = capture(state, source, id, anchorCell, SnapshotPolicy.minimal(), null);
-        if (anchorCaptured == null) {
-            return null;
-        }
-        Siting siting;
-        try (SnapshotLease phase1 = anchorCaptured.lease()) {
-            siting = siting(source, id, blueprint, origin, phase1.view());
-            if (siting == null) {
-                return null;
-            }
         }
         Cuboid bounds = sitedBounds(blueprint, siting);
         if (bounds == null) {

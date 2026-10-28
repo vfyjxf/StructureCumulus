@@ -100,21 +100,25 @@ Then the module files, in dependency order:
   snapshot. T1–T3 (D-34, `design/11-trait-providers.md`) replace the `readBlock`/`readEntity` trait
   providers with the generic `TraitProvider<T, H>`/`TraitHolder<H>` pair registry, one
   `CapabilityTraitProvider<T, H, C>` with block/entity accessors, the direct `IItemHandler`/
-  `IEnergyStorage`/`IFluidHandler` trait values and the NBT-trait removal. The tree registers 258
-  kernel tests in 39 containers, 284 adapter unit tests in 37 containers and 65 `@GameTest` methods;
-  a full `./gradlew check` and `runGameTestServer` on the T1–T3 working tree are both green (258
-  kernel tests, 284 adapter tests, 65/65 GameTests). Pending only: the
+  `IEnergyStorage`/`IFluidHandler` trait values and the NBT-trait removal. S5 of the 09 structure-set
+  close-out adds the production set command (`/cumulus set check`, `/cumulus set settle`), its one
+  union capture and check-only host path, the built-in `set_root`/`set_wing`/`set_demo` documents and
+  the real-level set GameTests (`design/06-verification.md` §3.5); S6 (shared budget,
+  `ContextStore` removal, same-siting rejection) stays out. The tree registers 258
+  kernel tests in 39 containers, 286 adapter unit tests in 37 containers and 69 `@GameTest` methods;
+  a full `./gradlew check` and `runGameTestServer` on the S5 working tree are both green (258
+  kernel tests, 286 adapter tests, 69/69 GameTests). Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-28, T1–T3 working tree): the kernel compiles with
+- Verification (2026-10-29, S5 working tree): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 258 kernel JUnit 5 tests (39 test
-  containers), 284 adapter unit tests (37 containers) and 65 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (258 kernel tests, 284 adapter
-  tests, 65/65 GameTests, 0 failures, 0 skipped). `Codes.all` has 64 entries
+  containers), 286 adapter unit tests (37 containers) and 69 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (258 kernel tests, 286 adapter
+  tests, 69/69 GameTests, 0 failures, 0 skipped). `Codes.all` has 64 entries
   and the decision record has 34 decisions (D-34; D-29 superseded).
 
 ## The one rule

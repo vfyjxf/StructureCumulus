@@ -1,9 +1,10 @@
 # 09. Structure sets and satellites
 
-> Status: implemented (S1, S2, S3 and S4); the H4 host-data round changes no set-layer rule. This
+> Status: implemented (S1, S2, S3, S4 and S5); the H4 host-data round changes no set-layer rule. This
 > document remains the source of truth for the structure-set layer; the document IR, JSON
-> reader/dispatcher/writer, `StructureSetCompiler`, the host plan, the host orchestration and the SS4
-> stress suite are on the tree. Visual review stays last and was not regenerated.
+> reader/dispatcher/writer, `StructureSetCompiler`, the host plan, the host orchestration, the SS4
+> stress suite and the S5 command/capture path are on the tree. Visual review stays last and was not
+> regenerated.
 
 ## 1. Purpose
 
@@ -451,6 +452,38 @@ order. Rollback releases claims only: the kernel context published by a rolled-b
 and `ContextStore` exposes no removal, so the result names every id in `rolledBack` for the host's own
 invalidation policy.
 
+### 10.5 Production command and one capture (S5)
+
+The production host driver is the pair of subcommands:
+
+```text
+/cumulus set check  <id> <origin>
+/cumulus set settle <id> <origin>
+```
+
+Both resolve the set document, compile it, resolve the root siting, place the set, **capture once**
+and then either run `StructureSetHost.check` or `StructureSetHost.run` with `Budget.unbounded()`, the
+server owner and one instance per checked structure.
+
+- The root siting is identity at the origin when the root has no anchors, and the minimal anchor
+  capture otherwise (`10-host-data.md`; the anchor property still selects the orientation).
+- The one capture region is the bounding box of the root bounds and every satellite's world bounds.
+  Its policy is one `SnapshotPolicy` over the union of the root's and every satellite's
+  `Blueprint.reads()`: the maximum depth, the union of kinds, traits and windows, and the adapter's
+  element ceiling.
+- The capture is sited with the root siting orientation, so the orientation audit of the capture
+  covers the whole region. A satellite placed with a non-identity relative orientation may therefore
+  be audited under the root orientation too and answer a `SC-MC-0004` warning that its own frame
+  would not produce; a warning never changes the command's exit code.
+- `set check` prints the set id and origin, the root and satellite outcomes, the empty settle
+  lifecycle, the per-structure claim row counts and `firstFailure`; it writes no claim and exits 1
+  only when the result carries no error finding and at least one admitted outcome.
+- `set settle` prints the same shape plus `settled`, `rolledBack` and `rollbackFailures`, and exits 1
+  only when the result is `formed()`.
+- A missing document, compile failure, placement failure, capture failure or siting failure prints
+  its findings and exits 0. A checked structure's findings are the set result's `setFindings`; the
+  command does not merge them into a single `MatchResult`.
+
 ## 11. Java API
 
 The document-layer records live in `kernel.document` and are produced by `StructureSetCompiler`:
@@ -486,6 +519,8 @@ record StructureSet(CompiledStructureSet compiled, Siting rootSiting, Cuboid roo
 
 final class StructureSetHost {
     StructureSetHost(StructureKernel kernel);
+    StructureSetResult check(StructureSet set, SnapshotLease lease, OwnerId owner,
+                             Budget budget, Supplier<InstanceId> instances);
     StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner,
                            Budget budget, Supplier<InstanceId> instances);
 }
@@ -500,7 +535,10 @@ record StructureSetResult(Map<NamespacedId, MatchOutcome> outcomes, List<Finding
 its world-space presence region; a mapping failure is `SC-SPC-0001`. The plan's structure keys are
 the root blueprint id and the satellite ids, so a satellite id equal to the root blueprint id is
 `SC-DOC-0004`. `StructureSetHost.run` takes the lease, owner, one budget and an instance supplier;
-the instances are allocated in check order root-first.
+the instances are allocated in check order root-first. `StructureSetHost.check` takes the same
+arguments, runs the same presence/link/check sequence and stops before the settle pass: it returns
+outcomes and set findings only, with empty `settled`, `rolledBack`, `rollbackFailures` and `claims`.
+The existing `run` signature is preserved.
 
 ## 12. Document pipeline
 
@@ -511,7 +549,7 @@ the instances are allocated in check order root-first.
 | compiler | `StructureSetCompiler`; resolves root/satellite documents, merges arguments, compiles blueprints, validates links/presence/duplicates |
 | writer | `StructureSetWriter`; canonical member order |
 | spans | set-member spans for findings |
-| adapter | host `StructureSet` plan (`StructureSet`, `StructureSet.Satellite`, `StructureSet.Placement`), presence/link/check/settle/rollback (`StructureSetHost`, `StructureSetResult`), `DatapackBlueprints` set loading and `ServerState` set compile |
+| adapter | host `StructureSet` plan (`StructureSet`, `StructureSet.Satellite`, `StructureSet.Placement`), presence/link/check/settle/rollback (`StructureSetHost`, `StructureSetResult`), `DatapackBlueprints` set loading and `ServerState` set compile, the built-in demo set (`set_root`/`set_wing`/`set_demo`), and the `/cumulus set check`/`set settle` command with its one set capture |
 
 `JsonReader` remains blueprint-only. A small dispatcher reads `kind` and selects the reader.
 
@@ -550,7 +588,9 @@ Document errors reuse existing codes:
 - world-coordinate placement in the document;
 - claim transaction across structures;
 - link direction beyond the six faces;
-- per-link arguments.
+- per-link arguments;
+- a shared budget across the members of one set, a `ContextStore` removal operation and same-siting
+  rejection at compile time (S6, out of this round).
 
 ## 15. Test obligations
 
@@ -564,6 +604,10 @@ Document errors reuse existing codes:
 - Duplicate id/placement rejection.
 - Host check-all/settle-all/rollback, ledger-wide claims filtering; context stays published on
   rollback because the kernel has no removal (06 §3.3).
+- Command: compile/placement/capture findings, the set summary and first failure, the two exit
+  codes, and a check that writes no row; one real capture over a root and a satellite with the real
+  ledger and contexts.
+- Check-only host path: admitted outcomes, no settle, no claim, no rollback.
 - Document errors: unknown kind, missing blueprint, nested set, duplicate id, invalid link/presence.
 - Codes family and count.
 
@@ -575,6 +619,7 @@ Document errors reuse existing codes:
 | S2 | set document IR, reader/dispatcher/writer/spans, compiler, argument merge, duplicate/link/presence validation | focused document tests |
 | S3 | `StructureSet`/`SatelliteSpec`/`LinkSpec`/`PresenceSpec`, host placement/link/presence/check/settle/rollback, adapter result | focused adapter/kernel tests |
 | S4 | docs, counts, stress scenarios | docs + focused regression |
+| S5 | production `set check`/`set settle`, one set capture, check-only host path, built-in demo set, real-level GameTests | focused adapter tests + `check` + `runGameTestServer` |
 
 ### 16.1 Progress
 
@@ -601,7 +646,20 @@ Document errors reuse existing codes:
   `@GameTest` methods**, `Codes.all` 64 and 33 decisions (D-33; D-29 is superseded). S4 adds no kernel type and
   regenerates no visual; the H4 host-data group (`06-verification.md` §3.4) touches the same
   adapter unit suite and changes no set-layer type or rule.
-- **Not in the set layer:** a command or capture executor that runs a set; the adapter result is a
-  library entry point only.
+- **S5** is implemented in the working tree after `9e363ad`. `mc` gains `SetCommand` and the
+  `/cumulus set check`/`set settle` literals, `CommandSupport.rootSiting` and `CommandSupport.policy(ReadScope)`,
+  `StructureSetHost.check` (the existing `run` signature is preserved) and the built-in demo set
+  (`structurecumulus:set_demo` with the `set_root`/`set_wing` blueprints plus the `ServerState.findSet`
+  builtin fallback). The command prints compile/placement/capture findings and the set summary (id and
+  origin, root and satellite outcomes, `settled`, `rolledBack`, `rollbackFailures`, per-structure claim
+  rows, `firstFailure`); `set check` exits 1 only with no error finding and at least one admitted
+  outcome, `set settle` only with `formed()`. Tests: two new `StructureSetHostTest` cases (24 total) and
+  the real-capture `StructureSetHostGameTest` plus the dispatcher `SetCommandGameTest` (four GameTests;
+  69 total). Counts on the S5 tree are **258 kernel tests (39 containers), 286 adapter unit tests (37
+  containers), 69 `@GameTest` methods**; `Codes.all` stays 64 and the decision record 34. No kernel
+  type and no visual changes.
+- **Out of this round (S6):** a shared budget across a set's members, a `ContextStore` removal
+  operation and same-siting rejection. The command and the one-capture executor are S5,
+  not S6.
 
 Visual review stays last.

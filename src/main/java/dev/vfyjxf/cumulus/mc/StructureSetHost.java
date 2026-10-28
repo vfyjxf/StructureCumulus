@@ -70,6 +70,31 @@ public final class StructureSetHost {
         Budget budget,
         Supplier<InstanceId> instances
     ) {
+        return run(set, lease, owner, budget, instances, true);
+    }
+
+    /**
+     * Runs every check of the set exactly as {@link #run} does and stops before the settle pass: no
+     * claim is written, nothing is settled and nothing is rolled back.
+     */
+    public StructureSetResult check(
+        StructureSet set,
+        SnapshotLease lease,
+        OwnerId owner,
+        Budget budget,
+        Supplier<InstanceId> instances
+    ) {
+        return run(set, lease, owner, budget, instances, false);
+    }
+
+    private StructureSetResult run(
+        StructureSet set,
+        SnapshotLease lease,
+        OwnerId owner,
+        Budget budget,
+        Supplier<InstanceId> instances,
+        boolean settle
+    ) {
         Objects.requireNonNull(set, "set");
         Objects.requireNonNull(lease, "lease");
         Objects.requireNonNull(owner, "owner");
@@ -146,6 +171,9 @@ public final class StructureSetHost {
                 return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
             }
             attempts.add(attempt);
+        }
+        if (!settle) {
+            return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         ClaimLedger ledger = kernel.ledger();
         List<Attempt> formed = new ArrayList<>();

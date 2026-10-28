@@ -37,10 +37,12 @@ The host-data round closes with H4: H1 adds `HostType`, `WorldView.get`, `Expect
 adds the adapter `property`/`state`/`tag`/`fluid` factories and `SC-MC-0006`…`0010`; H4 adds the
 documented counts and the adapter host-data stress group (§3.4). T1–T3 (D-34) then replace the
 `readBlock`/`readEntity` trait providers with the generic per-holder registry and direct capability
-values. The tree registers **258 kernel tests in 39 containers, 284 adapter unit tests in 37
-containers and 65 `@GameTest` methods**; `Codes.all` has 64 entries and the decision record has 34
-decisions (D-34). Pending only: the performance/cost pass (block-entity-lazy and entity sweep) and
-fresh visual review screenshots. There is no regeneration milestone.
+values. S5 of the structure-set close-out adds the production `set check`/`set settle` command, its
+one union capture and the check-only host path (`09-structure-sets.md` §16). The tree registers
+**258 kernel tests in 39 containers, 286 adapter unit tests in 37 containers and 69 `@GameTest`
+methods**; `Codes.all` has 64 entries and the decision record has 34 decisions (D-34). Pending only:
+the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+There is no regeneration milestone.
 
 ## 2. The order
 

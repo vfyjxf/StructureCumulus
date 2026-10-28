@@ -303,6 +303,11 @@ final class StructureSetTestSupport {
             return new StructureSetHost(kernel).run(plan, lease, owner, budget, this::nextInstance);
         }
 
+        StructureSetResult check() {
+            return new StructureSetHost(kernel)
+                    .check(plan, new TestLease(view), owner, Budget.unbounded(), this::nextInstance);
+        }
+
         InstanceId instance(int index) {
             return instances.get(index);
         }

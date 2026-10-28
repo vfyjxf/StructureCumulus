@@ -34,9 +34,10 @@ adds the six-class/33-test structure-set stress batch (§3.3). The host-data rou
 H1 adds `HostType`/`WorldView.get`/`Expectations.host` and `OccupantDescriptor(type, kind)`; H2 adds
 one `SnapshotLevel` per frame and the capture wiring; H3 adds the adapter host expectation factories
 and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). The
-T1–T3 trait-provider slice (D-34) then replaces the provider shape and the trait values. On the
-T1–T3 working tree a full `./gradlew check` and `runGameTestServer` both pass: 258 kernel tests (39
-containers), 284 adapter unit tests (37 containers), 65/65 `@GameTest` methods, 0 failures, 0 skipped.
+T1–T3 trait-provider slice (D-34) then replaces the provider shape and the trait values. S5 adds the
+production set command and its one capture, the check-only host path and the set GameTests (§3.5). On
+the S5 working tree a full `./gradlew check` and `runGameTestServer` both pass: 258 kernel tests (39
+containers), 286 adapter unit tests (37 containers), 69/69 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
 `Codes.all` has 64 entries and the decision record has 34 decisions (D-34). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
@@ -49,8 +50,9 @@ The envelope batch (`a5f7084`) adds `EnvelopeTest` (7 tests), `EnvelopeScenarioT
 three `DocumentCompilerTest` cases in the kernel, plus four `JsonDocumentTest` cases in the adapter.
 The context-cache batch (`681c505`) adds 31 kernel tests across four classes and changes the aggregate
 scenario; the structure-set slices add `StructureSetCompilerTest` (13 kernel tests),
-`JsonStructureSetTest` (10), `StructureSetPlanTest` (6), `StructureSetHostTest` (22),
-`DatapackStructureSetTest` (5) and the SS4 stress suite (33). The host-data round adds
+`JsonStructureSetTest` (10), `StructureSetPlanTest` (6), `StructureSetHostTest` (24, two of them S5's
+check-only path), `DatapackStructureSetTest` (5) and the SS4 stress suite (33). S5 adds the two
+real-level GameTest classes below (§3.5). The host-data round adds
 `HostExpectationTest` (7 kernel tests), `McAnchorsTest` (7), `SnapshotLevelTest` (7),
 `LevelSnapshotTest` (17), `AdapterExpectationsTest` (12) and the H4 `HostDataScenarioTest` (4, §3.4).
 Their focused runs are green: `compileKernelTestJava`, `compileTestJava`, `kernelTest` selections and
@@ -248,9 +250,10 @@ and not a pending list:
 
 **Boundaries, not gaps.** The host re-checks link distance and coverage but not the compiler's
 duplicate placement/parent-face rules (09 §6.4, §9); a hand-built `CompiledStructureSet` is assumed to
-have passed the compiler. The adapter still has no command or capture executor for a set, and no
-GameTest covers the set layer: `StructureSetHost` is a library entry point (§13.5) exercised only by
-the adapter unit suite.
+have passed the compiler. S5 adds the production command and its one capture (adapter §13.5) and two
+real-level GameTest classes (§3.5), so `StructureSetHost` is no longer exercised only as a library
+entry point by the adapter unit suite. The shared budget, `ContextStore` removal and same-siting
+rejection stay S6 and out of this round.
 
 ### 3.4 Host-data stress group (H4)
 
@@ -273,6 +276,28 @@ snapshot with no captured host values. It adds no kernel type and no GameTest.
 | A rotated siting compares the captured world-frame value; the adapter projects no definition-frame state (D-29 superseded by D-33) | `aRotatedStructureSetFormsFromTheCapturedHostSnapshot` |
 | The composed `fluid` expectation's meta is the kernel junction's `SC-EXP-0001`, while its findings are the leaves' `SC-MC-0009` | `aWaterloggedSlabIsABlockStateAndNotTheRealFluid` |
 | A nested child frame answers its own snapshot; a missing snapshot makes every host expectation `SC-MC-0010` (unreadable), never a mismatch | `aNestedChildFrameServesItsOwnHostSnapshot`, `aSetWithoutACapturedHostSnapshotIsUnreadable` |
+
+### 3.5 Structure-set command and host GameTests (S5)
+
+Two adapter GameTest classes (four methods) in `src/main/java/.../mc` drive the set layer over a real
+`LevelCapture`, the real `SavedClaims`/`SavedContexts` and the server dispatcher. They add no kernel
+type, no code and no decision.
+
+| Test | What it drives |
+| --- | --- |
+| `StructureSetHostGameTest.checkAllWritesNothingThenSettleAllWritesClaims` | a two-cell stone root and an attached stone wing captured once for the union bounds; `check` admits both members, writes no row and moves no revision; `run` settles both, writes the three claimed cells and bumps the revision once per structure |
+| `StructureSetHostGameTest.aFailedMemberStopsSettle` | the wing cell is dirt, so its check fails: only the root outcome is admitted, `settled`/`claims` stay empty, the revision does not move and no row is written |
+| `SetCommandGameTest.setCheckWritesNothingAndSetSettleWritesTheClaims` | the dispatcher `set check`/`set settle` over the built-in `structurecumulus:set_demo`: both exit 1, the summary names the set, origin, root and wing, `settled: none` on check, the two rows only on settle |
+| `SetCommandGameTest.aMissingRequiredSatelliteFailsCheckAndSettle` | an absent required wing is `SC-SET-0001`: both paths exit 0, report `first failure: SC-SET-0001`, write no row and move no revision |
+
+**Characterized behaviour** (documented, each with its asserting test):
+
+| Behaviour | Asserted by |
+| --- | --- |
+| One capture serves the whole set, so the capture region is the union bounding box and its element ceiling applies to the union | `checkAllWritesNothingThenSettleAllWritesClaims` (the three cells are captured under one lease) |
+| A failed satellite check stops the settle pass; the already-admitted root is not settled | `aFailedMemberStopsSettle` |
+| A set command reads the real per-structure claims ledger: check writes nothing, settle writes one row per footprint cell | `setCheckWritesNothingAndSetSettleWritesTheClaims` |
+| The set command's exit code follows the set result, not a member result: an error finding is 0 even when a member was admitted | `aMissingRequiredSatelliteFailsCheckAndSettle` |
 
 ## 4. Module tests
 
@@ -357,17 +382,18 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 65 `@GameTest` methods; the
-  T1–T3 full `runGameTestServer` is 65/65 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 69 `@GameTest` methods; the
+  S5 full `runGameTestServer` is 69/69 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
   rotated-siting two-phase capture
   (`RotatedSitingGameTest`), the M4 command surface (`SettleCommandGameTest`, `CommandGameTest`), the
   M5e capture report (`CaptureAuditGameTest`, `CommandCaptureReportGameTest`, `NestedCaptureGameTest`),
-  the claims read in check (`CheckClaimsGameTest`) and the retained orientation audit
+  the claims read in check (`CheckClaimsGameTest`), the retained orientation audit
   (`OrientationAuditGameTest`: an upright siting reports no `SC-MC-0004`, an unrepresentable state
-  reports one grouped entry, and a child frame is not audited). Unit evidence: `HostExpectationTest`
+  reports one grouped entry, and a child frame is not audited), and the S5 set layer
+  (`StructureSetHostGameTest`, `SetCommandGameTest`: §3.5). Unit evidence: `HostExpectationTest`
   for the typed bridge and absent codes, `SnapshotLevelTest` for the copied states/fluids/entities,
   `LevelSnapshotTest` for
   body/precedence/partial reads, `TraitLookupTest` for the `(trait, holder)` registry, the duplicate
@@ -383,8 +409,9 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   site, and the batch-2 persistence/policy units `EntityWindowPolicyTest` (D4 local-window
   characterization), `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row
   collapse) and `SavedContextsLifecycleTest` (merge/reload, instance isolation, D5 growth, unknown
-  type), and the structure-set units `StructureSetPlanTest`, `StructureSetHostTest`,
-  `DatapackStructureSetTest`, the six-class SS4 stress suite (§3.3) and `HostDataScenarioTest` (§3.4).
+  type), and the structure-set units `StructureSetPlanTest`, `StructureSetHostTest` (including S5's
+  two check-only cases), `DatapackStructureSetTest`, the six-class SS4 stress suite (§3.3),
+  `HostDataScenarioTest` (§3.4) and the S5 GameTest group (§3.5).
   **What remains:** the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.

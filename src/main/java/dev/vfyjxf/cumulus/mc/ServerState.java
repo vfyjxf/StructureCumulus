@@ -60,7 +60,8 @@ public final class ServerState {
 
             @Override
             public @Nullable StructureSetDocument findSet(NamespacedId id) {
-                return blueprints.findSet(id);
+                StructureSetDocument document = blueprints.findSet(id);
+                return document != null ? document : builtin.findSet(id);
             }
         };
         this.kernel = StructureKernel.create(catalogs, new Host(documents, null, ContextStore.inMemory(), Map.of()));

@@ -24,7 +24,8 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The command surface: {@code check}, {@code compile}, {@code settle}, {@code explain} and {@code claims}.
+ * The command surface: {@code check}, {@code compile}, {@code settle}, {@code explain}, {@code claims}
+ * and the structure-set pair {@code set check}/{@code set settle}.
  */
 @NullMarked
 public final class CumulusCommand {
@@ -34,21 +35,21 @@ public final class CumulusCommand {
                 .register(
                     Commands.literal("cumulus")
                             .then(
-                                Commands.literal("check")
+                                Commands.literal("check").then(
+                                    Commands.argument("id", ResourceLocationArgument.id()).then(
+                                        Commands.argument("origin", BlockPosArgument.blockPos())
+                                                .executes(CumulusCommand::check)
+                                    )
+                                )
+                            )
+                            .then(
+                                Commands.literal("settle")
                                         .then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(
                                                 Commands.argument("origin", BlockPosArgument.blockPos())
-                                                        .executes(CumulusCommand::check)
+                                                        .executes(SettleCommand::run)
                                             )
                                         )
-                            )
-                            .then(
-                                Commands.literal("settle").then(
-                                    Commands.argument("id", ResourceLocationArgument.id()).then(
-                                        Commands.argument("origin", BlockPosArgument.blockPos())
-                                                .executes(SettleCommand::run)
-                                    )
-                                )
                             )
                             .then(
                                 Commands.literal("compile").then(
@@ -61,12 +62,32 @@ public final class CumulusCommand {
                                 )
                             )
                             .then(
-                                Commands.literal("claims").then(
-                                    Commands.argument("from", BlockPosArgument.blockPos()).then(
-                                        Commands.argument("to", BlockPosArgument.blockPos())
-                                                .executes(ClaimsCommand::run)
-                                    )
-                                )
+                                Commands.literal("claims")
+                                        .then(
+                                            Commands.argument("from", BlockPosArgument.blockPos()).then(
+                                                Commands.argument("to", BlockPosArgument.blockPos())
+                                                        .executes(ClaimsCommand::run)
+                                            )
+                                        )
+                            )
+                            .then(
+                                Commands.literal("set")
+                                        .then(
+                                            Commands.literal("check").then(
+                                                Commands.argument("id", ResourceLocationArgument.id()).then(
+                                                    Commands.argument("origin", BlockPosArgument.blockPos())
+                                                            .executes(SetCommand::check)
+                                                )
+                                            )
+                                        )
+                                        .then(
+                                            Commands.literal("settle").then(
+                                                Commands.argument("id", ResourceLocationArgument.id()).then(
+                                                    Commands.argument("origin", BlockPosArgument.blockPos())
+                                                            .executes(SetCommand::settle)
+                                                )
+                                            )
+                                        )
                             )
                 );
     }
