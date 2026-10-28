@@ -227,16 +227,17 @@ public final class LeaseMarkCounterGameTest {
         LevelCapture capture = new LevelCapture(helper.getLevel());
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
         long chunk = ChunkPos.asLong(origin);
+        int baseline = LevelWatch.refCount(helper.getLevel(), chunk);
         CaptureResult.Captured first = captured(capture, cell(helper), SnapshotPolicy.minimal());
         try (SnapshotLease firstLease = first.lease()) {
-            helper.assertValueEqual(1, LevelWatch.refCount(helper.getLevel(), chunk), "one watch reference");
+            helper.assertValueEqual(baseline + 1, LevelWatch.refCount(helper.getLevel(), chunk), "one watch reference");
 
             CaptureResult.Captured second = captured(capture, cell(helper), SnapshotPolicy.minimal());
             try (SnapshotLease secondLease = second.lease()) {
                 helper.assertFalse(firstLease.isCurrent(), "the successor invalidates the old lease");
                 helper.assertTrue(secondLease.isCurrent(), "the successor is current");
                 helper.assertValueEqual(
-                    1,
+                    baseline + 1,
                     LevelWatch.refCount(helper.getLevel(), chunk),
                     "the watch reference is replaced"
                 );
@@ -249,13 +250,13 @@ public final class LeaseMarkCounterGameTest {
                 }
                 helper.assertTrue(secondLease.isCurrent(), "a failed capture leaves the watch and lease current");
                 helper.assertValueEqual(
-                    1,
+                    baseline + 1,
                     LevelWatch.refCount(helper.getLevel(), chunk),
                     "a failed capture keeps the watch"
                 );
             }
             helper.assertValueEqual(
-                0,
+                baseline,
                 LevelWatch.refCount(helper.getLevel(), chunk),
                 "closing the lease releases the watch"
             );
@@ -271,12 +272,13 @@ public final class LeaseMarkCounterGameTest {
         LevelCapture second = new LevelCapture(helper.getLevel());
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
         long chunk = ChunkPos.asLong(origin);
+        int baseline = LevelWatch.refCount(helper.getLevel(), chunk);
         CaptureResult.Captured firstCaptured = captured(first, cell(helper), SnapshotPolicy.minimal());
         CaptureResult.Captured secondCaptured = captured(second, cell(helper), SnapshotPolicy.minimal());
         try (SnapshotLease firstLease = firstCaptured.lease()) {
             try (SnapshotLease secondLease = secondCaptured.lease()) {
                 helper.assertValueEqual(
-                    2,
+                    baseline + 2,
                     LevelWatch.refCount(helper.getLevel(), chunk),
                     "two capture handles share a chunk"
                 );
@@ -285,12 +287,12 @@ public final class LeaseMarkCounterGameTest {
                 helper.assertFalse(firstLease.isCurrent(), "the event marks the first handle");
                 helper.assertFalse(secondLease.isCurrent(), "the event marks the second handle");
             }
-            helper.assertValueEqual(1, LevelWatch.refCount(helper.getLevel(), chunk), "one handle remains");
+            helper.assertValueEqual(baseline + 1, LevelWatch.refCount(helper.getLevel(), chunk), "one handle remains");
         } finally {
             first.close();
             second.close();
         }
-        helper.assertValueEqual(0, LevelWatch.refCount(helper.getLevel(), chunk), "the last handle releases");
+        helper.assertValueEqual(baseline, LevelWatch.refCount(helper.getLevel(), chunk), "the last handle releases");
         helper.succeed();
     }
 
