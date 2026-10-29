@@ -41,7 +41,7 @@ invalidation, and one set budget shared by presence and every member attempt (§
 working tree a full `./gradlew check` and `runGameTestServer` both pass: 261 kernel tests (39
 containers), 296 adapter unit tests (37 containers), 71/71 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
-`Codes.all` has 65 entries and the decision record has 37 decisions (D-37). Model C, body identity,
+`Codes.all` has 65 entries and the decision record has 38 decisions (D-38). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -217,7 +217,6 @@ and not a pending list:
 | Two `shared` bays over one cell write duplicate claim rows | `ClaimStressScenarioTest.duplicateRowsAreCharacterized` |
 | `whenAbsent` is a dead path for a check-only key: it needs a section computation, so a check cannot reach it | `ContextAggregateScenarioTest.whenAbsentIsADeadPathForACheckOnlyKey` |
 | D5: `SavedContexts` grows one entry per instance without eviction | `SavedContextsLifecycleTest.growthWithoutEvictionKeepsEveryInstance` |
-| Claim characterization: `release` removes the whole `(owner, siting)` key, not one row, and a reload collapses duplicate rows into one canonical order | `SavedClaimsLifecycleTest.releaseRemovesTheWholeOwnerSitingKey`, `SavedClaimsLifecycleTest.duplicateRowsCollapseAndReadIsCanonical` |
 
 **D4 fixed.** The host maps every blueprint-local entity window through its siting before it builds
 `SnapshotPolicy`: `CommandSupport.policy(blueprint, siting)` maps one blueprint's windows,
@@ -236,6 +235,11 @@ claiming bay reject a subject-binding focus that is not claimable, so `anySubjec
 custom nested focus now fails at build with `SC-BPT-0005`
 (`NestedCoverageScenarioTest.nestedAnySubjectBoundBodyFailsBuild`). The runtime `SC-CLM-0004` path
 stays covered by `ReadModelTest` and `NestedCoverageScenarioTest.aChildFrameOccupantIsRejectedAtCheck`.
+
+**Release granularity (D-38).** `ClaimLedger.release(owner, siting)` deletes every row of the
+`(owner, siting)` key; there is no per-bay or per-row release. One siting is one instance, and a
+shared cell's two rows are still one lifecycle object. `SavedClaimsLifecycleTest` characterizes the
+whole-key removal and the duplicate-row collapse on reload; this is intentional, not a gap.
 
 ### 3.3 Structure-set stress batch (SS4)
 
@@ -398,8 +402,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
     run before any check, any error returns before the first settle, and a failed check stops the
     remaining checks)
 23. Can a rolled-back structure keep claim rows, or can one structure's view leak a foreign owner's
-    rows? (host: release removes every `(owner, siting)` row for the released structure, and
-    `claimsOf` filters by `(owner, siting, bay)`; §3.3)
+    rows? (host: release removes every `(owner, siting)` row for the released structure by contract
+    (D-38), and `claimsOf` filters by `(owner, siting, bay)`; §3.3)
 24. Can a satellite link be considered aligned under a root rotation without composing both sitings?
     (host: the plan is `rootSiting.compose(relativeSiting)`, and both endpoints are mapped through
     their own sitings; §3.3)

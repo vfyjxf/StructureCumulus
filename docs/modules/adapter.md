@@ -40,7 +40,7 @@
   `SectionSlot.Partial`, four-state `TraitSlot`, `SnapshotPolicy.traits` by id, `OccupantTraits`,
   `SC-OCC-0004`, `SC-MC-0002` relay. M2d: `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
   `FrameData`, child frames, budgets/cuts, child entities and entity-hosted extents. M3: `SavedClaims`/
-  `SavedContexts`, CAS settle/release, reload codecs and per-level stores. M4: the JSON reader/writer,
+  `SavedContexts`, CAS settle/release (whole `(owner, siting)` key, D-38), reload codecs and per-level stores. M4: the JSON reader/writer,
   the datapack source, the merged document source and the five `/cumulus` subcommands. M5: the
   determinism gate (`DeterminismTest`) covers canonical bytes across member order, the parse/write
   fixed point, equal compile runs and stable finding order; capture-revision lease invalidation is

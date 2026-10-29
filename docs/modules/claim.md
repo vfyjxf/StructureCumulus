@@ -147,7 +147,9 @@ rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
   `Settled(newRevision, rows)`, bumping the revision by one.
 - `release(owner, siting)` deletes every row of the key and bumps the revision by one. An absent key
   is a no-op and does **not** bump. It is safe to call on every instance removal, move and world
-  unload; it is idempotent after the first.
+  unload; it is idempotent after the first. The whole-key granularity is the contract (D-38): one
+  siting is one instance, so there is no per-bay or per-row release; duplicate rows in the key are a
+  representation detail and are not independently releasable.
 - All rows of a `SettleRequest` must name the request's `owner` and `siting`; a mismatch is a
   programmer error (`IllegalArgumentException`) because the planner is the only source. A ledger may
   additionally refuse a row whose `sharing`/`bay` is inconsistent; that is `Conflict`/`SC-CLM-0004`,

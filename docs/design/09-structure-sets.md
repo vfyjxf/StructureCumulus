@@ -436,7 +436,7 @@ If a settle fails:
   not stop the remaining rollbacks;
 - do not auto-retry.
 
-`release(owner, siting)` is coarse and advances the ledger revision. `ContextStore.remove` is the
+`release(owner, siting)` is coarse by contract (D-38) and advances the ledger revision. `ContextStore.remove` is the
 host-side invalidation the set needs: a formed structure's context is removed even when its release
 fails. `rolledBack` names only the attempts whose release answered `Settled`; the host owns any
 further invalidation policy (`06-verification.md` §3.3).
@@ -695,7 +695,7 @@ Document errors reuse existing codes:
   before presence, and a one-cell shared budget leaves the root check `Undecided(SC-ENG-0001)`; the
   production set capture now carries no orientation and runs no orientation audit. Counts on the S6
   tree are **261 kernel tests (39 containers), 296 adapter unit tests (37 containers), 71 `@GameTest`
-  methods**; `Codes.all` is 65 and the decision record 37 (D-37). The command and the one-capture
+  methods**; `Codes.all` is 65 and the decision record 38 (D-38). The command and the one-capture
   executor remain S5.
 - The command and the one-capture executor are S5, not S6.
 

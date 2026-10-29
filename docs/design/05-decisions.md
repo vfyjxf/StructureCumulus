@@ -875,6 +875,24 @@ subjects must override it. The record set is now 37 decisions (D-37). **Status:*
 nested build-rejection test, the runtime `SC-CLM-0004` tests, the full `check` and
 `runGameTestServer` are green.
 
+### D-38 — Claim release is whole `(owner, siting)`
+
+`ClaimLedger.release(owner, siting)` deletes every row of that key and is the only release API. One
+siting is one instance: a structure's own bays share the key, so a shared cell with two rows is still
+one lifecycle object. Per-bay or per-row release would add lifecycle states the host does not have
+and would let one structure's rollback keep or drop a sibling bay's rows independently. Removal, move
+and world unload release the whole instance; a structure-set rollback releases each member's own key.
+A failed release leaves the key for a later attempt and is reported as `SC-SET-0007`; it is not split
+into partial releases. Duplicate rows in one key remain a ledger representation detail and collapse
+on reload.
+
+**Why:** the host owns structures, not claim rows. Whole-key release matches the instance boundary
+and keeps the ledger's compare-and-set model simple.
+
+**Consequence:** there is no per-bay or per-cell release. A caller that needs finer invalidation must
+settle the new row set instead. The record set is now 38 decisions (D-38). **Status:** decided; the
+existing `SavedClaimsLifecycleTest` cases characterize the whole-key and duplicate-row behavior.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
