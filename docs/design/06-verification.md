@@ -38,10 +38,10 @@ T1–T3 trait-provider slice (D-34) then replaces the provider shape and the tra
 production set command and its one capture, the check-only host path and the set GameTests (§3.5). S6
 closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
 invalidation, and one set budget shared by presence and every member attempt (§3.3). On the S6
-working tree a full `./gradlew check` and `runGameTestServer` both pass: 262 kernel tests (39
-containers), 296 adapter unit tests (37 containers), 71/71 `@GameTest` methods, 0 failures, 0 skipped.
+working tree a full `./gradlew check` and `runGameTestServer` both pass: 269 kernel tests (40
+containers), 280 adapter unit tests (35 containers), 73/73 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
-`Codes.all` has 65 entries and the decision record has 39 decisions (D-39). Model C, body identity,
+`Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -54,7 +54,7 @@ The context-cache batch (`681c505`) adds 31 kernel tests across four classes and
 scenario; the structure-set slices add `StructureSetCompilerTest` (15 kernel tests),
 `JsonStructureSetTest` (10), `StructureSetPlanTest` (8), `StructureSetHostTest` (26, two of them S5's
 check-only path), `DatapackStructureSetTest` (5) and the SS4 stress suite (34 after S6's shared-budget
-case). S6 also adds `ContextTest` (4) and `SavedContextsLifecycleTest` (6). S5 adds the two
+case). S6 also adds `ContextTest` (4); D-40 adds `StructureManagerTest` (7) and `StructureLifecycleGameTest` (2). S5 adds the two
 real-level GameTest classes below (§3.5). The host-data round adds
 `HostExpectationTest` (7 kernel tests), `McAnchorsTest` (7), `SnapshotLevelTest` (7),
 `LevelSnapshotTest` (17), `AdapterExpectationsTest` (12) and the H4 `HostDataScenarioTest` (4, §3.4).
@@ -205,8 +205,8 @@ characterization, not a new kernel promise.
 | kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, `whenAbsent` on a check-only key, a derivation output | 4 |
 | kernel | `GateBudgetScenarioTest` | stale lease at check, mid-attempt invalidation, invalidation before settle, a tiny budget | 4 |
 | adapter | `EntityWindowPolicyTest` | the blueprint-local entity window mapped into `CommandSupport.policy` through the siting (identity, nonzero and a dropped unmappable window), and a set's root/satellite windows mapped by their own sitings | 2 |
+| kernel | `StructureManagerTest` | begin/commit/abort, draft rejection, formed replacement, moved/broken/loaded/unloaded, bounds lookup and post-commit publish | 7 |
 | adapter | `SavedClaimsLifecycleTest` | stale CAS, conflict bytes, whole-key release, duplicate-row canonical collapse | 4 |
-| adapter | `SavedContextsLifecycleTest` | serial monotonicity, whole-context publish/reload, instance isolation, growth, unknown type | 5 |
 
 **Characterized gaps** — documented limitations, each with its asserting test; they are not owed work
 and not a pending list:
@@ -215,7 +215,6 @@ and not a pending list:
 | --- | --- |
 | Two `shared` bays over one cell write duplicate claim rows | `ClaimStressScenarioTest.duplicateRowsAreCharacterized` |
 | `whenAbsent` is a dead path for a check-only key: it needs a section computation, so a check cannot reach it | `ContextAggregateScenarioTest.whenAbsentIsADeadPathForACheckOnlyKey` |
-| D5: `SavedContexts` grows one entry per instance without eviction | `SavedContextsLifecycleTest.growthWithoutEvictionKeepsEveryInstance` |
 
 **D4 fixed.** The host maps every blueprint-local entity window through its siting before it builds
 `SnapshotPolicy`: `CommandSupport.policy(blueprint, siting)` maps one blueprint's windows,
@@ -304,8 +303,8 @@ snapshot with no captured host values. It adds no kernel type and no GameTest.
 
 ### 3.5 Structure-set command and host GameTests (S5, extended by S6)
 
-Two adapter GameTest classes (six methods) in `src/main/java/.../mc` drive the set layer over a real
-`LevelCapture`, the real `SavedClaims`/`SavedContexts` and the server dispatcher. They add no kernel
+Three adapter GameTest classes (eight methods) in `src/main/java/.../mc` drive the set layer over a real
+`LevelCapture`, the real `SavedClaims`/`StructureManager` and the server dispatcher. They add no kernel
 type, no code and no decision.
 
 | Test | What it drives |
@@ -416,8 +415,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 71 `@GameTest` methods; the
-  full `runGameTestServer` is 71/71 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 73 `@GameTest` methods; the
+  full `runGameTestServer` is 73/73 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
@@ -436,15 +435,14 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   and the direct value identity, `OccupantTraitsTest` for the three direct capability keys and the
   absent NBT traits, `NestedExtentTest` for
   the capability declaration, the typed holder ids, the per-holder lookup and its duplicate
-  rejection, and the capability provider delegation, `SavedClaimsTest`/`SavedContextsTest` for persistence,
+  rejection, and the capability provider delegation, `SavedClaimsTest` for claim persistence, `StructureManagerTest` for the manager,
   `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
   parse/write fixed point and equal compile runs, `ServerStateDocumentSourceTest`/
   `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing, `LevelWatchTest`
   for the mark counter's refcounts and lazy fingerprints, `CaptureReportsTest` for the report
   site, and the batch-2 persistence/policy units `EntityWindowPolicyTest` (D4 fixed host mapping),
-  `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row
-  collapse) and `SavedContextsLifecycleTest` (merge/reload, instance isolation, D5 growth, unknown
-  type), and the structure-set units `StructureSetPlanTest`, `StructureSetHostTest` (including S5's
+  `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row collapse), and the
+  structure-set units `StructureSetPlanTest`, `StructureSetHostTest` (including S5's
   two check-only cases), `DatapackStructureSetTest`, the six-class SS4 stress suite (§3.3),
   `HostDataScenarioTest` (§3.4) and the S5 GameTest group (§3.5).
   **What remains:** the

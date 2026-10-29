@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.kernel.spi;
 
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
 import org.jspecify.annotations.Nullable;
@@ -15,18 +16,26 @@ import java.util.TreeMap;
 public record Host(
     DocumentSource documents,
     @Nullable ClaimLedger ledger,
-    ContextStore contexts,
+    StructureManager structures,
     Map<NamespacedId, Class<?>> types
 ) {
 
     public Host {
         Objects.requireNonNull(documents, "documents");
-        Objects.requireNonNull(contexts, "contexts");
+        Objects.requireNonNull(structures, "structures");
         Objects.requireNonNull(types, "types");
         types = Collections.unmodifiableMap(new TreeMap<>(types));
     }
 
+    public ContextStore contexts() {
+        return structures;
+    }
+
+    public StructureManager structures() {
+        return structures;
+    }
+
     public static Host empty() {
-        return new Host(DocumentSource.empty(), null, ContextStore.inMemory(), Map.of());
+        return new Host(DocumentSource.empty(), null, StructureManager.create(), Map.of());
     }
 }

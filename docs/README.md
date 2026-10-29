@@ -65,7 +65,7 @@ Then the module files, in dependency order:
   mirror-then-rotate `BlockState` transform.
   M2c implements Model C, body identity, the total read and trait capture at `cb06aa8`/`64d04ce`.
   M2d implements nested extents, frames, cuts and child entities at `f3e0338`/`d6aefc2`. M3 is
-  committed at `d4b6d82`; its `SavedClaims`/`SavedContexts` persistence is compatible with Model C and
+  committed at `d4b6d82`; its `SavedClaims` persistence is compatible with Model C; the context `SavedData` was removed by D-40, and
   its CAS/release/reload tests are green. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
   (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
   implemented; capture-revision lease invalidation landed at `0f0bf25`, and the determinism gate
@@ -105,10 +105,10 @@ Then the module files, in dependency order:
   union capture and check-only host path, the built-in `set_root`/`set_wing`/`set_demo` documents and
   the real-level set GameTests (`design/06-verification.md` §3.5). S6 closes the set layer: the
   `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
-  budget shared by presence and every member attempt (D-35). The tree registers 261
-  kernel tests in 39 containers, 296 adapter unit tests in 37 containers and 71 `@GameTest` methods;
-  a full `./gradlew check` and `runGameTestServer` on the S6 working tree are both green (261
-  kernel tests, 296 adapter tests, 71/71 GameTests). Pending only: the
+  budget shared by presence and every member attempt (D-35). The tree registers 269
+  kernel tests in 40 containers, 280 adapter unit tests in 35 containers and 73 `@GameTest` methods;
+  a full `./gradlew check` and `runGameTestServer` on the S6 working tree are both green (269
+  kernel tests, 280 adapter tests, 73/73 GameTests). Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
@@ -116,11 +116,11 @@ Then the module files, in dependency order:
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-29, S6 working tree): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 262 kernel JUnit 5 tests (39 test
-  containers), 296 adapter unit tests (37 containers) and 71 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (262 kernel tests, 296 adapter
-  tests, 71/71 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
-  and the decision record has 39 decisions (D-39; D-29 superseded).
+  `javac --release 21` and JSpecify only. The tree registers 269 kernel JUnit 5 tests (40 test
+  containers), 280 adapter unit tests (35 containers) and 73 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (269 kernel tests, 280 adapter
+  tests, 73/73 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
+  and the decision record has 40 decisions (D-40; D-29 superseded).
 
 ## The one rule
 

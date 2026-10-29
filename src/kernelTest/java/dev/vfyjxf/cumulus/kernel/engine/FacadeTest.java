@@ -3,11 +3,12 @@ package dev.vfyjxf.cumulus.kernel.engine;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
-import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
@@ -65,21 +66,24 @@ class FacadeTest {
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air())).build();
         TestWorld.View view = new TestWorld.View().air(LatticePoint.origin);
         TestWorld.Ledger ledger = new TestWorld.Ledger();
-        StructureKernel kernel = StructureKernel.create(
-            Catalogs.builtin(),
-            new Host(DocumentSource.empty(), ledger, ContextStore.inMemory(), Map.of())
-        );
+        StructureManager structures = StructureManager.create();
+        StructureKernel kernel = StructureKernel
+                .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
+        Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+        StructureAttempt draft = structures
+                .begin(TestWorld.world, new StructureSpec(OwnerId.of(id("owner")), siting, blueprint.id()));
         MatchRequest request = MatchRequest.of(
             blueprint,
-            Siting.of(LatticePoint.origin, Orientation.identity),
+            siting,
             new TestWorld.Lease(view),
-            new InstanceId(TestWorld.world, 1),
+            draft.id(),
             OwnerId.of(id("owner")),
             Budget.unbounded(),
             new ClaimView(List.of(), 0, true)
         );
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, kernel.check(request));
-        assertInstanceOf(MatchResult.Formed.class, kernel.settle(request, admitted));
+        assertInstanceOf(MatchResult.Formed.class, kernel.settle(request, admitted, draft));
+        draft.commit(CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)));
         assertEquals(1, ledger.revision());
 
         Explanation explanation = kernel.explain(Codes.claimConflict.code());

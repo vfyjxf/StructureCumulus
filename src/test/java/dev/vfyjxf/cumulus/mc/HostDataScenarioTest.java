@@ -3,7 +3,7 @@ package dev.vfyjxf.cumulus.mc;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.CancelToken;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
@@ -79,7 +79,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -533,14 +532,11 @@ class HostDataScenarioTest {
             StructureSetTestSupport.FakeLedger ledger = new StructureSetTestSupport.FakeLedger();
             StructureKernel kernel = StructureKernel.create(
                 Catalogs.builtin(),
-                new Host(DocumentSource.empty(), ledger, ContextStore.inMemory(), Map.of())
+                new Host(DocumentSource.empty(), ledger, StructureManager.create(), Map.of())
             );
-            List<InstanceId> instances = new ArrayList<>();
-            return new StructureSetHost(kernel).run(plan, new Lease(view), owner, Budget.unbounded(), () -> {
-                InstanceId instance = new InstanceId(world, instances.size() + 1);
-                instances.add(instance);
-                return instance;
-            });
+            StructureManager structures = StructureManager.create();
+            return new StructureSetHost(kernel)
+                    .run(plan, new Lease(view), owner, Budget.unbounded(), spec -> structures.begin(world, spec));
         }
 
         @Nullable

@@ -11,7 +11,7 @@
 > keys (now three capability keys after T1–T3). M2d (`f3e0338`/`d6aefc2`) implements
 > `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with package-private `FrameData`, child frames
 > and cuts. M3 is committed at `d4b6d82`; `SavedClaims`/
-> `SavedContexts` are compatible with Model C. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
+> `SavedClaims` is compatible with Model C; the M3 `SavedContexts` was removed by D-40. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
 > (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
 > implemented; capture-revision lease invalidation landed at `0f0bf25`. M5a adds the event-edged
 > watched-region mark counter with lazy entity and block-entity fingerprints (`d1fa42f`); P1 fixes the
@@ -24,8 +24,8 @@
 > `CapabilityNestedExtentProvider` and the standard block/entity declarations. S5 adds the production set driver:
 > `/cumulus set check`/`set settle`, one capture for the bounding box of the root and every satellite under
 > the union of their `Blueprint.reads()`, the check-only host path and a built-in demo set. S6 closes
-> the set layer: `SC-SET-0008` same-siting rejection, `ContextStore.remove` (the adapter's
-> `SavedContexts.remove`) used by rollback, and one set budget shared by presence and every member
+> the set layer: `SC-SET-0008` same-siting rejection, `StructureManager` rollback
+> invalidation used by the set host, and one set budget shared by presence and every member
 > attempt.
 
 ## 1. Position
@@ -39,8 +39,9 @@
   orientation mapping. M2c: `OccupantRef.body` for entities, total `CellRead`/`ReadRefusal`,
   `SectionSlot.Partial`, four-state `TraitSlot`, `SnapshotPolicy.traits` by id, `OccupantTraits`,
   `SC-OCC-0004`, `SC-MC-0002` relay. M2d: `NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
-  `FrameData`, child frames, budgets/cuts, child entities and entity-hosted extents. M3: `SavedClaims`/
-  `SavedContexts`, CAS settle/release (whole `(owner, siting)` key, D-38), reload codecs and per-level stores. M4: the JSON reader/writer,
+  `FrameData`, child frames, budgets/cuts, child entities and entity-hosted extents. M3: `SavedClaims`,
+  CAS settle/release (whole `(owner, siting)` key, D-38), reload codecs and per-level stores; D-40
+  replaces the context `SavedData` with the host-driven `StructureManager`. M4: the JSON reader/writer,
   the datapack source, the merged document source and the five `/cumulus` subcommands. M5: the
   determinism gate (`DeterminismTest`) covers canonical bytes across member order, the parse/write
   fixed point, equal compile runs and stable finding order; capture-revision lease invalidation is
@@ -121,11 +122,11 @@
 | `AdapterCodes` | final class, package-private | the adapter's `SC-MC-*` codes, their catalog `CodeEntry`s and the severity each finding carries |
 | `CaptureReports` | final class, package-private | the report site: one `CaptureReport` entry → one `Finding` (severity, world label, trust guard) |
 | `SavedClaims` | `ClaimLedger` | per-world `SavedData`, CAS on the server thread (M3) |
-| `SavedContexts` | `ContextStore` | per-instance values in `SavedData`; `publish` and `remove` (M3, S6) |
+| `StructureManager` | `ContextStore` | in-memory per-level registry; `begin`/`commit`/`abort` and host lifecycle events (D-40) |
 | `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
 | `JsonDocument` / `StructureSetReader` / `StructureSetWriter` | — | `kind` dispatcher; Gson tree ↔ `StructureSetDocument`; canonical set output (S2) |
 | `DatapackBlueprints` | `DocumentSource` | reload listener; blueprint and structure-set ids under `data/<ns>/cumulus/structure/` (M4b + S3); wins over `BuiltinDocuments` on an id collision |
-| `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/contexts, capture cache, merged set lookup (datapack over builtin, S5) and set compile |
+| `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/structures, capture cache, merged set lookup (datapack over builtin, S5) and set compile |
 | `StructureSet` | — | host plan: compiled set + host root siting + each satellite's composed siting, world bounds and world-space presence region; `place` reports mapping failures |
 | `StructureSet.Satellite` | record | one placed satellite: id, compiled satellite, absolute siting, world bounds, presence cells |
 | `StructureSet.Placement` | record | the placed set or the findings that prevented it |
@@ -287,15 +288,18 @@ re-reads the store on load. The `/cumulus settle` command drives this path on th
 
 ## 6. Context
 
-`SavedContexts` stores `(instance, revision, values[id, type-text], findings, spend)` per instance
-(M3, committed). It is written only by `settle`/`derive`; the server thread is the only writer. A
-value's type text is the `Class.getName()` and the host's codec table maps it; an unknown type is a
-load-time finding, not a crash. A `RuntimeState` type does not exist: the `StructureContext` is the
-persisted value. The finding codec writes the code text, not a registry ordinal, so a persisted
-`SC-OCC-0004` or relayed host code survives a reload. `remove(instance)` returns the stored context
-(or `null`) and marks the SavedData dirty only when something was removed; an absent removal is a
-no-op, the removed entry is not written, and the next serial is restored from the remaining
-instances on reload (S6).
+`StructureManager` is the per-level in-memory registry (D-40). `ServerState` creates one manager per
+level; `SettleCommand`, `SetCommand` and `StructureSetHost` reserve a `StructureAttempt`, settle into
+its draft context, then `commit(bounds)`; a failed attempt calls `abort()`. The manager stores
+`StructureInstance(id, spec, context, bounds)`; no context is written to NBT. `ContextStore` remains
+the narrow publish/read interface implemented by the manager and the attempt.
+
+`WatchEvents` dispatches the host lifecycle: a player break or explosion inside a structure's bounds
+is `Broken`; a placement is `Invalidated`; a piston that moves the whole claimed structure is `Moved`
+and a partial move/destroy is `Invalidated`; a level unload is `Unloaded`. `Loaded` exists for a host
+that restores its own instances, but this adapter has no persisted instances to restore. A manager
+rejects an event that would create a duplicate `(owner, siting)`; `Broken`/`Invalidated` are
+idempotent.
 
 ## 7. Traits
 
@@ -765,12 +769,12 @@ and a range fan-in to one parent cell are legal.
 `SC-ENG-0002`, rejects a hand-built set whose satellite siting equals the root siting with
 `SC-SET-0008`, then runs the fixed order: presence, links, the root check, every present satellite
 check, then the root and the satellites in declaration order. Each check is one `MatchRequest` with
-a fresh `ClaimView` read for that structure's world bounds; the instance supplier allocates one
-`InstanceId` per checked structure, root first. Any failure before a settle returns with no settle.
+a fresh `ClaimView` read for that structure's world bounds; the manager begins one draft
+`StructureAttempt` per checked structure, root first. Any failure before a settle returns with no settle.
 
 A settle failure stops the settle pass, releases the already-settled structures in reverse order and
-removes the `StructureContext` of every formed attempt through `ContextStore.remove` (reached through
-`StructureKernel.contexts()`), regardless of the release verdict or a release throw. A release that
+dispatches `Broken` for every formed attempt through `StructureManager`, regardless of the release
+verdict or a release throw. A release that
 throws or answers anything except `Settled` is reported as `SC-SET-0007` in `rollbackFailures`, as is
 a removal `RuntimeException`; the remaining releases and removals still run, and nothing is retried.
 `settled` is the successful settle order and `rolledBack` the successful release order. `setFindings`
@@ -814,7 +818,7 @@ world-frame capture cannot audit the root's and each satellite's frames separate
 whose own frame would answer `SC-MC-0004` produces no entry here. The set checks still read the
 captured world-frame states.
 
-`StructureSetHostGameTest` drives the real `LevelCapture`, `SavedClaims` and `SavedContexts` over a
+`StructureSetHostGameTest` drives the real `LevelCapture`, `SavedClaims` and `StructureManager` over a
 two-cell root and an attached wing: check-all writes no row or revision, settle-all writes the three
 claimed cells, a wrong member stops the settle with the root's admitted outcome and no row, a
 hand-built satellite on the root siting is `SC-SET-0008` before presence with no outcome or instance,

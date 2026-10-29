@@ -49,7 +49,7 @@ public interface Catalogs {
 }
 
 public record Host(DocumentSource documents, @Nullable ClaimLedger ledger,
-                   ContextStore contexts, java.util.Map<NamespacedId, Class<?>> types) {
+                   StructureManager structures, java.util.Map<NamespacedId, Class<?>> types) {
     public Host { /* immutable; contexts non-null; types sorted */ }
     public static Host empty();
 }
@@ -62,6 +62,7 @@ public final class StructureKernel {
     public @Nullable Document document(NamespacedId id);
     public @Nullable ClaimLedger ledger();
     public ContextStore contexts();
+    public StructureManager structures();
 
     public CompileResult compile(Document document);
     public MatchResult check(MatchRequest request);
@@ -111,7 +112,7 @@ entries first. Two entries with one id and different values throw `IllegalArgume
 - `types` — custom document key types (`NamespacedId` → `Class<?>`); built-in types (`long`, `int`,
   `boolean`, `string`, `id`, `cuboid`, `cuboid_set`) are handled by the compiler.
 
-`Host.empty()` is `(DocumentSource.empty(), null, ContextStore.inMemory(), Map.of())`. A kernel
+`Host.empty()` is `(DocumentSource.empty(), null, StructureManager.create(), Map.of())`. A kernel
 created without a host can compile and check, but `settle` with claimable rows is
 `Undecided(ledgerUnavailable)`.
 
@@ -132,7 +133,7 @@ created without a host can compile and check, but `settle` with claimable rows i
   code is not found, which is legal.
 - **`explainOrFallback(code)`** returns the registered explanation or a synthesised family-level one.
 - **`document(id)`** is the host's document source; **`ledger()`** is the host's ledger;
-  **`contexts()`** is the host's per-instance store (the set rollback removes a formed attempt's
+  **`structures()`** is the host's structure manager (the set rollback dispatches `Broken` for a formed attempt's
   context through it).
 
 The facade holds no thread, clock, cache or mutable registry. `create` is the only construction path.

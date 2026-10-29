@@ -96,8 +96,20 @@ final class SetCommand {
             CommandSupport.printCaptureFindings(source, id, captured.report(), state.kernel(level));
             StructureSetHost host = new StructureSetHost(state.kernel(level));
             StructureSetResult result = settle
-                    ? host.run(plan, lease, state.owner(), Budget.unbounded(), () -> state.instance(level))
-                    : host.check(plan, lease, state.owner(), Budget.unbounded(), () -> state.instance(level));
+                    ? host.run(
+                        plan,
+                        lease,
+                        state.owner(),
+                        Budget.unbounded(),
+                        spec -> state.structures(level).begin(state.world(level), spec)
+                    )
+                    : host.check(
+                        plan,
+                        lease,
+                        state.owner(),
+                        Budget.unbounded(),
+                        spec -> state.structures(level).begin(state.world(level), spec)
+                    );
             print(source, plan, origin, result, settle);
             if (settle) {
                 return result.formed() ? 1 : 0;

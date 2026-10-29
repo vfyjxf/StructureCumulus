@@ -5,10 +5,12 @@
 
 ## 1. Scope
 
-**Owns:** `ContextStore`, `StructureContext`, `CachedContext`, `Deriver<T>`, `DeriveContext`, `Merges`.
+**Owns:** `StructureManager`, `StructureInstance`, `StructureSpec`, `StructureAttempt`,
+`StructureEvent`, `ContextStore`, `StructureContext`, `CachedContext`, `Deriver<T>`, `DeriveContext`,
+`Merges`.
 
 **Does not own:** `ContextKey`/`ContextView`/`Outcome` (`core`), computations and their contexts
-(`structure`), match results (`engine`), persistence (`mc`).
+(`structure`), match results (`engine`), world lifecycle detection and persistence (`mc`).
 
 **Imports:** `core`, `space`, `finding`, `structure`.
 
@@ -17,7 +19,13 @@
 | Type | Kind | Contract |
 | --- | --- | --- |
 | `StructureContext` | record | `(instance, revision, values, findings, spend)`, a `ContextView` |
-| `ContextStore` | interface | per-instance publish/read/remove; `inMemory()` for tests and hosts |
+| `ContextStore` | interface | per-instance publish/read/remove; the narrow engine port |
+| `StructureSpec` | record | `(owner, siting, structure)`, what to form |
+| `StructureInstance` | record | `(id, spec, context, bounds)`, the formed structure |
+| `StructureAttempt` | interface | a draft `ContextStore`; `id`, `spec`, `commit(bounds)`, `abort` |
+| `StructureManager` | interface | in-memory registry; `begin`, `find`, `findAt`, `instances`, `onEvent` |
+| `InMemoryStructureManager` | final class, package-private | the server-thread registry behind `StructureManager.create()` |
+| `StructureEvent` | sealed interface | `Broken`, `Moved`, `Loaded`, `Unloaded`, `Invalidated` |
 | `CachedContext` | interface | host-owned read port: `<T> @Nullable T get(NamespacedId id, Class<T> type)` |
 | `Deriver<T>` | interface | context-only producer of one key |
 | `DeriveContext` | interface | what a deriver sees: base context, budget, findings |
@@ -49,6 +57,34 @@ public interface ContextStore {
     StructureContext publish(InstanceId instance, java.util.Map<ContextKey<?>, Object> values,
                              FindingBundle findings, Spend spend);
     static ContextStore inMemory();
+}
+
+public record StructureSpec(OwnerId owner, Siting siting, NamespacedId structure) {}
+public record StructureInstance(InstanceId id, StructureSpec spec, StructureContext context,
+                                CuboidSet bounds) {}
+public interface StructureAttempt extends ContextStore {
+    InstanceId id();
+    StructureSpec spec();
+    StructureInstance commit(CuboidSet bounds);
+    void abort();
+}
+final class InMemoryStructureManager implements StructureManager { /* server-thread registry */ }
+
+public interface StructureManager extends ContextStore {
+    static StructureManager create();
+    StructureAttempt begin(World world, StructureSpec spec);
+    @Nullable StructureInstance find(InstanceId id);
+    @Nullable StructureInstance find(OwnerId owner, Siting siting);
+    java.util.List<StructureInstance> findAt(LatticePoint worldCell);
+    java.util.List<StructureInstance> instances();
+    void onEvent(StructureEvent event);
+}
+public sealed interface StructureEvent {
+    record Broken(InstanceId id) implements StructureEvent {}
+    record Moved(InstanceId id, Siting from, Siting to, CuboidSet bounds) implements StructureEvent {}
+    record Loaded(java.util.List<StructureInstance> instances) implements StructureEvent {}
+    record Unloaded(World world) implements StructureEvent {}
+    record Invalidated(InstanceId id, String reason) implements StructureEvent {}
 }
 
 public interface Deriver<T> {
@@ -87,9 +123,9 @@ ordered by `(key.id, key.type.getName())`; `keys()` returns that order. `get` re
 when the key is absent; a published `null` is not a value (a key's absence is the absence of the
 entry). `require` returns `Found(value)` or `Missing`; it never throws. `has` is `get != null`.
 
-`StructureContext` is the persisted form. The host serialises `(instance, revision, values)` with its
-own codec keyed by `ContextKey.id`; the kernel does not define a wire format (I-12 is about documents,
-not runtime values).
+`StructureContext` is the derived form. The manager does not persist it; the adapter is in-memory
+(D-40). A host that persists its own non-derived values owns the codec; the kernel defines no wire
+format (I-12 is about documents, not runtime values).
 
 ### 4.2 Publication
 
@@ -112,10 +148,23 @@ and no stale-publish finding.
 
 **Removal.** `remove(instance)` returns the stored `StructureContext`, or `null` when the instance is
 absent; it never fabricates an empty context. After removal a later `context(instance)` reads the
-empty context at revision 0. The in-memory store removes the map entry; the adapter's `SavedContexts`
-also marks the SavedData dirty only when an entry was removed and persists the absence, so the next
-serial is restored from the remaining instances on reload. A set rollback is the shipped caller: it
-removes every formed attempt's context, including one whose claim release failed (09 §10.3).
+empty context at revision 0. The manager removes the instance and its context together; a set
+rollback dispatches `Broken` for every formed attempt, including one whose claim release failed
+(09 §10.3).
+
+### 4.2.1 StructureManager
+
+`begin(world, spec)` allocates an `InstanceId` and a draft `StructureAttempt`; a second draft at the
+same `(owner, siting)` is rejected, but a formed instance may be replaced by a later `commit`. The
+settle pass publishes into the attempt. `commit(bounds)` forms the `StructureInstance`; `abort`
+discards the draft. The manager stores the world-frame `bounds` only for lifecycle lookup
+(`findAt`/`findIn`); it does not interpret them.
+
+The manager is in-memory and single-writer on the server thread. `Broken`/`Invalidated` remove the
+instance; `Moved` preserves the id and context and updates the spec siting and bounds; `Loaded`
+replaces the registry and raises the serial watermark; `Unloaded` removes one world's instances and
+drafts. The adapter dispatches these events from `WatchEvents`; the manager never listens to
+Minecraft events and never persists.
 
 ### 4.3 Derivation
 
@@ -126,7 +175,7 @@ produced earlier in the same derive pass. A `Deriver.requires` key must be prese
 skipped with `SC-CTX-0007`; a `Missing` return makes the output absent and adds the deriver's own
 findings, or `SC-CTX-0005` if it reported none. All `Found` values of one derive pass are published
 in one `ContextStore.publish`; a `match` key produced by a deriver is rejected with `SC-CTX-0005`
-(only `instance` values are persisted). A derive pass publishes one revision, never a partial batch.
+(only `instance` values are published). A derive pass publishes one revision, never a partial batch.
 
 A deriver has no world view and no lease: it reads `DeriveContext` (the base context) only. A
 deriver that needs the world must be a computation, not a deriver. `DerivationSpec.arguments` is
@@ -197,7 +246,7 @@ section computation returned `Missing` for a `Partial` slice. Producer: `engine.
 - Publish: merge semantics, revision growth, `match` rejection, cumulative spend, latest findings,
   one writer per instance.
 - Remove: the old context is returned, a second remove answers `null`, the instance reads empty at
-  revision 0 afterwards; the persisted store drops the entry and reloads it as absent.
+  revision 0 afterwards; `Broken` removes the instance and context together.
 - Derive: order, requires, missing deriver, stale base, one batch, no partial publish.
 - Cached context: instance-only eligibility, the declared-dependency gate (check requires and
   computation inputs), lookup by `(id, type)` for a host-decoded key, the attempt value shadows the

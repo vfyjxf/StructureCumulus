@@ -14,7 +14,7 @@ context,document,engine,remedy,spi}`, `src/kernelTest/java`, and the `src/main/j
 the adapter. Committed: M1 (host + `/cumulus check` + capture-check: `LevelCapture`,
 `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState` lifecycle, in-memory
 `BuiltinDocuments`), M2a (loaded-entity capture, policy windows, footprint indexing, entity-vs-block
-precedence), M2b (upright orientation mapping), M3 at `d4b6d82` (`SavedClaims`, `SavedContexts`,
+precedence), M2b (upright orientation mapping), M3 at `d4b6d82` (`SavedClaims`; `SavedContexts` removed by D-40,
 CAS/release/reload), M2c at `cb06aa8`/`64d04ce` (Model C, body identity, total read, four-state
 traits, the five adapter trait keys) and M2d at `f3e0338`/`d6aefc2` (nested extents, one
 `LevelSnapshot` + `FrameData`, child frames, cuts, child entities), M4a at `f2659c7` (JSON
@@ -41,8 +41,8 @@ values. S5 of the structure-set close-out adds the production `set check`/`set s
 one union capture and the check-only host path (`09-structure-sets.md` §16). S6 closes the set layer:
 `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
 budget shared by presence and every member attempt. The tree registers
-**262 kernel tests in 39 containers, 296 adapter unit tests in 37 containers and 71 `@GameTest`
-methods**; `Codes.all` has 65 entries and the decision record has 39 decisions (D-39). Pending only:
+**269 kernel tests in 40 containers, 280 adapter unit tests in 35 containers and 73 `@GameTest`
+methods**; `Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Pending only:
 the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
 There is no regeneration milestone.
 

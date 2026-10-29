@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | **Author** | `Blueprint`, `BlueprintBuilder`, `Bay`, `Check`, `Focuses`, `Expectations`, `ContextKeys`, `Computations` | declare a structure in Java |
 | **Addon** | `Expectation`, `Focus`, `Computation`, `Deriver`, `RemedyProvider`, `TraitKey`, `ContextKey` | teach the kernel one domain |
-| **Host** | `WorldCapture`, `WorldView`, `SnapshotLease`, `ClaimLedger`, `ContextStore`, `DocumentReader`, `DocumentWriter` | bind the kernel to a world, a store and a format |
+| **Host** | `WorldCapture`, `WorldView`, `SnapshotLease`, `ClaimLedger`, `StructureManager`, `DocumentReader`, `DocumentWriter` | bind the kernel to a world, a store and a format |
 
 The facade is one final class, `StructureKernel`, with four pipeline operations (`compile`, `check`,
 `settle`, `derive`), three helpers (`solve`, `explain`, `explainOrFallback`) and four lookups
@@ -355,6 +355,7 @@ public final class StructureKernel {
     public @Nullable Document document(NamespacedId id);
     public @Nullable ClaimLedger ledger();
     public ContextStore contexts();
+    public StructureManager structures();
 
     public CompileResult compile(Document document);
     public MatchResult check(MatchRequest request);
@@ -367,7 +368,7 @@ public final class StructureKernel {
 ```
 
 Four pipeline operations, three helpers, four lookups. `settle` takes only the request and the
-admitted result; it finds its ledger in the kernel's `Host`. `contexts()` exposes the same host's
+admitted result; it finds its ledger in the kernel's `Host`. `structures()` exposes the same host's manager; `contexts()` is its narrow engine port;
 per-instance store so a host can remove a rolled-back set member's context (D-35). `create(catalogs)`
 is the no-host form for compile-only use; `check` with a lease works, `settle` reports
 `Undecided(ledgerUnavailable)`.

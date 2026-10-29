@@ -199,7 +199,7 @@ exactly as before: only current section/aggregate values are visible.
 - No `Retention` split beyond the existing `match` / `instance`.
 - No per-key TTL, eviction, or cache ownership inside the kernel.
 - No cache of `Retention.match` values.
-- No change to `ContextStore`, `SavedContexts`, or the context wire format.
+- No change to `ContextStore` or the host-owned cache; the structure manager does not persist context.
 
 ## 7. Affected modules
 

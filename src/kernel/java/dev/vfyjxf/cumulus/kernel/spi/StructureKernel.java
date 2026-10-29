@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.spi;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
@@ -71,6 +72,10 @@ public final class StructureKernel {
         return host.contexts();
     }
 
+    public StructureManager structures() {
+        return host.structures();
+    }
+
     public CompileResult compile(Document document) {
         CompilerContext context = new CompilerContext(
             catalogs.focuses(),
@@ -87,7 +92,12 @@ public final class StructureKernel {
     }
 
     public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted) {
-        return MatchEngine.settle(request, admitted, host.ledger(), host.contexts());
+        return settle(request, admitted, host.contexts());
+    }
+
+    /** Settles through a reserved draft instead of the host registry. */
+    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted, ContextStore contexts) {
+        return MatchEngine.settle(request, admitted, host.ledger(), contexts);
     }
 
     public StructureContext derive(MatchResult.Formed formed, List<DerivationSpec> derivations) {

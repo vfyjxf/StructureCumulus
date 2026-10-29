@@ -90,8 +90,13 @@ public final class StructureSetHostGameTest {
             }
             try (lease) {
                 StructureSetHost host = new StructureSetHost(state.kernel(level));
-                StructureSetResult checked = host
-                        .check(plan, lease, state.owner(), Budget.unbounded(), () -> state.instance(level));
+                StructureSetResult checked = host.check(
+                    plan,
+                    lease,
+                    state.owner(),
+                    Budget.unbounded(),
+                    spec -> state.structures(level).begin(state.world(level), spec)
+                );
                 if (!checked.setFindings().isEmpty()) {
                     helper.fail("a clean check reported " + checked.setFindings());
                     return;
@@ -109,8 +114,13 @@ public final class StructureSetHostGameTest {
                 helper.assertValueEqual(revision, ledger.revision(), "a check does not move the ledger revision");
                 helper.assertValueEqual(0, ledger.read(SetCommand.bounds(plan)).rows().size(), "a check writes no row");
 
-                StructureSetResult settled = host
-                        .run(plan, lease, state.owner(), Budget.unbounded(), () -> state.instance(level));
+                StructureSetResult settled = host.run(
+                    plan,
+                    lease,
+                    state.owner(),
+                    Budget.unbounded(),
+                    spec -> state.structures(level).begin(state.world(level), spec)
+                );
                 if (!settled.formed()) {
                     helper.fail("the settle did not form: " + settled.setFindings());
                     return;
@@ -162,8 +172,13 @@ public final class StructureSetHostGameTest {
             }
             try (lease) {
                 StructureSetHost host = new StructureSetHost(state.kernel(level));
-                StructureSetResult result = host
-                        .run(plan, lease, state.owner(), Budget.unbounded(), () -> state.instance(level));
+                StructureSetResult result = host.run(
+                    plan,
+                    lease,
+                    state.owner(),
+                    Budget.unbounded(),
+                    spec -> state.structures(level).begin(state.world(level), spec)
+                );
                 helper.assertTrue(!result.formed(), "a failed member means no formed set");
                 helper.assertValueEqual(
                     List.of(rootId),
@@ -222,9 +237,9 @@ public final class StructureSetHostGameTest {
         }
         try (lease) {
             StructureSetResult result = new StructureSetHost(state.kernel(level))
-                    .check(handBuilt, lease, state.owner(), Budget.unbounded(), () -> {
+                    .check(handBuilt, lease, state.owner(), Budget.unbounded(), spec -> {
                         instances.incrementAndGet();
-                        return state.instance(level);
+                        return state.structures(level).begin(state.world(level), spec);
                     });
             helper.assertTrue(
                 result.setFindings().stream()
@@ -274,8 +289,13 @@ public final class StructureSetHostGameTest {
                 return;
             }
             try (lease) {
-                StructureSetResult result = new StructureSetHost(state.kernel(level))
-                        .run(plan, lease, state.owner(), Budget.of(1, Integer.MAX_VALUE), () -> state.instance(level));
+                StructureSetResult result = new StructureSetHost(state.kernel(level)).run(
+                    plan,
+                    lease,
+                    state.owner(),
+                    Budget.of(1, Integer.MAX_VALUE),
+                    spec -> state.structures(level).begin(state.world(level), spec)
+                );
                 helper.assertTrue(
                     result.setFindings().stream()
                             .anyMatch(finding -> finding.code().equals(Codes.budgetExhausted.code())),

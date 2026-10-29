@@ -1,6 +1,6 @@
 package dev.vfyjxf.cumulus.mc;
 
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
 import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
@@ -21,7 +21,7 @@ class BuiltinDocumentsTest {
     void airCellCompilesWithoutFindings() {
         StructureKernel kernel = StructureKernel.create(
             Catalogs.builtin(),
-            new Host(BuiltinDocuments.source(), null, ContextStore.inMemory(), Map.of())
+            new Host(BuiltinDocuments.source(), null, StructureManager.create(), Map.of())
         );
         Document document = kernel.document(BuiltinDocuments.airCellId());
         assertNotNull(document, "the built-in document resolves");

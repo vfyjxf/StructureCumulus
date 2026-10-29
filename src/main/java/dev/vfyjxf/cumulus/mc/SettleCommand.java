@@ -2,6 +2,8 @@ package dev.vfyjxf.cumulus.mc;
 
 import com.mojang.brigadier.context.CommandContext;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
@@ -58,22 +60,30 @@ final class SettleCommand {
         try (CommandSupport.Attempt prepared = attempt) {
             CommandSupport.printCaptureFindings(source, blueprint.id(), prepared.report(), kernel);
             ClaimView claims = state.claims(level).read(prepared.bounds());
+            StructureAttempt draft = state.structures(level)
+                    .begin(state.world(level), new StructureSpec(state.owner(), prepared.siting(), blueprint.id()));
             MatchRequest request = MatchRequest.of(
                 blueprint,
                 prepared.siting(),
                 prepared.lease(),
-                state.instance(level),
+                draft.id(),
                 state.owner(),
                 Budget.unbounded(),
                 claims
             );
             MatchResult checked = kernel.check(request);
             if (!(checked instanceof MatchResult.Admitted admitted)) {
+                draft.abort();
                 CommandSupport
                         .printFindings(source, summary("check", blueprint.id(), origin, checked), checked.findings());
                 return checked;
             }
-            MatchResult settled = kernel.settle(request, admitted);
+            MatchResult settled = kernel.settle(request, admitted, draft);
+            if (settled instanceof MatchResult.Formed) {
+                draft.commit(prepared.bounds().asSet());
+            } else {
+                draft.abort();
+            }
             CommandSupport
                     .printFindings(source, summary("settle", blueprint.id(), origin, settled), settled.findings());
             return settled;

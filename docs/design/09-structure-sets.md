@@ -621,8 +621,8 @@ Document errors reuse existing codes:
   set, while an origin satellite with a non-identity orientation is accepted.
 - Shared set budget: presence `(1, 0)` charges, an attempt sees the remainder, an admitted spend is
   added, and an exhausted attempt stops the set.
-- `ContextStore.remove`: in-memory old-context return, `SavedContexts` removal and reload, absent
-  removal is a no-op.
+- `StructureManager` lifecycle: a rolled-back attempt dispatches `Broken`, the context disappears with
+  the instance; a failed release still removes the instance. The manager is in-memory (D-40).
 - Host check-all/settle-all/rollback, ledger-wide claims filtering; a rollback removes every formed
   attempt's context, including a failed-release root, and reports a failed release or removal as
   `SC-SET-0007`.
@@ -665,7 +665,7 @@ Document errors reuse existing codes:
 - **S4** is implemented in the working tree after `93f5941`: six adapter stress classes (33 tests) in
   `src/test/.../mc` cover IE preheaters, TEP range fan-in, AE2 logical subnetworks, controller/port
   envelopes, rotation and rollback (`06-verification.md` §3.3). The counts at H4 (2026-10-28,
-  before T1–T3) are **258 kernel tests (39 containers), 276 adapter unit tests (36 containers), 64
+  before T1–T3) are **258 kernel tests (40 containers), 276 adapter unit tests (36 containers), 64
   `@GameTest` methods**, `Codes.all` 64 and 33 decisions (D-33; D-29 is superseded). S4 adds no kernel type and
   regenerates no visual; the H4 host-data group (`06-verification.md` §3.4) touches the same
   adapter unit suite and changes no set-layer type or rule.
@@ -679,23 +679,23 @@ Document errors reuse existing codes:
   rows, `firstFailure`); `set check` exits 1 only with no error finding and at least one admitted
   outcome, `set settle` only with `formed()`. Tests: two new `StructureSetHostTest` cases (24 total) and
   the real-capture `StructureSetHostGameTest` plus the dispatcher `SetCommandGameTest` (four GameTests;
-  69 total). Counts on the S5 tree are **258 kernel tests (39 containers), 286 adapter unit tests (37
+  69 total). Counts on the S5 tree are **258 kernel tests (40 containers), 286 adapter unit tests (37
   containers), 69 `@GameTest` methods**; `Codes.all` stays 64 and the decision record 34. No kernel
   type and no visual changes.
 - **S6** is implemented in the working tree after `8ba240e`. It closes the three set-layer gaps:
   `SC-SET-0008` (root/satellite placement collision) with the compiler, `StructureSet.place` and the
   host's defensive check; `ContextStore.remove(InstanceId)` (interface, in-memory and
-  `SavedContexts`), `StructureKernel.contexts()`, and rollback invalidation of every formed attempt
+  `StructureManager`), `StructureKernel.structures()`, and rollback invalidation of every formed attempt
   independent of its release; and one set-scoped budget shared by presence and every member attempt.
   The focused tests are two new `StructureSetCompilerTest` cases (15 total), two `StructureSetPlanTest`
   cases (8), two `StructureSetHostTest` cases (26), the renamed/new budget cases in
   `LogicalSubnetworkSetStressTest` (9), the updated `StructureSetRollbackStressTest` (6), plus
-  `ContextTest` (4) and `SavedContextsLifecycleTest` (6). The follow-up adds two real-level
+  `ContextTest` (4) and `StructureManagerTest` (7). The follow-up adds two real-level
   `StructureSetHostGameTest` cases: a hand-built satellite that shares the root siting is rejected
   before presence, and a one-cell shared budget leaves the root check `Undecided(SC-ENG-0001)`; the
   production set capture now carries no orientation and runs no orientation audit. Counts on the S6
-  tree are **262 kernel tests (39 containers), 296 adapter unit tests (37 containers), 71 `@GameTest`
-  methods**; `Codes.all` is 65 and the decision record 39 (D-39). The command and the one-capture
+  tree are **269 kernel tests (40 containers), 280 adapter unit tests (35 containers), 73 `@GameTest`
+  methods**; `Codes.all` is 65 and the decision record 40 (D-40). The command and the one-capture
   executor remain S5.
 - The command and the one-capture executor are S5, not S6.
 

@@ -3,6 +3,8 @@ package dev.vfyjxf.cumulus.mc;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
@@ -128,16 +130,19 @@ public final class CumulusCommand {
         try (CommandSupport.Attempt prepared = attempt) {
             CommandSupport.printCaptureFindings(source, blueprint.id(), prepared.report(), state.kernel());
             ClaimView claims = state.claims(level).read(prepared.bounds());
+            StructureAttempt draft = state.structures(level)
+                    .begin(state.world(level), new StructureSpec(state.owner(), prepared.siting(), blueprint.id()));
             MatchRequest request = MatchRequest.of(
                 blueprint,
                 prepared.siting(),
                 prepared.lease(),
-                state.instance(level),
+                draft.id(),
                 state.owner(),
                 Budget.unbounded(),
                 claims
             );
             MatchResult checked = state.kernel().check(request);
+            draft.abort();
             print(source, summary(blueprint.id(), origin, checked), checked.findings());
             return checked;
         }

@@ -9,7 +9,12 @@ import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
+import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
@@ -292,6 +297,7 @@ final class StructureSetTestSupport {
 
         final TestView view = new TestView();
         final FakeLedger ledger = new FakeLedger();
+        final StructureManager structures;
         final ContextStore contexts;
         final StructureKernel kernel;
         final StructureSet plan;
@@ -302,26 +308,28 @@ final class StructureSetTestSupport {
         }
 
         Fixture(CompiledStructureSet compiled, Siting rootSiting) {
-            this(compiled, rootSiting, ContextStore.inMemory());
+            this(compiled, rootSiting, StructureManager.create());
         }
 
-        Fixture(CompiledStructureSet compiled, Siting rootSiting, ContextStore contexts) {
-            this.contexts = contexts;
+        Fixture(CompiledStructureSet compiled, Siting rootSiting, StructureManager structures) {
+            this.structures = structures;
+            this.contexts = structures;
             this.kernel = StructureKernel
-                    .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, contexts, Map.of()));
+                    .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
             StructureSet.Placement placement = StructureSet.place(compiled, rootSiting);
             this.plan = Objects.requireNonNull(placement.set(), () -> "placement failed: " + placement.findings());
         }
 
         Fixture(StructureSet plan) {
-            this(plan, ContextStore.inMemory());
+            this(plan, StructureManager.create());
         }
 
-        Fixture(StructureSet plan, ContextStore contexts) {
-            this.contexts = contexts;
+        Fixture(StructureSet plan, StructureManager structures) {
+            this.structures = structures;
+            this.contexts = structures;
             this.plan = plan;
             this.kernel = StructureKernel
-                    .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, contexts, Map.of()));
+                    .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
         }
 
         StructureSetResult run() {
@@ -337,22 +345,22 @@ final class StructureSetTestSupport {
         }
 
         StructureSetResult run(SnapshotLease lease, Budget budget) {
-            return new StructureSetHost(kernel).run(plan, lease, owner, budget, this::nextInstance);
+            return new StructureSetHost(kernel).run(plan, lease, owner, budget, this::begin);
         }
 
         StructureSetResult check() {
             return new StructureSetHost(kernel)
-                    .check(plan, new TestLease(view), owner, Budget.unbounded(), this::nextInstance);
+                    .check(plan, new TestLease(view), owner, Budget.unbounded(), this::begin);
         }
 
         InstanceId instance(int index) {
             return instances.get(index);
         }
 
-        private InstanceId nextInstance() {
-            InstanceId instance = new InstanceId(world, instances.size() + 1);
-            instances.add(instance);
-            return instance;
+        private StructureAttempt begin(StructureSpec spec) {
+            StructureAttempt attempt = structures.begin(world, spec);
+            instances.add(attempt.id());
+            return attempt;
         }
     }
 
@@ -676,11 +684,36 @@ final class StructureSetTestSupport {
         }
     }
 
-    static final class RemoveFailingContexts implements ContextStore {
+    static final class RemoveFailingStructures implements StructureManager {
 
-        private final ContextStore delegate = ContextStore.inMemory();
+        private final StructureManager delegate = StructureManager.create();
         private final List<InstanceId> removed = new ArrayList<>();
         int allowedRemovals = Integer.MAX_VALUE;
+
+        @Override
+        public StructureAttempt begin(World world, StructureSpec spec) {
+            return delegate.begin(world, spec);
+        }
+
+        @Override
+        public @Nullable StructureInstance find(InstanceId id) {
+            return delegate.find(id);
+        }
+
+        @Override
+        public @Nullable StructureInstance find(OwnerId owner, Siting siting) {
+            return delegate.find(owner, siting);
+        }
+
+        @Override
+        public List<StructureInstance> findAt(LatticePoint worldCell) {
+            return delegate.findAt(worldCell);
+        }
+
+        @Override
+        public List<StructureInstance> instances() {
+            return delegate.instances();
+        }
 
         @Override
         public StructureContext context(InstanceId instance) {
@@ -704,6 +737,17 @@ final class StructureSetTestSupport {
                 throw new IllegalStateException("context removal refused by the test store");
             }
             return delegate.remove(instance);
+        }
+
+        @Override
+        public void onEvent(StructureEvent event) {
+            if (event instanceof StructureEvent.Broken broken) {
+                removed.add(broken.id());
+                if (removed.size() > allowedRemovals) {
+                    throw new IllegalStateException("context removal refused by the test store");
+                }
+            }
+            delegate.onEvent(event);
         }
 
         List<InstanceId> removed() {

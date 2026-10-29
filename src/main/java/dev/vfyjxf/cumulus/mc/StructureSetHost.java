@@ -4,8 +4,11 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
-import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
@@ -41,7 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 /**
  * Host orchestration for one placed structure set: presence, links, check-all, settle-all and rollback.
@@ -70,9 +73,9 @@ public final class StructureSetHost {
         SnapshotLease lease,
         OwnerId owner,
         Budget budget,
-        Supplier<InstanceId> instances
+        Function<StructureSpec, StructureAttempt> drafts
     ) {
-        return run(set, lease, owner, budget, instances, true);
+        return run(set, lease, owner, budget, drafts, true);
     }
 
     /**
@@ -84,9 +87,9 @@ public final class StructureSetHost {
         SnapshotLease lease,
         OwnerId owner,
         Budget budget,
-        Supplier<InstanceId> instances
+        Function<StructureSpec, StructureAttempt> drafts
     ) {
-        return run(set, lease, owner, budget, instances, false);
+        return run(set, lease, owner, budget, drafts, false);
     }
 
     private StructureSetResult run(
@@ -94,14 +97,14 @@ public final class StructureSetHost {
         SnapshotLease lease,
         OwnerId owner,
         Budget budget,
-        Supplier<InstanceId> instances,
+        Function<StructureSpec, StructureAttempt> drafts,
         boolean settle
     ) {
         Objects.requireNonNull(set, "set");
         Objects.requireNonNull(lease, "lease");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(budget, "budget");
-        Objects.requireNonNull(instances, "instances");
+        Objects.requireNonNull(drafts, "drafts");
         List<Finding> setFindings = new ArrayList<>();
         Map<NamespacedId, MatchOutcome> outcomes = new LinkedHashMap<>();
         Map<NamespacedId, List<ClaimRow>> claims = new LinkedHashMap<>();
@@ -162,7 +165,7 @@ public final class StructureSetHost {
             lease,
             owner,
             setBudget,
-            instances,
+            drafts,
             setFindings,
             outcomes
         );
@@ -182,31 +185,45 @@ public final class StructureSetHost {
                 lease,
                 owner,
                 setBudget,
-                instances,
+                drafts,
                 setFindings,
                 outcomes
             );
             if (attempt == null) {
+                for (Attempt checked : attempts) {
+                    checked.draft().abort();
+                }
                 return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
             }
             attempts.add(attempt);
         }
         if (!settle) {
+            for (Attempt attempt : attempts) {
+                attempt.draft().abort();
+            }
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         ClaimLedger ledger = kernel.ledger();
         List<Attempt> formed = new ArrayList<>();
-        for (Attempt attempt : attempts) {
-            MatchResult settleResult = kernel.settle(attempt.request(), attempt.admitted());
+        Map<NamespacedId, StructureInstance> instances = new LinkedHashMap<>();
+        for (int index = 0; index < attempts.size(); index++) {
+            Attempt attempt = attempts.get(index);
+            MatchResult settleResult = kernel.settle(attempt.request(), attempt.admitted(), attempt.draft());
             if (settleResult instanceof MatchResult.Formed formedResult) {
+                StructureInstance instance = attempt.draft().commit(attempt.worldBounds().asSet());
+                instances.put(attempt.key(), instance);
                 settled.add(attempt.key());
                 formed.add(attempt);
                 setFindings.addAll(formedResult.findings().findings());
                 claims.put(attempt.key(), claimsOf(formedResult, attempt.blueprint(), owner));
                 continue;
             }
+            attempt.draft().abort();
+            for (int remaining = index + 1; remaining < attempts.size(); remaining++) {
+                attempts.get(remaining).draft().abort();
+            }
             setFindings.addAll(settleResult.findings().findings());
-            rollback(formed, owner, ledger, rolledBack, rollbackFailures);
+            rollback(formed, instances, owner, ledger, rolledBack, rollbackFailures);
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
@@ -235,27 +252,29 @@ public final class StructureSetHost {
         SnapshotLease lease,
         OwnerId owner,
         SetBudget budget,
-        Supplier<InstanceId> instances,
+        Function<StructureSpec, StructureAttempt> drafts,
         List<Finding> setFindings,
         Map<NamespacedId, MatchOutcome> outcomes
     ) {
         ClaimLedger ledger = kernel.ledger();
         @Nullable
         ClaimView claims = ledger == null ? null : ledger.read(worldBounds);
-        MatchRequest request = MatchRequest
-                .of(blueprint, siting, lease, instances.get(), owner, budget.remaining(), claims);
+        StructureAttempt draft = drafts.apply(new StructureSpec(owner, siting, blueprint.id()));
+        MatchRequest request = MatchRequest.of(blueprint, siting, lease, draft.id(), owner, budget.remaining(), claims);
         MatchResult checked = kernel.check(request);
         if (checked instanceof MatchResult.Admitted admitted) {
             outcomes.put(key, admitted.outcome());
             budget.spend(admitted.outcome().spend());
-            return new Attempt(key, blueprint, siting, worldBounds, request, admitted);
+            return new Attempt(key, blueprint, siting, worldBounds, request, admitted, draft);
         }
+        draft.abort();
         setFindings.addAll(checked.findings().findings());
         return null;
     }
 
     private void rollback(
         List<Attempt> formed,
+        Map<NamespacedId, StructureInstance> instances,
         OwnerId owner,
         @Nullable ClaimLedger ledger,
         List<NamespacedId> rolledBack,
@@ -280,10 +299,15 @@ public final class StructureSetHost {
                     rollbackFailures.add(rollbackFailure(attempt, detail(failure)));
                 }
             }
-            try {
-                kernel.contexts().remove(attempt.request().instance());
-            } catch (RuntimeException failure) {
-                rollbackFailures.add(rollbackFailure(attempt, "the context could not be removed: " + detail(failure)));
+            StructureInstance instance = instances.get(attempt.key());
+            if (instance != null) {
+                try {
+                    kernel.structures().onEvent(new StructureEvent.Broken(instance.id()));
+                } catch (RuntimeException failure) {
+                    rollbackFailures.add(
+                        rollbackFailure(attempt, "the structure context could not be removed: " + detail(failure))
+                    );
+                }
             }
         }
     }
@@ -517,7 +541,8 @@ public final class StructureSetHost {
         Siting siting,
         Cuboid worldBounds,
         MatchRequest request,
-        MatchResult.Admitted admitted
+        MatchResult.Admitted admitted,
+        StructureAttempt draft
     ) {}
 
     private enum PresenceState {

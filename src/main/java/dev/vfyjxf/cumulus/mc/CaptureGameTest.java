@@ -1,6 +1,8 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
@@ -126,17 +128,13 @@ public final class CaptureGameTest {
             return;
         }
         try (SnapshotLease lease = captured.lease()) {
+            Siting siting = Siting.of(point, Orientation.identity);
+            StructureAttempt draft = state.structures(helper.getLevel())
+                    .begin(state.world(helper.getLevel()), new StructureSpec(state.owner(), siting, blueprint.id()));
             MatchResult result = state.kernel().check(
-                MatchRequest.of(
-                    blueprint,
-                    Siting.of(point, Orientation.identity),
-                    lease,
-                    state.instance(helper.getLevel()),
-                    state.owner(),
-                    Budget.unbounded(),
-                    null
-                )
+                MatchRequest.of(blueprint, siting, lease, draft.id(), state.owner(), Budget.unbounded(), null)
             );
+            draft.abort();
             if (result instanceof MatchResult.Failed failed) {
                 helper.fail("check failed: " + FindingRenderer.human(failed.findings(), RenderContext.plain()));
                 return;

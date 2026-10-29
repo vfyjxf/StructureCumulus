@@ -68,7 +68,7 @@ Notes:
   windows, full footprint indexing and entity-vs-block precedence (`world.md` §4.3); M2b adds upright
   orientation mapping; M2c implements Model C, body identity and trait capture; M2d implements the
   nested capability (`mc.capability.NestedExtent`/`NestedExtents`, one `LevelSnapshot` with
-  `FrameData`); M3 adds `SavedClaims`/`SavedContexts` with CAS/release/reload at `d4b6d82` and is
+  `FrameData`); M3 adds `SavedClaims` with CAS/release/reload at `d4b6d82`; D-40 removes the context `SavedData` and is
   compatible with Model C; M4 adds the JSON reader/writer, the datapack source, the merged document
   source and the five top-level `/cumulus` subcommands; M5a adds the event-edged watched-region mark counter
   (`LevelWatch`/`WatchEvents`, lazy entity and block-entity fingerprints) at `d1fa42f`; P1 fixes the
@@ -108,7 +108,7 @@ package-private and must not leak:
 - the match session/accumulator, the tally, the draft, the folded context builder;
 - the topological sort, the section iteration, the conflict grouping;
 - the internal `MapContextView`, the internal `ClaimPlanner.Derived` fields beyond its accessors;
-- the concrete `InMemoryClaimLedger`, `InMemoryContextStore` (tests may use them through a public
+- the concrete `InMemoryClaimLedger`, `StructureManager` (tests may use them through a public
   static factory).
 
 ## 4. Source sets

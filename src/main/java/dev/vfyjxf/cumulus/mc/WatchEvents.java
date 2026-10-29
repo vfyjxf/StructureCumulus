@@ -1,6 +1,17 @@
 package dev.vfyjxf.cumulus.mc;
 
+import dev.vfyjxf.cumulus.StructureCumulus;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
+import dev.vfyjxf.cumulus.kernel.space.Cuboid;
+import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.piston.PistonStructureResolver;
@@ -14,6 +25,10 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.level.PistonEvent;
 import org.jspecify.annotations.NullMarked;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** The main-bus listeners that edge the mark counter; no listener does work unless a watch is active. */
@@ -34,6 +49,7 @@ public final class WatchEvents {
         NeoForge.EVENT_BUS.addListener(ChunkEvent.Unload.class, WatchEvents::chunkUnloaded);
         NeoForge.EVENT_BUS.addListener(EntityJoinLevelEvent.class, WatchEvents::entityJoined);
         NeoForge.EVENT_BUS.addListener(EntityLeaveLevelEvent.class, WatchEvents::entityLeft);
+        NeoForge.EVENT_BUS.addListener(LevelEvent.Load.class, WatchEvents::levelLoaded);
         NeoForge.EVENT_BUS.addListener(LevelEvent.Unload.class, WatchEvents::levelUnloaded);
     }
 
@@ -50,45 +66,53 @@ public final class WatchEvents {
     }
 
     static void blockBroken(BlockEvent.BreakEvent event) {
-        if (!active(event.getLevel())) {
-            return;
+        if (active(event.getLevel())) {
+            dispatches.incrementAndGet();
+            LevelWatch.blockChanged(event.getLevel(), event.getPos());
         }
-        dispatches.incrementAndGet();
-        LevelWatch.blockChanged(event.getLevel(), event.getPos());
+        if (event.getLevel() instanceof ServerLevel level) {
+            broken(level, List.of(event.getPos()));
+        }
     }
 
     static void blockPlaced(BlockEvent.EntityPlaceEvent event) {
-        if (!active(event.getLevel())) {
-            return;
+        if (active(event.getLevel())) {
+            dispatches.incrementAndGet();
+            LevelWatch.blockChanged(event.getLevel(), event.getPos());
         }
-        dispatches.incrementAndGet();
-        LevelWatch.blockChanged(event.getLevel(), event.getPos());
+        if (event.getLevel() instanceof ServerLevel level) {
+            invalidated(level, List.of(event.getPos()), "a block was placed inside the structure");
+        }
     }
 
     static void explosionDetonated(ExplosionEvent.Detonate event) {
-        if (!active(event.getLevel())) {
-            return;
+        if (active(event.getLevel())) {
+            dispatches.incrementAndGet();
+            for (BlockPos pos : event.getAffectedBlocks()) {
+                LevelWatch.blockChanged(event.getLevel(), pos);
+            }
         }
-        dispatches.incrementAndGet();
-        for (BlockPos pos : event.getAffectedBlocks()) {
-            LevelWatch.blockChanged(event.getLevel(), pos);
+        if (event.getLevel() instanceof ServerLevel level) {
+            broken(level, event.getAffectedBlocks());
         }
     }
 
     static void pistonMoved(PistonEvent.Pre event) {
-        if (!active(event.getLevel())) {
-            return;
+        if (active(event.getLevel())) {
+            dispatches.incrementAndGet();
+            LevelWatch.blockChanged(event.getLevel(), event.getPos());
+            PistonStructureResolver resolver = event.getStructureHelper();
+            if (resolver != null && resolver.resolve()) {
+                for (BlockPos pos : resolver.getToPush()) {
+                    LevelWatch.blockChanged(event.getLevel(), pos);
+                }
+                for (BlockPos pos : resolver.getToDestroy()) {
+                    LevelWatch.blockChanged(event.getLevel(), pos);
+                }
+            }
         }
-        dispatches.incrementAndGet();
-        LevelWatch.blockChanged(event.getLevel(), event.getPos());
-        PistonStructureResolver resolver = event.getStructureHelper();
-        if (resolver != null && resolver.resolve()) {
-            for (BlockPos pos : resolver.getToPush()) {
-                LevelWatch.blockChanged(event.getLevel(), pos);
-            }
-            for (BlockPos pos : resolver.getToDestroy()) {
-                LevelWatch.blockChanged(event.getLevel(), pos);
-            }
+        if (event.getLevel() instanceof ServerLevel level) {
+            pistonStructures(level, event);
         }
     }
 
@@ -116,12 +140,161 @@ public final class WatchEvents {
         LevelWatch.entityChanged(event.getLevel(), event.getEntity(), false);
     }
 
+    static void levelLoaded(LevelEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            ServerState state = ServerState.current();
+            if (state != null) {
+                dispatch(state.structures(level), new StructureEvent.Loaded(List.of()));
+            }
+        }
+    }
+
     static void levelUnloaded(LevelEvent.Unload event) {
-        if (!active(event.getLevel())) {
+        if (active(event.getLevel())) {
+            dispatches.incrementAndGet();
+            LevelWatch.levelUnloaded(event.getLevel());
+        }
+        if (event.getLevel() instanceof ServerLevel level) {
+            ServerState state = ServerState.current();
+            if (state != null) {
+                dispatch(state.structures(level), new StructureEvent.Unloaded(state.world(level)));
+            }
+        }
+    }
+
+    private static void broken(ServerLevel level, List<BlockPos> positions) {
+        ServerState state = ServerState.current();
+        if (state == null) {
             return;
         }
-        dispatches.incrementAndGet();
-        LevelWatch.levelUnloaded(event.getLevel());
+        StructureManager manager = state.structures(level);
+        Set<InstanceId> seen = new HashSet<>();
+        for (BlockPos pos : positions) {
+            LatticePoint cell = LatticePoint.of(pos.getX(), pos.getY(), pos.getZ());
+            for (StructureInstance instance : manager.findAt(cell)) {
+                if (seen.add(instance.id())) {
+                    dispatch(manager, new StructureEvent.Broken(instance.id()));
+                }
+            }
+        }
+    }
+
+    private static void invalidated(ServerLevel level, List<BlockPos> positions, String reason) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            return;
+        }
+        StructureManager manager = state.structures(level);
+        Set<InstanceId> seen = new HashSet<>();
+        for (BlockPos pos : positions) {
+            LatticePoint cell = LatticePoint.of(pos.getX(), pos.getY(), pos.getZ());
+            for (StructureInstance instance : manager.findAt(cell)) {
+                if (seen.add(instance.id())) {
+                    dispatch(manager, new StructureEvent.Invalidated(instance.id(), reason));
+                }
+            }
+        }
+    }
+
+    private static void pistonStructures(ServerLevel level, PistonEvent.Pre event) {
+        PistonStructureResolver resolver = event.getStructureHelper();
+        if (resolver == null || !resolver.resolve()) {
+            return;
+        }
+        ServerState state = ServerState.current();
+        if (state == null) {
+            return;
+        }
+        StructureManager manager = state.structures(level);
+        Set<LatticePoint> pushed = new HashSet<>();
+        for (BlockPos pos : resolver.getToPush()) {
+            pushed.add(LatticePoint.of(pos.getX(), pos.getY(), pos.getZ()));
+        }
+        Set<LatticePoint> destroyed = new HashSet<>();
+        for (BlockPos pos : resolver.getToDestroy()) {
+            destroyed.add(LatticePoint.of(pos.getX(), pos.getY(), pos.getZ()));
+        }
+        List<Cuboid> affected = new ArrayList<>();
+        for (LatticePoint cell : pushed) {
+            affected.add(Cuboid.of(cell));
+        }
+        for (LatticePoint cell : destroyed) {
+            affected.add(Cuboid.of(cell));
+        }
+        if (affected.isEmpty()) {
+            return;
+        }
+        Direction direction = event.getDirection();
+        int dx = direction.getStepX();
+        int dy = direction.getStepY();
+        int dz = direction.getStepZ();
+        for (StructureInstance instance : manager.findIn(CuboidSet.of(affected))) {
+            boolean destroyedPart = false;
+            for (Cuboid box : instance.bounds().boxes()) {
+                for (LatticePoint cell : destroyed) {
+                    if (box.contains(cell)) {
+                        destroyedPart = true;
+                        break;
+                    }
+                }
+                if (destroyedPart) {
+                    break;
+                }
+            }
+            if (destroyedPart) {
+                dispatch(
+                    manager,
+                    new StructureEvent.Invalidated(instance.id(), "a piston destroyed part of the structure")
+                );
+                continue;
+            }
+            boolean hasClaim = false;
+            boolean allMoved = true;
+            Cuboid claimBounds = instance.bounds().bounds();
+            if (claimBounds == null) {
+                dispatch(manager, new StructureEvent.Invalidated(instance.id(), "the structure has no bounds"));
+                continue;
+            }
+            ClaimView claims = state.claims(level).read(claimBounds);
+            for (ClaimRow row : claims.rows()) {
+                if (!row.owner().equals(instance.owner()) || !row.siting().equals(instance.siting())) {
+                    continue;
+                }
+                hasClaim = true;
+                LatticePoint cell = row.cell().point();
+                BlockPos pos = new BlockPos(cell.x(), cell.y(), cell.z());
+                if (!level.getBlockState(pos).isAir() && !pushed.contains(cell)) {
+                    allMoved = false;
+                    break;
+                }
+            }
+            CuboidSet movedBounds = instance.bounds().translate(dx, dy, dz);
+            LatticePoint movedOrigin = instance.siting().origin().offset(dx, dy, dz);
+            if (!hasClaim || !allMoved || movedBounds == null || movedOrigin == null) {
+                dispatch(
+                    manager,
+                    new StructureEvent.Invalidated(instance.id(), "a piston moved only part of the structure")
+                );
+                continue;
+            }
+            dispatch(
+                manager,
+                new StructureEvent.Moved(
+                    instance.id(),
+                    instance.siting(),
+                    instance.siting().withOrigin(movedOrigin),
+                    movedBounds
+                )
+            );
+        }
+    }
+
+    private static void dispatch(StructureManager manager, StructureEvent event) {
+        try {
+            manager.onEvent(event);
+        } catch (RuntimeException failure) {
+            StructureCumulus.logger.warn("structure lifecycle event {} was rejected", event, failure);
+        }
     }
 
     private static boolean active(LevelAccessor level) {

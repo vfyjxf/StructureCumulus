@@ -2,8 +2,7 @@ package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
 import dev.vfyjxf.cumulus.StructureCumulus;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
-import dev.vfyjxf.cumulus.kernel.core.InstanceId;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.World;
@@ -64,7 +63,7 @@ public final class ServerState {
                 return document != null ? document : builtin.findSet(id);
             }
         };
-        this.kernel = StructureKernel.create(catalogs, new Host(documents, null, ContextStore.inMemory(), Map.of()));
+        this.kernel = StructureKernel.create(catalogs, new Host(documents, null, StructureManager.create(), Map.of()));
         this.traitLookup = TraitLookup.load(StructureCumulus.logger);
     }
 
@@ -140,8 +139,8 @@ public final class ServerState {
         return store(level).claims();
     }
 
-    SavedContexts contexts(ServerLevel level) {
-        return store(level).contexts();
+    StructureManager structures(ServerLevel level) {
+        return store(level).structures();
     }
 
     LevelCapture capture(ServerLevel level) {
@@ -156,8 +155,8 @@ public final class ServerState {
         captures.clear();
     }
 
-    InstanceId instance(ServerLevel level) {
-        return new InstanceId(World.of(world(level)), contexts(level).allocateSerial());
+    World world(ServerLevel level) {
+        return World.of(worldId(level));
     }
 
     OwnerId owner() {
@@ -166,20 +165,19 @@ public final class ServerState {
 
     private LevelStore store(ServerLevel level) {
         return levels.computeIfAbsent(level, attached -> {
-            World world = World.of(world(attached));
+            World world = World.of(worldId(attached));
             SavedClaims claims = attached.getDataStorage()
                     .computeIfAbsent(SavedClaims.factory(world), SavedClaims.dataName);
-            SavedContexts contexts = attached.getDataStorage()
-                    .computeIfAbsent(SavedContexts.factory(world), SavedContexts.dataName);
-            Host host = new Host(documents, claims, contexts, Map.of());
-            return new LevelStore(claims, contexts, StructureKernel.create(catalogs, host));
+            StructureManager structures = StructureManager.create();
+            Host host = new Host(documents, claims, structures, Map.of());
+            return new LevelStore(claims, structures, StructureKernel.create(catalogs, host));
         });
     }
 
-    private static NamespacedId world(ServerLevel level) {
+    private static NamespacedId worldId(ServerLevel level) {
         var location = level.dimension().location();
         return NamespacedId.of(location.getNamespace(), location.getPath());
     }
 
-    private record LevelStore(SavedClaims claims, SavedContexts contexts, StructureKernel kernel) {}
+    private record LevelStore(SavedClaims claims, StructureManager structures, StructureKernel kernel) {}
 }

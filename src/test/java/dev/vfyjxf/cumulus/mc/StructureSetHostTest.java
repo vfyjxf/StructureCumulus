@@ -606,7 +606,7 @@ class StructureSetHostTest {
 
     @Test
     void aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals() {
-        StructureSetTestSupport.RemoveFailingContexts contexts = new StructureSetTestSupport.RemoveFailingContexts();
+        StructureSetTestSupport.RemoveFailingStructures contexts = new StructureSetTestSupport.RemoveFailingStructures();
         StructureSetTestSupport.Fixture fixture = new StructureSetTestSupport.Fixture(
             compiled(
                 compiled(leftSatellite(false, LinkSpec.face(leftParent, port)), preheaterBlueprint()),

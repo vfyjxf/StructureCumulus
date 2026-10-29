@@ -919,6 +919,34 @@ that genuinely need a fluid rule. No new finding code is introduced (the leaves 
 now 39 decisions (D-39). **Status:** implemented; kernel tests, full `check` and 71/71 GameTests are
 green.
 
+### D-40 — Structure contexts belong to a host-driven structure manager
+
+`StructureContext` had no owning structure object. It was published into a `ContextStore` map and
+the adapter persisted that map in `SavedContexts`; the map grew without lifecycle, and `nextSerial`
+existed only because the map could outlive the session. D-40 replaces the detached store with
+`StructureManager`:
+
+- `StructureSpec(owner, siting, structure)` describes what to form; `StructureInstance(id, spec,
+  context, bounds)` is the formed object and owns its latest context;
+- `StructureManager.begin(world, spec)` reserves a draft `StructureAttempt`; the settle pass publishes
+  into the draft; `commit(bounds)` forms the instance; `abort()` discards it;
+- the host dispatches `Broken`, `Moved`, `Loaded`, `Unloaded` and `Invalidated`; the manager owns the
+  registry and the context lifecycle;
+- the manager is in-memory. The adapter deletes `SavedContexts`, its codecs and tests; no context is
+  persisted. A host that wants durable non-derived values persists them itself and restores through
+  `Loaded`;
+- the adapter's `WatchEvents` detects breaks, explosions, placements, piston moves and level unloads
+  and dispatches the corresponding events.
+
+**Why:** the library owns the identity/context state machine, not the world lifecycle. Binding the
+context to the instance removes the map/serial/eviction side table; the host already knows when a
+structure is formed, moved or gone.
+
+**Consequence:** `ContextStore` remains the narrow publish/read interface implemented by the manager
+and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` has an attempt overload.
+The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
+`StructureLifecycleGameTest`, full `check` and 73/73 GameTests are green.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
