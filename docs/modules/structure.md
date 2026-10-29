@@ -508,10 +508,10 @@ non-`None` bay's cells must stay inside `bay.cells ∪ footprint`; a `Bound` foo
 settle, a `Box`/`Declared` at build.
 
 The host derives `SnapshotPolicy` from `Blueprint.reads()`: `kinds`, `traits` and `depth` map
-directly, and `windows` is `reads.windows()`. `maxElements` and the capture bounds remain the host's
-choice. No hidden read is legal; a policy without the declared trait ids produces `TraitSlot.Refused`
-(or no slot), never a default value. A generic `occupant`/`bay` read declares no kind: it sees
-whatever the host captured. A blueprint that requires entity-over-block or a nested body therefore
+directly, and `windows` maps each blueprint-local window through the siting into the world frame.
+`maxElements` and the capture bounds remain the host's choice. No hidden read is legal; a policy
+without the declared trait ids produces `TraitSlot.Refused` (or no slot), never a default value. A
+generic `occupant`/`bay` read declares no kind: it sees whatever the host captured. A blueprint that requires entity-over-block or a nested body therefore
 uses an `entity`/`nested` focus (or a custom focus that declares the kind), because `reads.kinds` is
 the only capture signal; an `occupant` focus over an entity the host never captured sees the block
 under it.

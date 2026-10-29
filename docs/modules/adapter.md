@@ -60,7 +60,7 @@
   layer: `Siting.compose` and the `SC-SET` codes (`9cf2794`), the set document IR/reader/
   writer/compiler (`00cf6c4`), the host `StructureSet` plan, `StructureSetHost` and `StructureSetResult`
   (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3). S5 adds `SetCommand` and the
-  `set check`/`set settle` literals, `CommandSupport.rootSiting`/`policy(ReadScope)`,
+  `set check`/`set settle` literals, `CommandSupport.rootSiting`/`policy(Blueprint, Siting)`,
   `StructureSetHost.check`, the built-in `set_root`/`set_wing`/`set_demo` documents with the
   `ServerState.findSet` builtin fallback, and the real-level `StructureSetHostGameTest`/`SetCommandGameTest`
   (`06-verification.md` §3.5). S6 adds `SC-SET-0008` at compile/placement/host, the shared set budget
@@ -152,8 +152,9 @@ The rules below are implemented.
   `null`, the cell is a plain block and no block capability is queried; the adapter never re-fetches
   the block entity.
 - Entities intersecting `bounds.inflate(maxEntitySpan)` are queried; M2a admits a loaded entity when
-  its footprint intersects the bounds, adds each policy window's typed cells, and indexes every
-  covered cell. A body leaving the capture is not clipped; its covered cells outside are unreadable.
+  its footprint intersects the bounds, adds each world-frame policy window's typed cells, and
+  indexes every covered cell. A body leaving the capture is not clipped; its covered cells outside
+  are unreadable.
   Entity-vs-block narrowing follows `world.md` §4.3: non-air, then smaller footprint volume, then
   `OccupantRef` order including `body`.
 - Entity identity: `OccupantDescriptors.entity(...)` mints `body =
@@ -554,7 +555,7 @@ no-chunk reads, cycle detection, budget, refusal and the child view:
   UUID-derived id, so two same-type entities at one anchor no longer collapse. Entity-hosted nested
   extents are supported by `NestedExtents.ENTITY`; the nested scan queries a loaded entity even when
   it is not indexed as an `entity` occupant, and block source precedence still applies per cell.
-  `SnapshotPolicy.windows` is root-framed and is not a child capture bound; a child captures entities
+  `SnapshotPolicy.windows` is world-framed and is not a child capture bound; a child captures entities
   whose footprint intersects its own bounds.
 - Nested focus and claims: `Focuses.nested` returns the child view with an empty subject list. A
   check that binds a nested body through `Focuses.occupant` fails at claim prediction with
@@ -649,11 +650,12 @@ All commands run on the server thread. `check` returns 1 whenever it reaches a r
   An anchored blueprint captures twice (P1, `56c632c`): the anchor cell is captured, `McAnchors`
   resolves the siting from that captured view (`view.get(origin, HostTypes.blockState)`), and the
   sited bounds are the capture the orientation audit runs on. The phase-1 view is closed after
-  resolution. The anchor property still selects the orientation, and `AnchorSpec.value` is now a real
-  constraint: a captured value that differs from the declaration (case-insensitively) is
-  `SC-BPT-0006` anchor-invalid. An uncaptured anchor state is `SC-MC-0010`, the same
-  host-value-not-captured code as the expectation absent value; `SC-MC-0001` remains the capture
-  refusal (§3.2, §12).
+  resolution. The capture policy maps the blueprint's entity windows through that siting, dropping a
+  window that leaves the lattice (`CommandSupport.policy(Blueprint, Siting)`). The anchor property
+  still selects the orientation, and `AnchorSpec.value` is now a real constraint: a captured value
+  that differs from the declaration (case-insensitively) is `SC-BPT-0006` anchor-invalid. An
+  uncaptured anchor state is `SC-MC-0010`, the same host-value-not-captured code as the expectation
+  absent value; `SC-MC-0001` remains the capture refusal (§3.2, §12).
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
   findings.
 - `/cumulus settle <id> <origin>` — capture once, `check`, then `settle` with the same request; print
@@ -792,9 +794,10 @@ and a placement failure exits 0.
 The set capture is **one** `LevelCapture.capture` call for the bounding box of `rootBounds()` and
 every satellite's `worldBounds()`, with a null orientation. Its policy is one `SnapshotPolicy` with
 the adapter's element ceiling and the union of the root's and every satellite's `Blueprint.reads()`:
-maximum depth, union of kinds, union of traits, union of windows (`ReadScope.union`). The capture
-report prints through `CaptureReports` before the set summary. The lease is closed after the host
-run.
+maximum depth, union of kinds and traits (`ReadScope.union`), and the root and every satellite window
+mapped into world space by that member's own siting (`CommandSupport.windows`); a window that leaves
+the lattice under its siting is dropped. The capture report prints through `CaptureReports` before the
+set summary. The lease is closed after the host run.
 
 The host then runs `StructureSetHost.check` or `StructureSetHost.run` with `Budget.unbounded()`, the
 server owner and `() -> state.instance(level)`. `check` is the same presence/link/check sequence and

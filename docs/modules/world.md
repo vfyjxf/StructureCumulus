@@ -351,10 +351,10 @@ it.
 
 `SnapshotPolicy` is a ceiling, not a request to over-read: `maxElements` bounds the total captured
 elements (root plus every child frame); `maxDepth` bounds the nested frames below the root; `kinds`
-and `traits` say what must be resolved; `windows` names the entity windows a read scope needs. The
-host derives the policy from `Blueprint.reads()` (`structure` §4.5). A required trait that cannot be
-resolved is a `TraitSlot.Refused` on the occupant, never a fabricated default and never a refusal of
-the whole cell.
+and `traits` say what must be resolved; `windows` names the world-frame entity windows the host must
+include. The host derives the policy from `Blueprint.reads()` (`structure` §4.5), mapping the local
+windows through the siting. A required trait that cannot be resolved is a `TraitSlot.Refused` on the
+occupant, never a fabricated default and never a refusal of the whole cell.
 
 A trait that was never asked for has no slot. That is "unasked", not `Absent`: a consumer that needs
 the trait reports an unreadable trait, never a mismatch. The same rule holds for a `Refused` slot.
@@ -399,10 +399,11 @@ never a totality proof.
 
 An entity can move within a section without a block change, so an entity check declares a window:
 the bay box inflated by `maxEntitySpan` on every axis, clamped to the lattice. The window is a
-read-scope entry, not a capture bound; `SnapshotPolicy.windows` asks the host to include it. The
-kernel has no type-body data, so a body wider than one section is the host's capture concern, not a
-blueprint build error. The body identity of §4.4 is what keeps two entities in one window distinct
-when they share a type and an anchor.
+read-scope entry in the blueprint-local frame, not a capture bound; the host maps it through the
+siting into the world frame before it builds `SnapshotPolicy.windows`. The kernel has no type-body
+data, so a body wider than one section is the host's capture concern, not a blueprint build error.
+The body identity of §4.4 is what keeps two entities in one window distinct when they share a type
+and an anchor.
 
 ### 4.9 Nested frames
 

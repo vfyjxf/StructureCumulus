@@ -12,6 +12,7 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
+import dev.vfyjxf.cumulus.kernel.world.EntityWindow;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import net.minecraft.commands.CommandSourceStack;
@@ -22,6 +23,7 @@ import net.minecraft.server.level.ServerLevel;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -113,13 +115,16 @@ final class SetCommand {
         return bounds;
     }
 
-    /** The capture policy of a set: the union of the root's and every satellite's declared reads. */
+    /** The capture policy of a set: the union of the declared reads with each member's windows mapped. */
     static SnapshotPolicy policy(StructureSet plan) {
         ReadScope reads = plan.root().reads();
+        List<EntityWindow> windows = new ArrayList<>(CommandSupport.windows(reads.windows(), plan.rootSiting()));
         for (StructureSet.Satellite satellite : plan.satellites()) {
-            reads = reads.union(satellite.blueprint().reads());
+            ReadScope satelliteReads = satellite.blueprint().reads();
+            windows.addAll(CommandSupport.windows(satelliteReads.windows(), satellite.siting()));
+            reads = reads.union(satelliteReads);
         }
-        return CommandSupport.policy(reads);
+        return CommandSupport.policy(reads, windows);
     }
 
     private static void print(

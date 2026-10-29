@@ -23,13 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-/** An entity window declared in the blueprint's local frame, and the world frame a host would need (D4). */
+/** An entity window declared in the blueprint's local frame; the host maps it into the world frame (D4). */
 class EntityWindowScenarioTest {
 
     private static final LatticePoint worldOrigin = LatticePoint.of(10, 64, 10);
 
     @Test
-    @DisplayName("known gap D4: entity read-scope window stays blueprint-local, not world-frame")
+    @DisplayName("the kernel keeps the entity read-scope window blueprint-local; the host maps it")
     void sitedEntityWindowIsPublishedInTheLocalFrame() {
         Siting siting = TechFixtures.identity(worldOrigin);
         Blueprint blueprint = entityBlueprint("entity/local_window");

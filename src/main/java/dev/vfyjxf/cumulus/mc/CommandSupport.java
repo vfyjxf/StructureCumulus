@@ -19,6 +19,7 @@ import dev.vfyjxf.cumulus.kernel.structure.SitingResult;
 import dev.vfyjxf.cumulus.kernel.world.CaptureReport;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
+import dev.vfyjxf.cumulus.kernel.world.EntityWindow;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
@@ -29,6 +30,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /** The helpers shared by the {@code /cumulus} subcommands: arguments, documents, capture, siting and output. */
 @NullMarked
@@ -78,12 +82,27 @@ final class CommandSupport {
         return bounds;
     }
 
-    static SnapshotPolicy policy(Blueprint blueprint) {
-        return policy(blueprint.reads());
+    static SnapshotPolicy policy(Blueprint blueprint, Siting siting) {
+        return policy(blueprint.reads(), siting);
     }
 
-    static SnapshotPolicy policy(ReadScope reads) {
-        return new SnapshotPolicy(maxElements, reads.depth(), reads.kinds(), reads.traits(), reads.windows());
+    static SnapshotPolicy policy(ReadScope reads, Siting siting) {
+        return policy(reads, windows(reads.windows(), siting));
+    }
+
+    static SnapshotPolicy policy(ReadScope reads, List<EntityWindow> windows) {
+        return new SnapshotPolicy(maxElements, reads.depth(), reads.kinds(), reads.traits(), windows);
+    }
+
+    static List<EntityWindow> windows(List<EntityWindow> local, Siting siting) {
+        List<EntityWindow> mapped = new ArrayList<>(local.size());
+        for (EntityWindow window : local) {
+            Cuboid world = siting.toWorld(window.cells());
+            if (world != null) {
+                mapped.add(new EntityWindow(world, window.type()));
+            }
+        }
+        return mapped;
     }
 
     static @Nullable Captured capture(
@@ -193,14 +212,13 @@ final class CommandSupport {
         LatticePoint origin
     ) {
         if (blueprint.anchors().isEmpty()) {
+            Siting siting = Siting.of(origin, Orientation.identity);
             Cuboid bounds = worldBounds(blueprint, origin, source);
             if (bounds == null) {
                 return null;
             }
-            Captured captured = capture(state, source, id, bounds, policy(blueprint), null);
-            return captured == null
-                    ? null
-                    : new Attempt(bounds, Siting.of(origin, Orientation.identity), captured.lease(), captured.report());
+            Captured captured = capture(state, source, id, bounds, policy(blueprint, siting), null);
+            return captured == null ? null : new Attempt(bounds, siting, captured.lease(), captured.report());
         }
         Siting siting = rootSiting(state, source, id, blueprint, origin);
         if (siting == null) {
@@ -211,7 +229,14 @@ final class CommandSupport {
             source.sendFailure(Component.literal("the sited blueprint bounds leave the world at " + origin));
             return null;
         }
-        Captured captured = capture(state, source, id, bounds, policy(blueprint), siting.placement().orientation());
+        Captured captured = capture(
+            state,
+            source,
+            id,
+            bounds,
+            policy(blueprint, siting),
+            siting.placement().orientation()
+        );
         return captured == null ? null : new Attempt(bounds, siting, captured.lease(), captured.report());
     }
 

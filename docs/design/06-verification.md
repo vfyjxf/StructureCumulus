@@ -181,7 +181,7 @@ they are not owed work and not a pending list:
 | Gap | Asserted by |
 | --- | --- |
 | A check cannot read instance context already published in `ContextStore` (it stays `SC-CTX-0007`) | `ContextInstanceScenarioTest.checkCannotReadPersistedInstanceContext` |
-| An entity read-scope window is published in the blueprint-local frame, not the world frame | `EntityWindowScenarioTest.sitedEntityWindowIsPublishedInTheLocalFrame` |
+| The kernel keeps an entity read-scope window in the blueprint-local frame; the host maps it into the world frame (D4, §3.2) | `EntityWindowScenarioTest.sitedEntityWindowIsPublishedInTheLocalFrame` |
 | `anyOccupant` has no fluid predicate, so water satisfies a NOTAIR slot | `BloodAltarScenarioTest.waterInANotAirSlotIsAdmittedAsAKnownFalsePositive` |
 | A cell outside every bay is ignored unless the blueprint asks for `envelope`; with `"envelope": true` the bounds are closed (a non-air occupant inside is `SC-EXP-0006`) and only cells outside `bounds` stay invisible | Without the flag: `Ae2CpuScenarioTest.anExtraBlockJustOutsideTheBayIsAdmitted`, `GtEbfScenarioTest.anExtraHatchOutsideTheBayIsNotEvidence`, `PncRefineryScenarioTest.aFifthOutputOutsideTheBayIsAdmitted`, `TerraPlateScenarioTest.anExtraBlockAboveThePlateIsIgnored`. With the flag: `EnvelopeScenarioTest.fusionTorusEnvelopeIsCleanAtAHalfTurn`, `EnvelopeScenarioTest.aCrystalInTheVoidFailsAtItsCell`, `EnvelopeScenarioTest.envelopeOnlyBlueprintIsAdmittedWithNoRows` |
 | Per-cell checks cannot express "exactly one controller" or a mixed coil count; a host `Computation`/aggregate must | `PncRefineryScenarioTest.twoControllersAreAdmittedByPerCellChecks`, `PncRefineryScenarioTest.aHostCountRejectsTwoControllers`, `GtEbfScenarioTest.mixedCoilCountNeedsAHostAggregate` |
@@ -205,7 +205,7 @@ characterization, not a new kernel promise.
 | kernel | `ClaimStressScenarioTest` | shared/exclusive walls, per-owner release, whole-key settle replacement, duplicate rows | 5 |
 | kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, `whenAbsent` on a check-only key, a derivation output | 4 |
 | kernel | `GateBudgetScenarioTest` | stale lease at check, mid-attempt invalidation, invalidation before settle, a tiny budget | 4 |
-| adapter | `EntityWindowPolicyTest` | the blueprint-local entity window copied into `CommandSupport.policy`, and a nonzero siting | 2 |
+| adapter | `EntityWindowPolicyTest` | the blueprint-local entity window mapped into `CommandSupport.policy` through the siting (identity, nonzero and a dropped unmappable window), and a set's root/satellite windows mapped by their own sitings | 2 |
 | adapter | `SavedClaimsLifecycleTest` | stale CAS, conflict bytes, whole-key release, duplicate-row canonical collapse | 4 |
 | adapter | `SavedContextsLifecycleTest` | serial monotonicity, whole-context publish/reload, instance isolation, growth, unknown type | 5 |
 
@@ -217,9 +217,17 @@ and not a pending list:
 | `Coverage.anySubject + Footprint.bound` accepts a nested body at build, then check rejects it with `SC-CLM-0004` | `NestedCoverageScenarioTest.nestedAnySubjectBoundBodyBuildsThenFailsAtCheck` |
 | Two `shared` bays over one cell write duplicate claim rows | `ClaimStressScenarioTest.duplicateRowsAreCharacterized` |
 | `whenAbsent` is a dead path for a check-only key: it needs a section computation, so a check cannot reach it | `ContextAggregateScenarioTest.whenAbsentIsADeadPathForACheckOnlyKey` |
-| D4: `CommandSupport.policy` copies the blueprint-local entity window and a nonzero siting never maps it to the world frame | `EntityWindowPolicyTest.policyCopiesTheLocalEntityWindow`, `EntityWindowPolicyTest.aNonzeroSitingStillLeavesThePolicyWindowLocal` |
 | D5: `SavedContexts` grows one entry per instance without eviction | `SavedContextsLifecycleTest.growthWithoutEvictionKeepsEveryInstance` |
 | Claim characterization: `release` removes the whole `(owner, siting)` key, not one row, and a reload collapses duplicate rows into one canonical order | `SavedClaimsLifecycleTest.releaseRemovesTheWholeOwnerSitingKey`, `SavedClaimsLifecycleTest.duplicateRowsCollapseAndReadIsCanonical` |
+
+**D4 fixed.** The host maps every blueprint-local entity window through its siting before it builds
+`SnapshotPolicy`: `CommandSupport.policy(blueprint, siting)` maps one blueprint's windows,
+`SetCommand.policy(plan)` maps the root window by the root siting and every satellite window by its
+own composed siting, and a window whose cells leave the lattice under the siting is dropped without a
+new finding. The kernel keeps `ReadScope.windows` blueprint-local, so
+`EntityWindowScenarioTest.sitedEntityWindowIsPublishedInTheLocalFrame` remains a kernel
+characterization. Asserted by `EntityWindowPolicyTest.policyMapsTheLocalEntityWindowThroughTheSiting`
+and `EntityWindowPolicyTest.aSetPolicyMapsRootAndSatelliteWindowsThroughTheirOwnSitings`.
 
 **NestedFocus fixed.** `NestedFocus.bindsSubjects()` is now false, so a nested focus never backs a
 `Coverage.oneSubject` bay: `oneSubject + Bound + nested` fails the build with `SC-BPT-0005` instead of
@@ -420,8 +428,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   parse/write fixed point and equal compile runs, `ServerStateDocumentSourceTest`/
   `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing, `LevelWatchTest`
   for the mark counter's refcounts and lazy fingerprints, `CaptureReportsTest` for the report
-  site, and the batch-2 persistence/policy units `EntityWindowPolicyTest` (D4 local-window
-  characterization), `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row
+  site, and the batch-2 persistence/policy units `EntityWindowPolicyTest` (D4 fixed host mapping),
+  `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row
   collapse) and `SavedContextsLifecycleTest` (merge/reload, instance isolation, D5 growth, unknown
   type), and the structure-set units `StructureSetPlanTest`, `StructureSetHostTest` (including S5's
   two check-only cases), `DatapackStructureSetTest`, the six-class SS4 stress suite (§3.3),

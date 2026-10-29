@@ -302,7 +302,9 @@ snake_case (`all_of`, `each_cell`, `any_occupant`, `all_cells`); an unqualified 
 A root `WorldView` is world-framed; a blueprint's bays, checks and computations are local. Every
 `FocusContext`/`SectionContext`/`AggregateContext` cell argument is mapped by the request's `Siting`
 before a view read, and every subject footprint is world-framed. `BayView`/`Focuses`/`Engine` do the
-mapping once; a raw `view.occupant(local)` in a check would be a frame bug. Nested subjects
+mapping once; a raw `view.occupant(local)` in a check would be a frame bug. The host applies the same
+rule to the read-scope entity windows: it maps every `ReadScope.windows` entry through the siting
+before it builds `SnapshotPolicy`, so the kernel keeps them blueprint-local. Nested subjects
 (`frame != 0`) are readable but cannot back a claim.
 
 ### D-23 — The document IR names `Footprint` and `Sharing`
@@ -345,8 +347,8 @@ The replacement is one total read and three narrower shapes: a per-cell `CellRea
   keys, and its constructor copies the ids without silently emptying the set. `maxDepth` is the
   nested ceiling.
 - `Blueprint.reads()` is the union of every check's `ReadScope` and every computation's region; the
-  host derives `SnapshotPolicy` (`kinds`, `traits`, `depth`, `windows`) from it. `ReadScope` carries
-  `(cells, keys, traits, kinds, depth, windows)`.
+  host derives `SnapshotPolicy` (`kinds`, `traits`, `depth`, and `windows` mapped through the siting)
+  from it. `ReadScope` carries `(cells, keys, traits, kinds, depth, windows)`.
 
 **The body component.** `OccupantRef` gains an opaque `@Nullable NamespacedId body` after `anchor`;
 the five-argument constructor is the compatibility form and passes `null`. Equality and `compareTo`

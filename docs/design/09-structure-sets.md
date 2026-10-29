@@ -482,8 +482,9 @@ server owner and one instance per checked structure.
   capture otherwise (`10-host-data.md`; the anchor property still selects the orientation).
 - The one capture region is the bounding box of the root bounds and every satellite's world bounds.
   Its policy is one `SnapshotPolicy` over the union of the root's and every satellite's
-  `Blueprint.reads()`: the maximum depth, the union of kinds, traits and windows, and the adapter's
-  element ceiling.
+  `Blueprint.reads()`: the maximum depth, the union of kinds and traits, and the root and every
+  satellite window mapped into world space by that member's own siting; the adapter's element ceiling
+  is the cap.
 - The capture carries no orientation, so it runs no orientation audit. One world-frame capture
   cannot audit the root's and each satellite's frames separately; the set checks still read the
   captured world-frame states, and this capture produces no `SC-MC-0004` warning.
@@ -669,8 +670,9 @@ Document errors reuse existing codes:
   regenerates no visual; the H4 host-data group (`06-verification.md` §3.4) touches the same
   adapter unit suite and changes no set-layer type or rule.
 - **S5** is implemented in the working tree after `9e363ad`. `mc` gains `SetCommand` and the
-  `/cumulus set check`/`set settle` literals, `CommandSupport.rootSiting` and `CommandSupport.policy(ReadScope)`,
-  `StructureSetHost.check` (the existing `run` signature is preserved) and the built-in demo set
+  `/cumulus set check`/`set settle` literals, `CommandSupport.rootSiting` and
+  `CommandSupport.policy(ReadScope, List<EntityWindow>)`, `StructureSetHost.check` (the existing
+  `run` signature is preserved) and the built-in demo set
   (`structurecumulus:set_demo` with the `set_root`/`set_wing` blueprints plus the `ServerState.findSet`
   builtin fallback). The command prints compile/placement/capture findings and the set summary (id and
   origin, root and satellite outcomes, `settled`, `rolledBack`, `rollbackFailures`, per-structure claim
