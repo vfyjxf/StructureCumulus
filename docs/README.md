@@ -116,11 +116,11 @@ Then the module files, in dependency order:
 - Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
   the adapter. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-29, S6 working tree): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 261 kernel JUnit 5 tests (39 test
+  `javac --release 21` and JSpecify only. The tree registers 262 kernel JUnit 5 tests (39 test
   containers), 296 adapter unit tests (37 containers) and 71 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (261 kernel tests, 296 adapter
+  `./gradlew check` and `runGameTestServer` both pass at this revision (262 kernel tests, 296 adapter
   tests, 71/71 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
-  and the decision record has 38 decisions (D-38; D-29 superseded).
+  and the decision record has 39 decisions (D-39; D-29 superseded).
 
 ## The one rule
 

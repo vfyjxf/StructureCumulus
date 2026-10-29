@@ -38,10 +38,10 @@ T1–T3 trait-provider slice (D-34) then replaces the provider shape and the tra
 production set command and its one capture, the check-only host path and the set GameTests (§3.5). S6
 closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
 invalidation, and one set budget shared by presence and every member attempt (§3.3). On the S6
-working tree a full `./gradlew check` and `runGameTestServer` both pass: 261 kernel tests (39
+working tree a full `./gradlew check` and `runGameTestServer` both pass: 262 kernel tests (39
 containers), 296 adapter unit tests (37 containers), 71/71 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
-`Codes.all` has 65 entries and the decision record has 38 decisions (D-38). Model C, body identity,
+`Codes.all` has 65 entries and the decision record has 39 decisions (D-39). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -165,7 +165,7 @@ suite, and each gap below is asserted rather than hidden.
 | --- | --- | --- |
 | `Ae2CpuScenarioTest` | AE2 crafting CPU: 2×2×2 solid, missing storage cell, outside block, lattice edge, exclusive conflict | 5 |
 | `AstralAltarScenarioTest` | Astral Altar tier II (54 cells) and tier III (72 cells) grown in place | 4 |
-| `BloodAltarScenarioTest` | Blood Altar tier prefixes, any-rune slots, footprint variants, a NOTAIR probe | 5 |
+| `BloodAltarScenarioTest` | Blood Altar tier prefixes, any-rune slots, footprint variants, a NOTAIR probe and the empty/non-fluid classification | 6 |
 | `ContextInstanceScenarioTest` | a context-focus check over already-published instance values | 1 |
 | `DoorCoverageScenarioTest` | two-cell door coverage and a three-cell `everyCell` bay | 2 |
 | `EntityWindowScenarioTest` | a read-scope entity window at a sited capture | 2 |
@@ -182,7 +182,6 @@ they are not owed work and not a pending list:
 | --- | --- |
 | A check cannot read instance context already published in `ContextStore` (it stays `SC-CTX-0007`) | `ContextInstanceScenarioTest.checkCannotReadPersistedInstanceContext` |
 | The kernel keeps an entity read-scope window in the blueprint-local frame; the host maps it into the world frame (D4, §3.2) | `EntityWindowScenarioTest.sitedEntityWindowIsPublishedInTheLocalFrame` |
-| `anyOccupant` has no fluid predicate, so water satisfies a NOTAIR slot | `BloodAltarScenarioTest.waterInANotAirSlotIsAdmittedAsAKnownFalsePositive` |
 | A cell outside every bay is ignored unless the blueprint asks for `envelope`; with `"envelope": true` the bounds are closed (a non-air occupant inside is `SC-EXP-0006`) and only cells outside `bounds` stay invisible | Without the flag: `Ae2CpuScenarioTest.anExtraBlockJustOutsideTheBayIsAdmitted`, `GtEbfScenarioTest.anExtraHatchOutsideTheBayIsNotEvidence`, `PncRefineryScenarioTest.aFifthOutputOutsideTheBayIsAdmitted`, `TerraPlateScenarioTest.anExtraBlockAboveThePlateIsIgnored`. With the flag: `EnvelopeScenarioTest.fusionTorusEnvelopeIsCleanAtAHalfTurn`, `EnvelopeScenarioTest.aCrystalInTheVoidFailsAtItsCell`, `EnvelopeScenarioTest.envelopeOnlyBlueprintIsAdmittedWithNoRows` |
 | Per-cell checks cannot express "exactly one controller" or a mixed coil count; a host `Computation`/aggregate must | `PncRefineryScenarioTest.twoControllersAreAdmittedByPerCellChecks`, `PncRefineryScenarioTest.aHostCountRejectsTwoControllers`, `GtEbfScenarioTest.mixedCoilCountNeedsAHostAggregate` |
 | A seam is inert: it declares a connectable edge, never feeds the engine and never owns a cell | `SeamScenarioTest.aDeclaredSeamOverAirPassesAndDoesNotChangeTheResult` |
@@ -235,6 +234,13 @@ claiming bay reject a subject-binding focus that is not claimable, so `anySubjec
 custom nested focus now fails at build with `SC-BPT-0005`
 (`NestedCoverageScenarioTest.nestedAnySubjectBoundBodyFailsBuild`). The runtime `SC-CLM-0004` path
 stays covered by `ReadModelTest` and `NestedCoverageScenarioTest.aChildFrameOccupantIsRejectedAtCheck`.
+
+**NOTAIR classification (D-39).** `Expectations.empty()` matches air or a vanilla fluid block and
+`Expectations.nonFluid()` matches every non-fluid occupant; a NOTAIR slot uses `not(empty())`.
+`BloodAltarScenarioTest.waterInANotAirSlotIsRejected` now fails water with `SC-EXP-0002`, and
+`BloodAltarScenarioTest.emptyAndNonFluidClassifyAirWaterLavaAndStone` covers air/water/lava/stone for
+both leaves. The kernel classifies by the vanilla block type; a waterlogged block is not a fluid
+occupant at this layer. `anyOccupant` is unchanged.
 
 **Release granularity (D-38).** `ClaimLedger.release(owner, siting)` deletes every row of the
 `(owner, siting)` key; there is no per-bay or per-row release. One siting is one instance, and a

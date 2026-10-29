@@ -207,6 +207,8 @@ public final class Expectations {
                                                           java.util.function.Predicate<T> test);
     public static Expectation<OccupantSnapshot> traitAbsent(TraitKey<?> key);
     public static Expectation<OccupantSnapshot> anyOccupant();
+    public static Expectation<OccupantSnapshot> empty();
+    public static Expectation<OccupantSnapshot> nonFluid();
     public static <T> Expectation<T> context(ContextKey<T> key,
                                              java.util.function.Predicate<T> test);
     public static <T> Expectation<T> allOf(Expectation<T>... children);
@@ -489,6 +491,13 @@ custom focus that lies still fails at check with `SC-CLM-0004`. A nested body is
 occupant of the parent frame; a
 check that binds it through `Focuses.occupant` fails at claim prediction with `SC-CLM-0004` before an
 `Admitted` exists, and `settle` revalidates the same rule (`engine` §7.5).
+
+`Expectations.empty()` matches air or a vanilla fluid block (`minecraft:water`/`minecraft:lava`);
+`Expectations.nonFluid()` matches every occupant that is not one of those fluid blocks (air is
+non-fluid). A NOTAIR slot is `not(empty())`: it rejects air, water and lava, and accepts a solid block
+or an entity. `anyOccupant` remains the "any readable occupant, including air" leaf. The kernel
+classifies fluids by the vanilla block type; a waterlogged block is a solid block occupant, and a host
+`fluid` expectation reads its captured fluid state instead.
 
 ### 4.5 Read scope
 

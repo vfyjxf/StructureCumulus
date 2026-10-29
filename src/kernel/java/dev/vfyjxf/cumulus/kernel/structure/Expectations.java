@@ -72,6 +72,16 @@ public final class Expectations {
         return new AnyOccupant();
     }
 
+    /** Matches air or a vanilla fluid block; a solid block or an entity is not empty. */
+    public static Expectation<OccupantSnapshot> empty() {
+        return new Empty();
+    }
+
+    /** Matches any occupant that is not a vanilla fluid block; air is non-fluid. */
+    public static Expectation<OccupantSnapshot> nonFluid() {
+        return new NonFluid();
+    }
+
     public static <T> Expectation<T> context(ContextKey<T> key, Predicate<T> test) {
         return new ContextValue<>(key, test);
     }
@@ -404,6 +414,54 @@ public final class Expectations {
         public ExpectationMeta meta() {
             return new ExpectationMeta(id("context"), 10, Set.of(key), code(1));
         }
+    }
+
+    private record Empty() implements Expectation<OccupantSnapshot> {
+
+        @Override
+        public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
+            OccupantSnapshot occupant = ctx.subject();
+            if (occupant.isAir() || isVanillaFluid(occupant.descriptor().type())) {
+                return Reply.match();
+            }
+            return mismatch(problem(ctx, occupant, "the cell is not empty: a solid occupant is present"));
+        }
+
+        @Override
+        public Class<OccupantSnapshot> subject() {
+            return OccupantSnapshot.class;
+        }
+
+        @Override
+        public ExpectationMeta meta() {
+            return ExpectationMeta.of(id("empty"), 10, code(1));
+        }
+    }
+
+    private record NonFluid() implements Expectation<OccupantSnapshot> {
+
+        @Override
+        public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
+            OccupantSnapshot occupant = ctx.subject();
+            if (!isVanillaFluid(occupant.descriptor().type())) {
+                return Reply.match();
+            }
+            return mismatch(problem(ctx, occupant, "the cell contains a vanilla fluid block"));
+        }
+
+        @Override
+        public Class<OccupantSnapshot> subject() {
+            return OccupantSnapshot.class;
+        }
+
+        @Override
+        public ExpectationMeta meta() {
+            return ExpectationMeta.of(id("non_fluid"), 10, code(1));
+        }
+    }
+
+    private static boolean isVanillaFluid(NamespacedId type) {
+        return type.equals(NamespacedId.of("minecraft", "water")) || type.equals(NamespacedId.of("minecraft", "lava"));
     }
 
     private record AnyOccupant() implements Expectation<OccupantSnapshot> {

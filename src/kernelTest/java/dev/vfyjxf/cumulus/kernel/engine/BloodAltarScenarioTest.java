@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
@@ -14,8 +15,10 @@ import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.BlueprintBuilder;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
+import dev.vfyjxf.cumulus.kernel.structure.Expectation;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
+import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +36,9 @@ class BloodAltarScenarioTest {
     private static final NamespacedId runeB = MagicFixtures.id("blood/opaque_rune_b");
     private static final NamespacedId runeC = MagicFixtures.id("blood/opaque_rune_c");
     private static final NamespacedId water = MagicFixtures.mc("water");
+    private static final NamespacedId lava = MagicFixtures.mc("lava");
+    private static final NamespacedId stone = MagicFixtures.mc("stone");
+    private static final NamespacedId air = NamespacedId.of("air");
 
     private static final LatticePoint originCell = LatticePoint.origin;
     private static final LatticePoint west = LatticePoint.of(-1, 0, 0);
@@ -131,18 +137,63 @@ class BloodAltarScenarioTest {
     }
 
     @Test
-    @DisplayName("known false positive: anyOccupant admits water in a NOTAIR slot")
-    void waterInANotAirSlotIsAdmittedAsAKnownFalsePositive() {
+    @DisplayName("not(empty) rejects water in a NOTAIR slot")
+    void waterInANotAirSlotIsRejected() {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
         TestWorld.View view = prefixView(siting);
         MagicFixtures.put(view, siting, notAir, water);
         MatchResult checked = MagicFixtures
                 .check(notAirBlueprint("blood/not_air_water"), siting, view, new ClaimView(List.of(), 0, true));
-        assertInstanceOf(
-            MatchResult.Admitted.class,
-            checked,
-            "known gap: anyOccupant has no fluid predicate, so water satisfies a NOTAIR slot"
-        );
+        MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, checked, "water is not a NOTAIR slot");
+        assertTrue(MagicFixtures.hasCode(failed, Codes.negationMatched), "not(empty) reports SC-EXP-0002");
+    }
+
+    @Test
+    void emptyAndNonFluidClassifyAirWaterLavaAndStone() {
+        Siting siting = MagicFixtures.identity(LatticePoint.origin);
+        assertAdmitted(expectationCheck("empty/air", Expectations.empty(), siting, air));
+        assertAdmitted(expectationCheck("empty/water", Expectations.empty(), siting, water));
+        assertAdmitted(expectationCheck("empty/lava", Expectations.empty(), siting, lava));
+        assertFailed(expectationCheck("empty/stone", Expectations.empty(), siting, stone), Codes.expected);
+
+        assertAdmitted(expectationCheck("non_fluid/air", Expectations.nonFluid(), siting, air));
+        assertAdmitted(expectationCheck("non_fluid/stone", Expectations.nonFluid(), siting, stone));
+        assertFailed(expectationCheck("non_fluid/water", Expectations.nonFluid(), siting, water), Codes.expected);
+        assertFailed(expectationCheck("non_fluid/lava", Expectations.nonFluid(), siting, lava), Codes.expected);
+    }
+
+    private static MatchResult expectationCheck(
+        String path,
+        Expectation<OccupantSnapshot> expectation,
+        Siting siting,
+        NamespacedId occupant
+    ) {
+        CuboidSet cells = MagicFixtures.cellsAt(LatticePoint.origin);
+        Bay bay = MagicFixtures
+                .bay(MagicFixtures.id(path + "_bay"), cells, Coverage.everyCell, Footprint.none(), Sharing.shared);
+        Check<?> check = Check
+                .of(MagicFixtures.id(path + "_check"), bay, Focuses.bay(), Expectations.eachCell(expectation));
+        Blueprint blueprint = Blueprint.builder(MagicFixtures.id(path)).bounds(bounds).check(check).build();
+        TestWorld.View view = MagicFixtures.view();
+        if (occupant != null) {
+            MagicFixtures.put(view, siting, LatticePoint.origin, occupant);
+        }
+        return MagicFixtures.check(blueprint, siting, view, new ClaimView(List.of(), 0, true));
+    }
+
+    private static void assertAdmitted(MatchResult result) {
+        if (result instanceof MatchResult.Failed failed) {
+            String findings = failed.findings().findings().stream()
+                    .map(finding -> finding.code().text() + " " + finding.message()).toList().toString();
+            assertInstanceOf(MatchResult.Admitted.class, result, findings);
+            return;
+        }
+        assertInstanceOf(MatchResult.Admitted.class, result, result.toString());
+    }
+
+    private static void assertFailed(MatchResult result, CodeEntry code) {
+        MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result);
+        assertTrue(MagicFixtures.hasCode(failed, code));
     }
 
     private record ViewPair(TestWorld.View view, TestWorld.Ledger ledger) {}
@@ -246,7 +297,12 @@ class BloodAltarScenarioTest {
             );
         }
         builder.check(
-            Check.of(MagicFixtures.id(path + "_not_air"), bay, Focuses.occupant(notAir), Expectations.anyOccupant())
+            Check.of(
+                MagicFixtures.id(path + "_not_air"),
+                bay,
+                Focuses.occupant(notAir),
+                Expectations.not(Expectations.empty())
+            )
         );
         return builder.build();
     }
