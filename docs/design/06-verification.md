@@ -39,9 +39,9 @@ production set command and its one capture, the check-only host path and the set
 closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
 invalidation, and one set budget shared by presence and every member attempt (§3.3). On the S6
 working tree a full `./gradlew check` and `runGameTestServer` both pass: 261 kernel tests (39
-containers), 292 adapter unit tests (37 containers), 69/69 `@GameTest` methods, 0 failures, 0 skipped.
+containers), 296 adapter unit tests (37 containers), 69/69 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
-`Codes.all` has 65 entries and the decision record has 35 decisions (D-35). Model C, body identity,
+`Codes.all` has 65 entries and the decision record has 36 decisions (D-36). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -410,7 +410,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   throw/null/wrong-id refusals, `CapabilityTraitProviderTest` for the one generic capability provider
   and the direct value identity, `OccupantTraitsTest` for the three direct capability keys and the
   absent NBT traits, `NestedExtentTest` for
-  the capability declaration, `SavedClaimsTest`/`SavedContextsTest` for persistence,
+  the capability declaration, the typed holder ids, the per-holder lookup and its duplicate
+  rejection, and the capability provider delegation, `SavedClaimsTest`/`SavedContextsTest` for persistence,
   `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
   parse/write fixed point and equal compile runs, `ServerStateDocumentSourceTest`/
   `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing, `LevelWatchTest`

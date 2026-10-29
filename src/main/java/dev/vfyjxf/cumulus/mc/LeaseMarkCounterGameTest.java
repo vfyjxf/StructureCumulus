@@ -9,13 +9,17 @@ import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
+import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
@@ -24,7 +28,6 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -309,7 +312,7 @@ public final class LeaseMarkCounterGameTest {
             LatticePoint.of(child.getX(), child.getY(), child.getZ())
         );
         FakeLookup lookup = new FakeLookup(Map.of(anchor, extent));
-        LevelCapture capture = new LevelCapture(helper.getLevel(), lookup);
+        LevelCapture capture = new LevelCapture(helper.getLevel(), lookup.lookup());
         CaptureResult.Captured captured = captured(capture, around(helper, new BlockPos(0, 1, 0), 1), nestedPolicy());
         try (SnapshotLease lease = captured.lease()) {
             helper.getLevel().setBlock(outside, Blocks.STONE.defaultBlockState(), 3);
@@ -478,21 +481,20 @@ public final class LeaseMarkCounterGameTest {
         return handle;
     }
 
-    private record FakeLookup(Map<BlockPos, NestedExtent> blocks) implements NestedExtentLookup {
+    private record FakeLookup(Map<BlockPos, NestedExtent> blocks) {
 
-        @Override
-        public @Nullable NestedExtent block(
-            ServerLevel level,
-            BlockPos pos,
-            BlockState state,
-            @Nullable BlockEntity blockEntity
-        ) {
-            return blocks.get(pos);
-        }
+        private NestedExtentLookup lookup() {
+            return NestedExtentLookup.builder().add(new NestedExtentProvider<BlockNestedExtentContext>() {
+                @Override
+                public NestedExtentHolder<BlockNestedExtentContext> holder() {
+                    return NestedExtentHolders.block;
+                }
 
-        @Override
-        public @Nullable NestedExtent entity(Entity entity) {
-            return null;
+                @Override
+                public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
+                    return blocks.get(actual.pos());
+                }
+            }).build();
         }
     }
 }

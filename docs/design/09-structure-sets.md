@@ -690,8 +690,8 @@ Document errors reuse existing codes:
   cases (8), two `StructureSetHostTest` cases (26), the renamed/new budget cases in
   `LogicalSubnetworkSetStressTest` (9), the updated `StructureSetRollbackStressTest` (6), plus
   `ContextTest` (4) and `SavedContextsLifecycleTest` (6). Counts on the S6 tree are **261 kernel tests
-  (39 containers), 292 adapter unit tests (37 containers), 69 `@GameTest` methods**; `Codes.all` is 65
-  and the decision record 35 (D-35). The command and the one-capture executor remain S5.
+  (39 containers), 296 adapter unit tests (37 containers), 69 `@GameTest` methods**; `Codes.all` is 65
+  and the decision record 36 (D-36). The command and the one-capture executor remain S5.
 - The command and the one-capture executor are S5, not S6.
 
 Visual review stays last.

@@ -412,9 +412,11 @@ adapter, not `kernel.world`.
 structure block stays metadata. A template-backed extents provider (`TemplateNestedExtent`) is a
 future, separate feature. The adapter's fake-provider seam is package-private
 (`LevelCapture(ServerLevel, NestedExtentLookup)`), because a real registration cannot be made after
-the MOD bus event. **Status (v1.2):** implemented in `f3e0338`/`d6aefc2`; the nested query remains
-the four-argument block overload, while the separate trait capability queries use the five-argument
-`Void`-context form.
+the MOD bus event. **Amendment (D-36):** the seam is now the public generic per-holder
+`NestedExtentLookup`/`NestedExtentProvider` registry in `mc.capability`; `CapabilityLookup` and the
+old aggregate `mc.NestedExtentLookup` are deleted. **Status (v1.2):** implemented in
+`f3e0338`/`d6aefc2`; the nested query remains the four-argument block overload, while the separate
+trait capability queries use the five-argument `Void`-context form.
 
 ### D-27 — A cut child is absent, not a refused child
 
@@ -815,6 +817,40 @@ rollback removes the `StructureContext` of every formed attempt (`rolledBack` st
 successful releases); a failed release does not skip the context removal; `SavedContexts` persists
 the removal. The record set is now 35 decisions (D-35). **Status (S6):** implemented; the focused
 kernel/adapter tests, the full `check` and `runGameTestServer` are green.
+
+### D-36 — Nested-extent lookup is generic per holder
+
+The nested capability had one package-private aggregate lookup with a hardcoded `block(...)` and
+`entity(...)` method. Every fake and the production `CapabilityLookup` had to implement both, and a
+future subject kind would have changed the interface. D-36 replaces that seam with the same
+per-holder shape as the trait providers:
+
+- `NestedExtentHolder<H>` is a typed `NamespacedId` token, never a `Class<?>`;
+- `NestedExtentProvider<H>` declares `holder()` and `@Nullable NestedExtent get(H actual)`;
+- `NestedExtentLookup` is an immutable registry keyed by holder id: `get(holder, actual)`,
+  `knows(holder)`, a builder with duplicate-holder rejection, and `capabilities()` for the built-in
+  block/entity pair;
+- `NestedExtentHolders.block` carries `BlockNestedExtentContext(level, pos, state, blockEntity)`;
+  `NestedExtentHolders.entity` carries the loaded `Entity`;
+- `NestedExtentAccess<H, C>` and one `CapabilityNestedExtentProvider<H, C>` cover both
+  `BaseCapability<NestedExtent, C>` signatures; `NestedExtentAccesses.block()`/`entity()` and
+  `NestedExtentProviders.block`/`entity` are the standard declarations.
+
+`LevelCapture` keeps its package-private constructors and calls
+`get(NestedExtentHolders.block, new BlockNestedExtentContext(...))` or
+`get(NestedExtentHolders.entity, entity)`. The old `mc.NestedExtentLookup` interface and
+`CapabilityLookup` enum are deleted. There is no aggregate block/entity interface and no
+per-capability provider class. A new subject kind adds a holder, an accessor when it is a capability,
+and a provider; it does not edit the lookup interface or every fake.
+
+**Why:** the previous seam encoded the current two subjects into the lookup type. The generic
+registry keeps one lookup, one provider shape and one registration path, and mirrors
+`TraitProvider`/`TraitHolder` without pretending a nested extent has a trait key.
+
+**Consequence:** the provider/holder/lookup API is public in `mc.capability`; the fake tests register
+only the providers they need; a provider `RuntimeException` still becomes the existing capture
+warning at the `LevelCapture` call site. The record set is now 36 decisions (D-36). **Status (N1):**
+implemented; the nested unit and GameTests, the full `check` and `runGameTestServer` are green.
 
 ## 3. Consequences a reviewer should attack
 

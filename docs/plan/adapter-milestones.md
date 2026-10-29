@@ -27,11 +27,12 @@ projection is superseded by the typed host snapshot (D-33): the descriptor has n
 projection is retired and the orientation audit remains (`OrientationAuditGameTest`). S5 of the 09
 structure-set close-out then adds the production set command and its one capture, the check-only host
 path and the two real-level set GameTest classes; S6 closes the set layer with `SC-SET-0008`
-same-siting, `ContextStore.remove` rollback invalidation and one shared set budget (D-35). Current
-counts (2026-10-29, after T1–T3, the 09 S5 slice and the 09 S6 slice): **261 kernel tests in 39
-containers, 292 adapter unit tests in 37 containers, 69
-registered GameTests**, `Codes.all` 65 entries, 35 decisions (D-35; D-29 superseded). A full
-`./gradlew check` and `runGameTestServer` pass on the S6 working tree (261 kernel tests, 292 adapter
+same-siting, `ContextStore.remove` rollback invalidation and one shared set budget (D-35). N1 (D-36)
+then replaces the package-private nested-extent seam with the generic per-holder lookup. Current
+counts (2026-10-29, after T1–T3, the 09 S5 slice, the 09 S6 slice and N1): **261 kernel tests in 39
+containers, 296 adapter unit tests in 37 containers, 69
+registered GameTests**, `Codes.all` 65 entries, 36 decisions (D-36; D-29 superseded). A full
+`./gradlew check` and `runGameTestServer` pass on the S6 working tree (261 kernel tests, 296 adapter
 tests, 69/69 GameTests). Pending only: the performance/cost pass and fresh review screenshots.
 
 | Milestone | Deliverable | State |
@@ -53,6 +54,7 @@ tests, 69/69 GameTests). Pending only: the performance/cost pass and fresh revie
 | T1–T3 | **Generic trait providers (D-34)**: `TraitProvider<T,H>`, `TraitHolder<H>`, `(trait, holder)` `TraitLookup`, `CapabilityTraitProvider<T,H,C>` + `CapabilityAccesses`, direct `IItemHandler`/`IEnergyStorage`/`IFluidHandler` values, NBT traits removed, standard providers split by holder | **implemented**; design at `11-trait-providers.md`, `TraitLookupTest`/`CapabilityTraitProviderTest`/`OccupantTraitsTest` and `TraitCaptureGameTest` green |
 | S5 (09 §16) | **Production set command**: `/cumulus set check` and `/cumulus set settle` (compile, root siting, placement), one set capture over the union bounds and union `Blueprint.reads()` policy with the root orientation, `StructureSetHost.check`, the built-in `set_root`/`set_wing`/`set_demo` documents (with `ServerState.findSet` builtin fallback), `SetCommand`, and the `StructureSetHostGameTest`/`SetCommandGameTest` real-level group | **implemented in the working tree after `9e363ad`**; focused adapter tests, full `check` and 69/69 GameTests green |
 | S6 (09 §16) | **Structure-set close-out**: `SC-SET-0008` same-siting at compile/placement/host, `ContextStore.remove` (`inMemory`, `SavedContexts`) and rollback invalidation of every formed attempt, one set budget shared by presence and every member attempt, D-35 and the count/docs refresh | **implemented in the working tree after `8ba240e`**; focused kernel/adapter tests, full `check` and 69/69 GameTests green |
+| N1 | **Nested-extent lookup (D-36)**: `NestedExtentHolder<H>`/`NestedExtentHolders`, `NestedExtentProvider<H>`, the `NestedExtentLookup` registry with `get`/`knows`/`builder`/`capabilities`, the `BlockNestedExtentContext` input, one `CapabilityNestedExtentProvider<H, C>` over `NestedExtentAccesses.block()`/`entity()` and the standard `NestedExtentProviders.block`/`entity`; the package-private aggregate interface and enum are deleted | **implemented in the working tree**; `NestedExtentTest`, full `check` and 69/69 GameTests green |
 
 ## Acceptance
 
@@ -70,7 +72,7 @@ tests, 69/69 GameTests). Pending only: the performance/cost pass and fresh revie
 | H1–H4 | Met: `HostExpectationTest` (the bridge and caller-supplied absent code), `McAnchorsTest` (the captured anchor and `SC-MC-0010`), `SnapshotLevelTest`/`LevelSnapshotTest` (copied states, fluids, entities and typed dispatch), `AdapterExpectationsTest` (the four factories, waterlogged slab, JSON/Java parity) and `HostDataScenarioTest` (rotated structure set, nested child frame, waterlogged slab, missing snapshot). `Codes.all` is 64 and the decision record is 33. |
 | T1–T3 | Met: `TraitLookupTest` covers the generic provider, the holder pair, the duplicate pair, one trait on two holders, known-without-provider absence, unknown denial, throw/null/wrong-id refusals and the missing block entity; `CapabilityTraitProviderTest` covers one class for block and entity, direct value identity and the capture/actual inputs; `OccupantTraitsTest` covers the three direct capability keys and the absent NBT traits; `TraitCaptureGameTest` covers live `IItemHandler`/`IFluidHandler` handles, entity inventory, custom energy identity, the missing-block-entity refusal and the child frame. Block/entity capability absence, null block entity and malformed capability keep their states; plugin registration is the built-in parity path. Focused `check` (286 adapter unit tests, 258 kernel tests) and `runGameTestServer` (69/69) are green. |
 | S5 (09 §16) | Met: `StructureSetHostTest` (24 tests, two of them the check-only path), `StructureSetHostGameTest` (real capture, real ledger/contexts; check writes no row, settle writes the three cells, a failed member stops the settle) and `SetCommandGameTest` (dispatcher check/settle, exit codes, rows, `SC-SET-0001`) cover the command and the one capture; `CommandRouterTest` covers the two `set` paths. `Codes.all` stays 64 and no decision is added. Focused adapter tests (286), kernel tests (258) and `runGameTestServer` (69/69) are green on the S5 working tree. |
-| S6 (09 §16) | Met: `StructureSetCompilerTest`/`StructureSetPlanTest`/`StructureSetHostTest` cover same-siting (`SC-SET-0008`) and the allowed origin + non-identity orientation; `StructureSetRollbackStressTest` and `StructureSetHostTest` cover context removal including a failed release; `LogicalSubnetworkSetStressTest` covers the shared budget and a one-cell budget that cannot cover presence plus an attempt; `ContextTest`/`SavedContextsLifecycleTest` cover `remove`. `Codes.all` is 65 and the decision record is 35 (D-35). Focused adapter tests (292), kernel tests (261) and `runGameTestServer` (69/69) are green on the S6 working tree. |
+| S6 (09 §16) | Met: `StructureSetCompilerTest`/`StructureSetPlanTest`/`StructureSetHostTest` cover same-siting (`SC-SET-0008`) and the allowed origin + non-identity orientation; `StructureSetRollbackStressTest` and `StructureSetHostTest` cover context removal including a failed release; `LogicalSubnetworkSetStressTest` covers the shared budget and a one-cell budget that cannot cover presence plus an attempt; `ContextTest`/`SavedContextsLifecycleTest` cover `remove`. `Codes.all` is 65 and the decision record is 36 (D-36). Focused adapter tests (296), kernel tests (261) and `runGameTestServer` (69/69) are green on the S6 working tree. |
 
 ## Owners
 

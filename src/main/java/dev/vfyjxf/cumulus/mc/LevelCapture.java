@@ -24,7 +24,10 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldCapture;
 import dev.vfyjxf.cumulus.mc.LevelWatch.WatchHandle;
+import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
 import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import net.minecraft.core.BlockPos;
@@ -639,7 +642,8 @@ public final class LevelCapture implements WorldCapture {
 
     private @Nullable NestedExtent blockExtent(BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity) {
         try {
-            return nestedLookup.block(level, pos, state, blockEntity);
+            return nestedLookup
+                    .get(NestedExtentHolders.block, new BlockNestedExtentContext(level, pos, state, blockEntity));
         } catch (RuntimeException failure) {
             StructureCumulus.logger.warn("nested block provider failed at {}", pos, failure);
             return null;
@@ -648,7 +652,7 @@ public final class LevelCapture implements WorldCapture {
 
     private @Nullable NestedExtent entityExtent(EntityCandidate candidate) {
         try {
-            return nestedLookup.entity(candidate.entity());
+            return nestedLookup.get(NestedExtentHolders.entity, candidate.entity());
         } catch (RuntimeException failure) {
             StructureCumulus.logger.warn("nested entity provider failed for {}", candidate.id(), failure);
             return null;

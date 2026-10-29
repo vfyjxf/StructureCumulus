@@ -17,7 +17,12 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
+import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -27,7 +32,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -116,7 +120,7 @@ public final class OrientationAuditGameTest {
         SnapshotPolicy policy = new SnapshotPolicy(1_000_000, 1, Set.of(OccupantKind.nested), Set.of(), List.of());
         try {
             level.setBlock(origin, stairs(Direction.EAST), 3);
-            CaptureResult result = new LevelCapture(level, lookup)
+            CaptureResult result = new LevelCapture(level, lookup.lookup())
                     .capture(new CaptureRequest(Cuboid.of(point), policy), clockwise);
             if (!(result instanceof CaptureResult.Captured captured)) {
                 helper.fail("the nested sited capture failed: " + result);
@@ -167,25 +171,36 @@ public final class OrientationAuditGameTest {
         return new BlockPos((base.getX() & ~15) + 8, base.getY(), (base.getZ() & ~15) + 8);
     }
 
-    private static final class RecordingLookup implements NestedExtentLookup {
+    private static final class RecordingLookup {
 
         private final Map<BlockPos, NestedExtent> extents = new HashMap<>();
         private final List<BlockState> states = new ArrayList<>();
+        private final NestedExtentLookup lookup = NestedExtentLookup.builder()
+                .add(new NestedExtentProvider<BlockNestedExtentContext>() {
+                    @Override
+                    public NestedExtentHolder<BlockNestedExtentContext> holder() {
+                        return NestedExtentHolders.block;
+                    }
 
-        @Override
-        public @Nullable NestedExtent block(
-            ServerLevel level,
-            BlockPos pos,
-            BlockState state,
-            @Nullable BlockEntity blockEntity
-        ) {
-            states.add(state);
-            return extents.get(pos);
-        }
+                    @Override
+                    public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
+                        states.add(actual.state());
+                        return extents.get(actual.pos());
+                    }
+                }).add(new NestedExtentProvider<Entity>() {
+                    @Override
+                    public NestedExtentHolder<Entity> holder() {
+                        return NestedExtentHolders.entity;
+                    }
 
-        @Override
-        public @Nullable NestedExtent entity(Entity entity) {
-            return null;
+                    @Override
+                    public @Nullable NestedExtent get(Entity actual) {
+                        return null;
+                    }
+                }).build();
+
+        private NestedExtentLookup lookup() {
+            return lookup;
         }
     }
 }

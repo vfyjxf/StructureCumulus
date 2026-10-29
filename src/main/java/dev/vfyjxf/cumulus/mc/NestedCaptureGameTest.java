@@ -15,7 +15,12 @@ import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
+import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -23,8 +28,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -67,7 +70,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("nested capture failed: " + result);
@@ -172,7 +175,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult flat = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult flat = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 0, false)));
         if (!(flat instanceof CaptureResult.Captured captured)) {
             helper.fail("depth-zero capture failed: " + flat);
@@ -188,7 +191,7 @@ public final class NestedCaptureGameTest {
         }
         helper.assertValueEqual(lookup.blockQueries, 0, "depth zero queries no capability");
 
-        CaptureResult nested = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult nested = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(nested instanceof CaptureResult.Captured nestedCaptured)) {
             helper.fail("depth-one capture failed: " + nested);
@@ -222,7 +225,7 @@ public final class NestedCaptureGameTest {
             anchor.getY() + 1,
             anchor.getZ() + 1
         );
-        LevelCapture capture = new LevelCapture(helper.getLevel(), new FakeLookup());
+        LevelCapture capture = new LevelCapture(helper.getLevel(), new FakeLookup().lookup());
         CaptureResult result = capture.capture(new CaptureRequest(bounds, policy(0, 1, true)));
 
         if (!(result instanceof CaptureResult.TooLarge tooLarge)) {
@@ -255,7 +258,7 @@ public final class NestedCaptureGameTest {
             worldFirst.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("sibling capture failed: " + result);
@@ -308,7 +311,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 2, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("cycle capture failed: " + result);
@@ -354,7 +357,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult cut = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult cut = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(5, 1, false)));
         if (!(cut instanceof CaptureResult.Captured captured)) {
             helper.fail("budget capture failed: " + cut);
@@ -369,7 +372,7 @@ public final class NestedCaptureGameTest {
             );
         }
 
-        CaptureResult childFits = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult childFits = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(6, 2, false)));
         if (!(childFits instanceof CaptureResult.Captured childCaptured)) {
             helper.fail("child capture failed: " + childFits);
@@ -389,7 +392,7 @@ public final class NestedCaptureGameTest {
             );
         }
 
-        CaptureResult allFit = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult allFit = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(7, 2, false)));
         if (!(allFit instanceof CaptureResult.Captured allCaptured)) {
             helper.fail("grandchild capture failed: " + allFit);
@@ -424,7 +427,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("unloaded capture failed: " + result);
@@ -454,7 +457,7 @@ public final class NestedCaptureGameTest {
             origin.getZ() + 2
         );
         SnapshotPolicy tiny = new SnapshotPolicy(7, 0, Set.of(), Set.of(), List.of());
-        CaptureResult result = new LevelCapture(helper.getLevel(), new FakeLookup())
+        CaptureResult result = new LevelCapture(helper.getLevel(), new FakeLookup().lookup())
                 .capture(new CaptureRequest(bounds, tiny));
         if (!(result instanceof CaptureResult.TooLarge tooLarge)) {
             helper.fail("the tiny ceiling did not refuse the root: " + result);
@@ -490,7 +493,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("the cut capture failed: " + result);
@@ -521,7 +524,7 @@ public final class NestedCaptureGameTest {
             origin.getY() + 1,
             origin.getZ() + 1
         );
-        CaptureResult result = new LevelCapture(helper.getLevel(), new FakeLookup())
+        CaptureResult result = new LevelCapture(helper.getLevel(), new FakeLookup().lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 0, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("the plain capture failed: " + result);
@@ -553,7 +556,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("a provider exception failed the capture: " + result);
@@ -607,7 +610,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("precedence capture failed: " + result);
@@ -653,7 +656,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("entity source capture failed: " + result);
@@ -698,7 +701,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, true)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("child entity capture failed: " + result);
@@ -767,7 +770,7 @@ public final class NestedCaptureGameTest {
             worldAnchor.getZ() + 1
         );
 
-        CaptureResult result = new LevelCapture(level, lookup)
+        CaptureResult result = new LevelCapture(level, lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
         if (!(result instanceof CaptureResult.Captured captured)) {
             helper.fail("build-height capture failed: " + result);
@@ -828,36 +831,47 @@ public final class NestedCaptureGameTest {
         );
     }
 
-    private static final class FakeLookup implements NestedExtentLookup {
+    private static final class FakeLookup {
 
         private final Map<BlockPos, NestedExtent> blocks = new HashMap<>();
         private final Map<UUID, NestedExtent> entities = new HashMap<>();
         private final Set<BlockPos> throwingBlocks = new HashSet<>();
         private final Set<UUID> throwingEntities = new HashSet<>();
+        private final NestedExtentLookup lookup = NestedExtentLookup.builder()
+                .add(new NestedExtentProvider<BlockNestedExtentContext>() {
+                    @Override
+                    public NestedExtentHolder<BlockNestedExtentContext> holder() {
+                        return NestedExtentHolders.block;
+                    }
+
+                    @Override
+                    public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
+                        blockQueries++;
+                        if (throwingBlocks.contains(actual.pos())) {
+                            throw new IllegalStateException("fake block provider");
+                        }
+                        return blocks.get(actual.pos());
+                    }
+                }).add(new NestedExtentProvider<Entity>() {
+                    @Override
+                    public NestedExtentHolder<Entity> holder() {
+                        return NestedExtentHolders.entity;
+                    }
+
+                    @Override
+                    public @Nullable NestedExtent get(Entity actual) {
+                        entityQueries++;
+                        if (throwingEntities.contains(actual.getUUID())) {
+                            throw new IllegalStateException("fake entity provider");
+                        }
+                        return entities.get(actual.getUUID());
+                    }
+                }).build();
         private int blockQueries;
         private int entityQueries;
 
-        @Override
-        public @Nullable NestedExtent block(
-            ServerLevel level,
-            BlockPos pos,
-            BlockState state,
-            @Nullable BlockEntity blockEntity
-        ) {
-            blockQueries++;
-            if (throwingBlocks.contains(pos)) {
-                throw new IllegalStateException("fake block provider");
-            }
-            return blocks.get(pos);
-        }
-
-        @Override
-        public @Nullable NestedExtent entity(Entity entity) {
-            entityQueries++;
-            if (throwingEntities.contains(entity.getUUID())) {
-                throw new IllegalStateException("fake entity provider");
-            }
-            return entities.get(entity.getUUID());
+        private NestedExtentLookup lookup() {
+            return lookup;
         }
     }
 }

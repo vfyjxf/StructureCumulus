@@ -17,7 +17,12 @@ import dev.vfyjxf.cumulus.kernel.world.Trait;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
+import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
 import dev.vfyjxf.cumulus.mc.trait.BlockTraitContext;
 import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
 import dev.vfyjxf.cumulus.mc.trait.TraitHolder;
@@ -28,18 +33,14 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LayeredCauldronBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -273,7 +274,7 @@ public final class TraitCaptureGameTest {
         );
 
         CaptureResult.Captured captured = capture(
-            new LevelCapture(helper.getLevel(), new SingleExtentLookup(worldAnchor, extent)),
+            new LevelCapture(helper.getLevel(), new SingleExtentLookup(worldAnchor, extent).lookup()),
             box(worldAnchor),
             nestedPolicy(Set.of(OccupantTraits.inventory.id()))
         );
@@ -472,21 +473,20 @@ public final class TraitCaptureGameTest {
         }).build();
     }
 
-    private record SingleExtentLookup(BlockPos pos, NestedExtent extent) implements NestedExtentLookup {
+    private record SingleExtentLookup(BlockPos pos, NestedExtent extent) {
 
-        @Override
-        public @Nullable NestedExtent block(
-            ServerLevel level,
-            BlockPos query,
-            BlockState state,
-            @Nullable BlockEntity blockEntity
-        ) {
-            return query.equals(pos) ? extent : null;
-        }
+        private NestedExtentLookup lookup() {
+            return NestedExtentLookup.builder().add(new NestedExtentProvider<BlockNestedExtentContext>() {
+                @Override
+                public NestedExtentHolder<BlockNestedExtentContext> holder() {
+                    return NestedExtentHolders.block;
+                }
 
-        @Override
-        public @Nullable NestedExtent entity(Entity entity) {
-            return null;
+                @Override
+                public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
+                    return actual.pos().equals(pos) ? extent : null;
+                }
+            }).build();
         }
     }
 

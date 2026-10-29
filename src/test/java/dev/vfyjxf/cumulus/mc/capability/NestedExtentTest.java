@@ -5,11 +5,15 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import net.minecraft.resources.ResourceLocation;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NestedExtentTest {
 
@@ -73,4 +77,86 @@ class NestedExtentTest {
         assertEquals(void.class, NestedExtents.ENTITY.contextClass());
         assertNotSame(NestedExtents.BLOCK, NestedExtents.ENTITY);
     }
+
+    @Test
+    void holdersAreTypedIdsAndSortByTheirId() {
+        assertEquals(NamespacedId.of("structurecumulus", "block"), NestedExtentHolders.block.id());
+        assertEquals(NamespacedId.of("structurecumulus", "entity"), NestedExtentHolders.entity.id());
+        assertNotEquals(NestedExtentHolders.block, NestedExtentHolders.entity);
+        assertTrue(NestedExtentHolders.block.compareTo(NestedExtentHolders.entity) < 0);
+    }
+
+    @Test
+    void lookupRegistersByHolderAndUnknownHoldersAreNull() {
+        NestedExtent extent = new NestedExtent(
+            NamespacedId.of("test", "nested"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            LatticePoint.origin
+        );
+        NestedExtentHolder<String> custom = NestedExtentHolder.of(NamespacedId.of("test", "custom"));
+        NestedExtentLookup lookup = NestedExtentLookup.builder().add(new NestedExtentProvider<String>() {
+            @Override
+            public NestedExtentHolder<String> holder() {
+                return custom;
+            }
+
+            @Override
+            public @Nullable NestedExtent get(String actual) {
+                return actual.equals("hit") ? extent : null;
+            }
+        }).build();
+
+        assertEquals(extent, lookup.get(custom, "hit"));
+        assertNull(lookup.get(custom, "miss"));
+        assertTrue(lookup.knows(custom));
+        assertNull(lookup.get(NestedExtentHolder.of(NamespacedId.of("test", "unknown")), "hit"));
+        assertTrue(NestedExtentLookup.capabilities().knows(NestedExtentHolders.block));
+        assertTrue(NestedExtentLookup.capabilities().knows(NestedExtentHolders.entity));
+    }
+
+    @Test
+    void duplicateHolderRegistrationIsRejected() {
+        NestedExtentHolder<String> custom = NestedExtentHolder.of(NamespacedId.of("test", "duplicate"));
+        NestedExtentProvider<String> first = new NestedExtentProvider<>() {
+            @Override
+            public NestedExtentHolder<String> holder() {
+                return custom;
+            }
+
+            @Override
+            public @Nullable NestedExtent get(String actual) {
+                return null;
+            }
+        };
+        NestedExtentProvider<String> second = new NestedExtentProvider<>() {
+            @Override
+            public NestedExtentHolder<String> holder() {
+                return custom;
+            }
+
+            @Override
+            public @Nullable NestedExtent get(String actual) {
+                return null;
+            }
+        };
+        NestedExtentLookup.Builder builder = NestedExtentLookup.builder().add(first);
+        assertThrows(IllegalArgumentException.class, () -> builder.add(second));
+    }
+
+    @Test
+    void capabilityProviderDelegatesToTheAccessor() {
+        NestedExtent extent = new NestedExtent(
+            NamespacedId.of("test", "nested"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            LatticePoint.origin
+        );
+        NestedExtentHolder<String> custom = NestedExtentHolder.of(NamespacedId.of("test", "capability"));
+        NestedExtentProvider<String> provider = CapabilityNestedExtentProvider
+                .of(custom, NestedExtents.ENTITY, (capability, actual) -> actual.equals("hit") ? extent : null);
+
+        assertEquals(extent, provider.get("hit"));
+        assertNull(provider.get("miss"));
+        assertEquals(custom, provider.holder());
+    }
+
 }
