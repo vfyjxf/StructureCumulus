@@ -225,6 +225,11 @@ class ScenarioTest {
             }
 
             @Override
+            public boolean bindsClaimableSubject() {
+                return true;
+            }
+
+            @Override
             public CuboidSet staticCells(CuboidSet bayCells) {
                 return CuboidSet.empty();
             }
@@ -419,6 +424,11 @@ class ScenarioTest {
             }
 
             @Override
+            public boolean bindsClaimableSubject() {
+                return true;
+            }
+
+            @Override
             public CuboidSet staticCells(CuboidSet bayCells) {
                 return CuboidSet.empty();
             }
@@ -499,6 +509,11 @@ class ScenarioTest {
             @Override
             public Class<OccupantSnapshot> subject() {
                 return OccupantSnapshot.class;
+            }
+
+            @Override
+            public boolean bindsClaimableSubject() {
+                return true;
             }
 
             @Override

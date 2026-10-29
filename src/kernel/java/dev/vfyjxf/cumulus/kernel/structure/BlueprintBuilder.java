@@ -223,6 +223,16 @@ public final class BlueprintBuilder {
                 }
                 decided = decided.union(staticCells);
             }
+            if (!(bay.footprint() instanceof Footprint.None)) {
+                for (Check<?> check : bayChecks) {
+                    if (check.focus().bindsSubjects() && !check.focus().bindsClaimableSubject()) {
+                        fail(
+                            "SC-BPT-0005",
+                            "focus of " + check.id() + " binds a non-claimable subject for claiming bay " + bay.id()
+                        );
+                    }
+                }
+            }
             switch (bay.coverage()) {
                 case everyCell -> {
                     if (!decided.containsAll(bay.cells())) {

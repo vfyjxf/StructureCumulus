@@ -124,8 +124,8 @@ still carries the reported finding.
 
 ### D-09 — No `DecisionKind`, no `ReadSet`, no `ClaimPlan`
 
-`Coverage` is the only three-value vocabulary; a focus declares `staticCells` and `bindsSubjects`;
-the build compares them to the bay's coverage. `ReadScope` is the only read closure; there is no
+`Coverage` is the only three-value vocabulary; a focus declares `staticCells`, `bindsSubjects` and
+`bindsClaimableSubject`; the build compares them to the bay's coverage and footprint. `ReadScope` is the only read closure; there is no
 `ReadSet`, `ChangeSet` or invalidation index. `Admitted` carries the bindings and the revision it
 read; there is no `ClaimPlan` type and no row in a plan.
 
@@ -853,6 +853,27 @@ registry keeps one lookup, one provider shape and one registration path, and mir
 only the providers they need; a provider `RuntimeException` still becomes the existing capture
 warning at the `LevelCapture` call site. The record set is now 36 decisions (D-36). **Status (N1):**
 implemented; the nested unit and GameTests, the full `check` and `runGameTestServer` are green.
+
+### D-37 — A focus declares whether its subjects can back a claim
+
+`Focus.bindsSubjects()` says a focus produces subjects; it does not say those subjects are
+claimable. A custom focus could bind a nested body while answering `bindsSubjects() == true`, so
+`Coverage.anySubject + Footprint.bound` built a blueprint that could only fail later with
+`SC-CLM-0004`. D-37 adds `Focus.bindsClaimableSubject()`, default **false**: an unknown custom focus
+is not assumed claimable. The shipped focuses that bind root block/entity subjects answer true;
+`nested` and `context` stay false. When a bay's footprint is not `None`, `BlueprintBuilder` rejects
+any check that binds subjects but does not claim them (`SC-BPT-0005`). A bay with `Footprint.None`
+claims nothing and is not rejected. The runtime `SC-CLM-0004` check in `ClaimPlanner` remains the
+authority if a focus declaration is wrong or a subject changes frame at runtime.
+
+**Why:** claimability is a positive property. Defaulting unknown focuses to true was the hole that
+let the nested custom focus pass the build. Defaulting to false makes a custom focus opt in, moves
+the failure to the earliest place that has the bay's footprint, and keeps one runtime guard.
+
+**Consequence:** the focus API has one more default method; custom focuses that bind claimable
+subjects must override it. The record set is now 37 decisions (D-37). **Status:** implemented; the
+nested build-rejection test, the runtime `SC-CLM-0004` tests, the full `check` and
+`runGameTestServer` are green.
 
 ## 3. Consequences a reviewer should attack
 

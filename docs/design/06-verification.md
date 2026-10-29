@@ -41,7 +41,7 @@ invalidation, and one set budget shared by presence and every member attempt (§
 working tree a full `./gradlew check` and `runGameTestServer` both pass: 261 kernel tests (39
 containers), 296 adapter unit tests (37 containers), 71/71 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
-`Codes.all` has 65 entries and the decision record has 36 decisions (D-36). Model C, body identity,
+`Codes.all` has 65 entries and the decision record has 37 decisions (D-37). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -201,7 +201,7 @@ characterization, not a new kernel promise.
 
 | Suite | Class | Shape it drives | Tests |
 | --- | --- | --- | --- |
-| kernel | `NestedCoverageScenarioTest` | a nested focus binds no subject; `oneSubject + Bound` at build; `anySubject + Bound` at check; a cut child; a child-frame occupant | 4 |
+| kernel | `NestedCoverageScenarioTest` | a nested focus binds no subject; `oneSubject + Bound` at build; `anySubject + Bound` with a non-claimable custom focus at build; a cut child; a child-frame occupant | 4 |
 | kernel | `ClaimStressScenarioTest` | shared/exclusive walls, per-owner release, whole-key settle replacement, duplicate rows | 5 |
 | kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, `whenAbsent` on a check-only key, a derivation output | 4 |
 | kernel | `GateBudgetScenarioTest` | stale lease at check, mid-attempt invalidation, invalidation before settle, a tiny budget | 4 |
@@ -214,7 +214,6 @@ and not a pending list:
 
 | Gap | Asserted by |
 | --- | --- |
-| `Coverage.anySubject + Footprint.bound` accepts a nested body at build, then check rejects it with `SC-CLM-0004` | `NestedCoverageScenarioTest.nestedAnySubjectBoundBodyBuildsThenFailsAtCheck` |
 | Two `shared` bays over one cell write duplicate claim rows | `ClaimStressScenarioTest.duplicateRowsAreCharacterized` |
 | `whenAbsent` is a dead path for a check-only key: it needs a section computation, so a check cannot reach it | `ContextAggregateScenarioTest.whenAbsentIsADeadPathForACheckOnlyKey` |
 | D5: `SavedContexts` grows one entry per instance without eviction | `SavedContextsLifecycleTest.growthWithoutEvictionKeepsEveryInstance` |
@@ -229,10 +228,14 @@ new finding. The kernel keeps `ReadScope.windows` blueprint-local, so
 characterization. Asserted by `EntityWindowPolicyTest.policyMapsTheLocalEntityWindowThroughTheSiting`
 and `EntityWindowPolicyTest.aSetPolicyMapsRootAndSatelliteWindowsThroughTheirOwnSitings`.
 
-**NestedFocus fixed.** `NestedFocus.bindsSubjects()` is now false, so a nested focus never backs a
-`Coverage.oneSubject` bay: `oneSubject + Bound + nested` fails the build with `SC-BPT-0005` instead of
-building a blueprint that can never admit (`NestedCoverageScenarioTest`, `3e60ed4`; `structure` §4.4).
-The `anySubject + Bound` acceptance above remains the open half and is characterized, not fixed.
+**NestedFocus and claimability fixed.** `NestedFocus.bindsSubjects()` is false, so a nested focus
+never backs a `Coverage.oneSubject` bay: `oneSubject + Bound + nested` fails the build with
+`SC-BPT-0005` instead of building a blueprint that can never admit (`NestedCoverageScenarioTest`,
+`3e60ed4`; `structure` §4.4). D-37 adds `Focus.bindsClaimableSubject()` (default false) and makes a
+claiming bay reject a subject-binding focus that is not claimable, so `anySubject + Bound` with the
+custom nested focus now fails at build with `SC-BPT-0005`
+(`NestedCoverageScenarioTest.nestedAnySubjectBoundBodyFailsBuild`). The runtime `SC-CLM-0004` path
+stays covered by `ReadModelTest` and `NestedCoverageScenarioTest.aChildFrameOccupantIsRejectedAtCheck`.
 
 ### 3.3 Structure-set stress batch (SS4)
 

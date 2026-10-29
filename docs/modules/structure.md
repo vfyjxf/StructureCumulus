@@ -100,6 +100,7 @@ public interface Focus<T> {
     CuboidSet staticCells(CuboidSet bayCells);
     default ReadScope reads(CuboidSet bayCells);
     default boolean bindsSubjects();
+    default boolean bindsClaimableSubject();
     default FindingBundle describeMissing();
 }
 
@@ -404,11 +405,12 @@ what the instance owns, `Sharing` says how claims meet. They are three independe
 | --- | --- | --- |
 | `everyCell` | union of the bay's checks' `focus.staticCells(bay.cells())` contains `bay.cells()` | — |
 | `oneSubject` | at least one check binds subjects; static cells stay inside the bay | union of bound subject footprints equals `bay.cells()` |
-| `anySubject` | every check's static cells is empty | — |
+| `anySubject` | every check's static cells is empty; a claiming footprint also requires every subject-binding focus to be claimable | — |
 
 `exclusive` requires a footprint other than `None` (R1). `oneSubject + Box` is legal (the bay owns
-its air); `anySubject + Bound` is legal (a pen owns the animal's cells). Only `None + exclusive` is a
-contradiction.
+its air); `anySubject + Bound` is legal (a pen owns the animal's cells) only when every focus that
+binds a subject answers `bindsClaimableSubject() == true`. Only `None + exclusive` is a
+contradiction; a claiming bay with an unknown custom focus fails the build (`SC-BPT-0005`).
 
 ### 4.2 Check
 
@@ -454,7 +456,10 @@ Combinators evaluate every child (diagnostics matter more than a short-circuit) 
 A focus binds a subject or says why not. `staticCells` is the build-time decision set; it is empty
 for dynamic focuses (`context`, `entity`) and non-empty for static ones (`occupant`, `bay`,
 `allCells`, `door`, `nested`). `bindsSubjects` is false for `context` and `nested`: a nested take
-yields the child view as its subject but never a claim subject. `reads` defaults to the
+yields the child view as its subject but never a claim subject. `bindsClaimableSubject` defaults to
+false for an unknown custom focus; the shipped root block/entity focuses answer true. When the bay's
+footprint claims cells, the builder rejects a subject-binding focus that is not claimable with
+`SC-BPT-0005`. `reads` defaults to the
 static cells; an entity focus adds a window and the `entity` kind; a nested focus adds the `nested`
 kind and one level of depth; a trait expectation adds its trait id. An expectation that reads outside
 its cells declares it through `Expectation.reads()`.
@@ -478,9 +483,10 @@ require `occupant(cell)` to narrow to the nested body, so an entity or block ove
 hide the child. A `null` child is a cut: `Unavailable(SC-OCC-0003)` with a local/world label. A
 successful take is `Taken(child, List.of(), notes)`: the child view is the subject, but the focus
 produces **no claim subject** and `bindsSubjects` is false, so `Coverage.oneSubject` with a nested
-focus is a build error (`SC-BPT-0005`). `Coverage.anySubject + Footprint.bound` still builds a nested
-body and rejects it at check (`SC-CLM-0004`) — a known gap characterized in `06-verification.md`
-§3.2. A nested body is still an ordinary occupant of the parent frame; a
+focus is a build error (`SC-BPT-0005`). A custom focus that binds a nested body and leaves
+`bindsClaimableSubject` false is also rejected at build when the bay's footprint claims cells; a
+custom focus that lies still fails at check with `SC-CLM-0004`. A nested body is still an ordinary
+occupant of the parent frame; a
 check that binds it through `Focuses.occupant` fails at claim prediction with `SC-CLM-0004` before an
 `Admitted` exists, and `settle` revalidates the same rule (`engine` §7.5).
 

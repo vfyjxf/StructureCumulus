@@ -62,8 +62,8 @@ class NestedCoverageScenarioTest {
     }
 
     @Test
-    @DisplayName("known gap: ANY_SUBJECT+BOUND accepts a nested body at build, then check rejects it with SC-CLM-0004")
-    void nestedAnySubjectBoundBodyBuildsThenFailsAtCheck() {
+    @DisplayName("ANY_SUBJECT+BOUND rejects a custom focus that binds a non-claimable nested subject at build")
+    void nestedAnySubjectBoundBodyFailsBuild() {
         Bay bay = MagicFixtures.bay(
             MagicFixtures.id("nested/any_bay"),
             oneCell,
@@ -71,15 +71,13 @@ class NestedCoverageScenarioTest {
             Footprint.bound(),
             Sharing.exclusive
         );
-        Blueprint blueprint = Blueprint.builder(MagicFixtures.id("nested/any_subject")).bounds(bounds)
-                .check(
-                    Check.of(MagicFixtures.id("nested/any_check"), bay, bindNested(origin), Expectations.anyOccupant())
-                ).build();
-        TestWorld.View view = MagicFixtures.view().put(nestedOccupant(origin, 0));
-        MatchResult result = MagicFixtures
-                .check(blueprint, MagicFixtures.identity(origin), view, new ClaimView(List.of(), 0, true));
-        MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result);
-        assertTrue(MagicFixtures.hasCode(failed, Codes.bindingInvalid), "the nested subject is SC-CLM-0004");
+        BlueprintBuilder builder = Blueprint.builder(MagicFixtures.id("nested/any_subject")).bounds(bounds).check(
+            Check.of(MagicFixtures.id("nested/any_check"), bay, bindNested(origin), Expectations.anyOccupant())
+        );
+        IllegalArgumentException rejected = assertThrows(IllegalArgumentException.class, () -> builder.build());
+        String message = Objects.requireNonNull(rejected.getMessage(), "message");
+        assertTrue(message.contains("SC-BPT-0005"), "the non-claimable subject is rejected: " + message);
+        assertTrue(message.contains("non-claimable subject"), "the message names the claimability rule: " + message);
     }
 
     @Test

@@ -695,7 +695,7 @@ Document errors reuse existing codes:
   before presence, and a one-cell shared budget leaves the root check `Undecided(SC-ENG-0001)`; the
   production set capture now carries no orientation and runs no orientation audit. Counts on the S6
   tree are **261 kernel tests (39 containers), 296 adapter unit tests (37 containers), 71 `@GameTest`
-  methods**; `Codes.all` is 65 and the decision record 36 (D-36). The command and the one-capture
+  methods**; `Codes.all` is 65 and the decision record 37 (D-37). The command and the one-capture
   executor remain S5.
 - The command and the one-capture executor are S5, not S6.
 

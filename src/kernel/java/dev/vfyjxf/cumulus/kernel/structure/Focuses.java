@@ -64,6 +64,11 @@ public final class Focuses {
     private record OccupantFocus(LatticePoint cell) implements Focus<OccupantSnapshot> {
 
         @Override
+        public boolean bindsClaimableSubject() {
+            return true;
+        }
+
+        @Override
         public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
             CellRead read = ctx.read(cell);
             if (read instanceof CellRead.Unreadable unreadable) {
@@ -94,6 +99,11 @@ public final class Focuses {
     private record BayFocus() implements Focus<BayView> {
 
         @Override
+        public boolean bindsClaimableSubject() {
+            return true;
+        }
+
+        @Override
         public FocusResult<BayView> take(FocusContext ctx) {
             BayView view = ctx.bay();
             return new FocusResult.Taken<>(view, view.occupants(), FindingBundle.empty());
@@ -111,6 +121,11 @@ public final class Focuses {
     }
 
     private record AllCellsFocus() implements Focus<List<OccupantSnapshot>> {
+
+        @Override
+        public boolean bindsClaimableSubject() {
+            return true;
+        }
 
         @Override
         public FocusResult<List<OccupantSnapshot>> take(FocusContext ctx) {
@@ -151,6 +166,11 @@ public final class Focuses {
     }
 
     private record EntityFocus(NamespacedId type) implements Focus<OccupantSnapshot> {
+
+        @Override
+        public boolean bindsClaimableSubject() {
+            return true;
+        }
 
         @Override
         public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
@@ -249,6 +269,11 @@ public final class Focuses {
     }
 
     private record DoorFocus(LatticePoint origin) implements Focus<DoorView> {
+
+        @Override
+        public boolean bindsClaimableSubject() {
+            return true;
+        }
 
         @Override
         public FocusResult<DoorView> take(FocusContext ctx) {

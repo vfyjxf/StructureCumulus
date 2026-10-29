@@ -430,6 +430,11 @@ class ReadModelTest {
             }
 
             @Override
+            public boolean bindsClaimableSubject() {
+                return true;
+            }
+
+            @Override
             public CuboidSet staticCells(CuboidSet bayCells) {
                 return CuboidSet.empty();
             }
