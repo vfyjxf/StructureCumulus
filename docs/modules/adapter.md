@@ -20,8 +20,10 @@
 > (`SC-MC-0003`/`0004`/`0005`) plus the report site the commands print (`28d0334`). T1–T3 (D-34)
 > replace the M2c provider shape with generic per-holder providers and make the three capability
 > traits return the capability handle itself. N1 (D-36) gives the nested-extent lookup the same
-> per-holder shape: one public generic `NestedExtentLookup`, one `NestedExtentProvider`, one
-> `CapabilityNestedExtentProvider` and the standard block/entity declarations. S5 adds the production set driver:
+> per-holder shape: one public generic `NestedExtentLookup`, the capability source types
+> `CapabilityNestedExtentProvider`/`CapabilityNestedExtentAccess` and the standard block/entity
+> declarations; design 13 keeps `C` as the capability's own context and passes it to the capability
+> get. S5 adds the production set driver:
 > `/cumulus set check`/`set settle`, one capture for the bounding box of the root and every satellite under
 > the union of their `Blueprint.reads()`, the check-only host path and a built-in demo set. S6 closes
 > the set layer: `SC-SET-0008` same-siting rejection, `StructureManager` rollback
@@ -55,9 +57,11 @@
   `CapabilityTraitProvider<T, H, C>` with `CapabilityAccesses.block`/`entity`/`entityVoid`, the
   three direct capability trait keys (`IItemHandler`, `IEnergyStorage`, `IFluidHandler`) and remove
   the NBT traits (D-34). N1 replaces the nested-extent seam with `NestedExtentHolder`/
-  `NestedExtentProvider`/`NestedExtentLookup`, one `CapabilityNestedExtentProvider` over
-  `NestedExtentAccesses.block()`/`entity()` and the `BlockNestedExtentContext` input (D-36); the
-  previous package-private aggregate seam is gone. S1–S4 add the structure-set
+  `CapabilityNestedExtentProvider`/`NestedExtentLookup`, the standard capability declarations over
+  `CapabilityNestedExtentAccesses.block()`/`entity()` and the `BlockNestedExtentContext` input
+  (D-36); `C` is the capability's own context (`@Nullable Direction` for the standard pair) and the
+  capture passes `TraitCaptureContext.capabilityContext()` (design 13). The previous package-private
+  aggregate seam and the unified `NestedExtentAccess`/`NestedExtentProvider` pair are gone. S1–S4 add the structure-set
   layer: `Siting.compose` and the `SC-SET` codes (`9cf2794`), the set document IR/reader/
   writer/compiler (`00cf6c4`), the host `StructureSet` plan, `StructureSetHost` and `StructureSetResult`
   (`93f5941`), and the SS4 stress suite (`06-verification.md` §3.3). S5 adds `SetCommand` and the
@@ -114,10 +118,13 @@
 | `NestedExtent` | record (capability) | one provider declaration: type, absolute bounds, world origin |
 | `NestedExtents` | final class (capability) | the `BLOCK` and `ENTITY` capabilities |
 | `NestedExtentHolder<H>` / `NestedExtentHolders` | record / final class (capability) | typed holder id token (never a `Class<?>`); the adapter's `block` and `entity` declarations |
-| `NestedExtentProvider<H>` | interface (capability) | one typed provider: `holder()` and `get(actual)` |
-| `NestedExtentLookup` | final class (capability) | immutable registry keyed by holder id: `get(holder, actual)`, `knows(holder)`, `builder()`, `capabilities()` |
+| `CapabilityNestedExtentProvider<H, C>` | interface (capability) | one capability provider: `holder()` and `get(actual, context)`; `C` is the capability's own context |
+| `NestedExtentLookup` | final class (capability) | immutable two-source registry keyed by holder id: explicit `getCapability`/`getAttachment`, capability-first `get`, `knows`, `builder()`, `capabilities()` |
+| `AttachmentNestedExtentProvider<H, T>` | interface (capability) | one attachment provider: holder/type plus `hasData`, `getExistingDataOrNull`, `getData`, `setData`, `removeData` |
+| `AttachmentNestedExtentProviders` | final class (capability) | `readOnly`/`readWrite` binding factories, plus the standard `blockEntity()`/`entity()` holder adapters |
+| `AttachmentHolder<H>` / `AttachmentNestedExtentReader<T>` / `AttachmentNestedExtentWriter<T>` | functional interfaces (capability) | subject → nullable `IAttachmentHolder`; attachment data → extent; extent → attachment data |
 | `BlockNestedExtentContext` | record (capability) | the block provider input: level, pos, state and the nullable already-read block entity |
-| `NestedExtentAccess<H, C>` / `CapabilityNestedExtentProvider<H, C>` / `NestedExtentAccesses` / `NestedExtentProviders` | functional interface / final class / final class / final class (capability) | one generic capability provider; `block()`/`entity()` map a holder to its capability get signature; the standard block and entity declarations |
+| `CapabilityNestedExtentAccess<H, C>` / `CapabilityNestedExtentProviders` / `CapabilityNestedExtentAccesses` / `NestedExtentProviders` | functional interface / final class / final class / final class (capability) | one capability access over `BaseCapability`; the binding factory; `block()`/`entity()`/`entityVoid()` map a holder to its capability get signature; the standard block and entity declarations |
 | `OrientationMapping` | — | `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror`; upright mirror-then-rotate transform and the non-upright capability remap, with `MappingResult.Unrepresentable` as the `SC-MC-0004` payload |
 | `AdapterCodes` | final class, package-private | the adapter's `SC-MC-*` codes, their catalog `CodeEntry`s and the severity each finding carries |
 | `CaptureReports` | final class, package-private | the report site: one `CaptureReport` entry → one `Finding` (severity, world label, trust guard) |
@@ -396,8 +403,9 @@ constructors are preserved.
 
 ### 8.1 The public declaration
 
-`dev.vfyjxf.cumulus.mc.capability` is the public API a provider uses (D-36). It is one generic
-provider over a typed holder, not an aggregate block/entity interface:
+`dev.vfyjxf.cumulus.mc.capability` is the public API a provider uses (D-36). It is a per-holder
+provider seam with separate capability and attachment source types, not an aggregate block/entity
+interface:
 
 ```java
 package dev.vfyjxf.cumulus.mc.capability;
@@ -407,8 +415,8 @@ public record NestedExtent(NamespacedId type, Cuboid bounds, LatticePoint origin
 }
 
 public final class NestedExtents {
-    public static final BlockCapability<NestedExtent, @Nullable Void> BLOCK;
-    public static final EntityCapability<NestedExtent, @Nullable Void> ENTITY;
+    public static final BlockCapability<NestedExtent, @Nullable Direction> BLOCK;
+    public static final EntityCapability<NestedExtent, @Nullable Direction> ENTITY;
     private NestedExtents() {}
 }
 
@@ -422,19 +430,27 @@ public final class NestedExtentHolders {
     private NestedExtentHolders() {}
 }
 
-public interface NestedExtentProvider<H> {
+public interface CapabilityNestedExtentProvider<H, C extends @Nullable Object> {
     NestedExtentHolder<H> holder();
-    @Nullable NestedExtent get(H actual);
+    @Nullable NestedExtent get(H actual, @Nullable C context);
 }
 
 public final class NestedExtentLookup {
     public static NestedExtentLookup capabilities() { /* ... */ }
     public static Builder builder() { /* ... */ }
-    public <H> @Nullable NestedExtent get(NestedExtentHolder<H> holder, H actual) { /* ... */ }
+    public <H, C extends @Nullable Object> @Nullable NestedExtent getCapability(
+            NestedExtentHolder<H> holder, H actual, @Nullable C context) { /* ... */ }
+    public <H> @Nullable NestedExtent getAttachment(
+            NestedExtentHolder<H> holder, H actual) { /* ... */ }
+    /** Capability first; falls back to the attachment source when the capability answers null. */
+    public <H, C extends @Nullable Object> @Nullable NestedExtent get(
+            NestedExtentHolder<H> holder, H actual, @Nullable C context) { /* ... */ }
     public boolean knows(NestedExtentHolder<?> holder) { /* ... */ }
 
     public static final class Builder {
-        public <H> Builder add(NestedExtentProvider<H> provider) { /* ... */ }
+        public <H, C extends @Nullable Object> Builder add(
+                CapabilityNestedExtentProvider<H, C> provider) { /* ... */ }
+        public <H, T> Builder add(AttachmentNestedExtentProvider<H, T> provider) { /* ... */ }
         public NestedExtentLookup build() { /* ... */ }
     }
 }
@@ -443,38 +459,85 @@ public record BlockNestedExtentContext(
     ServerLevel level, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity
 ) {}
 
-public interface NestedExtentAccess<H, C extends @Nullable Object> {
-    @Nullable NestedExtent get(BaseCapability<NestedExtent, C> capability, H actual);
+public interface CapabilityNestedExtentAccess<H, C extends @Nullable Object> {
+    @Nullable NestedExtent get(BaseCapability<NestedExtent, C> capability, H actual, @Nullable C context);
 }
 
-public final class CapabilityNestedExtentProvider<H, C extends @Nullable Object>
-        implements NestedExtentProvider<H> {
+public final class CapabilityNestedExtentProviders {
     public static <H, C extends @Nullable Object> CapabilityNestedExtentProvider<H, C> of(
             NestedExtentHolder<H> holder, BaseCapability<NestedExtent, C> capability,
-            NestedExtentAccess<H, C> access) { /* ... */ }
+            CapabilityNestedExtentAccess<H, C> access) { /* ... */ }
 }
 
-public final class NestedExtentAccesses {
-    public static NestedExtentAccess<BlockNestedExtentContext, @Nullable Void> block();
-    public static NestedExtentAccess<Entity, @Nullable Void> entity();
+public final class CapabilityNestedExtentAccesses {
+    public static CapabilityNestedExtentAccess<BlockNestedExtentContext, @Nullable Direction> block();
+    public static CapabilityNestedExtentAccess<Entity, @Nullable Direction> entity();
+    public static CapabilityNestedExtentAccess<Entity, @Nullable Void> entityVoid();
 }
 
 public final class NestedExtentProviders {
-    public static final NestedExtentProvider<BlockNestedExtentContext> block;
-    public static final NestedExtentProvider<Entity> entity;
+    public static final CapabilityNestedExtentProvider<BlockNestedExtentContext, @Nullable Direction> block;
+    public static final CapabilityNestedExtentProvider<Entity, @Nullable Direction> entity;
+}
+
+public interface AttachmentNestedExtentProvider<H, T> {
+    NestedExtentHolder<H> holder();
+    AttachmentType<T> type();
+    boolean hasData(H actual);
+    @Nullable NestedExtent getExistingDataOrNull(H actual);
+    @Nullable NestedExtent getData(H actual);
+    @Nullable NestedExtent setData(H actual, NestedExtent value);
+    @Nullable NestedExtent removeData(H actual);
+}
+
+public final class AttachmentNestedExtentProviders {
+    public static <H, T> AttachmentNestedExtentProvider<H, T> readOnly(
+            NestedExtentHolder<H> holder, AttachmentType<T> type,
+            AttachmentHolder<H> holderOf, AttachmentNestedExtentReader<T> reader) { /* ... */ }
+    public static <H, T> AttachmentNestedExtentProvider<H, T> readWrite(
+            NestedExtentHolder<H> holder, AttachmentType<T> type,
+            AttachmentHolder<H> holderOf, AttachmentNestedExtentReader<T> reader,
+            AttachmentNestedExtentWriter<T> writer) { /* ... */ }
+    public static AttachmentHolder<BlockNestedExtentContext> blockEntity() { /* ... */ }
+    public static AttachmentHolder<Entity> entity() { /* ... */ }
+}
+
+@FunctionalInterface
+public interface AttachmentHolder<H> {
+    @Nullable IAttachmentHolder holder(H actual);
+}
+
+@FunctionalInterface
+public interface AttachmentNestedExtentReader<T> {
+    @Nullable NestedExtent read(T data);
+}
+
+@FunctionalInterface
+public interface AttachmentNestedExtentWriter<T> {
+    @Nullable T write(NestedExtent extent);
 }
 ```
 
 `NestedExtentHolders` is the adapter's declared subject kinds: `block` (`structurecumulus:block`,
 input `BlockNestedExtentContext`) and `entity` (`structurecumulus:entity`, input the loaded `Entity`).
+`NestedExtentLookup` keeps the capability and attachment registries separate. `getCapability` and
+`getAttachment` are explicit; `get` is capability-first and falls back to the attachment source when
+the capability answers `null` (or no capability provider is registered for that holder). The two
+sources may share one holder id; the builder rejects a duplicate only within one source. The
+attachment provider mirrors `IAttachmentHolder`; capture only calls `getExistingDataOrNull`, so it
+never creates a default attachment or dirties a holder. The host configures the lookup through
+`ServerState.installNestedExtentLookup(NestedExtentLookup)`, defaulting to
+`NestedExtentLookup.capabilities()`; `§8.5` owns the test seam and the in-repo registration boundary.
 The holder is the registry key and the type parameter is a compile-time token only, never a
 `Class<?>`. `NestedExtentLookup.capabilities()` is the production pair over
 `NestedExtentProviders.block`/`entity`; a fake registers only the providers it queries and an
 unregistered holder answers `null`. The builder rejects a second provider for one holder id when it
 is added; `knows(holder)` keeps "registered but absent here" apart from "unknown holder". One
-`CapabilityNestedExtentProvider` covers both holders through `NestedExtentAccesses.block()`/
-`entity()`; there is no per-capability provider class and no aggregate `block(...)`/`entity(...)`
-interface. A new subject kind adds a holder, an accessor when it is a capability, and a provider; it
+`CapabilityNestedExtentProvider` binds one capability and one access; `CapabilityNestedExtentAccesses
+.block()`/`entity()` are the standard accesses and `NestedExtentProviders.block`/`entity` the
+standard declarations. The context `C` is the capability's own context, not a new capture record:
+the block and entity standard pairs use `@Nullable Direction` and `entityVoid()` covers a
+`createVoid` capability. There is no aggregate `block(...)`/`entity(...)` interface. A new subject kind adds a holder, an accessor when it is a capability, and a provider; it
 does not edit the lookup or every fake (D-36).
 
 `bounds` is absolute world space, half-open. `origin` is the world position of the child-local
@@ -485,9 +548,12 @@ origin is authoritative. `origin` may lie outside `bounds`; the local frame stil
 a reserved id or empty box is a provider bug, not a cut. A local translation that would leave the
 lattice is the same class of provider bug and is rejected before a frame is allocated.
 
-`NestedExtents.BLOCK` and `NestedExtents.ENTITY` are `createVoid` capabilities with id
-`structurecumulus:nested_extent`, so a provider needs no context object. The constants are declared
-once, in `NestedExtents`; an addon must query these constants, not create a same-named capability.
+`NestedExtents.BLOCK` and `NestedExtents.ENTITY` are created with the real capability context type
+(`BlockCapability.createSided` / `EntityCapability.createSided`, context `@Nullable Direction`) with
+id `structurecumulus:nested_extent`, so `C` is the side the capture carries and the access passes it
+to `getCapability`. A Void-context capability is still expressible with `createVoid` and read
+through `entityVoid()`. The constants are declared once, in `NestedExtents`; an addon must query
+these constants, not create a same-named capability.
 
 ### 8.2 No built-in provider
 
@@ -505,15 +571,17 @@ a future, separate feature; it is not part of this round.
 The adapter queries only declarations, on the server thread, in a loaded chunk, through
 `NestedExtentLookup.capabilities()`:
 
-- Block: `get(NestedExtentHolders.block, new BlockNestedExtentContext(level, pos, state, blockEntity))`.
-  The standard provider's `NestedExtentAccesses.block()` casts the `BaseCapability` to
-  `BlockCapability` and calls the four-argument `level.getCapability(NestedExtents.BLOCK, pos, state,
-  blockEntity)` with the already-read `state` and `blockEntity`. The two- and three-argument
-  overloads are never used: they re-fetch the state/block entity and can hide a read. The capture
-  skips the query when `state.hasBlockEntity()` and the already-read block entity is `null`.
-- Entity: `get(NestedExtentHolders.entity, entity)`; `NestedExtentAccesses.entity()` calls
-  `entity.getCapability(NestedExtents.ENTITY, null)` — chunk-free, on a loaded entity the capture
-  already knows.
+- Block: `get(NestedExtentHolders.block, new BlockNestedExtentContext(level, pos, state, blockEntity),
+  side)`, where `side` is `TraitCaptureContext.capabilityContext()` (nullable). The standard access
+  `CapabilityNestedExtentAccesses.block()` casts the `BaseCapability` to `BlockCapability` and calls
+  the five-argument `level.getCapability(NestedExtents.BLOCK, pos, state, blockEntity, side)` with
+  the already-read `state` and `blockEntity`. The two- and three-argument overloads are never used:
+  they re-fetch the state/block entity and can hide a read. The capture skips the query when
+  `state.hasBlockEntity()` and the already-read block entity is `null`.
+- Entity: `get(NestedExtentHolders.entity, entity, side)`; `CapabilityNestedExtentAccesses.entity()`
+  calls `entity.getCapability(NestedExtents.ENTITY, side)` — chunk-free, on a loaded entity the
+  capture already knows. `entityVoid()` is the `Void`-context variant and passes `null` for a
+  `createVoid` capability.
 - One query per cell/source. The first non-null provider result wins; the adapter does not merge,
   take multiple results or report a conflict. If a block and an entity at one cell both declare an
   extent, the block wins: one nested body per cell, source precedence block > entity.
@@ -571,18 +639,45 @@ no-chunk reads, cycle detection, budget, refusal and the child view:
 ### 8.5 Test seam
 
 There is no test mod source set and a real `RegisterCapabilitiesEvent` registration cannot be made at
-runtime. The seam is the public generic registry itself (D-36): a fake builds
+runtime. The seam is the public registry itself (D-36): a fake builds
 `NestedExtentLookup.builder().add(provider)` and registers only the holders its scenario queries,
 with a block provider receiving `BlockNestedExtentContext` (level, pos, state, block entity) and an
-entity provider receiving the loaded `Entity`, both answering `@Nullable NestedExtent`.
+entity provider receiving the loaded `Entity`, both answering `@Nullable NestedExtent` and observing
+the context the lookup passes to `get(actual, context)`.
 `LevelCapture` therefore keeps its package-private constructors
-`LevelCapture(ServerLevel level, NestedExtentLookup lookup)` and
-`LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup, TraitLookup traitLookup)`; the public
-constructors use `NestedExtentLookup.capabilities()`. The fake providers return extents for chosen
-cells/entities, count queries, record the state the audit saw or throw on a chosen cell; the
-production pair is `NestedExtentProviders.block`/`entity` over `NestedExtents.BLOCK`/`ENTITY`.
-`NestedExtentTest` covers the holder ids, the lookup and duplicate registration. The lookup is public
-adapter API but is not on the kernel classpath and no kernel type names it.
+`LevelCapture(ServerLevel level, NestedExtentLookup lookup)`,
+`LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup, TraitLookup traitLookup)` and the
+capture-context form; the public constructors use `NestedExtentLookup.capabilities()`. The fake
+providers return extents for chosen cells/entities, count queries, record the state the audit saw,
+record the capability context or throw on a chosen cell; the production pair is
+`NestedExtentProviders.block`/`entity` over `NestedExtents.BLOCK`/`ENTITY` with
+`CapabilityNestedExtentAccesses.block()`/`entity()`. `NestedExtentTest` covers the extent record, the
+holder ids, the lookup, duplicate registration, a direction-sensitive custom capability receiving
+the bound capability and its context, the Void-context null and the standard context types;
+`NestedCaptureGameTest.capturePassesTheCapabilitySideToTheBlockAndEntityProviders` covers the
+capture passing `TraitCaptureContext.capabilityContext()` to both providers, and
+`theStandardCapabilityAccessesAreDirectionTypedAndNullSafe` exercises the standard accesses.
+
+An attachment source uses the same seam without a capability:
+`AttachmentNestedExtentProviders.readOnly(...)`/`.readWrite(...)` bind an `AttachmentType`, an
+`AttachmentHolder<H>` and an `AttachmentNestedExtentReader`/`AttachmentNestedExtentWriter`. The
+standard adapters are `AttachmentNestedExtentProviders.blockEntity()` over the context's already-read
+block entity (null-safe) and `.entity()` over the loaded entity. `NeoForgeRegistries.ATTACHMENT_TYPES`
+is frozen before a GameTest runs, so a test cannot register its own `AttachmentType`; the attachment
+tests drive the provider with a fake `IAttachmentHolder` behind the same adapter shape and check the
+adapters separately. `LevelCapture` calls `NestedExtentLookup.get(...)`, which is capability-first and
+falls back to `getAttachment(...)`; the attachment read uses `getExistingDataOrNull` only, so a
+capture never creates a default attachment or dirties the holder. `readOnly` rejects `setData` with
+`UnsupportedOperationException`; `readWrite` maps `setData`/`removeData` through the writer/reader; a
+null holder is absent for every operation. The lookup rejects a duplicate holder id within each
+source; a capability and an attachment may share a holder id, and `getCapability`/`getAttachment`
+stay explicit. `AttachmentNestedExtentTest`
+covers the reader, present/absent data, no default creation, the null holder, readOnly/readWrite,
+writer-null rejection and the lookup fallback/duplicate rules; `NestedCaptureGameTest` adds the
+block-entity present/absent/null-block-entity, entity, capture-no-dirty and readOnly/readWrite
+GameTests, plus `installingAHostLookupInvalidatesAnOpenCaptureLease` for installing a host lookup
+invalidating an open capture lease. The lookup is public adapter API but is not on the kernel classpath and no kernel type
+names it.
 
 ## 9. Documents
 

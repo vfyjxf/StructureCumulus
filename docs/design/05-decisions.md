@@ -880,18 +880,24 @@ nested build-rejection test, the runtime `SC-CLM-0004` tests, the full `check` a
 `ClaimLedger.release(owner, siting)` deletes every row of that key and is the only release API. One
 siting is one instance: a structure's own bays share the key, so a shared cell with two rows is still
 one lifecycle object. Per-bay or per-row release would add lifecycle states the host does not have
-and would let one structure's rollback keep or drop a sibling bay's rows independently. Removal, move
-and world unload release the whole instance; a structure-set rollback releases each member's own key.
-A failed release leaves the key for a later attempt and is reported as `SC-SET-0007`; it is not split
-into partial releases. Duplicate rows in one key remain a ledger representation detail and collapse
-on reload.
+and would let one structure's rollback keep or drop a sibling bay's rows independently. Removal
+(`Broken`/`Invalidated`) and a move release the whole instance; a structure-set rollback releases
+each member's own key. A world unload is different: it drops only the in-memory manager instances
+(and drafts) for that world and keeps the persisted claim rows; the host owns whether those rows are
+later released or reused. A failed release leaves the key for a later attempt and is reported as
+`SC-SET-0007`; it is not split into partial releases. Duplicate rows in one key remain a ledger
+representation detail and collapse on reload.
 
 **Why:** the host owns structures, not claim rows. Whole-key release matches the instance boundary
 and keeps the ledger's compare-and-set model simple.
 
 **Consequence:** there is no per-bay or per-cell release. A caller that needs finer invalidation must
-settle the new row set instead. The record set is now 38 decisions (D-38). **Status:** decided; the
-existing `SavedClaimsLifecycleTest` cases characterize the whole-key and duplicate-row behavior.
+settle the new row set instead. A piston full move translates the rows to the new siting and then
+releases the old key; a partial/destroyed piston result is a removal and releases the key. A world
+unload neither removes nor rewrites claim rows. The record set is now 38 decisions (D-38).
+**Status:** decided; `SavedClaimsLifecycleTest` characterizes the whole-key removal and duplicate-row
+collapse, and `StructureLifecycleAdversarialGameTest.levelUnloadDropsInstancesAndKeepsTheClaimRows`
+plus the piston partial/destroy/move cases carry the lifecycle behavior.
 
 ### D-39 — Empty and non-fluid expectations
 
@@ -945,7 +951,8 @@ structure is formed, moved or gone.
 **Consequence:** `ContextStore` remains the narrow publish/read interface implemented by the manager
 and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` has an attempt overload.
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
-`StructureLifecycleGameTest`, full `check` and 74/74 GameTests are green.
+`AdversarialManagerTest`, `StructureLifecycleGameTest` and
+`StructureLifecycleAdversarialGameTest`, full `check` and 112/112 GameTests are green.
 
 ## 3. Consequences a reviewer should attack
 

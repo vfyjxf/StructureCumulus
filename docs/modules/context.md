@@ -23,7 +23,7 @@
 | `StructureSpec` | record | `(owner, siting, structure)`, what to form |
 | `StructureInstance` | record | `(id, spec, context, bounds)`, the formed structure |
 | `StructureAttempt` | interface | a draft `ContextStore`; `id`, `spec`, `commit(bounds)`, `abort` |
-| `StructureManager` | interface | in-memory registry; `begin`, `find`, `findAt`, `instances`, `onEvent` |
+| `StructureManager` | interface | in-memory registry; `begin`, world-scoped `find`, `findAt`/`findIn`, `instances`, `onEvent` |
 | `InMemoryStructureManager` | final class, package-private | the server-thread registry behind `StructureManager.create()` |
 | `StructureEvent` | sealed interface | `Broken`, `Moved`, `Loaded`, `Unloaded`, `Invalidated` |
 | `CachedContext` | interface | host-owned read port: `<T> @Nullable T get(NamespacedId id, Class<T> type)` |
@@ -74,15 +74,17 @@ public interface StructureManager extends ContextStore {
     static StructureManager create();
     StructureAttempt begin(World world, StructureSpec spec);
     @Nullable StructureInstance find(InstanceId id);
-    @Nullable StructureInstance find(OwnerId owner, Siting siting);
+    @Nullable StructureInstance find(World world, OwnerId owner, Siting siting);
+    default @Nullable StructureInstance find(OwnerId owner, Siting siting) { /* ambiguous throws */ }
     java.util.List<StructureInstance> findAt(LatticePoint worldCell);
+    default java.util.List<StructureInstance> findIn(CuboidSet worldCells);
     java.util.List<StructureInstance> instances();
     void onEvent(StructureEvent event);
 }
 public sealed interface StructureEvent {
     record Broken(InstanceId id) implements StructureEvent {}
     record Moved(InstanceId id, Siting from, Siting to, CuboidSet bounds) implements StructureEvent {}
-    record Loaded(java.util.List<StructureInstance> instances) implements StructureEvent {}
+    record Loaded(World world, java.util.List<StructureInstance> instances) implements StructureEvent {}
     record Unloaded(World world) implements StructureEvent {}
     record Invalidated(InstanceId id, String reason) implements StructureEvent {}
 }
@@ -150,21 +152,31 @@ and no stale-publish finding.
 absent; it never fabricates an empty context. After removal a later `context(instance)` reads the
 empty context at revision 0. The manager removes the instance and its context together; a set
 rollback dispatches `Broken` for every formed attempt, including one whose claim release failed
-(09 §10.3).
+(09 §10.3). On a draft, `remove` closes the attempt: it releases the `(world, owner, siting)`
+reservation, returns the old context, and subsequent `publish`/`remove`/`commit`/`abort` throw
+`IllegalStateException`; no instance is formed. `Broken`/`Invalidated` and a world unload close a
+draft the same way.
 
 ### 4.2.1 StructureManager
 
-`begin(world, spec)` allocates an `InstanceId` and a draft `StructureAttempt`; a second draft at the
-same `(owner, siting)` is rejected, but a formed instance may be replaced by a later `commit`. The
-settle pass publishes into the attempt. `commit(bounds)` forms the `StructureInstance`; `abort`
-discards the draft. The manager stores the world-frame `bounds` only for lifecycle lookup
+`begin(world, spec)` allocates an `InstanceId` and a draft `StructureAttempt`; the reservation is
+`(world, owner, siting)`. A second draft for that tuple is rejected; the same tuple in another world
+is independent, and a formed instance at the tuple in the same world may be replaced by a later
+`commit`. `find(World, owner, siting)` is the unambiguous lookup; the two-argument `find` answers the
+tuple only when exactly one world holds it and throws on ambiguity. The settle pass publishes into
+the attempt. `commit(bounds)` forms the `StructureInstance`; `abort` discards the draft; `remove` on
+the draft closes it as above. The manager stores the world-frame `bounds` only for lifecycle lookup
 (`findAt`/`findIn`); it does not interpret them.
 
 The manager is in-memory and single-writer on the server thread. `Broken`/`Invalidated` remove the
-instance; `Moved` preserves the id and context and updates the spec siting and bounds; `Loaded`
-replaces the registry and raises the serial watermark; `Unloaded` removes one world's instances and
-drafts. The adapter dispatches these events from `WatchEvents`; the manager never listens to
-Minecraft events and never persists.
+instance (or close a draft); `Moved` preserves the id and context and updates the spec siting and
+bounds, with collision checked inside the same world; `Loaded(World, List)` validates every restored
+instance belongs to that world and has a unique id/siting before replacing only that world, closes
+that world's drafts and raises the serial watermark; other worlds are untouched. A rejected
+`Loaded` leaves the registry unchanged. `Unloaded(world)` removes that world's instances and drafts
+only. Neither unload nor `Loaded` touches persisted claim rows: world unload keeps claims, while
+`Broken`/`Invalidated`/move release the whole `(owner, siting)` key (D-38). The adapter dispatches
+these events from `WatchEvents`; the manager never listens to Minecraft events and never persists.
 
 ### 4.3 Derivation
 
@@ -245,15 +257,20 @@ section computation returned `Missing` for a `Partial` slice. Producer: `engine.
 - `StructureContext`: sorted keys, typed get/require, empty, immutability.
 - Publish: merge semantics, revision growth, `match` rejection, cumulative spend, latest findings,
   one writer per instance.
-- Remove: the old context is returned, a second remove answers `null`, the instance reads empty at
-  revision 0 afterwards; `Broken` removes the instance and context together.
+- Remove: the old context is returned, a second remove answers `null` (or throws on a closed
+  attempt), the instance reads empty at revision 0 afterwards; `Broken` removes the instance and
+  context together; draft removal closes the attempt and releases its reservation.
+- Manager/attempt lifecycle: world-scoped keys (`(world, owner, siting)`), per-world `Loaded` with
+  validate-before-mutate atomicity, one-shot commit/abort/remove, closed-attempt write rejection,
+  per-world unload and draft invalidation; `StructureManagerTest` and `AdversarialManagerTest`.
 - Derive: order, requires, missing deriver, stale base, one batch, no partial publish.
 - Cached context: instance-only eligibility, the declared-dependency gate (check requires and
   computation inputs), lookup by `(id, type)` for a host-decoded key, the attempt value shadows the
   cached one, a missing key is `SC-CTX-0007`, a wrong type or host exception is absent, a `match` key
   is never read from the cache, and a cached value is never published.
 - Merges: associativity for each built-in; `union` canonical.
-- In-memory store: concurrent publish one winner; two instances never collide.
+- In-memory store: one server-thread writer; two instances at the same `(world, owner, siting)`
+  never coexist, and the same tuple in two worlds does.
 
 ## 8. Dependencies
 

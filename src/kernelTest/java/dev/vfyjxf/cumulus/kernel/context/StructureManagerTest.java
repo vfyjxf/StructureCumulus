@@ -152,7 +152,8 @@ class StructureManagerTest {
         assertTrue(manager.find(first.id()) == null);
         assertNotNull(manager.find(second.id()));
 
-        manager.onEvent(new StructureEvent.Loaded(List.of(first, second)));
+        manager.onEvent(new StructureEvent.Loaded(world, List.of(first)));
+        manager.onEvent(new StructureEvent.Loaded(otherWorld, List.of(second)));
         assertEquals(2, manager.instances().size());
         assertEquals(
             3,
@@ -162,6 +163,47 @@ class StructureManagerTest {
             ).id().serial(),
             "loaded instances raise the watermark"
         );
+    }
+
+    @Test
+    void loadedIsPerWorldAndValidatesBeforeReplacing() {
+        StructureManager manager = StructureManager.create();
+        StructureInstance inWorld = manager.begin(world, new StructureSpec(owner, siting, blueprint)).commit(bounds);
+        StructureInstance inOther = manager.begin(otherWorld, new StructureSpec(owner, siting, blueprint))
+                .commit(bounds);
+        InstanceId restoredId = new InstanceId(world, 10);
+        StructureInstance restored = new StructureInstance(
+            restoredId,
+            new StructureSpec(owner, Siting.of(LatticePoint.of(8, 0, 8), Orientation.identity), blueprint),
+            StructureContext.empty(restoredId),
+            bounds
+        );
+
+        manager.onEvent(new StructureEvent.Loaded(world, List.of(restored)));
+
+        assertNull(manager.find(inWorld.id()), "Loaded replaces only the requested world");
+        assertEquals(inOther, manager.find(inOther.id()), "another world is preserved");
+        assertEquals(restored, manager.find(world, owner, restored.siting()));
+        assertNull(manager.find(world, owner, siting));
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.onEvent(new StructureEvent.Loaded(world, List.of(restored, restored)))
+        );
+        assertEquals(restored, manager.find(world, owner, restored.siting()), "a rejected Loaded is atomic");
+        assertEquals(inOther, manager.find(inOther.id()), "a rejected Loaded leaves other worlds alone");
+    }
+
+    @Test
+    void findRequiresAWorldWhenTheSameTupleExistsInTwoWorlds() {
+        StructureManager manager = StructureManager.create();
+        StructureInstance inWorld = manager.begin(world, new StructureSpec(owner, siting, blueprint)).commit(bounds);
+        StructureInstance inOther = manager.begin(otherWorld, new StructureSpec(owner, siting, blueprint))
+                .commit(bounds);
+
+        assertEquals(inWorld, manager.find(world, owner, siting));
+        assertEquals(inOther, manager.find(otherWorld, owner, siting));
+        assertThrows(IllegalArgumentException.class, () -> manager.find(owner, siting));
     }
 
     @Test

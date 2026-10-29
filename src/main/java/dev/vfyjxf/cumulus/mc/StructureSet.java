@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.document.CompiledSatellite;
 import dev.vfyjxf.cumulus.kernel.document.CompiledStructureSet;
+import dev.vfyjxf.cumulus.kernel.document.LinkMode;
 import dev.vfyjxf.cumulus.kernel.document.LinkSpec;
 import dev.vfyjxf.cumulus.kernel.document.SatelliteSpec;
 import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
@@ -13,14 +14,17 @@ import dev.vfyjxf.cumulus.kernel.finding.Label;
 import dev.vfyjxf.cumulus.kernel.finding.Severity;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -165,6 +169,77 @@ public record StructureSet(
         return new Placement(new StructureSet(compiled, rootSiting, rootBounds, placed), findings);
     }
 
+    /**
+     * Validates a hand-built set against the plan rules the compiler enforces, before any presence
+     * probe or instance allocation. The returned findings are empty for a valid set.
+     */
+    public static List<Finding> validate(StructureSet set) {
+        Objects.requireNonNull(set, "set");
+        List<Finding> findings = new ArrayList<>();
+        Map<Siting, Satellite> placements = new HashMap<>();
+        for (Satellite satellite : set.satellites()) {
+            if (satellite.siting().equals(set.rootSiting())) {
+                findings.add(
+                    problem(
+                        Codes.rootPlacementCollision,
+                        "the satellite " + satellite.id().text() + " is placed exactly on the root",
+                        Locus.world(satellite.presenceCells())
+                    )
+                );
+            }
+            Satellite previous = placements.putIfAbsent(satellite.siting(), satellite);
+            if (previous != null) {
+                findings.add(
+                    problem(
+                        Codes.duplicatePlacement,
+                        "the satellite " + satellite.id().text() + " repeats the placement of " + previous.id().text(),
+                        Locus.world(satellite.presenceCells())
+                    )
+                );
+            }
+            if (!satellite.worldBounds().asSet().containsAll(satellite.presenceCells())) {
+                findings.add(
+                    problem(
+                        Codes.documentField,
+                        "the presence region of " + satellite.id().text() + " leaves the satellite bounds",
+                        Locus.world(satellite.presenceCells())
+                    )
+                );
+            }
+        }
+        Map<FaceWorld, Satellite> faces = new HashMap<>();
+        for (Satellite satellite : set.satellites()) {
+            for (LinkSpec link : satellite.links()) {
+                if (link.mode() != LinkMode.face || link.parentCell() == null || link.satelliteCell() == null) {
+                    continue;
+                }
+                LatticePoint parent = set.rootSiting().toWorld(link.parentCell());
+                LatticePoint port = satellite.siting().toWorld(link.satelliteCell());
+                if (parent == null || port == null) {
+                    continue;
+                }
+                FaceWorld face = new FaceWorld(
+                    parent,
+                    (long) port.x() - parent.x(),
+                    (long) port.y() - parent.y(),
+                    (long) port.z() - parent.z()
+                );
+                Satellite previous = faces.putIfAbsent(face, satellite);
+                if (previous != null) {
+                    findings.add(
+                        problem(
+                            Codes.duplicateFaceLink,
+                            "the parent cell " + link.parentCell() + " already carries a face link to "
+                                    + satellite.id().text(),
+                            Locus.world(CuboidSet.of(Cuboid.of(parent), Cuboid.of(port)))
+                        )
+                    );
+                }
+            }
+        }
+        return List.copyOf(findings);
+    }
+
     private static boolean hasErrors(List<Finding> findings) {
         for (Finding finding : findings) {
             if (finding.severity() == Severity.error) {
@@ -177,6 +252,8 @@ public record StructureSet(
     private static Finding problem(CodeEntry entry, String message, Locus locus) {
         return Finding.builder(entry).phase(Phase.check).message(message).label(Label.primary(locus, message)).build();
     }
+
+    private record FaceWorld(LatticePoint parent, long dx, long dy, long dz) {}
 
     /** The placement outcome: the placed set, or the findings that prevented it. */
     public record Placement(@Nullable StructureSet set, List<Finding> findings) {

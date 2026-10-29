@@ -18,11 +18,11 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
+import dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentProvider;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
-import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -176,25 +176,25 @@ public final class OrientationAuditGameTest {
         private final Map<BlockPos, NestedExtent> extents = new HashMap<>();
         private final List<BlockState> states = new ArrayList<>();
         private final NestedExtentLookup lookup = NestedExtentLookup.builder()
-                .add(new NestedExtentProvider<BlockNestedExtentContext>() {
+                .add(new CapabilityNestedExtentProvider<BlockNestedExtentContext, @Nullable Direction>() {
                     @Override
                     public NestedExtentHolder<BlockNestedExtentContext> holder() {
                         return NestedExtentHolders.block;
                     }
 
                     @Override
-                    public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
+                    public @Nullable NestedExtent get(BlockNestedExtentContext actual, @Nullable Direction context) {
                         states.add(actual.state());
                         return extents.get(actual.pos());
                     }
-                }).add(new NestedExtentProvider<Entity>() {
+                }).add(new CapabilityNestedExtentProvider<Entity, @Nullable Direction>() {
                     @Override
                     public NestedExtentHolder<Entity> holder() {
                         return NestedExtentHolders.entity;
                     }
 
                     @Override
-                    public @Nullable NestedExtent get(Entity actual) {
+                    public @Nullable NestedExtent get(Entity actual, @Nullable Direction context) {
                         return null;
                     }
                 }).build();

@@ -701,6 +701,11 @@ final class StructureSetTestSupport {
         }
 
         @Override
+        public @Nullable StructureInstance find(World world, OwnerId owner, Siting siting) {
+            return delegate.find(world, owner, siting);
+        }
+
+        @Override
         public @Nullable StructureInstance find(OwnerId owner, Siting siting) {
             return delegate.find(owner, siting);
         }

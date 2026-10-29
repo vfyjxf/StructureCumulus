@@ -18,11 +18,11 @@ import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
+import dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentProvider;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
-import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
 import dev.vfyjxf.cumulus.mc.trait.BlockTraitContext;
 import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
 import dev.vfyjxf.cumulus.mc.trait.TraitHolder;
@@ -30,6 +30,7 @@ import dev.vfyjxf.cumulus.mc.trait.TraitHolders;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import dev.vfyjxf.cumulus.mc.trait.TraitProvider;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -476,17 +477,21 @@ public final class TraitCaptureGameTest {
     private record SingleExtentLookup(BlockPos pos, NestedExtent extent) {
 
         private NestedExtentLookup lookup() {
-            return NestedExtentLookup.builder().add(new NestedExtentProvider<BlockNestedExtentContext>() {
-                @Override
-                public NestedExtentHolder<BlockNestedExtentContext> holder() {
-                    return NestedExtentHolders.block;
-                }
+            return NestedExtentLookup.builder()
+                    .add(new CapabilityNestedExtentProvider<BlockNestedExtentContext, @Nullable Direction>() {
+                        @Override
+                        public NestedExtentHolder<BlockNestedExtentContext> holder() {
+                            return NestedExtentHolders.block;
+                        }
 
-                @Override
-                public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
-                    return actual.pos().equals(pos) ? extent : null;
-                }
-            }).build();
+                        @Override
+                        public @Nullable NestedExtent get(
+                            BlockNestedExtentContext actual,
+                            @Nullable Direction context
+                        ) {
+                            return actual.pos().equals(pos) ? extent : null;
+                        }
+                    }).build();
         }
     }
 

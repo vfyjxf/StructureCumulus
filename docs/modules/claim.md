@@ -146,8 +146,9 @@ rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
   `Conflict` with the incumbents and writes nothing. Otherwise it replaces the key and answers
   `Settled(newRevision, rows)`, bumping the revision by one.
 - `release(owner, siting)` deletes every row of the key and bumps the revision by one. An absent key
-  is a no-op and does **not** bump. It is safe to call on every instance removal, move and world
-  unload; it is idempotent after the first. The whole-key granularity is the contract (D-38): one
+  is a no-op and does **not** bump. It is safe to call on every instance removal and move; it is
+  idempotent after the first. A world unload keeps the persisted claim rows and does not release them
+  (D-38). The whole-key granularity is the contract (D-38): one
   siting is one instance, so there is no per-bay or per-row release; duplicate rows in the key are a
   representation detail and are not independently releasable.
 - All rows of a `SettleRequest` must name the request's `owner` and `siting`; a mismatch is a
@@ -171,7 +172,7 @@ re-reading.
 - `compile`: `Sharing`/`Footprint` are bay declaration values; no ledger.
 - `check`: the request carries a frozen `ClaimView`; the engine derives a prediction and compares.
 - `settle`: the engine derives rows, then the ledger CAS; `Conflict`/`RevisionMoved` are results.
-- `release`: host lifecycle only (removal, move, unload).
+- `release`: host lifecycle only (removal and move; a world unload keeps claim rows).
 
 ## 6. Codes
 

@@ -86,7 +86,7 @@ public final class LevelCapture implements WorldCapture {
         this(level, NestedExtentLookup.capabilities(), traitLookup, traitCapture);
     }
 
-    LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup) {
+    public LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup) {
         this(level, nestedLookup, TraitLookup.builtin(), TraitCaptureContext.empty());
     }
 
@@ -642,8 +642,11 @@ public final class LevelCapture implements WorldCapture {
 
     private @Nullable NestedExtent blockExtent(BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity) {
         try {
-            return nestedLookup
-                    .get(NestedExtentHolders.block, new BlockNestedExtentContext(level, pos, state, blockEntity));
+            return nestedLookup.get(
+                NestedExtentHolders.block,
+                new BlockNestedExtentContext(level, pos, state, blockEntity),
+                traitCapture.capabilityContext()
+            );
         } catch (RuntimeException failure) {
             StructureCumulus.logger.warn("nested block provider failed at {}", pos, failure);
             return null;
@@ -652,7 +655,7 @@ public final class LevelCapture implements WorldCapture {
 
     private @Nullable NestedExtent entityExtent(EntityCandidate candidate) {
         try {
-            return nestedLookup.get(NestedExtentHolders.entity, candidate.entity());
+            return nestedLookup.get(NestedExtentHolders.entity, candidate.entity(), traitCapture.capabilityContext());
         } catch (RuntimeException failure) {
             StructureCumulus.logger.warn("nested entity provider failed for {}", candidate.id(), failure);
             return null;

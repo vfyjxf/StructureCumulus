@@ -15,7 +15,7 @@ import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
-import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -41,6 +41,7 @@ public final class ServerState {
     private final DatapackBlueprints blueprints;
     private final DocumentSource documents;
     private final TraitLookup traitLookup;
+    private NestedExtentLookup nestedExtentLookup = NestedExtentLookup.capabilities();
     private final Map<ServerLevel, LevelStore> levels = new HashMap<>();
     private final Map<ServerLevel, LevelCapture> captures = new HashMap<>();
 
@@ -143,11 +144,17 @@ public final class ServerState {
         return store(level).structures();
     }
 
+    /**
+     * Installs the host's nested-extent lookup; the default is {@link NestedExtentLookup#capabilities()}.
+     * Open captures are closed because a capture keeps the lookup it was built with.
+     */
+    public void installNestedExtentLookup(NestedExtentLookup lookup) {
+        this.nestedExtentLookup = Objects.requireNonNull(lookup, "lookup");
+        closeCaptures();
+    }
+
     LevelCapture capture(ServerLevel level) {
-        return captures.computeIfAbsent(
-            level,
-            attached -> new LevelCapture(attached, traitLookup, TraitCaptureContext.empty())
-        );
+        return captures.computeIfAbsent(level, attached -> new LevelCapture(attached, nestedExtentLookup, traitLookup));
     }
 
     void closeCaptures() {

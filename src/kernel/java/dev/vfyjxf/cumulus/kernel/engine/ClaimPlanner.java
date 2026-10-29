@@ -60,7 +60,9 @@ public final class ClaimPlanner {
                 case Footprint.Bound ignored -> {
                     CuboidSet union = CuboidSet.empty();
                     for (OccupantSnapshot subject : subjects) {
-                        union = union.union(subject.footprint().asSet());
+                        if (!subject.isAir()) {
+                            union = union.union(subject.footprint().asSet());
+                        }
                     }
                     yield union;
                 }

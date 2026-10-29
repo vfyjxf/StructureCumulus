@@ -19,7 +19,7 @@ import java.util.Objects;
  * <p>{@code outcomes} holds one entry per structure whose check was admitted, keyed by the root
  * blueprint id and each satellite id. {@code claims} holds the rows each {@code Formed} structure wrote,
  * filtered by {@code (owner, siting, bay)} from the ledger-wide {@code ClaimSet}. Rollback releases
- * claims only; a rolled-back structure's kernel context stays published, so the host must invalidate it.
+ * claims and invalidates the settled drafts or instances through the bound structure manager.
  */
 public record StructureSetResult(
     Map<NamespacedId, MatchOutcome> outcomes,

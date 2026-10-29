@@ -39,7 +39,7 @@ final class InMemoryStructureManager implements StructureManager {
     public StructureAttempt begin(World world, StructureSpec spec) {
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(spec, "spec");
-        SitingKey key = new SitingKey(spec.owner(), spec.siting());
+        SitingKey key = new SitingKey(world, spec.owner(), spec.siting());
         if (drafts.values().stream().anyMatch(draft -> draft.key().equals(key))) {
             throw new IllegalArgumentException("an attempt already occupies " + key);
         }
@@ -56,10 +56,11 @@ final class InMemoryStructureManager implements StructureManager {
     }
 
     @Override
-    public @Nullable StructureInstance find(OwnerId owner, Siting siting) {
+    public @Nullable StructureInstance find(World world, OwnerId owner, Siting siting) {
+        Objects.requireNonNull(world, "world");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(siting, "siting");
-        InstanceId id = bySiting.get(new SitingKey(owner, siting));
+        InstanceId id = bySiting.get(new SitingKey(world, owner, siting));
         return id == null ? null : instances.get(id);
     }
 
@@ -99,7 +100,11 @@ final class InMemoryStructureManager implements StructureManager {
             return formed.context();
         }
         Draft draft = drafts.remove(instance);
-        return draft == null ? null : draft.context();
+        if (draft == null) {
+            return null;
+        }
+        draft.close();
+        return draft.context();
     }
 
     @Override
@@ -138,7 +143,7 @@ final class InMemoryStructureManager implements StructureManager {
                 }
             }
             case StructureEvent.Moved moved -> move(moved);
-            case StructureEvent.Loaded loaded -> load(loaded.instances());
+            case StructureEvent.Loaded loaded -> load(loaded.world(), loaded.instances());
             case StructureEvent.Unloaded unloaded -> unload(unloaded.world());
             case StructureEvent.Invalidated invalidated -> {
                 removeFormed(invalidated.id());
@@ -158,7 +163,8 @@ final class InMemoryStructureManager implements StructureManager {
         if (!instance.siting().equals(moved.from())) {
             throw new IllegalArgumentException("the structure is not at " + moved.from());
         }
-        SitingKey target = new SitingKey(instance.owner(), moved.to());
+        World world = instance.id().world();
+        SitingKey target = new SitingKey(world, instance.owner(), moved.to());
         InstanceId occupant = bySiting.get(target);
         if (occupant != null && !occupant.equals(instance.id())) {
             throw new IllegalArgumentException("a structure already occupies " + target);
@@ -170,25 +176,53 @@ final class InMemoryStructureManager implements StructureManager {
             instance.context(),
             moved.bounds()
         );
-        bySiting.remove(new SitingKey(instance.owner(), instance.siting()));
+        bySiting.remove(new SitingKey(world, instance.owner(), instance.siting()));
         instances.put(instance.id(), movedInstance);
         bySiting.put(target, instance.id());
     }
 
-    private void load(List<StructureInstance> restored) {
-        instances.clear();
-        bySiting.clear();
-        drafts.clear();
+    private void load(World world, List<StructureInstance> restored) {
+        Map<InstanceId, StructureInstance> validated = new LinkedHashMap<>();
+        Map<SitingKey, InstanceId> restoredSitings = new HashMap<>();
         long maxSerial = 0;
         for (StructureInstance instance : restored) {
-            if (instances.putIfAbsent(instance.id(), instance) != null) {
+            if (!instance.id().world().equals(world)) {
+                throw new IllegalArgumentException(
+                    "the restored instance " + instance.id() + " belongs to another world"
+                );
+            }
+            if (validated.putIfAbsent(instance.id(), instance) != null) {
                 throw new IllegalArgumentException("duplicate structure instance " + instance.id());
             }
-            SitingKey key = new SitingKey(instance.owner(), instance.siting());
-            if (bySiting.putIfAbsent(key, instance.id()) != null) {
+            SitingKey key = new SitingKey(world, instance.owner(), instance.siting());
+            if (restoredSitings.putIfAbsent(key, instance.id()) != null) {
                 throw new IllegalArgumentException("duplicate structure siting " + key);
             }
             maxSerial = Math.max(maxSerial, instance.id().serial());
+        }
+
+        List<InstanceId> replaced = new ArrayList<>();
+        for (InstanceId id : instances.keySet()) {
+            if (id.world().equals(world)) {
+                replaced.add(id);
+            }
+        }
+        for (InstanceId id : replaced) {
+            removeFormed(id);
+        }
+        List<Draft> discarded = new ArrayList<>();
+        for (Draft draft : drafts.values()) {
+            if (draft.id().world().equals(world)) {
+                discarded.add(draft);
+            }
+        }
+        for (Draft draft : discarded) {
+            drafts.remove(draft.id());
+            draft.close();
+        }
+        for (StructureInstance instance : restored) {
+            instances.put(instance.id(), instance);
+            bySiting.put(new SitingKey(world, instance.owner(), instance.siting()), instance.id());
         }
         nextSerial = Math.max(nextSerial, maxSerial + 1);
     }
@@ -215,13 +249,13 @@ final class InMemoryStructureManager implements StructureManager {
     private @Nullable StructureInstance removeFormed(InstanceId id) {
         StructureInstance removed = instances.remove(id);
         if (removed != null) {
-            bySiting.remove(new SitingKey(removed.owner(), removed.siting()));
+            bySiting.remove(new SitingKey(removed.id().world(), removed.owner(), removed.siting()));
         }
         return removed;
     }
 
     private void register(StructureInstance instance) {
-        SitingKey key = new SitingKey(instance.owner(), instance.siting());
+        SitingKey key = new SitingKey(instance.id().world(), instance.owner(), instance.siting());
         if (instances.containsKey(instance.id()) || bySiting.containsKey(key)) {
             throw new IllegalArgumentException("a structure already occupies " + key);
         }
@@ -254,7 +288,7 @@ final class InMemoryStructureManager implements StructureManager {
         );
     }
 
-    private record SitingKey(OwnerId owner, Siting siting) {}
+    private record SitingKey(World world, OwnerId owner, Siting siting) {}
 
     private final class Draft implements StructureAttempt {
 
@@ -270,7 +304,7 @@ final class InMemoryStructureManager implements StructureManager {
         }
 
         private SitingKey key() {
-            return new SitingKey(spec.owner(), spec.siting());
+            return new SitingKey(id.world(), spec.owner(), spec.siting());
         }
 
         private StructureContext context() {
@@ -297,11 +331,14 @@ final class InMemoryStructureManager implements StructureManager {
 
         @Override
         public @Nullable StructureContext remove(InstanceId instance) {
+            ensureOpen();
             if (!instance.equals(id)) {
                 return null;
             }
             StructureContext old = context;
             context = StructureContext.empty(id);
+            drafts.remove(id);
+            closed = true;
             return old;
         }
 
@@ -312,6 +349,7 @@ final class InMemoryStructureManager implements StructureManager {
             FindingBundle findings,
             Spend spend
         ) {
+            ensureOpen();
             if (!instance.equals(id)) {
                 throw new IllegalArgumentException("the draft belongs to " + id);
             }
@@ -322,12 +360,10 @@ final class InMemoryStructureManager implements StructureManager {
         @Override
         public StructureInstance commit(CuboidSet bounds) {
             Objects.requireNonNull(bounds, "bounds");
-            if (closed) {
-                throw new IllegalStateException("the attempt is already closed");
-            }
+            ensureOpen();
             closed = true;
             drafts.remove(id);
-            InstanceId previous = bySiting.get(new SitingKey(spec.owner(), spec.siting()));
+            InstanceId previous = bySiting.get(new SitingKey(id.world(), spec.owner(), spec.siting()));
             if (previous != null && !previous.equals(id)) {
                 removeFormed(previous);
             }
@@ -338,11 +374,15 @@ final class InMemoryStructureManager implements StructureManager {
 
         @Override
         public void abort() {
+            ensureOpen();
+            closed = true;
+            drafts.remove(id);
+        }
+
+        private void ensureOpen() {
             if (closed) {
                 throw new IllegalStateException("the attempt is already closed");
             }
-            closed = true;
-            drafts.remove(id);
         }
 
         private void close() {

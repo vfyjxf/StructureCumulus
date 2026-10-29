@@ -37,9 +37,10 @@ and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress gro
 T1–T3 trait-provider slice (D-34) then replaces the provider shape and the trait values. S5 adds the
 production set command and its one capture, the check-only host path and the set GameTests (§3.5). S6
 closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
-invalidation, and one set budget shared by presence and every member attempt (§3.3). On the S6
-working tree a full `./gradlew check` and `runGameTestServer` both pass: 269 kernel tests (40
-containers), 280 adapter unit tests (35 containers), 74/74 `@GameTest` methods, 0 failures, 0 skipped.
+invalidation, and one set budget shared by presence and every member attempt (§3.3). On the current
+working tree a full `./gradlew check` and `runGameTestServer` both pass: 351 kernel tests (44
+containers), 384 adapter unit tests (40 containers), 112/112 `@GameTest` methods, 0 failures, 0
+skipped.
 `tools/spec-check.py` is clean.
 `Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
@@ -54,7 +55,10 @@ The context-cache batch (`681c505`) adds 31 kernel tests across four classes and
 scenario; the structure-set slices add `StructureSetCompilerTest` (15 kernel tests),
 `JsonStructureSetTest` (10), `StructureSetPlanTest` (8), `StructureSetHostTest` (26, two of them S5's
 check-only path), `DatapackStructureSetTest` (5) and the SS4 stress suite (34 after S6's shared-budget
-case). S6 also adds `ContextTest` (4); D-40 adds `StructureManagerTest` (7) and `StructureLifecycleGameTest` (2). S5 adds the two
+case). S6 also adds `ContextTest` (4); D-40 adds `StructureManagerTest` (9) and `StructureLifecycleGameTest` (3);
+the adversarial round adds `AdversarialManagerTest` (41), `AdversarialClaimCoverageTest` (18),
+`AdversarialExpectationTest` (13) and `AdversarialFuzzTest` (8), plus the three GameTest classes in
+§3.6. S5 adds the two
 real-level GameTest classes below (§3.5). The host-data round adds
 `HostExpectationTest` (7 kernel tests), `McAnchorsTest` (7), `SnapshotLevelTest` (7),
 `LevelSnapshotTest` (17), `AdapterExpectationsTest` (12) and the H4 `HostDataScenarioTest` (4, §3.4).
@@ -241,10 +245,15 @@ non-air occupant and is admitted; `BloodAltarScenarioTest.waterInANotAirSlotIsAd
 both explicit leaves. The kernel classifies by the vanilla block type; a waterlogged block is not a
 fluid occupant at this layer. `anyOccupant` is unchanged.
 
-**Release granularity (D-38).** `ClaimLedger.release(owner, siting)` deletes every row of the
-`(owner, siting)` key; there is no per-bay or per-row release. One siting is one instance, and a
-shared cell's two rows are still one lifecycle object. `SavedClaimsLifecycleTest` characterizes the
-whole-key removal and the duplicate-row collapse on reload; this is intentional, not a gap.
+**Release granularity and unload (D-38).** `ClaimLedger.release(owner, siting)` deletes every row of
+the `(owner, siting)` key; there is no per-bay or per-row release. One siting is one instance, and a
+shared cell's two rows are still one lifecycle object. Removal (`Broken`/`Invalidated`), a piston
+partial/destroy and a structure-set rollback releases the whole key; a piston full move translates the rows
+then releases the old key. A world unload is not a release: it drops only the world's in-memory
+manager instances and drafts, while the persisted claim rows stay until a later host action or a new
+settle replaces the key. `SavedClaimsLifecycleTest` characterizes the whole-key removal and the
+duplicate-row collapse on reload; `StructureLifecycleAdversarialGameTest.levelUnloadDropsInstancesAndKeepsTheClaimRows`
+asserts the unload split. This is intentional, not a gap.
 
 ### 3.3 Structure-set stress batch (SS4)
 
@@ -326,6 +335,56 @@ type, no code and no decision.
 | The set budget is shared: presence may consume it all, leaving the root check `Undecided` with `SC-ENG-0001` | `aOneCellSetBudgetLeavesTheRootCheckUndecided` |
 | A set command reads the real per-structure claims ledger: check writes nothing, settle writes one row per footprint cell | `setCheckWritesNothingAndSetSettleWritesTheClaims` |
 | The set command's exit code follows the set result, not a member result: an error finding is 0 even when a member was admitted | `aMissingRequiredSatelliteFailsCheckAndSettle` |
+
+### 3.6 Adversarial close-out
+
+The 2026-10-29 adversarial round adds four kernel classes (80 tests) and three real-level GameTest
+classes (29 methods), and extends the manager lifecycle and claim/coverage edges. It adds no kernel
+type, no new code and no decision.
+
+| Suite | Class | What it drives | Tests |
+| --- | --- | --- | --- |
+| kernel | `AdversarialManagerTest` | one-shot close/remove, attempt-remove close, per-world `Loaded` validation and identity, world-scoped draft keys, event rejection, bounds lookup, context merge/validation and closed-attempt writes | 41 |
+| kernel | `AdversarialClaimCoverageTest` | coverage/claimability/footprint matrix, anySubject/Bound, NOTAIR/empty/non-fluid and nested-subject rejection | 18 |
+| kernel | `AdversarialExpectationTest` | expectation combinators, absent/refused/trait states and typed host values | 13 |
+| kernel | `AdversarialFuzzTest` | deterministic small-model manager/claim/coverage sequences | 8 |
+| adapter | `CaptureAdversarialGameTest` | world-frame capture, over-cap boundary, lease invalidation, build-height child refusal, nested origin/provider/cut and manager bounds | 13 |
+| adapter | `StructureLifecycleAdversarialGameTest` | overlapping break, explosion, placement, same-siting settle replacement, piston full move/partial/destroy/conflict, level unload keeps claims, rejected move | 11 |
+| adapter | `StructureSetAdversarialGameTest` | check-only leaves no state, re-settle replacement, shared budget stop, duplicate placement, six-satellite set | 5 |
+
+**Corrected lifecycle (D-38/D-40).** The lifecycle wording is now:
+
+- `Broken`/`Invalidated` release the whole `(owner, siting)` claim key; a piston partial/destroyed
+  result is an invalidation and releases the old rows; a piston full move translates the rows to the
+  new siting and releases the old key; a rejected move does not leave translated rows behind.
+  `StructureLifecycleAdversarialGameTest.pistonFullMoveTranslatesClaimsAndKeepsTheInstanceContext`,
+  `pistonPartialMoveInvalidatesAndReleasesTheOldClaims`,
+  `pistonDestroyedPartInvalidatesAndReleasesTheOldClaims`,
+  `pistonMoveClaimConflictInvalidatesAndKeepsTheIncumbent`,
+  `rejectedPistonMoveMustNotLeaveTranslatedClaimsBehind`.
+- A level unload dispatches `Unloaded(world)` and drops only that world's in-memory manager instances
+  and drafts; persisted claim rows stay. `StructureLifecycleAdversarialGameTest.levelUnloadDropsInstancesAndKeepsTheClaimRows`.
+- `StructureManager` keys are `(world, owner, siting)`: the same tuple in two worlds coexists;
+  `find(World, owner, siting)` is the unambiguous lookup and the two-argument `find` throws on an
+  ambiguous tuple. `Loaded(World, List)` replaces only that world, validates world membership and
+  duplicates before mutating, closes that world's drafts, and raises the serial watermark;
+  `AdversarialManagerTest.theSameOwnerAndSitingInTwoWorldsMustCoexist`,
+  `aDraftSitingReservationIsPerWorld`, `loadedKeepsInstancesOfWorldsItDoesNotRestore`,
+  `loadedRejectsAnotherWorldsRestoredInstanceWithoutMutating`,
+  `aRejectedLoadedDuplicateIdMustNotDestroyTheCurrentRegistry`.
+- `ContextStore.remove` on an attempt closes it: reservation released, old context returned, later
+  writes/commit/abort throw, and no instance forms.
+  `AdversarialManagerTest.attemptRemoveClosesTheDraftReleasesTheSitingAndFormsNothing`,
+  `removingADraftIdInvalidatesTheAttempt`, `closedAttemptsCannotWriteThroughTheDraftIntoTheRegistry`.
+
+**Nested source split (design 13).** The approved nested-extent seam no longer models only
+capabilities. `CapabilityNestedExtentAccess<H, C>` passes the capability's own `C` (no new
+read-context record), `AttachmentNestedExtentProvider<H, T>` adds the attachment source with
+`readOnly`/`readWrite` factories, and `NestedExtentLookup` exposes explicit
+`getCapability`/`getAttachment` plus the capability-first `get` used by capture. Capture is
+read-only: it calls `getExistingDataOrNull` and never creates/writes an attachment. Covered by
+`NestedExtentTest` and the nested/capture GameTests (`NestedCaptureGameTest`,
+`CaptureAdversarialGameTest`); the full design is `docs/design/13-nested-extent-access.md`.
 
 ## 4. Module tests
 
@@ -415,8 +474,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 74 `@GameTest` methods; the
-  full `runGameTestServer` is 74/74 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 112 `@GameTest` methods; the
+  full `runGameTestServer` is 112/112 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the

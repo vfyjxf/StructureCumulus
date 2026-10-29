@@ -9,6 +9,7 @@ import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
 import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
+import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
@@ -148,7 +149,7 @@ public final class WatchEvents {
         if (event.getLevel() instanceof ServerLevel level) {
             ServerState state = ServerState.current();
             if (state != null) {
-                dispatch(state.structures(level), new StructureEvent.Loaded(List.of()));
+                dispatch(state.structures(level), new StructureEvent.Loaded(state.world(level), List.of()));
             }
         }
     }
@@ -252,6 +253,7 @@ public final class WatchEvents {
                     manager,
                     new StructureEvent.Invalidated(instance.id(), "a piston destroyed part of the structure")
                 );
+                release(level, instance);
                 continue;
             }
             boolean hasClaim = false;
@@ -286,12 +288,16 @@ public final class WatchEvents {
                 continue;
             }
             Siting movedSiting = instance.siting().withOrigin(movedOrigin);
+            StructureEvent moved = new StructureEvent.Moved(instance.id(), instance.siting(), movedSiting, movedBounds);
+            if (!dispatchChecked(manager, moved)) {
+                continue;
+            }
             if (!moveClaims(level, instance, movedSiting, dx, dy, dz)) {
                 dispatch(manager, new StructureEvent.Invalidated(instance.id(), "the moved claims conflict"));
                 release(level, instance);
+                release(level, instance.owner(), movedSiting);
                 continue;
             }
-            dispatch(manager, new StructureEvent.Moved(instance.id(), instance.siting(), movedSiting, movedBounds));
         }
     }
 
@@ -341,22 +347,32 @@ public final class WatchEvents {
     }
 
     private static void release(ServerLevel level, StructureInstance instance) {
+        release(level, instance.owner(), instance.siting());
+    }
+
+    private static void release(ServerLevel level, OwnerId owner, Siting siting) {
         ServerState state = ServerState.current();
         if (state == null) {
             return;
         }
         try {
-            state.claims(level).release(instance.owner(), instance.siting());
+            state.claims(level).release(owner, siting);
         } catch (RuntimeException failure) {
-            StructureCumulus.logger.warn("claim release for {} failed", instance.id(), failure);
+            StructureCumulus.logger.warn("claim release for {} at {} failed", owner, siting, failure);
         }
     }
 
     private static void dispatch(StructureManager manager, StructureEvent event) {
+        dispatchChecked(manager, event);
+    }
+
+    private static boolean dispatchChecked(StructureManager manager, StructureEvent event) {
         try {
             manager.onEvent(event);
+            return true;
         } catch (RuntimeException failure) {
             StructureCumulus.logger.warn("structure lifecycle event {} was rejected", event, failure);
+            return false;
         }
     }
 

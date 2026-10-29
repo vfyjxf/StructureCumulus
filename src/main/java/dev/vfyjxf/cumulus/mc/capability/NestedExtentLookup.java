@@ -8,16 +8,21 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** An immutable nested-extent-provider registry keyed by holder id. */
+/** An immutable nested-extent provider registry keyed by holder id, capability or attachment. */
 @NullMarked
 public final class NestedExtentLookup {
 
     private static final NestedExtentLookup capabilities = buildCapabilities();
 
-    private final Map<NamespacedId, NestedExtentProvider<?>> providers;
+    private final Map<NamespacedId, CapabilityNestedExtentProvider<?, ?>> capabilityProviders;
+    private final Map<NamespacedId, AttachmentNestedExtentProvider<?, ?>> attachmentProviders;
 
-    private NestedExtentLookup(Map<NamespacedId, NestedExtentProvider<?>> providers) {
-        this.providers = Map.copyOf(providers);
+    private NestedExtentLookup(
+        Map<NamespacedId, CapabilityNestedExtentProvider<?, ?>> capabilityProviders,
+        Map<NamespacedId, AttachmentNestedExtentProvider<?, ?>> attachmentProviders
+    ) {
+        this.capabilityProviders = Map.copyOf(capabilityProviders);
+        this.attachmentProviders = Map.copyOf(attachmentProviders);
     }
 
     public static NestedExtentLookup capabilities() {
@@ -28,16 +33,42 @@ public final class NestedExtentLookup {
         return new Builder();
     }
 
+    /** The explicit capability lookup; an attachment provider never answers it. */
     @SuppressWarnings("unchecked")
-    public <H> @Nullable NestedExtent get(NestedExtentHolder<H> holder, H actual) {
+    public <H, C extends @Nullable Object> @Nullable NestedExtent getCapability(
+        NestedExtentHolder<H> holder,
+        H actual,
+        @Nullable C context
+    ) {
         Objects.requireNonNull(holder, "holder");
-        NestedExtentProvider<H> provider = (NestedExtentProvider<H>) providers.get(holder.id());
-        return provider == null ? null : provider.get(actual);
+        CapabilityNestedExtentProvider<H, C> provider = (CapabilityNestedExtentProvider<H, C>) capabilityProviders
+                .get(holder.id());
+        return provider == null ? null : provider.get(actual, context);
+    }
+
+    /** The explicit attachment lookup; it reads existing data and never creates a default. */
+    @SuppressWarnings("unchecked")
+    public <H> @Nullable NestedExtent getAttachment(NestedExtentHolder<H> holder, H actual) {
+        Objects.requireNonNull(holder, "holder");
+        AttachmentNestedExtentProvider<H, ?> provider = (AttachmentNestedExtentProvider<H, ?>) attachmentProviders
+                .get(holder.id());
+        return provider == null ? null : provider.getExistingDataOrNull(actual);
+    }
+
+    /** Capability first, then the attachment source when the capability answers null. */
+    public <H, C extends @Nullable Object> @Nullable NestedExtent get(
+        NestedExtentHolder<H> holder,
+        H actual,
+        @Nullable C context
+    ) {
+        Objects.requireNonNull(holder, "holder");
+        NestedExtent capability = getCapability(holder, actual, context);
+        return capability != null ? capability : getAttachment(holder, actual);
     }
 
     public boolean knows(NestedExtentHolder<?> holder) {
         Objects.requireNonNull(holder, "holder");
-        return providers.containsKey(holder.id());
+        return capabilityProviders.containsKey(holder.id()) || attachmentProviders.containsKey(holder.id());
     }
 
     private static NestedExtentLookup buildCapabilities() {
@@ -46,21 +77,31 @@ public final class NestedExtentLookup {
 
     public static final class Builder {
 
-        private final Map<NamespacedId, NestedExtentProvider<?>> providers = new LinkedHashMap<>();
+        private final Map<NamespacedId, CapabilityNestedExtentProvider<?, ?>> capabilityProviders = new LinkedHashMap<>();
+        private final Map<NamespacedId, AttachmentNestedExtentProvider<?, ?>> attachmentProviders = new LinkedHashMap<>();
 
         private Builder() {}
 
-        public <H> Builder add(NestedExtentProvider<H> provider) {
+        public <H, C extends @Nullable Object> Builder add(CapabilityNestedExtentProvider<H, C> provider) {
             Objects.requireNonNull(provider, "provider");
             NamespacedId holder = Objects.requireNonNull(provider.holder().id(), "holder id");
-            if (providers.putIfAbsent(holder, provider) != null) {
-                throw new IllegalArgumentException("duplicate nested extent provider for " + holder);
+            if (capabilityProviders.putIfAbsent(holder, provider) != null) {
+                throw new IllegalArgumentException("duplicate capability nested extent provider for " + holder);
+            }
+            return this;
+        }
+
+        public <H, T> Builder add(AttachmentNestedExtentProvider<H, T> provider) {
+            Objects.requireNonNull(provider, "provider");
+            NamespacedId holder = Objects.requireNonNull(provider.holder().id(), "holder id");
+            if (attachmentProviders.putIfAbsent(holder, provider) != null) {
+                throw new IllegalArgumentException("duplicate attachment nested extent provider for " + holder);
             }
             return this;
         }
 
         public NestedExtentLookup build() {
-            return new NestedExtentLookup(providers);
+            return new NestedExtentLookup(capabilityProviders, attachmentProviders);
         }
     }
 }

@@ -15,20 +15,32 @@ import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
+import dev.vfyjxf.cumulus.mc.capability.AttachmentNestedExtentProvider;
+import dev.vfyjxf.cumulus.mc.capability.AttachmentNestedExtentProviders;
 import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
+import dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentAccesses;
+import dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentProvider;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
-import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
+import dev.vfyjxf.cumulus.mc.capability.NestedExtents;
+import dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitContext;
+import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.attachment.AttachmentType;
+import net.neoforged.neoforge.attachment.IAttachmentHolder;
+import net.neoforged.neoforge.capabilities.EntityCapability;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.jspecify.annotations.NullMarked;
@@ -41,6 +53,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** M2d GameTests: nested frames, cut rules and source precedence through the fake-provider seam. */
 @NullMarked
@@ -831,6 +844,466 @@ public final class NestedCaptureGameTest {
         );
     }
 
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void capturePassesTheCapabilitySideToTheBlockAndEntityProviders(GameTestHelper helper) {
+        BlockPos anchor = new BlockPos(0, 1, 0);
+        helper.setBlock(anchor, Blocks.STONE);
+        helper.spawnWithNoFreeWill(EntityType.CHICKEN, new Vec3(0.5, 2.0, 0.5));
+        BlockPos worldAnchor = helper.absolutePos(anchor);
+        LatticePoint localAnchor = LatticePoint.of(worldAnchor.getX(), worldAnchor.getY(), worldAnchor.getZ());
+        Cuboid bounds = Cuboid.of(
+            worldAnchor.getX(),
+            worldAnchor.getY(),
+            worldAnchor.getZ(),
+            worldAnchor.getX() + 1,
+            worldAnchor.getY() + 2,
+            worldAnchor.getZ() + 1
+        );
+        AtomicReference<@Nullable Direction> blockSide = new AtomicReference<>();
+        AtomicReference<@Nullable Direction> entitySide = new AtomicReference<>();
+        NestedExtentLookup lookup = NestedExtentLookup.builder()
+                .add(new CapabilityNestedExtentProvider<BlockNestedExtentContext, @Nullable Direction>() {
+                    @Override
+                    public NestedExtentHolder<BlockNestedExtentContext> holder() {
+                        return NestedExtentHolders.block;
+                    }
+
+                    @Override
+                    public @Nullable NestedExtent get(BlockNestedExtentContext actual, @Nullable Direction context) {
+                        blockSide.set(context);
+                        return null;
+                    }
+                }).add(new CapabilityNestedExtentProvider<Entity, @Nullable Direction>() {
+                    @Override
+                    public NestedExtentHolder<Entity> holder() {
+                        return NestedExtentHolders.entity;
+                    }
+
+                    @Override
+                    public @Nullable NestedExtent get(Entity actual, @Nullable Direction context) {
+                        entitySide.set(context);
+                        return null;
+                    }
+                }).build();
+        TraitCaptureContext capture = new TraitCaptureContext(Direction.WEST, TraitContext.empty());
+        SnapshotPolicy policy = new SnapshotPolicy(
+            maxElements,
+            1,
+            Set.of(OccupantKind.nested, OccupantKind.entity),
+            Set.of(),
+            List.of()
+        );
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup, TraitLookup.builtin(), capture)
+                .capture(new CaptureRequest(bounds, policy));
+
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the capability-side capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            helper.assertValueEqual(Direction.WEST, blockSide.get(), "the block provider sees the capture side");
+            helper.assertValueEqual(Direction.WEST, entitySide.get(), "the entity provider sees the capture side");
+            helper.assertTrue(lease.view().nested(localAnchor) == null, "a null declaration yields no child");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void theStandardCapabilityAccessesAreDirectionTypedAndNullSafe(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(0, 1, 0);
+        helper.setBlock(relative, Blocks.CHEST);
+        BlockPos chestPos = helper.absolutePos(relative);
+        ServerLevel level = helper.getLevel();
+        BlockNestedExtentContext context = new BlockNestedExtentContext(
+            level,
+            chestPos,
+            level.getBlockState(chestPos),
+            level.getBlockEntity(chestPos)
+        );
+        Entity chicken = helper.spawnWithNoFreeWill(EntityType.CHICKEN, new Vec3(2.5, 1.0, 0.5));
+        EntityCapability<NestedExtent, @Nullable Void> voidCapability = EntityCapability
+                .createVoid(ResourceLocation.fromNamespaceAndPath(Constants.modId, "void_nested"), NestedExtent.class);
+
+        helper.assertValueEqual(Direction.class, NestedExtents.BLOCK.contextClass(), "the block context is a side");
+        helper.assertValueEqual(Direction.class, NestedExtents.ENTITY.contextClass(), "the entity context is a side");
+        helper.assertTrue(
+            CapabilityNestedExtentAccesses.block().get(NestedExtents.BLOCK, context, Direction.WEST) == null,
+            "no block provider is registered, so the five-argument query answers null"
+        );
+        helper.assertTrue(
+            CapabilityNestedExtentAccesses.entity().get(NestedExtents.ENTITY, chicken, Direction.WEST) == null,
+            "no entity provider is registered, so the sided query answers null"
+        );
+        helper.assertTrue(
+            CapabilityNestedExtentAccesses.entityVoid().get(voidCapability, chicken, null) == null,
+            "a Void-context capability stays null-safe"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void blockEntityAttachmentProvidesTheNestedExtent(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(0, 1, 0);
+        helper.setBlock(relative, Blocks.CHEST);
+        BlockPos chestPos = helper.absolutePos(relative);
+        LatticePoint anchor = LatticePoint.of(chestPos.getX(), chestPos.getY(), chestPos.getZ());
+        NestedExtent extent = childExtent(anchor, "attachment_block");
+        AttachmentType<String> attachment = attachmentType();
+        FakeAttachmentHolder holder = new FakeAttachmentHolder();
+        holder.setData(attachment, "child");
+        NestedExtentLookup lookup = NestedExtentLookup.builder()
+                .add(
+                    AttachmentNestedExtentProviders.<BlockNestedExtentContext, String>readOnly(
+                        NestedExtentHolders.block,
+                        attachment,
+                        context -> holder,
+                        data -> extent
+                    )
+                ).build();
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+                .capture(new CaptureRequest(cellAround(chestPos), policy(maxElements, 1, false)));
+
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the attachment capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView child = lease.view().nested(anchor);
+            if (child == null) {
+                helper.fail("the attachment extent did not open a child frame");
+                return;
+            }
+            helper.assertValueEqual(extent.origin(), child.origin(), "the child uses the attachment origin");
+            helper.assertValueEqual(1, child.depth(), "the child depth");
+            helper.assertTrue(captured.report().isEmpty(), "an attachment declaration is not a cut");
+            helper.assertValueEqual(0, holder.getDataCalls, "the capture read only existing data");
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void anAbsentAttachmentIsNoChildAndNeverDirtiesTheHolder(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(0, 1, 0);
+        helper.setBlock(relative, Blocks.CHEST);
+        BlockPos chestPos = helper.absolutePos(relative);
+        LatticePoint anchor = LatticePoint.of(chestPos.getX(), chestPos.getY(), chestPos.getZ());
+        AttachmentType<String> attachment = attachmentType();
+        FakeAttachmentHolder holder = new FakeAttachmentHolder();
+        NestedExtentLookup lookup = NestedExtentLookup.builder()
+                .add(
+                    AttachmentNestedExtentProviders.<BlockNestedExtentContext, String>readOnly(
+                        NestedExtentHolders.block,
+                        attachment,
+                        context -> holder,
+                        data -> childExtent(anchor, "absent_attachment")
+                    )
+                ).build();
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+                .capture(new CaptureRequest(cellAround(chestPos), policy(maxElements, 1, false)));
+
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the absent-attachment capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            helper.assertTrue(lease.view().nested(anchor) == null, "absent attachment data yields no child");
+        }
+        helper.assertValueEqual(0, holder.getDataCalls, "the capture never calls getData");
+        helper.assertTrue(!holder.hasAttachments(), "the capture read never creates a default attachment");
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aBlockWithoutABlockEntityNeverReachesAnAttachmentHolder(GameTestHelper helper) {
+        BlockPos chestRelative = new BlockPos(0, 1, 0);
+        helper.setBlock(chestRelative, Blocks.CHEST);
+        BlockPos chestPos = helper.absolutePos(chestRelative);
+        ServerLevel level = helper.getLevel();
+        BlockNestedExtentContext withBlockEntity = new BlockNestedExtentContext(
+            level,
+            chestPos,
+            level.getBlockState(chestPos),
+            level.getBlockEntity(chestPos)
+        );
+        BlockNestedExtentContext withoutBlockEntity = new BlockNestedExtentContext(
+            level,
+            chestPos,
+            level.getBlockState(chestPos),
+            null
+        );
+        AttachmentType<String> attachment = attachmentType();
+        AttachmentNestedExtentProvider<BlockNestedExtentContext, String> provider = AttachmentNestedExtentProviders
+                .readOnly(
+                    NestedExtentHolders.block,
+                    attachment,
+                    AttachmentNestedExtentProviders.blockEntity(),
+                    data -> childExtent(
+                        LatticePoint.of(chestPos.getX(), chestPos.getY(), chestPos.getZ()),
+                        "no_block_entity"
+                    )
+                );
+
+        helper.assertTrue(
+            AttachmentNestedExtentProviders.blockEntity().holder(withBlockEntity) == level.getBlockEntity(chestPos),
+            "the block-entity adapter is the already-read block entity"
+        );
+        helper.assertTrue(
+            AttachmentNestedExtentProviders.blockEntity().holder(withoutBlockEntity) == null,
+            "a null block entity has no attachment holder"
+        );
+        helper.assertTrue(!provider.hasData(withoutBlockEntity), "a null block entity has no attachment data");
+        helper.assertTrue(
+            provider.getExistingDataOrNull(withoutBlockEntity) == null,
+            "a null block entity is absent, never an error"
+        );
+        helper.assertTrue(provider.removeData(withoutBlockEntity) == null, "removing from a null holder answers null");
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void entityAttachmentProvidesTheNestedExtent(GameTestHelper helper) {
+        Entity chicken = helper.spawnWithNoFreeWill(EntityType.CHICKEN, new Vec3(0.5, 2.0, 0.5));
+        AttachmentType<String> attachment = attachmentType();
+        FakeAttachmentHolder holder = new FakeAttachmentHolder();
+        holder.setData(attachment, "child");
+        BlockPos entityPos = chicken.blockPosition();
+        LatticePoint anchor = LatticePoint.of(entityPos.getX(), entityPos.getY(), entityPos.getZ());
+        NestedExtent extent = childExtent(anchor, "attachment_entity");
+        NestedExtentLookup lookup = NestedExtentLookup.builder().add(
+            AttachmentNestedExtentProviders
+                    .<Entity, String>readOnly(NestedExtentHolders.entity, attachment, actual -> holder, data -> extent)
+        ).build();
+        BlockPos base = helper.absolutePos(new BlockPos(0, 1, 0));
+        Cuboid bounds = Cuboid
+                .of(base.getX(), base.getY(), base.getZ(), base.getX() + 1, base.getY() + 3, base.getZ() + 1);
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup)
+                .capture(new CaptureRequest(bounds, policy(maxElements, 1, true)));
+
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the entity-attachment capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            helper.assertTrue(
+                lease.view().nested(anchor) != null,
+                "the entity attachment opens the child at the entity anchor"
+            );
+            helper.assertValueEqual(
+                chicken,
+                AttachmentNestedExtentProviders.entity().holder(chicken),
+                "an entity is its own attachment holder"
+            );
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void readOnlyRejectsWritesAndReadWriteMapsTheHolder(GameTestHelper helper) {
+        AttachmentType<String> attachment = attachmentType();
+        FakeAttachmentHolder holder = new FakeAttachmentHolder();
+        LatticePoint anchor = LatticePoint.of(0, 0, 0);
+        NestedExtent extent = childExtent(anchor, "attachment_write");
+        NestedExtentHolder<String> holderId = NestedExtentHolder.of(NamespacedId.of("test", "attachment_write"));
+        AttachmentNestedExtentProvider<String, String> readOnly = AttachmentNestedExtentProviders
+                .readOnly(holderId, attachment, actual -> holder, data -> extent);
+        AttachmentNestedExtentProvider<String, String> readWrite = AttachmentNestedExtentProviders.readWrite(
+            holderId,
+            attachment,
+            actual -> holder,
+            data -> extent,
+            value -> "raw:" + value.type().text()
+        );
+
+        try {
+            readOnly.setData("subject", extent);
+            helper.fail("a read-only attachment provider accepted a write");
+            return;
+        } catch (UnsupportedOperationException expected) {
+            // expected: read-only providers expose no writer
+        }
+        helper.assertTrue(readWrite.setData("subject", extent) == null, "the first write has no previous value");
+        helper.assertValueEqual(
+            "raw:test:attachment_write",
+            holder.getExistingDataOrNull(attachment),
+            "the writer stored the raw value"
+        );
+        helper.assertValueEqual(extent, readWrite.getExistingDataOrNull("subject"), "the reader maps the stored value");
+        helper.assertValueEqual(extent, readWrite.removeData("subject"), "removal answers the previous extent");
+        helper.assertTrue(holder.getExistingDataOrNull(attachment) == null, "removal clears the attachment");
+        helper.succeed();
+    }
+
+    private static Cuboid cellAround(BlockPos pos) {
+        return Cuboid.of(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1);
+    }
+
+    private static NestedExtent childExtent(LatticePoint anchor, String path) {
+        LatticePoint origin = LatticePoint.of(anchor.x() + 2, anchor.y(), anchor.z() + 2);
+        return new NestedExtent(
+            NamespacedId.of("test", path),
+            Cuboid.of(origin.x(), origin.y(), origin.z(), origin.x() + 1, origin.y() + 1, origin.z() + 1),
+            origin
+        );
+    }
+
+    private static AttachmentType<String> attachmentType() {
+        return AttachmentType.builder(() -> "").build();
+    }
+
+    private static final class FakeAttachmentHolder implements IAttachmentHolder {
+
+        private final Map<AttachmentType<?>, Object> data = new HashMap<>();
+        private int getDataCalls;
+
+        @Override
+        public boolean hasAttachments() {
+            return !data.isEmpty();
+        }
+
+        @Override
+        public boolean hasData(AttachmentType<?> type) {
+            return data.containsKey(type);
+        }
+
+        @Override
+        public <T> T getData(AttachmentType<T> type) {
+            getDataCalls++;
+            T existing = getExistingDataOrNull(type);
+            if (existing != null) {
+                return existing;
+            }
+            throw new AssertionError("the capture must not create a default attachment");
+        }
+
+        @Override
+        public <T> @Nullable T getExistingDataOrNull(AttachmentType<T> type) {
+            @SuppressWarnings("unchecked")
+            T value = (T) data.get(type);
+            return value;
+        }
+
+        @Override
+        public <T> @Nullable T setData(AttachmentType<T> type, T value) {
+            @SuppressWarnings("unchecked")
+            T previous = (T) data.put(type, value);
+            return previous;
+        }
+
+        @Override
+        public <T> @Nullable T removeData(AttachmentType<T> type) {
+            @SuppressWarnings("unchecked")
+            T previous = (T) data.remove(type);
+            return previous;
+        }
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void theHostConfiguredLookupReachesTheServerCapture(GameTestHelper helper) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            helper.fail("server state is not open");
+            return;
+        }
+        BlockPos relative = new BlockPos(0, 1, 0);
+        helper.setBlock(relative, Blocks.CHEST);
+        BlockPos chestPos = helper.absolutePos(relative);
+        LatticePoint anchor = LatticePoint.of(chestPos.getX(), chestPos.getY(), chestPos.getZ());
+        AttachmentType<String> attachment = attachmentType();
+        FakeAttachmentHolder holder = new FakeAttachmentHolder();
+        holder.setData(attachment, "child");
+        NestedExtent extent = childExtent(anchor, "configured_lookup");
+        NestedExtentLookup custom = NestedExtentLookup.builder()
+                .add(
+                    AttachmentNestedExtentProviders.<BlockNestedExtentContext, String>readOnly(
+                        NestedExtentHolders.block,
+                        attachment,
+                        context -> holder,
+                        data -> extent
+                    )
+                ).build();
+        SnapshotPolicy policy = policy(maxElements, 1, false);
+        CaptureRequest request = new CaptureRequest(cellAround(chestPos), policy);
+        try {
+            CaptureResult before = state.capture(helper.getLevel()).capture(request);
+            if (!(before instanceof CaptureResult.Captured beforeCaptured)) {
+                helper.fail("the default-lookup capture failed: " + before);
+                return;
+            }
+            try (SnapshotLease lease = beforeCaptured.lease()) {
+                helper.assertTrue(
+                    lease.view().nested(anchor) == null,
+                    "the default lookup has no attachment provider for the block holder"
+                );
+            }
+
+            state.installNestedExtentLookup(custom);
+
+            CaptureResult installed = state.capture(helper.getLevel()).capture(request);
+            if (!(installed instanceof CaptureResult.Captured installedCaptured)) {
+                helper.fail("the installed-lookup capture failed: " + installed);
+                return;
+            }
+            try (SnapshotLease lease = installedCaptured.lease()) {
+                WorldView child = lease.view().nested(anchor);
+                if (child == null) {
+                    helper.fail("the host-installed lookup did not reach the capture");
+                    return;
+                }
+                helper.assertValueEqual(extent.origin(), child.origin(), "the attachment origin");
+                helper.assertValueEqual(0, holder.getDataCalls, "the capture still only reads existing data");
+            }
+        } finally {
+            state.installNestedExtentLookup(NestedExtentLookup.capabilities());
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void installingAHostLookupInvalidatesAnOpenCaptureLease(GameTestHelper helper) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            helper.fail("server state is not open");
+            return;
+        }
+        ServerLevel level = helper.getLevel();
+        BlockPos relative = new BlockPos(0, 1, 0);
+        helper.setBlock(relative, Blocks.STONE);
+        CaptureRequest request = new CaptureRequest(
+            cellAround(helper.absolutePos(relative)),
+            policy(maxElements, 0, false)
+        );
+        CaptureResult opened = state.capture(level).capture(request);
+        if (!(opened instanceof CaptureResult.Captured captured)) {
+            helper.fail("the capture that should be invalidated failed: " + opened);
+            return;
+        }
+        SnapshotLease stale = captured.lease();
+        helper.assertTrue(stale.isCurrent(), "a fresh server capture lease is current");
+
+        try {
+            state.installNestedExtentLookup(NestedExtentLookup.builder().build());
+            helper.assertTrue(!stale.isCurrent(), "installing a host lookup invalidates the open lease");
+
+            CaptureResult reopened = state.capture(level).capture(request);
+            if (!(reopened instanceof CaptureResult.Captured fresh)) {
+                helper.fail("the capture after installing the lookup failed: " + reopened);
+                return;
+            }
+            try (SnapshotLease lease = fresh.lease()) {
+                helper.assertTrue(lease.isCurrent(), "a capture opened after the install is current");
+            }
+        } finally {
+            state.installNestedExtentLookup(NestedExtentLookup.capabilities());
+        }
+        helper.assertTrue(!stale.isCurrent(), "the old lease stays invalid after restoring the default");
+        stale.close();
+        helper.succeed();
+    }
+
     private static final class FakeLookup {
 
         private final Map<BlockPos, NestedExtent> blocks = new HashMap<>();
@@ -838,28 +1311,28 @@ public final class NestedCaptureGameTest {
         private final Set<BlockPos> throwingBlocks = new HashSet<>();
         private final Set<UUID> throwingEntities = new HashSet<>();
         private final NestedExtentLookup lookup = NestedExtentLookup.builder()
-                .add(new NestedExtentProvider<BlockNestedExtentContext>() {
+                .add(new CapabilityNestedExtentProvider<BlockNestedExtentContext, @Nullable Direction>() {
                     @Override
                     public NestedExtentHolder<BlockNestedExtentContext> holder() {
                         return NestedExtentHolders.block;
                     }
 
                     @Override
-                    public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
+                    public @Nullable NestedExtent get(BlockNestedExtentContext actual, @Nullable Direction context) {
                         blockQueries++;
                         if (throwingBlocks.contains(actual.pos())) {
                             throw new IllegalStateException("fake block provider");
                         }
                         return blocks.get(actual.pos());
                     }
-                }).add(new NestedExtentProvider<Entity>() {
+                }).add(new CapabilityNestedExtentProvider<Entity, @Nullable Direction>() {
                     @Override
                     public NestedExtentHolder<Entity> holder() {
                         return NestedExtentHolders.entity;
                     }
 
                     @Override
-                    public @Nullable NestedExtent get(Entity actual) {
+                    public @Nullable NestedExtent get(Entity actual, @Nullable Direction context) {
                         entityQueries++;
                         if (throwingEntities.contains(actual.getUUID())) {
                             throw new IllegalStateException("fake entity provider");

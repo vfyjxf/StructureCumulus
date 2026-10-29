@@ -28,8 +28,10 @@ public sealed interface StructureEvent {
         }
     }
 
-    record Loaded(List<StructureInstance> instances) implements StructureEvent {
+    /** Replaces one world's restored instances; other worlds are untouched. */
+    record Loaded(World world, List<StructureInstance> instances) implements StructureEvent {
         public Loaded {
+            Objects.requireNonNull(world, "world");
             Objects.requireNonNull(instances, "instances");
             instances = List.copyOf(instances);
         }

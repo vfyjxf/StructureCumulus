@@ -4,11 +4,14 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
 import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
+import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
@@ -50,23 +53,40 @@ import java.util.function.Function;
  * Host orchestration for one placed structure set: presence, links, check-all, settle-all and rollback.
  *
  * <p>The kernel still checks and settles one blueprint at a time; this class sequences those independent
- * attempts under one set-scoped budget. It owns no kernel transaction: a rolled-back structure's
- * published {@code StructureContext} is removed through {@code ContextStore.remove}, and a removal
- * failure is reported as a rollback failure.
+ * attempts under one set-scoped budget. Member commits are deferred until every settle succeeds, so a
+ * failed settlement leaves the previous claim rows and instances in place. Rollback releases claims in
+ * reverse order, invalidates every settled draft or instance through the bound manager, and reports a
+ * cleanup failure as {@code SC-SET-0007}.
  */
 public final class StructureSetHost {
 
     private final StructureKernel kernel;
+    private final StructureManager structures;
+    private final boolean verifyManagerBinding;
 
     public StructureSetHost(StructureKernel kernel) {
+        this(kernel, kernel.structures(), false);
+    }
+
+    /**
+     * Binds the host to the manager its drafts come from. Rollback and commit verification target this
+     * manager, so a caller that uses two managers cannot silently leave the formed contexts behind.
+     */
+    public StructureSetHost(StructureKernel kernel, StructureManager structures) {
+        this(kernel, structures, true);
+    }
+
+    private StructureSetHost(StructureKernel kernel, StructureManager structures, boolean verifyManagerBinding) {
         this.kernel = Objects.requireNonNull(kernel, "kernel");
+        this.structures = Objects.requireNonNull(structures, "structures");
+        this.verifyManagerBinding = verifyManagerBinding;
     }
 
     /**
      * Runs the set in the fixed order of design 09: presence of every satellite, link distance and
      * coverage, the root check, then every present satellite check, then the root and the satellites in
-     * declaration order. Any failure before a settle means no settle; a settle failure releases the
-     * already-settled structures in reverse order.
+     * declaration order. Any failure before a settle means no settle; the commits run only after every
+     * member settles, and a settle failure releases the already-settled members in reverse order.
      */
     public StructureSetResult run(
         StructureSet set,
@@ -75,7 +95,19 @@ public final class StructureSetHost {
         Budget budget,
         Function<StructureSpec, StructureAttempt> drafts
     ) {
-        return run(set, lease, owner, budget, drafts, true);
+        return run(set, lease, owner, budget, structures, drafts, true, verifyManagerBinding);
+    }
+
+    /** Runs with an explicit manager, used when the caller supplies a manager-bound drafts function. */
+    public StructureSetResult run(
+        StructureSet set,
+        SnapshotLease lease,
+        OwnerId owner,
+        Budget budget,
+        StructureManager structures,
+        Function<StructureSpec, StructureAttempt> drafts
+    ) {
+        return run(set, lease, owner, budget, structures, drafts, true, true);
     }
 
     /**
@@ -89,7 +121,19 @@ public final class StructureSetHost {
         Budget budget,
         Function<StructureSpec, StructureAttempt> drafts
     ) {
-        return run(set, lease, owner, budget, drafts, false);
+        return run(set, lease, owner, budget, structures, drafts, false, verifyManagerBinding);
+    }
+
+    /** Checks with an explicit manager binding; no commit or rollback is reached. */
+    public StructureSetResult check(
+        StructureSet set,
+        SnapshotLease lease,
+        OwnerId owner,
+        Budget budget,
+        StructureManager structures,
+        Function<StructureSpec, StructureAttempt> drafts
+    ) {
+        return run(set, lease, owner, budget, structures, drafts, false, true);
     }
 
     private StructureSetResult run(
@@ -97,13 +141,16 @@ public final class StructureSetHost {
         SnapshotLease lease,
         OwnerId owner,
         Budget budget,
+        StructureManager structures,
         Function<StructureSpec, StructureAttempt> drafts,
-        boolean settle
+        boolean settle,
+        boolean verifyBinding
     ) {
         Objects.requireNonNull(set, "set");
         Objects.requireNonNull(lease, "lease");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(budget, "budget");
+        Objects.requireNonNull(structures, "structures");
         Objects.requireNonNull(drafts, "drafts");
         List<Finding> setFindings = new ArrayList<>();
         Map<NamespacedId, MatchOutcome> outcomes = new LinkedHashMap<>();
@@ -117,23 +164,12 @@ public final class StructureSetHost {
             );
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
-        boolean rootCollision = false;
-        for (StructureSet.Satellite satellite : set.satellites()) {
-            if (satellite.siting().equals(set.rootSiting())) {
-                setFindings.add(
-                    problem(
-                        Codes.rootPlacementCollision,
-                        "the satellite " + satellite.id().text() + " is placed exactly on the root",
-                        Locus.world(satellite.presenceCells()),
-                        Phase.check
-                    )
-                );
-                rootCollision = true;
-            }
-        }
-        if (rootCollision) {
+        List<Finding> validation = StructureSet.validate(set);
+        if (hasErrors(validation)) {
+            setFindings.addAll(validation);
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
+        setFindings.addAll(validation);
         WorldView view = lease.view();
         SetBudget setBudget = new SetBudget(budget);
         Map<NamespacedId, Boolean> present = new LinkedHashMap<>();
@@ -157,31 +193,14 @@ public final class StructureSetHost {
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         List<Attempt> attempts = new ArrayList<>();
-        Attempt root = checkOne(
-            set.root(),
-            set.rootSiting(),
-            set.rootBounds(),
-            set.root().id(),
-            lease,
-            owner,
-            setBudget,
-            drafts,
-            setFindings,
-            outcomes
-        );
-        if (root == null) {
-            return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
-        }
-        attempts.add(root);
-        for (StructureSet.Satellite satellite : set.satellites()) {
-            if (!Boolean.TRUE.equals(present.get(satellite.id()))) {
-                continue;
-            }
-            Attempt attempt = checkOne(
-                satellite.blueprint(),
-                satellite.siting(),
-                satellite.worldBounds(),
-                satellite.id(),
+        boolean checkFailed = false;
+        Attempt root;
+        try {
+            root = checkOne(
+                set.root(),
+                set.rootSiting(),
+                set.rootBounds(),
+                set.root().id(),
                 lease,
                 owner,
                 setBudget,
@@ -189,42 +208,107 @@ public final class StructureSetHost {
                 setFindings,
                 outcomes
             );
-            if (attempt == null) {
-                for (Attempt checked : attempts) {
-                    checked.draft().abort();
+            if (root != null) {
+                attempts.add(root);
+                for (StructureSet.Satellite satellite : set.satellites()) {
+                    if (!Boolean.TRUE.equals(present.get(satellite.id()))) {
+                        continue;
+                    }
+                    Attempt attempt = checkOne(
+                        satellite.blueprint(),
+                        satellite.siting(),
+                        satellite.worldBounds(),
+                        satellite.id(),
+                        lease,
+                        owner,
+                        setBudget,
+                        drafts,
+                        setFindings,
+                        outcomes
+                    );
+                    if (attempt == null) {
+                        checkFailed = true;
+                        break;
+                    }
+                    attempts.add(attempt);
                 }
-                return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
             }
-            attempts.add(attempt);
+        } catch (RuntimeException failure) {
+            List<Finding> cleanup = new ArrayList<>();
+            abortFrom(attempts, 0, cleanup);
+            attachCleanup(failure, cleanup);
+            throw failure;
+        }
+        if (root == null || checkFailed) {
+            abortFrom(attempts, 0, rollbackFailures);
+            return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         if (!settle) {
-            for (Attempt attempt : attempts) {
-                attempt.draft().abort();
-            }
+            abortFrom(attempts, 0, rollbackFailures);
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         ClaimLedger ledger = kernel.ledger();
-        List<Attempt> formed = new ArrayList<>();
-        Map<NamespacedId, StructureInstance> instances = new LinkedHashMap<>();
+        @Nullable
+        ClaimSnapshot oldClaims;
+        try {
+            oldClaims = snapshotClaims(ledger, owner, set);
+        } catch (RuntimeException failure) {
+            List<Finding> cleanup = new ArrayList<>();
+            abortFrom(attempts, 0, cleanup);
+            attachCleanup(failure, cleanup);
+            throw failure;
+        }
+        List<Settled> settledMembers = new ArrayList<>();
         for (int index = 0; index < attempts.size(); index++) {
             Attempt attempt = attempts.get(index);
-            MatchResult settleResult = kernel.settle(attempt.request(), attempt.admitted(), attempt.draft());
+            MatchResult settleResult;
+            try {
+                settleResult = kernel.settle(attempt.request(), attempt.admitted(), attempt.draft());
+            } catch (RuntimeException failure) {
+                List<Finding> cleanup = new ArrayList<>();
+                List<Attempt> rollbackMembers = attemptsOf(settledMembers);
+                rollbackMembers.add(attempt);
+                rollbackAttempts(rollbackMembers, Map.of(), owner, ledger, rolledBack, cleanup);
+                abortFrom(attempts, index + 1, cleanup);
+                restoreOldClaims(ledger, owner, oldClaims, rollbackMembers, cleanup);
+                attachCleanup(failure, cleanup);
+                throw failure;
+            }
             if (settleResult instanceof MatchResult.Formed formedResult) {
-                StructureInstance instance = attempt.draft().commit(attempt.worldBounds().asSet());
-                instances.put(attempt.key(), instance);
-                settled.add(attempt.key());
-                formed.add(attempt);
                 setFindings.addAll(formedResult.findings().findings());
+                settled.add(attempt.key());
                 claims.put(attempt.key(), claimsOf(formedResult, attempt.blueprint(), owner));
+                settledMembers.add(new Settled(attempt, formedResult));
                 continue;
             }
-            attempt.draft().abort();
-            for (int remaining = index + 1; remaining < attempts.size(); remaining++) {
-                attempts.get(remaining).draft().abort();
-            }
             setFindings.addAll(settleResult.findings().findings());
-            rollback(formed, instances, owner, ledger, rolledBack, rollbackFailures);
+            List<Attempt> rollbackMembers = attemptsOf(settledMembers);
+            rollbackAttempts(rollbackMembers, Map.of(), owner, ledger, rolledBack, rollbackFailures);
+            abortFrom(attempts, index, rollbackFailures);
+            restoreOldClaims(ledger, owner, oldClaims, rollbackMembers, rollbackFailures);
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
+        }
+        Map<NamespacedId, StructureInstance> instances = new LinkedHashMap<>();
+        List<StructureInstance> committed = new ArrayList<>();
+        try {
+            for (Settled member : settledMembers) {
+                StructureInstance instance = member.attempt().draft().commit(member.attempt().worldBounds().asSet());
+                if (verifyBinding && structures.find(instance.id()) == null) {
+                    throw new IllegalStateException(
+                        "the drafts function committed " + member.attempt().key().text()
+                                + " into a manager other than this host's manager"
+                    );
+                }
+                instances.put(member.attempt().key(), instance);
+                committed.add(instance);
+            }
+        } catch (RuntimeException failure) {
+            List<Finding> cleanup = new ArrayList<>();
+            List<Attempt> rollbackMembers = attemptsOf(settledMembers);
+            rollbackAttempts(rollbackMembers, instances, owner, ledger, rolledBack, cleanup);
+            restoreOldClaims(ledger, owner, oldClaims, rollbackMembers, cleanup);
+            attachCleanup(failure, cleanup);
+            throw failure;
         }
         return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
     }
@@ -260,28 +344,38 @@ public final class StructureSetHost {
         @Nullable
         ClaimView claims = ledger == null ? null : ledger.read(worldBounds);
         StructureAttempt draft = drafts.apply(new StructureSpec(owner, siting, blueprint.id()));
-        MatchRequest request = MatchRequest.of(blueprint, siting, lease, draft.id(), owner, budget.remaining(), claims);
-        MatchResult checked = kernel.check(request);
-        if (checked instanceof MatchResult.Admitted admitted) {
-            outcomes.put(key, admitted.outcome());
-            budget.spend(admitted.outcome().spend());
-            return new Attempt(key, blueprint, siting, worldBounds, request, admitted, draft);
+        try {
+            MatchRequest request = MatchRequest
+                    .of(blueprint, siting, lease, draft.id(), owner, budget.remaining(), claims);
+            MatchResult checked = kernel.check(request);
+            if (checked instanceof MatchResult.Admitted admitted) {
+                outcomes.put(key, admitted.outcome());
+                budget.spend(admitted.outcome().spend());
+                return new Attempt(key, blueprint, siting, worldBounds, request, admitted, draft);
+            }
+            draft.abort();
+            setFindings.addAll(checked.findings().findings());
+            return null;
+        } catch (RuntimeException failure) {
+            try {
+                draft.abort();
+            } catch (RuntimeException cleanup) {
+                failure.addSuppressed(cleanup);
+            }
+            throw failure;
         }
-        draft.abort();
-        setFindings.addAll(checked.findings().findings());
-        return null;
     }
 
-    private void rollback(
-        List<Attempt> formed,
+    private void rollbackAttempts(
+        List<Attempt> members,
         Map<NamespacedId, StructureInstance> instances,
         OwnerId owner,
         @Nullable ClaimLedger ledger,
         List<NamespacedId> rolledBack,
         List<Finding> rollbackFailures
     ) {
-        for (int index = formed.size() - 1; index >= 0; index--) {
-            Attempt attempt = formed.get(index);
+        for (int index = members.size() - 1; index >= 0; index--) {
+            Attempt attempt = members.get(index);
             if (ledger == null) {
                 // A Formed structure without a ledger wrote no rows; nothing is left to release.
                 rolledBack.add(attempt.key());
@@ -300,16 +394,123 @@ public final class StructureSetHost {
                 }
             }
             StructureInstance instance = instances.get(attempt.key());
-            if (instance != null) {
-                try {
-                    kernel.structures().onEvent(new StructureEvent.Broken(instance.id()));
-                } catch (RuntimeException failure) {
-                    rollbackFailures.add(
-                        rollbackFailure(attempt, "the structure context could not be removed: " + detail(failure))
-                    );
-                }
+            InstanceId contextId = instance == null ? attempt.draft().id() : instance.id();
+            try {
+                structures.onEvent(new StructureEvent.Broken(contextId));
+            } catch (RuntimeException failure) {
+                rollbackFailures.add(
+                    rollbackFailure(attempt, "the structure context could not be removed: " + detail(failure))
+                );
             }
         }
+    }
+
+    private static List<Attempt> attemptsOf(List<Settled> members) {
+        List<Attempt> attempts = new ArrayList<>(members.size());
+        for (Settled member : members) {
+            attempts.add(member.attempt());
+        }
+        return attempts;
+    }
+
+    private void abortFrom(List<Attempt> attempts, int from, List<Finding> rollbackFailures) {
+        for (int index = from; index < attempts.size(); index++) {
+            Attempt attempt = attempts.get(index);
+            try {
+                attempt.draft().abort();
+            } catch (RuntimeException failure) {
+                rollbackFailures
+                        .add(rollbackFailure(attempt, "the draft context could not be removed: " + detail(failure)));
+            }
+        }
+    }
+
+    private static @Nullable ClaimSnapshot snapshotClaims(
+        @Nullable ClaimLedger ledger,
+        OwnerId owner,
+        StructureSet set
+    ) {
+        if (ledger == null) {
+            return null;
+        }
+        Map<Siting, List<ClaimRow>> rows = new LinkedHashMap<>();
+        collectClaims(ledger, owner, set.rootSiting(), set.rootBounds(), rows);
+        for (StructureSet.Satellite satellite : set.satellites()) {
+            collectClaims(ledger, owner, satellite.siting(), satellite.worldBounds(), rows);
+        }
+        return new ClaimSnapshot(rows);
+    }
+
+    private static void collectClaims(
+        ClaimLedger ledger,
+        OwnerId owner,
+        Siting siting,
+        Cuboid bounds,
+        Map<Siting, List<ClaimRow>> rows
+    ) {
+        List<ClaimRow> old = rows.computeIfAbsent(siting, ignored -> new ArrayList<>());
+        ClaimView view = ledger.read(bounds);
+        for (ClaimRow row : view.rows()) {
+            if (row.owner().equals(owner) && row.siting().equals(siting)) {
+                old.add(row);
+            }
+        }
+    }
+
+    private void restoreOldClaims(
+        @Nullable ClaimLedger ledger,
+        OwnerId owner,
+        @Nullable ClaimSnapshot snapshot,
+        List<Attempt> members,
+        List<Finding> rollbackFailures
+    ) {
+        if (ledger == null || snapshot == null) {
+            return;
+        }
+        for (Attempt member : members) {
+            List<ClaimRow> rows = snapshot.rows().get(member.siting());
+            if (rows == null || rows.isEmpty()) {
+                continue;
+            }
+            restoreOne(ledger, owner, member, rows, rollbackFailures);
+        }
+    }
+
+    private void restoreOne(
+        ClaimLedger ledger,
+        OwnerId owner,
+        Attempt attempt,
+        List<ClaimRow> rows,
+        List<Finding> rollbackFailures
+    ) {
+        for (int retry = 0; retry < 3; retry++) {
+            try {
+                long revision = ledger.read(Cuboid.of(rows.get(0).cell().point())).revision();
+                ClaimVerdict verdict = ledger.settle(new SettleRequest(owner, attempt.siting(), rows, revision));
+                if (verdict instanceof ClaimVerdict.Settled) {
+                    return;
+                }
+                if (verdict instanceof ClaimVerdict.RevisionMoved) {
+                    continue;
+                }
+                rollbackFailures.add(rollbackFailure(attempt, "the previous claim rows could not be restored"));
+                return;
+            } catch (RuntimeException failure) {
+                rollbackFailures.add(
+                    rollbackFailure(attempt, "the previous claim rows could not be restored: " + detail(failure))
+                );
+                return;
+            }
+        }
+        rollbackFailures.add(rollbackFailure(attempt, "the previous claim rows could not be restored"));
+    }
+
+    private static void attachCleanup(RuntimeException failure, List<Finding> cleanup) {
+        if (cleanup.isEmpty()) {
+            return;
+        }
+        IllegalStateException cleanupFailure = new IllegalStateException("cleanup reported " + cleanup);
+        failure.addSuppressed(cleanupFailure);
     }
 
     private static String detail(RuntimeException failure) {
@@ -544,6 +745,10 @@ public final class StructureSetHost {
         MatchResult.Admitted admitted,
         StructureAttempt draft
     ) {}
+
+    private record Settled(Attempt attempt, MatchResult.Formed result) {}
+
+    private record ClaimSnapshot(Map<Siting, List<ClaimRow>> rows) {}
 
     private enum PresenceState {
         present, absent, unknown

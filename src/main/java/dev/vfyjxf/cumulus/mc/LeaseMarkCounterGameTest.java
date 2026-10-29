@@ -10,11 +10,11 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext;
+import dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentProvider;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
-import dev.vfyjxf.cumulus.mc.capability.NestedExtentProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -484,17 +484,21 @@ public final class LeaseMarkCounterGameTest {
     private record FakeLookup(Map<BlockPos, NestedExtent> blocks) {
 
         private NestedExtentLookup lookup() {
-            return NestedExtentLookup.builder().add(new NestedExtentProvider<BlockNestedExtentContext>() {
-                @Override
-                public NestedExtentHolder<BlockNestedExtentContext> holder() {
-                    return NestedExtentHolders.block;
-                }
+            return NestedExtentLookup.builder()
+                    .add(new CapabilityNestedExtentProvider<BlockNestedExtentContext, @Nullable Direction>() {
+                        @Override
+                        public NestedExtentHolder<BlockNestedExtentContext> holder() {
+                            return NestedExtentHolders.block;
+                        }
 
-                @Override
-                public @Nullable NestedExtent get(BlockNestedExtentContext actual) {
-                    return blocks.get(actual.pos());
-                }
-            }).build();
+                        @Override
+                        public @Nullable NestedExtent get(
+                            BlockNestedExtentContext actual,
+                            @Nullable Direction context
+                        ) {
+                            return blocks.get(actual.pos());
+                        }
+                    }).build();
         }
     }
 }
