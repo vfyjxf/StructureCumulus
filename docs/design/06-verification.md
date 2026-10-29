@@ -235,12 +235,12 @@ custom nested focus now fails at build with `SC-BPT-0005`
 (`NestedCoverageScenarioTest.nestedAnySubjectBoundBodyFailsBuild`). The runtime `SC-CLM-0004` path
 stays covered by `ReadModelTest` and `NestedCoverageScenarioTest.aChildFrameOccupantIsRejectedAtCheck`.
 
-**NOTAIR classification (D-39).** `Expectations.empty()` matches air or a vanilla fluid block and
-`Expectations.nonFluid()` matches every non-fluid occupant; a NOTAIR slot uses `not(empty())`.
-`BloodAltarScenarioTest.waterInANotAirSlotIsRejected` now fails water with `SC-EXP-0002`, and
+**NOTAIR and fluid leaves (D-39).** `Expectations.empty()` matches air or a vanilla fluid block and
+`Expectations.nonFluid()` matches every non-fluid occupant. `NOTAIR` is `not(air())`, so water is a
+non-air occupant and is admitted; `BloodAltarScenarioTest.waterInANotAirSlotIsAdmitted` asserts that.
 `BloodAltarScenarioTest.emptyAndNonFluidClassifyAirWaterLavaAndStone` covers air/water/lava/stone for
-both leaves. The kernel classifies by the vanilla block type; a waterlogged block is not a fluid
-occupant at this layer. `anyOccupant` is unchanged.
+both explicit leaves. The kernel classifies by the vanilla block type; a waterlogged block is not a
+fluid occupant at this layer. `anyOccupant` is unchanged.
 
 **Release granularity (D-38).** `ClaimLedger.release(owner, siting)` deletes every row of the
 `(owner, siting)` key; there is no per-bay or per-row release. One siting is one instance, and a

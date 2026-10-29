@@ -893,7 +893,7 @@ and keeps the ledger's compare-and-set model simple.
 settle the new row set instead. The record set is now 38 decisions (D-38). **Status:** decided; the
 existing `SavedClaimsLifecycleTest` cases characterize the whole-key and duplicate-row behavior.
 
-### D-39 — Empty and non-fluid expectations for NOTAIR slots
+### D-39 — Empty and non-fluid expectations
 
 `anyOccupant` deliberately matches every occupant, including air; it is a "the read succeeded" leaf,
 not a NOTAIR test. D-39 adds two kernel leaves:
@@ -902,18 +902,22 @@ not a NOTAIR test. D-39 adds two kernel leaves:
 - `Expectations.nonFluid()` matches any occupant that is not one of those fluid blocks (air is
   non-fluid).
 
-A NOTAIR slot uses `not(empty())`: air, water and lava are rejected, while a solid block or an entity
-passes. The kernel `OccupantSnapshot` has no separate fluid state; the classification is by the
-vanilla fluid block type. A waterlogged block remains a solid block occupant at the kernel level and
-is not classified as a fluid; a host `fluid` expectation can read the captured fluid state.
+`NOTAIR` is exactly `not(air())`: water and lava are non-air and pass, while air fails. `empty()` and
+`nonFluid()` are separate opt-in leaves for slots whose real rule is "no air and no fluid" or "no
+fluid"; they do not redefine `NOTAIR`. The kernel `OccupantSnapshot` has no separate fluid state; the
+classification is by the vanilla fluid block type. A waterlogged block remains a solid block occupant
+at the kernel level and is not classified as a fluid; a host `fluid` expectation can read the captured
+fluid state.
 
-**Why:** `anyOccupant` cannot express "not air and not a fluid", and the altar test used it for a
-NOTAIR probe. Two small leaves keep `anyOccupant` honest and give the slot an exact test without a
-new finding code (the leaves use `SC-EXP-0001`/the `not` wrapper's `SC-EXP-0002`).
+**Why:** `anyOccupant` cannot express "not air" by itself, and the altar test had conflated `NOTAIR`
+with "no fluid". `not(air())` is the exact NOTAIR test; `empty`/`nonFluid` remain available for slots
+that genuinely need a fluid rule. No new finding code is introduced (the leaves use `SC-EXP-0001`/the
+`not` wrapper's `SC-EXP-0002`).
 
-**Consequence:** `BloodAltarScenarioTest` now rejects water in its NOTAIR slot; `empty` and `nonFluid`
-have direct classification tests. `Codes.all` is unchanged. The record set is now 39 decisions
-(D-39). **Status:** implemented; kernel tests, full `check` and 71/71 GameTests are green.
+**Consequence:** `BloodAltarScenarioTest` admits water in its NOTAIR slot (water is not air);
+`empty` and `nonFluid` have direct classification tests. `Codes.all` is unchanged. The record set is
+now 39 decisions (D-39). **Status:** implemented; kernel tests, full `check` and 71/71 GameTests are
+green.
 
 ## 3. Consequences a reviewer should attack
 

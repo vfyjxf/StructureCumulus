@@ -494,10 +494,11 @@ check that binds it through `Focuses.occupant` fails at claim prediction with `S
 
 `Expectations.empty()` matches air or a vanilla fluid block (`minecraft:water`/`minecraft:lava`);
 `Expectations.nonFluid()` matches every occupant that is not one of those fluid blocks (air is
-non-fluid). A NOTAIR slot is `not(empty())`: it rejects air, water and lava, and accepts a solid block
-or an entity. `anyOccupant` remains the "any readable occupant, including air" leaf. The kernel
-classifies fluids by the vanilla block type; a waterlogged block is a solid block occupant, and a host
-`fluid` expectation reads its captured fluid state instead.
+non-fluid). `NOTAIR` is exactly `not(air())`: water and lava are non-air and pass, while air fails.
+`empty` and `nonFluid` are opt-in leaves for slots whose real rule is "no air and no fluid" or "no
+fluid"; they do not redefine `NOTAIR`. `anyOccupant` remains the "any readable occupant, including
+air" leaf. The kernel classifies fluids by the vanilla block type; a waterlogged block is a solid
+block occupant, and a host `fluid` expectation reads its captured fluid state instead.
 
 ### 4.5 Read scope
 

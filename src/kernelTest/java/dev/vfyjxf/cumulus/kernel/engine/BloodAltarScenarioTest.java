@@ -137,15 +137,14 @@ class BloodAltarScenarioTest {
     }
 
     @Test
-    @DisplayName("not(empty) rejects water in a NOTAIR slot")
-    void waterInANotAirSlotIsRejected() {
+    @DisplayName("water is not air, so it satisfies a NOTAIR slot")
+    void waterInANotAirSlotIsAdmitted() {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
         TestWorld.View view = prefixView(siting);
         MagicFixtures.put(view, siting, notAir, water);
         MatchResult checked = MagicFixtures
                 .check(notAirBlueprint("blood/not_air_water"), siting, view, new ClaimView(List.of(), 0, true));
-        MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, checked, "water is not a NOTAIR slot");
-        assertTrue(MagicFixtures.hasCode(failed, Codes.negationMatched), "not(empty) reports SC-EXP-0002");
+        assertAdmitted(checked);
     }
 
     @Test
@@ -301,7 +300,7 @@ class BloodAltarScenarioTest {
                 MagicFixtures.id(path + "_not_air"),
                 bay,
                 Focuses.occupant(notAir),
-                Expectations.not(Expectations.empty())
+                Expectations.not(Expectations.air())
             )
         );
         return builder.build();
