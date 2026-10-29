@@ -2,14 +2,18 @@ package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
 import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.space.Siting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -174,6 +178,7 @@ public final class WatchEvents {
             for (StructureInstance instance : manager.findAt(cell)) {
                 if (seen.add(instance.id())) {
                     dispatch(manager, new StructureEvent.Broken(instance.id()));
+                    release(level, instance);
                 }
             }
         }
@@ -191,6 +196,7 @@ public final class WatchEvents {
             for (StructureInstance instance : manager.findAt(cell)) {
                 if (seen.add(instance.id())) {
                     dispatch(manager, new StructureEvent.Invalidated(instance.id(), reason));
+                    release(level, instance);
                 }
             }
         }
@@ -253,6 +259,7 @@ public final class WatchEvents {
             Cuboid claimBounds = instance.bounds().bounds();
             if (claimBounds == null) {
                 dispatch(manager, new StructureEvent.Invalidated(instance.id(), "the structure has no bounds"));
+                release(level, instance);
                 continue;
             }
             ClaimView claims = state.claims(level).read(claimBounds);
@@ -275,17 +282,73 @@ public final class WatchEvents {
                     manager,
                     new StructureEvent.Invalidated(instance.id(), "a piston moved only part of the structure")
                 );
+                release(level, instance);
                 continue;
             }
-            dispatch(
-                manager,
-                new StructureEvent.Moved(
-                    instance.id(),
-                    instance.siting(),
-                    instance.siting().withOrigin(movedOrigin),
-                    movedBounds
-                )
-            );
+            Siting movedSiting = instance.siting().withOrigin(movedOrigin);
+            if (!moveClaims(level, instance, movedSiting, dx, dy, dz)) {
+                dispatch(manager, new StructureEvent.Invalidated(instance.id(), "the moved claims conflict"));
+                release(level, instance);
+                continue;
+            }
+            dispatch(manager, new StructureEvent.Moved(instance.id(), instance.siting(), movedSiting, movedBounds));
+        }
+    }
+
+    private static boolean moveClaims(
+        ServerLevel level,
+        StructureInstance instance,
+        Siting to,
+        int dx,
+        int dy,
+        int dz
+    ) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            return false;
+        }
+        Cuboid oldBounds = instance.bounds().bounds();
+        if (oldBounds == null) {
+            return true;
+        }
+        SavedClaims ledger = state.claims(level);
+        ClaimView old = ledger.read(oldBounds);
+        List<ClaimRow> moved = new ArrayList<>();
+        for (ClaimRow row : old.rows()) {
+            if (!row.owner().equals(instance.owner()) || !row.siting().equals(instance.siting())) {
+                continue;
+            }
+            LatticePoint cell = row.cell().point();
+            LatticePoint next = cell.offset(dx, dy, dz);
+            if (next == null) {
+                return false;
+            }
+            moved.add(new ClaimRow(LatticeKey.of(next), row.sharing(), row.owner(), to, row.bay()));
+        }
+        if (moved.isEmpty()) {
+            return true;
+        }
+        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance.owner(), to, moved, ledger.revision()));
+        if (!(verdict instanceof ClaimVerdict.Settled)) {
+            return false;
+        }
+        try {
+            ledger.release(instance.owner(), instance.siting());
+        } catch (RuntimeException failure) {
+            StructureCumulus.logger.warn("claim release for moved structure {} failed", instance.id(), failure);
+        }
+        return true;
+    }
+
+    private static void release(ServerLevel level, StructureInstance instance) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            return;
+        }
+        try {
+            state.claims(level).release(instance.owner(), instance.siting());
+        } catch (RuntimeException failure) {
+            StructureCumulus.logger.warn("claim release for {} failed", instance.id(), failure);
         }
     }
 

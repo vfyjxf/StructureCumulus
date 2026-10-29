@@ -295,8 +295,10 @@ its draft context, then `commit(bounds)`; a failed attempt calls `abort()`. The 
 the narrow publish/read interface implemented by the manager and the attempt.
 
 `WatchEvents` dispatches the host lifecycle: a player break or explosion inside a structure's bounds
-is `Broken`; a placement is `Invalidated`; a piston that moves the whole claimed structure is `Moved`
-and a partial move/destroy is `Invalidated`; a level unload is `Unloaded`. `Loaded` exists for a host
+is `Broken` and releases the claim rows; a placement is `Invalidated` and releases the rows; a piston
+that moves the whole claimed structure is `Moved`, translates the claim rows and invalidates on a
+conflict; a partial move/destroy is `Invalidated` and releases the rows; a level unload is
+`Unloaded`. `Loaded` exists for a host
 that restores its own instances, but this adapter has no persisted instances to restore. A manager
 rejects an event that would create a duplicate `(owner, siting)`; `Broken`/`Invalidated` are
 idempotent.

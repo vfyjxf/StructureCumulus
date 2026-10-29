@@ -133,7 +133,8 @@ The host supplies the world-frame `bounds`; the manager never interprets them. T
   captured cells);
 - a piston that moves only part of the structure, or destroys a bound cell, dispatches `Invalidated`;
 - a piston that moves every claimed non-air cell by one direction dispatches `Moved` with the
-  translated bounds and siting;
+  translated bounds and siting; the adapter translates the claim rows to the new siting, and if the
+  new claims conflict it dispatches `Invalidated` and releases the old rows;
 - a level unload dispatches `Unloaded(world)`;
 - a host that restores its own instances dispatches `Loaded(instances)`.
 

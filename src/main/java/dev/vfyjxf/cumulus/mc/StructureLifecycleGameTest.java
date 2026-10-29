@@ -1,6 +1,9 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
+import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
+import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
@@ -9,6 +12,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
@@ -26,6 +30,8 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.jspecify.annotations.NullMarked;
+
+import java.util.List;
 
 /** The adapter dispatches the host lifecycle events into the per-level structure manager. */
 @NullMarked
@@ -48,12 +54,23 @@ public final class StructureLifecycleGameTest {
         StructureManager manager = state.structures(level);
         StructureInstance instance = instance(manager, state, level, pos);
         helper.setBlock(BlockPos.ZERO, Blocks.STONE);
+        SavedClaims ledger = state.claims(level);
+        LatticePoint point = LatticePoint.of(pos.getX(), pos.getY(), pos.getZ());
+        ledger.settle(
+            new SettleRequest(
+                owner,
+                Siting.of(point, Orientation.identity),
+                List.of(new ClaimRow(LatticeKey.of(point), Sharing.exclusive, owner, instance.siting(), blueprint)),
+                ledger.revision()
+            )
+        );
 
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
         BlockState broken = Blocks.STONE.defaultBlockState();
         WatchEvents.blockBroken(new BlockEvent.BreakEvent(level, pos, broken, player));
 
         helper.assertTrue(manager.find(instance.id()) == null, "the broken structure is removed");
+        helper.assertTrue(ledger.read(Cuboid.of(point)).rows().isEmpty(), "the broken structure releases its claims");
         helper.succeed();
     }
 
