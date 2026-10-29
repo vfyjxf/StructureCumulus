@@ -135,6 +135,14 @@ def extract_decisions() -> None:
             paragraph = ("Twenty-four old questions are answered by deletion: no predicate/blueprint "
                          "cycle, no stage carrier, one ReadScope, one Coverage, one publication, one "
                          "conflict rule, one code table. The full table is in docs/design/05-decisions.md.")
+        if ident == "D-36":
+            paragraph = ("The nested-extent seam is now generic per holder: NestedExtentHolder<H> and "
+                         "NestedExtentHolders.block/entity name the subject, NestedExtentProvider<H> is "
+                         "one get(actual) provider, NestedExtentLookup is the immutable registry, and one "
+                         "CapabilityNestedExtentProvider<H, C> covers both capability signatures through "
+                         "NestedExtentAccesses.block()/entity(); NestedExtentProviders.block/entity are "
+                         "the standard declarations. The old aggregate mc.NestedExtentLookup and "
+                         "CapabilityLookup are deleted. See docs/design/05-decisions.md.")
         if not paragraph:
             paragraph = f"{title}. See docs/design/05-decisions.md."
         items.append({"id": ident, "title": title, "summary": paragraph})

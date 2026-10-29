@@ -31,6 +31,8 @@ const FALSIFIERS = [
   { claim: 'A set command writes nothing on check and the claims on settle', gate: 'setCheckWritesNothingAndSetSettleWritesTheClaims', detail: 'the built-in structurecumulus:set_demo over the dispatcher' },
   { claim: 'A satellite placed exactly on the root is rejected', gate: 'aSatellitePlacedExactlyOnTheRootIsRejected', detail: 'SC-SET-0008 in the compiler, StructureSet.place and the host' },
   { claim: 'Presence and every member attempt share one set budget', gate: 'presenceAndEveryStructureAttemptShareOneBudgetCeiling', detail: 'presence (1) + root (1) + satellite (1) under Budget 3' },
+  { claim: 'A hand-built set on the root siting is rejected before presence', gate: 'aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence', detail: 'real-level GameTest: SC-SET-0008, no outcome, instance, row or revision' },
+  { claim: 'A one-cell set budget leaves the root check undecided', gate: 'aOneCellSetBudgetLeavesTheRootCheckUndecided', detail: 'real-level GameTest: presence takes the cell; the root is Undecided (SC-ENG-0001)' },
   { claim: 'A set rollback removes every formed context', gate: 'rollbackRemovesTheKernelContextOfEveryFormedAttempt', detail: 'claims released and ContextStore.remove called' },
   { claim: 'A failed context removal is SC-SET-0007 and does not stop the other rollbacks', gate: 'aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals', detail: 'the release verdict does not skip ContextStore.remove' },
   { claim: 'An envelope-only blueprint gets one derived bay and check', gate: 'anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck', detail: 'D-30; an empty set is a no-op' },
@@ -51,6 +53,8 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
   setCheckWritesNothingAndSetSettleWritesTheClaims: { claim: 'set 命令 check 不写，settle 写 claims', detail: 'dispatcher 上的内置 structurecumulus:set_demo' },
   aSatellitePlacedExactlyOnTheRootIsRejected: { claim: '正好落在 root 上的 satellite 会被拒绝', detail: 'compiler、StructureSet.place 和 host 都报 SC-SET-0008' },
   presenceAndEveryStructureAttemptShareOneBudgetCeiling: { claim: 'presence 和每个成员 attempt 共享一个 set budget', detail: 'Budget 3 下 presence (1) + root (1) + satellite (1)' },
+  aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence: { claim: '手写 set 的 satellite 若与 root 同 siting，会在 presence 前被拒绝', detail: '真实 level GameTest：SC-SET-0008，没有 outcome、instance、row 或 revision' },
+  aOneCellSetBudgetLeavesTheRootCheckUndecided: { claim: '一格 set budget 会让 root check 变成 undecided', detail: '真实 level GameTest：presence 用掉唯一一格，root 是 Undecided（SC-ENG-0001）' },
   rollbackRemovesTheKernelContextOfEveryFormedAttempt: { claim: 'set rollback 移除每个已形成的 context', detail: 'claims 释放并调用 ContextStore.remove' },
   aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals: { claim: 'removal 失败是 SC-SET-0007，且不阻断其余 rollback', detail: 'release verdict 不会跳过 ContextStore.remove' },
   anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck: { claim: '只有 envelope 的 blueprint 得到一个推导 bay 和 check', detail: 'D-30；空集合是 no-op' },
@@ -107,7 +111,7 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、261 个 kernel 测试（39 个 container）、292 个 adapter 单元测试（37 个 container）、69 个 GameTests、65 个 code、35 条决策。adapter 已实现到 H1–H4、T1–T3 和 S5/S6 的 set 收束：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次 union capture、内置 set_demo）和 <code>SC-SET-0008</code>/<code>ContextStore.remove</code>/共享 set budget（D-35）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在 <code>58e97b8</code> 都是绿的。剩下 performance/cost pass 和新的 review screenshots。</> : <>Six gates, 261 kernel tests in 39 containers, 292 adapter unit tests in 37 containers, 69 GameTests, 65 codes and 35 decisions. The adapter is implemented through H1–H4, T1–T3 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one union capture, the built-in set_demo) and <code>SC-SET-0008</code>/<code>ContextStore.remove</code>/one shared set budget (D-35). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green at <code>58e97b8</code>. Pending only a performance/cost pass and fresh review screenshots.</>}
+        note={zh ? <>六道 gate、261 个 kernel 测试（39 个 container）、296 个 adapter 单元测试（37 个 container）、71 个 GameTests、65 个 code、36 条决策（D-36）。adapter 已实现到 H1–H4、T1–T3、N1 和 S5/S6：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次不带 orientation、也不做 orientation audit 的 union capture、内置 set_demo）、<code>SC-SET-0008</code>/<code>ContextStore.remove</code>/共享 set budget（D-35）和按 holder 泛型的 nested-extent lookup（D-36；旧的 <code>mc.NestedExtentLookup</code> 与 <code>CapabilityLookup</code> 已删除）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在 <code>f84dba8</code> 都是绿的（71/71）。剩下 performance/cost pass 和新的 review screenshots。</> : <>Six gates, 261 kernel tests in 39 containers, 296 adapter unit tests in 37 containers, 71 GameTests, 65 codes and 36 decisions (D-36). The adapter is implemented through H1–H4, T1–T3, N1 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one unsited union capture with no orientation audit, the built-in set_demo), <code>SC-SET-0008</code>/<code>ContextStore.remove</code>/one shared set budget (D-35) and the generic per-holder nested-extent lookup (D-36; the old <code>mc.NestedExtentLookup</code> and <code>CapabilityLookup</code> are deleted). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green at <code>f84dba8</code> (71/71). Pending only a performance/cost pass and fresh review screenshots.</>}
       />
 
       <Reveal>
@@ -136,7 +140,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '39 个 JUnit container · adapter 292 / 37 个 container · GameTests 69/69' : '39 JUnit containers · adapter 292 / 37 containers · GameTests 69/69'}
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '39 个 JUnit container · adapter 296 / 37 个 container · GameTests 71/71' : '39 JUnit containers · adapter 296 / 37 containers · GameTests 71/71'}
               </div>
             </div>
           </div>
@@ -149,7 +153,7 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green at 58e97b8; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 69/69 (through S6).</div>
+            <div className="warn">check: ./gradlew check is green at f84dba8; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 71/71 (through N1 and S6).</div>
             <div style={{ height: 14 }} />
             <div className="cmd">{zh ? '下一个攻击点：performance/cost pass，以及新的 review screenshots。' : 'Next attack: a performance/cost pass and fresh review screenshots.'}</div>
           </div>
@@ -159,7 +163,7 @@ export function Proof() {
       <Reveal delay={40}>
         <div style={{ marginTop: 26 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <div className="eyebrow">{zh ? '当前已实现的层 / D-30 … D-35' : 'Current implemented layers / D-30 … D-35'}</div>
+            <div className="eyebrow">{zh ? '当前已实现的层 / D-30 … D-36' : 'Current implemented layers / D-30 … D-36'}</div>
             <div className="mono muted">{zh ? 'host 层与 kernel 的边界' : 'the host boundary around the kernel'}</div>
           </div>
           <div className="gate-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>

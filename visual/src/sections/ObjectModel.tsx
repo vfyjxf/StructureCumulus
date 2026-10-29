@@ -65,7 +65,7 @@ const ZH_CHAIN: Record<string, { role: string; detail: string; side: string }> =
   world: {
     role: '一个不可变读取面',
     detail: 'world 不是可变 level。它是一个冻结的递归 view：snapshot id、frame、section 网格，以及一个只回答“它还 current 吗？”的 lease。',
-    side: '嵌套 view 是同一个类型，只是 frame 不同。section key 只回答自己的 frame。',
+    side: '嵌套 view 是同一个类型，只是 frame 不同。HostType 读取一份快照；descriptor 是 (type, kind)，不携带 properties 或 tags。',
   },
   bay: {
     role: '带 coverage 和 footprint 的 cells',
@@ -183,12 +183,13 @@ export function ObjectModel() {
               <div><span className="k">bridge</span><span className="v">Expectations.host</span></div>
               <div><span className="k">descriptor</span><span className="v">(type, kind)</span></div>
               <div><span className="k">traits</span><span className="v">TraitProvider&lt;T, H&gt;</span></div>
+              <div><span className="k">nested</span><span className="v">NestedExtentLookup</span></div>
               <div><span className="k">D-29</span><span className="v">{zh ? '已被取代' : 'superseded'}</span></div>
             </div>
             <p style={{ marginTop: 10 }}>
               {zh
-                ? <>一份不可变快照、多种类型化读取。descriptor 不再有 properties/tags；property、state、tag、fluid 是 adapter 在 <code>Expectations.host</code> 上的 leaf。capability trait 直接返回 <code>IItemHandler</code> / <code>IEnergyStorage</code> / <code>IFluidHandler</code>。</>
-                : <>One immutable snapshot, many typed reads. The descriptor has no properties or tags; property, state, tag and fluid are adapter leaves over <code>Expectations.host</code>. Capability traits return <code>IItemHandler</code>, <code>IEnergyStorage</code> and <code>IFluidHandler</code> directly.</>}
+                ? <>一份不可变快照、多种类型化读取。descriptor 不再有 properties/tags；property、state、tag、fluid 是 adapter 在 <code>Expectations.host</code> 上的 leaf。capability trait 直接返回 <code>IItemHandler</code> / <code>IEnergyStorage</code> / <code>IFluidHandler</code>。nested extent 是同一套 per-holder 形状：一个 <code>NestedExtentLookup</code>、每个 holder 一个 <code>NestedExtentProvider</code>，以及一个 <code>CapabilityNestedExtentProvider</code>；旧的聚合 lookup 和 <code>CapabilityLookup</code> 已删除。</>
+                : <>One immutable snapshot, many typed reads. The descriptor has no properties or tags; property, state, tag and fluid are adapter leaves over <code>Expectations.host</code>. Capability traits return <code>IItemHandler</code>, <code>IEnergyStorage</code> and <code>IFluidHandler</code> directly. Nested extents follow the same per-holder shape: one <code>NestedExtentLookup</code>, a <code>NestedExtentProvider</code> per holder and one <code>CapabilityNestedExtentProvider</code>; the old aggregate lookup and <code>CapabilityLookup</code> are gone.</>}
             </p>
             <div className="aside-rule" />
             <div className="eyebrow">{zh ? '关于缺席' : 'A note on absence'}</div>

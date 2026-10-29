@@ -62,6 +62,7 @@ export const REMOVED = [
   { term: 'Structure-set transaction', replacement: 'StructureSetHost', why: 'Root, satellites and links are host orchestration; the kernel still checks and settles one blueprint.' },
   { term: 'Per-attempt set budget', replacement: 'One shared set budget', why: 'Presence and every member attempt draw from the same ceiling; the set is the unit the host admitted.' },
   { term: 'Kernel context rollback', replacement: 'ContextStore.remove', why: 'A set rollback releases claims and removes each formed StructureContext through the store; the kernel still has no transaction.' },
+  { term: 'CapabilityLookup', replacement: 'NestedExtentLookup', why: 'One per-holder registry replaces the aggregate block/entity lookup; a new subject kind adds a holder and a provider, not an interface method.' },
 ];
 
 export const DOCS = [
@@ -93,25 +94,26 @@ export const DOCS = [
 ];
 
 export const HERO_STATS = [
-  { value: '261', label: 'tests', note: 'kernel JUnit 5 · adapter 292 · GameTests 69/69' },
+  { value: '261', label: 'tests', note: 'kernel JUnit 5 · adapter 296 · GameTests 71/71' },
   { value: '65', label: 'codes', note: '13 kernel families · one Codes table' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
-  { value: '35', label: 'decisions', note: 'rulings, not preferences' },
+  { value: '36', label: 'decisions', note: 'rulings, not preferences' },
 ];
 
 export const LAYERS = [
   { id: 'D-30', title: 'Derived envelope', text: 'bounds minus declared cells becomes one reserved bay and check; a foreign occupant is SC-EXP-0006, an empty set is a no-op.' },
   { id: 'D-31', title: 'Cached context', text: 'MatchRequest.cachedContext is a host-owned (id, type) cache for declared instance keys; the current attempt always wins.' },
-  { id: 'D-32', title: 'Structure sets', text: 'root + satellites + links + presence, sequenced by StructureSetHost; S5 ships /cumulus set check|settle over one union capture, and the kernel still has no set type.' },
+  { id: 'D-32', title: 'Structure sets', text: 'root + satellites + links + presence, sequenced by StructureSetHost; S5 ships /cumulus set check|settle over one unsited union capture (no orientation audit, so no spurious SC-MC-0004), and the kernel still has no set type.' },
   { id: 'D-33', title: 'Typed host snapshot', text: 'one snapshot per frame, HostType reads and Expectations.host; OccupantDescriptor is (type, kind) and D-29 is superseded.' },
   { id: 'D-34', title: 'Trait providers', text: 'TraitProvider<T, H>/TraitHolder per holder and one CapabilityTraitProvider class; capability traits return IItemHandler, IEnergyStorage and IFluidHandler. No NBT traits, no item holder.' },
-  { id: 'D-35', title: 'Set close-out', text: 'SC-SET-0008 rejects a satellite on the root siting (compiler, StructureSet.place, host check); presence and every attempt share one set budget; rollback removes formed contexts through ContextStore.remove.' },
+  { id: 'D-35', title: 'Set close-out', text: 'SC-SET-0008 rejects a satellite on the root siting (compiler, StructureSet.place, host check); presence and every attempt share one set budget; rollback removes formed contexts through ContextStore.remove. The real-level StructureSetHostGameTest covers the same-siting rejection and a one-cell shared budget.' },
+  { id: 'D-36', title: 'Nested-extent lookup', text: 'NestedExtentHolder/Provider/Lookup replace the aggregate nested lookup: NestedExtentHolders.block/entity, one CapabilityNestedExtentProvider over NestedExtentAccesses, and the standard NestedExtentProviders. The old mc.NestedExtentLookup and CapabilityLookup are deleted.' },
 ];
 
 export const GATES = [
-  { label: 'Compile', value: 'PASS', note: 'gradlew check green at 58e97b8' },
+  { label: 'Compile', value: 'PASS', note: 'gradlew check green at f84dba8' },
   { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
-  { label: 'Tests', value: '261/261', note: 'kernel JUnit 5 · 39 containers; adapter 292 · GameTests 69/69' },
+  { label: 'Tests', value: '261/261', note: 'kernel JUnit 5 · 39 containers; adapter 296 · GameTests 71/71' },
   { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 65 codes' },
   { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
   { label: 'Determinism', value: 'PASS', note: 'DeterminismTest · canonical bytes, fixed point, compile runs' },

@@ -53,6 +53,7 @@ export const ZH_REMOVED: Record<string, string> = {
   'Structure-set transaction': 'root、satellites 和 links 都是 host 编排；kernel 仍然一次只 check、settle 一个 blueprint。',
   'Per-attempt set budget': 'presence 和每个成员 attempt 从同一个上限读取；set 才是 host 准入的单位。',
   'Kernel context rollback': 'set rollback 释放 claims，并通过 store 移除每个已形成的 StructureContext；kernel 仍然没有事务。',
+  CapabilityLookup: '一个 per-holder registry 取代聚合的 block/entity lookup；新增 subject kind 只需加 holder 和 provider，不改查找接口。',
 };
 
 export const ZH_DOCS: Record<string, string> = {
@@ -89,16 +90,16 @@ export const ZH_GROUPS: Record<string, string> = {
 };
 
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
-  Compile: { label: '编译', note: 'gradlew check 在 58e97b8 通过' },
+  Compile: { label: '编译', note: 'gradlew check 在 f84dba8 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 39 个容器；adapter 292 · GameTests 69/69' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 39 个容器；adapter 296 · GameTests 71/71' },
   'Spec index': { label: '规范索引', note: 'spec-check.py · 65 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 292 · GameTests 69/69' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 296 · GameTests 71/71' },
   codes: { label: '代码', note: '13 个 kernel family · 一张 Codes 表' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
   decisions: { label: '决策', note: 'ruling，不是偏好' },
@@ -115,7 +116,7 @@ export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
   },
   'D-32': {
     title: '结构集合',
-    text: 'root + satellites + links + presence，由 StructureSetHost 编排；S5 提供 /cumulus set check|settle 和一次 union capture；kernel 仍然没有 set 类型。',
+    text: 'root + satellites + links + presence，由 StructureSetHost 编排；S5 提供 /cumulus set check|settle 和一次不带 orientation 的 union capture（不做 orientation audit，因此不会为 satellite cell 产生多余的 SC-MC-0004）；kernel 仍然没有 set 类型。',
   },
   'D-33': {
     title: '类型化 host 快照',
@@ -127,6 +128,10 @@ export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
   },
   'D-35': {
     title: 'set 收束',
-    text: 'SC-SET-0008 拒绝与 root 同 siting 的 satellite（compiler、StructureSet.place、host check）；presence 和每个 attempt 共享一个 set budget；rollback 通过 ContextStore.remove 移除已形成的 context。',
+    text: 'SC-SET-0008 拒绝与 root 同 siting 的 satellite（compiler、StructureSet.place、host check）；presence 和每个 attempt 共享一个 set budget；rollback 通过 ContextStore.remove 移除已形成的 context。真实 level 的 StructureSetHostGameTest 覆盖同 siting 拒绝和一格共享 budget。',
+  },
+  'D-36': {
+    title: 'nested-extent lookup',
+    text: 'NestedExtentHolder/Provider/Lookup 取代聚合的 nested lookup：NestedExtentHolders.block/entity，一个通过 NestedExtentAccesses 覆盖两种签名的 CapabilityNestedExtentProvider，以及标准的 NestedExtentProviders。旧的 mc.NestedExtentLookup 和 CapabilityLookup 已删除。',
   },
 };
