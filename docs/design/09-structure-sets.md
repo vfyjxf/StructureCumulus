@@ -694,7 +694,7 @@ Document errors reuse existing codes:
   `StructureSetHostGameTest` cases: a hand-built satellite that shares the root siting is rejected
   before presence, and a one-cell shared budget leaves the root check `Undecided(SC-ENG-0001)`; the
   production set capture now carries no orientation and runs no orientation audit. Counts on the S6
-  tree are **269 kernel tests (40 containers), 280 adapter unit tests (35 containers), 73 `@GameTest`
+  tree are **269 kernel tests (40 containers), 280 adapter unit tests (35 containers), 74 `@GameTest`
   methods**; `Codes.all` is 65 and the decision record 40 (D-40). The command and the one-capture
   executor remain S5.
 - The command and the one-capture executor are S5, not S6.

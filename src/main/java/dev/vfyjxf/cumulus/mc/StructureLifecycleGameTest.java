@@ -20,6 +20,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.common.util.BlockSnapshot;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -53,6 +54,25 @@ public final class StructureLifecycleGameTest {
         WatchEvents.blockBroken(new BlockEvent.BreakEvent(level, pos, broken, player));
 
         helper.assertTrue(manager.find(instance.id()) == null, "the broken structure is removed");
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void blockPlaceDispatchesInvalidated(GameTestHelper helper) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            helper.fail("server state is not open");
+            return;
+        }
+        ServerLevel level = helper.getLevel();
+        BlockPos pos = helper.absolutePos(BlockPos.ZERO);
+        StructureManager manager = state.structures(level);
+        StructureInstance instance = instance(manager, state, level, pos);
+        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
+        BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
+        WatchEvents.blockPlaced(new BlockEvent.EntityPlaceEvent(snapshot, Blocks.AIR.defaultBlockState(), player));
+
+        helper.assertTrue(manager.find(instance.id()) == null, "a placement invalidates the structure");
         helper.succeed();
     }
 

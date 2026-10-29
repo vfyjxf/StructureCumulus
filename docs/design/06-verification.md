@@ -39,7 +39,7 @@ production set command and its one capture, the check-only host path and the set
 closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
 invalidation, and one set budget shared by presence and every member attempt (§3.3). On the S6
 working tree a full `./gradlew check` and `runGameTestServer` both pass: 269 kernel tests (40
-containers), 280 adapter unit tests (35 containers), 73/73 `@GameTest` methods, 0 failures, 0 skipped.
+containers), 280 adapter unit tests (35 containers), 74/74 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
 `Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
@@ -303,7 +303,7 @@ snapshot with no captured host values. It adds no kernel type and no GameTest.
 
 ### 3.5 Structure-set command and host GameTests (S5, extended by S6)
 
-Three adapter GameTest classes (eight methods) in `src/main/java/.../mc` drive the set layer over a real
+Three adapter GameTest classes (nine methods) in `src/main/java/.../mc` drive the set layer over a real
 `LevelCapture`, the real `SavedClaims`/`StructureManager` and the server dispatcher. They add no kernel
 type, no code and no decision.
 
@@ -415,8 +415,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 73 `@GameTest` methods; the
-  full `runGameTestServer` is 73/73 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 74 `@GameTest` methods; the
+  full `runGameTestServer` is 74/74 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the

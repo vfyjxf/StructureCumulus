@@ -945,7 +945,7 @@ structure is formed, moved or gone.
 **Consequence:** `ContextStore` remains the narrow publish/read interface implemented by the manager
 and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` has an attempt overload.
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
-`StructureLifecycleGameTest`, full `check` and 73/73 GameTests are green.
+`StructureLifecycleGameTest`, full `check` and 74/74 GameTests are green.
 
 ## 3. Consequences a reviewer should attack
 
