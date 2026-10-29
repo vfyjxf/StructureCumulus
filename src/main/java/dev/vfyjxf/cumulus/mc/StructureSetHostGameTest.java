@@ -10,6 +10,7 @@ import dev.vfyjxf.cumulus.kernel.document.CompiledSatellite;
 import dev.vfyjxf.cumulus.kernel.document.CompiledStructureSet;
 import dev.vfyjxf.cumulus.kernel.document.LinkSpec;
 import dev.vfyjxf.cumulus.kernel.document.SatelliteSpec;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -36,6 +37,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** The set host over one real level: a two-cell root, an attached wing, the real ledger and contexts. */
 @NullMarked
@@ -177,6 +179,117 @@ public final class StructureSetHostGameTest {
                     0,
                     ledger.read(SetCommand.bounds(plan)).rows().size(),
                     "the failed set writes no row"
+                );
+            }
+        } finally {
+            release(ledger, state, rootSiting, wingSiting);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence(GameTestHelper helper) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            helper.fail("server state is not open");
+            return;
+        }
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        helper.setBlock(new BlockPos(0, 0, 0), Blocks.STONE);
+        helper.setBlock(new BlockPos(1, 0, 0), Blocks.STONE);
+        StructureSet plan = plan(lattice(origin));
+        StructureSet.Satellite wing = plan.satellite(wingId);
+        if (wing == null) {
+            helper.fail("the wing is not placed");
+            return;
+        }
+        Siting rootSiting = plan.rootSiting();
+        Cuboid onRoot = Objects.requireNonNull(rootSiting.toWorld(wing.blueprint().bounds()), "satellite bounds");
+        StructureSet handBuilt = new StructureSet(
+            plan.compiled(),
+            rootSiting,
+            plan.rootBounds(),
+            List.of(new StructureSet.Satellite(wingId, wing.compiled(), rootSiting, onRoot, onRoot.asSet()))
+        );
+        SavedClaims ledger = state.claims(level);
+        long revision = ledger.revision();
+        AtomicInteger instances = new AtomicInteger();
+        SnapshotLease lease = capture(state, level, plan);
+        if (lease == null) {
+            helper.fail("the set capture did not succeed");
+            return;
+        }
+        try (lease) {
+            StructureSetResult result = new StructureSetHost(state.kernel(level))
+                    .check(handBuilt, lease, state.owner(), Budget.unbounded(), () -> {
+                        instances.incrementAndGet();
+                        return state.instance(level);
+                    });
+            helper.assertTrue(
+                result.setFindings().stream()
+                        .anyMatch(finding -> finding.code().equals(Codes.rootPlacementCollision.code())),
+                "the same-siting code: " + result.setFindings()
+            );
+            helper.assertTrue(result.outcomes().isEmpty(), "the set is rejected before any check");
+            helper.assertValueEqual(0, instances.get(), "no instance is allocated");
+            helper.assertTrue(result.settled().isEmpty(), "the rejected set settles nothing");
+            helper.assertTrue(result.rolledBack().isEmpty(), "the rejected set rolls nothing back");
+            helper.assertTrue(result.claims().isEmpty(), "the rejected set reports no claim");
+            helper.assertValueEqual(revision, ledger.revision(), "the rejected set moves no revision");
+            helper.assertValueEqual(
+                0,
+                ledger.read(SetCommand.bounds(plan)).rows().size(),
+                "the rejected set writes no row"
+            );
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aOneCellSetBudgetLeavesTheRootCheckUndecided(GameTestHelper helper) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            helper.fail("server state is not open");
+            return;
+        }
+        ServerLevel level = helper.getLevel();
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        helper.setBlock(new BlockPos(2, 0, 0), Blocks.STONE);
+        StructureSet plan = plan(lattice(origin));
+        StructureSet.Satellite wing = plan.satellite(wingId);
+        if (wing == null) {
+            helper.fail("the wing is not placed");
+            return;
+        }
+        SavedClaims ledger = state.claims(level);
+        Siting rootSiting = plan.rootSiting();
+        Siting wingSiting = wing.siting();
+        try {
+            release(ledger, state, rootSiting, wingSiting);
+            long revision = ledger.revision();
+            SnapshotLease lease = capture(state, level, plan);
+            if (lease == null) {
+                helper.fail("the set capture did not succeed");
+                return;
+            }
+            try (lease) {
+                StructureSetResult result = new StructureSetHost(state.kernel(level))
+                        .run(plan, lease, state.owner(), Budget.of(1, Integer.MAX_VALUE), () -> state.instance(level));
+                helper.assertTrue(
+                    result.setFindings().stream()
+                            .anyMatch(finding -> finding.code().equals(Codes.budgetExhausted.code())),
+                    "the shared budget is exhausted: " + result.setFindings()
+                );
+                helper.assertTrue(result.outcomes().isEmpty(), "the root check is not admitted");
+                helper.assertTrue(result.settled().isEmpty(), "an undecided run settles nothing");
+                helper.assertTrue(result.rolledBack().isEmpty(), "an undecided run rolls nothing back");
+                helper.assertTrue(result.claims().isEmpty(), "an undecided run writes no claim");
+                helper.assertValueEqual(revision, ledger.revision(), "the undecided set moves no revision");
+                helper.assertValueEqual(
+                    0,
+                    ledger.read(SetCommand.bounds(plan)).rows().size(),
+                    "the undecided set writes no row"
                 );
             }
         } finally {

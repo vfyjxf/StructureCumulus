@@ -668,8 +668,8 @@ All commands run on the server thread. `check` returns 1 whenever it reaches a r
   failure. Rows print in claim order and the read never writes.
 - `/cumulus set check <id> <origin>` / `/cumulus set settle <id> <origin>` — the production structure-set
   driver (§13.5): the document is resolved from the merged source (the built-in demo set is the
-  fallback), compiled and placed, then captured once for the union bounds under the union policy and
-  the root siting orientation; the host checks every member and, for `settle`, settles them in
+  fallback), compiled and placed, then captured once for the union bounds under the union policy with
+  no orientation audit; the host checks every member and, for `settle`, settles them in
   declaration order. The command prints the set id/origin, the root and satellite outcomes, `settled`,
   `rolledBack`, `rollbackFailures`, the per-structure claim row counts and `firstFailure`, then the set
   findings. `set check` writes no row.
@@ -790,11 +790,11 @@ lease is closed before the set capture. `StructureSet.place` then maps the plan;
 and a placement failure exits 0.
 
 The set capture is **one** `LevelCapture.capture` call for the bounding box of `rootBounds()` and
-every satellite's `worldBounds()`, sited with `rootSiting.placement().orientation()`. Its policy is
-one `SnapshotPolicy` with the adapter's element ceiling and the union of the root's and every
-satellite's `Blueprint.reads()`: maximum depth, union of kinds, union of traits, union of windows
-(`ReadScope.union`). The capture report prints through `CaptureReports` before the set summary. The
-lease is closed after the host run.
+every satellite's `worldBounds()`, with a null orientation. Its policy is one `SnapshotPolicy` with
+the adapter's element ceiling and the union of the root's and every satellite's `Blueprint.reads()`:
+maximum depth, union of kinds, union of traits, union of windows (`ReadScope.union`). The capture
+report prints through `CaptureReports` before the set summary. The lease is closed after the host
+run.
 
 The host then runs `StructureSetHost.check` or `StructureSetHost.run` with `Budget.unbounded()`, the
 server owner and `() -> state.instance(level)`. `check` is the same presence/link/check sequence and
@@ -805,15 +805,17 @@ plan order), `settled`, `rolledBack`, `rollbackFailures` count, per-structure cl
 exits 1 only with no error finding and at least one admitted outcome; `settle` exits 1 only on
 `formed()`.
 
-One capture is an explicit host choice; it has two consequences. The capture is a superset region,
-so its element ceiling applies to the union box. The orientation audit of the sited capture also
-covers the satellite cells: a satellite with a non-identity relative orientation under a rotated root
-can answer a `SC-MC-0004` warning that its own frame would not produce. That is a warning only; it
-never changes the summary or the exit code.
+One capture is an explicit host choice. The capture is a superset region, so its element ceiling
+applies to the union box. It carries no orientation and therefore runs no orientation audit: one
+world-frame capture cannot audit the root's and each satellite's frames separately, so a satellite
+whose own frame would answer `SC-MC-0004` produces no entry here. The set checks still read the
+captured world-frame states.
 
 `StructureSetHostGameTest` drives the real `LevelCapture`, `SavedClaims` and `SavedContexts` over a
 two-cell root and an attached wing: check-all writes no row or revision, settle-all writes the three
-claimed cells, and a wrong member stops the settle with the root's admitted outcome and no row.
+claimed cells, a wrong member stops the settle with the root's admitted outcome and no row, a
+hand-built satellite on the root siting is `SC-SET-0008` before presence with no outcome or instance,
+and a one-cell shared budget leaves the root check `Undecided(SC-ENG-0001)` without a row or revision.
 `SetCommandGameTest` drives the dispatcher over the built-in demo set: check and settle exit 1 and
 write the two rows only on settle, while an absent required wing is `SC-SET-0001` and exits 0 on both
 paths.
@@ -832,7 +834,7 @@ the host's defensive check. The SS4 stress suite
 (`ImprovedBlastFurnaceSetStressTest`, `TepReactorSetStressTest`,
 `LogicalSubnetworkSetStressTest`, `PortEnvelopeSetStressTest`, `StructureSetRotationStressTest`,
 `StructureSetRollbackStressTest`; 34 tests) exercises these rules with fake views, leases and
-ledgers; S5 adds the two real-level GameTest classes above (four methods).
+ledgers; S5 adds the two real-level GameTest classes above, and S6 extends them to six methods.
 
 ## 14. What is deliberately absent
 

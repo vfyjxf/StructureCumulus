@@ -39,7 +39,7 @@ production set command and its one capture, the check-only host path and the set
 closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
 invalidation, and one set budget shared by presence and every member attempt (§3.3). On the S6
 working tree a full `./gradlew check` and `runGameTestServer` both pass: 261 kernel tests (39
-containers), 296 adapter unit tests (37 containers), 69/69 `@GameTest` methods, 0 failures, 0 skipped.
+containers), 296 adapter unit tests (37 containers), 71/71 `@GameTest` methods, 0 failures, 0 skipped.
 `tools/spec-check.py` is clean.
 `Codes.all` has 65 entries and the decision record has 36 decisions (D-36). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
@@ -281,9 +281,9 @@ snapshot with no captured host values. It adds no kernel type and no GameTest.
 | The composed `fluid` expectation's meta is the kernel junction's `SC-EXP-0001`, while its findings are the leaves' `SC-MC-0009` | `aWaterloggedSlabIsABlockStateAndNotTheRealFluid` |
 | A nested child frame answers its own snapshot; a missing snapshot makes every host expectation `SC-MC-0010` (unreadable), never a mismatch | `aNestedChildFrameServesItsOwnHostSnapshot`, `aSetWithoutACapturedHostSnapshotIsUnreadable` |
 
-### 3.5 Structure-set command and host GameTests (S5)
+### 3.5 Structure-set command and host GameTests (S5, extended by S6)
 
-Two adapter GameTest classes (four methods) in `src/main/java/.../mc` drive the set layer over a real
+Two adapter GameTest classes (six methods) in `src/main/java/.../mc` drive the set layer over a real
 `LevelCapture`, the real `SavedClaims`/`SavedContexts` and the server dispatcher. They add no kernel
 type, no code and no decision.
 
@@ -291,6 +291,8 @@ type, no code and no decision.
 | --- | --- |
 | `StructureSetHostGameTest.checkAllWritesNothingThenSettleAllWritesClaims` | a two-cell stone root and an attached stone wing captured once for the union bounds; `check` admits both members, writes no row and moves no revision; `run` settles both, writes the three claimed cells and bumps the revision once per structure |
 | `StructureSetHostGameTest.aFailedMemberStopsSettle` | the wing cell is dirt, so its check fails: only the root outcome is admitted, `settled`/`claims` stay empty, the revision does not move and no row is written |
+| `StructureSetHostGameTest.aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence` | a hand-built `StructureSet.Satellite` whose siting equals the root siting: `check` reports `SC-SET-0008`, admits no outcome, allocates no instance and writes no claim, row or revision |
+| `StructureSetHostGameTest.aOneCellSetBudgetLeavesTheRootCheckUndecided` | a real capture with `Budget.of(1, Integer.MAX_VALUE)`: presence consumes the one cell, the root check is `Undecided` with `SC-ENG-0001`, and no settle, row or revision follows |
 | `SetCommandGameTest.setCheckWritesNothingAndSetSettleWritesTheClaims` | the dispatcher `set check`/`set settle` over the built-in `structurecumulus:set_demo`: both exit 1, the summary names the set, origin, root and wing, `settled: none` on check, the two rows only on settle |
 | `SetCommandGameTest.aMissingRequiredSatelliteFailsCheckAndSettle` | an absent required wing is `SC-SET-0001`: both paths exit 0, report `first failure: SC-SET-0001`, write no row and move no revision |
 
@@ -298,8 +300,10 @@ type, no code and no decision.
 
 | Behaviour | Asserted by |
 | --- | --- |
-| One capture serves the whole set, so the capture region is the union bounding box and its element ceiling applies to the union | `checkAllWritesNothingThenSettleAllWritesClaims` (the three cells are captured under one lease) |
+| One capture serves the whole set, so the capture region is the union bounding box and its element ceiling applies to the union; it is unsited and runs no orientation audit | `checkAllWritesNothingThenSettleAllWritesClaims` (the three cells are captured under one lease) |
 | A failed satellite check stops the settle pass; the already-admitted root is not settled | `aFailedMemberStopsSettle` |
+| A hand-built set whose satellite siting equals the root siting is rejected before presence and before any check | `aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence` |
+| The set budget is shared: presence may consume it all, leaving the root check `Undecided` with `SC-ENG-0001` | `aOneCellSetBudgetLeavesTheRootCheckUndecided` |
 | A set command reads the real per-structure claims ledger: check writes nothing, settle writes one row per footprint cell | `setCheckWritesNothingAndSetSettleWritesTheClaims` |
 | The set command's exit code follows the set result, not a member result: an error finding is 0 even when a member was admitted | `aMissingRequiredSatelliteFailsCheckAndSettle` |
 
@@ -391,8 +395,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 69 `@GameTest` methods; the
-  S5 full `runGameTestServer` is 69/69 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 71 `@GameTest` methods; the
+  full `runGameTestServer` is 71/71 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
@@ -401,7 +405,7 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
   M5e capture report (`CaptureAuditGameTest`, `CommandCaptureReportGameTest`, `NestedCaptureGameTest`),
   the claims read in check (`CheckClaimsGameTest`), the retained orientation audit
   (`OrientationAuditGameTest`: an upright siting reports no `SC-MC-0004`, an unrepresentable state
-  reports one grouped entry, and a child frame is not audited), and the S5 set layer
+  reports one grouped entry, and a child frame is not audited), and the set layer
   (`StructureSetHostGameTest`, `SetCommandGameTest`: §3.5). Unit evidence: `HostExpectationTest`
   for the typed bridge and absent codes, `SnapshotLevelTest` for the copied states/fluids/entities,
   `LevelSnapshotTest` for

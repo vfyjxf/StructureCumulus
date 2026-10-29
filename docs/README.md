@@ -106,9 +106,9 @@ Then the module files, in dependency order:
   the real-level set GameTests (`design/06-verification.md` §3.5). S6 closes the set layer: the
   `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
   budget shared by presence and every member attempt (D-35). The tree registers 261
-  kernel tests in 39 containers, 296 adapter unit tests in 37 containers and 69 `@GameTest` methods;
+  kernel tests in 39 containers, 296 adapter unit tests in 37 containers and 71 `@GameTest` methods;
   a full `./gradlew check` and `runGameTestServer` on the S6 working tree are both green (261
-  kernel tests, 296 adapter tests, 69/69 GameTests). Pending only: the
+  kernel tests, 296 adapter tests, 71/71 GameTests). Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
   There is no regeneration milestone.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
@@ -117,9 +117,9 @@ Then the module files, in dependency order:
   the adapter. The adapter is the only place allowed to name Minecraft.
 - Verification (2026-10-29, S6 working tree): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 261 kernel JUnit 5 tests (39 test
-  containers), 296 adapter unit tests (37 containers) and 69 `@GameTest` methods; a full
+  containers), 296 adapter unit tests (37 containers) and 71 `@GameTest` methods; a full
   `./gradlew check` and `runGameTestServer` both pass at this revision (261 kernel tests, 296 adapter
-  tests, 69/69 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
+  tests, 71/71 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
   and the decision record has 36 decisions (D-36; D-29 superseded).
 
 ## The one rule

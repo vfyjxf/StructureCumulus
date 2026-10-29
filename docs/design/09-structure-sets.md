@@ -484,10 +484,9 @@ server owner and one instance per checked structure.
   Its policy is one `SnapshotPolicy` over the union of the root's and every satellite's
   `Blueprint.reads()`: the maximum depth, the union of kinds, traits and windows, and the adapter's
   element ceiling.
-- The capture is sited with the root siting orientation, so the orientation audit of the capture
-  covers the whole region. A satellite placed with a non-identity relative orientation may therefore
-  be audited under the root orientation too and answer a `SC-MC-0004` warning that its own frame
-  would not produce; a warning never changes the command's exit code.
+- The capture carries no orientation, so it runs no orientation audit. One world-frame capture
+  cannot audit the root's and each satellite's frames separately; the set checks still read the
+  captured world-frame states, and this capture produces no `SC-MC-0004` warning.
 - `set check` prints the set id and origin, the root and satellite outcomes, the empty settle
   lifecycle, the per-structure claim row counts and `firstFailure`; it writes no claim and exits 1
   only when the result carries no error finding and at least one admitted outcome.
@@ -689,9 +688,13 @@ Document errors reuse existing codes:
   The focused tests are two new `StructureSetCompilerTest` cases (15 total), two `StructureSetPlanTest`
   cases (8), two `StructureSetHostTest` cases (26), the renamed/new budget cases in
   `LogicalSubnetworkSetStressTest` (9), the updated `StructureSetRollbackStressTest` (6), plus
-  `ContextTest` (4) and `SavedContextsLifecycleTest` (6). Counts on the S6 tree are **261 kernel tests
-  (39 containers), 296 adapter unit tests (37 containers), 69 `@GameTest` methods**; `Codes.all` is 65
-  and the decision record 36 (D-36). The command and the one-capture executor remain S5.
+  `ContextTest` (4) and `SavedContextsLifecycleTest` (6). The follow-up adds two real-level
+  `StructureSetHostGameTest` cases: a hand-built satellite that shares the root siting is rejected
+  before presence, and a one-cell shared budget leaves the root check `Undecided(SC-ENG-0001)`; the
+  production set capture now carries no orientation and runs no orientation audit. Counts on the S6
+  tree are **261 kernel tests (39 containers), 296 adapter unit tests (37 containers), 71 `@GameTest`
+  methods**; `Codes.all` is 65 and the decision record 36 (D-36). The command and the one-capture
+  executor remain S5.
 - The command and the one-capture executor are S5, not S6.
 
 Visual review stays last.

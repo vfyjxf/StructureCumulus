@@ -86,8 +86,7 @@ final class SetCommand {
         }
         StructureSet plan = Objects.requireNonNull(placement.set());
         ServerLevel level = source.getLevel();
-        CommandSupport.Captured captured = CommandSupport
-                .capture(state, source, id, bounds(plan), policy(plan), rootSiting.placement().orientation());
+        CommandSupport.Captured captured = CommandSupport.capture(state, source, id, bounds(plan), policy(plan), null);
         if (captured == null) {
             return 0;
         }
