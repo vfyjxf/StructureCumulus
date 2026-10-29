@@ -643,7 +643,8 @@ The alternatives were rejected:
 - **World coordinates in the set document** would make it a placement record, not a portable graph;
   a satellite is exactly `rootSiting.compose(relativeSiting)`, and a null composition is a finding.
 - **A kernel context rollback** would hide the published value from the host that owns the instance;
-  release is claim-only and the host removes the context through `ContextStore.remove` (D-35).
+  release is claim-only and the host invalidates the context through `StructureEvent.Broken` on the
+  bound `StructureManager` (D-35).
 - **Host-only JSON parsing without the document layer** would lose the shared schema, spans and the
   `(blueprint, effective arguments)` compile cache; the set document reuses the blueprint compiler.
 
@@ -655,10 +656,10 @@ alone can observe.
 **Consequence:** set failures live in the `set` code family (`SC-SET-0001`…`0008`); presence and links
 are host work before any check; presence and the member attempts share one budget (D-35); any failure
 before a settle means no settle; a settle failure releases
-the formed structures in reverse declaration order and reports a failed release or context removal
+the formed structures in reverse declaration order and reports a failed release or `Broken` dispatch
 as `SC-SET-0007`; `claims` is filtered by `(owner, siting, bay)` so a ledger-wide `ClaimSet` never
-leaks another structure's rows; a rolled-back structure's context is removed through
-`ContextStore.remove` (D-35); a satellite may not share the root siting (D-35); nested sets,
+leaks another structure's rows; a rolled-back structure's context is invalidated by
+`StructureEvent.Broken` through the bound manager (D-35); a satellite may not share the root siting (D-35); nested sets,
 satellite-of-satellite, automatic retry, world-coordinate placement in the document and a
 command/capture executor for a set are out. **Status (SS4):** the document/compiler layer landed at
 `9cf2794`/`00cf6c4`, the host plan and orchestration at `93f5941`, and SS4 adds the six-class/33-test
@@ -788,12 +789,11 @@ The contract:
   charges `(1, 0)` per read; each attempt (root, then each present satellite) receives the remaining
   `Budget`; an admitted outcome's `spend()` is subtracted. Presence exhaustion is `SC-SET-0004`; an
   exhausted attempt is the engine's `SC-ENG-0001` and stops the set, as any non-admitted check does.
-- **Context removal.** `ContextStore.remove(InstanceId)` returns the removed `StructureContext` or
-  `null`; `SavedContexts` removes it and marks the SavedData dirty (an absent removal changes
-  nothing); `StructureKernel.contexts()` exposes the host store. `StructureSetHost` rollback calls
-  `remove` for every formed attempt regardless of the release verdict or a release throw; a removal
-  `RuntimeException` is a `SC-SET-0007` rollback failure and does not stop the other releases or
-  removals.
+- **Context invalidation.** The bound `StructureManager` removes the instance and its
+  `StructureContext` when it receives `StructureEvent.Broken`; `ContextStore.remove` is not the
+  rollback path. `StructureSetHost` dispatches `Broken` for every formed attempt regardless of the
+  release verdict or a release throw; a dispatch `RuntimeException` is a `SC-SET-0007` rollback
+  failure and does not stop the other releases or dispatches.
 
 The alternatives were rejected:
 
@@ -815,10 +815,10 @@ rollback that only releases claims leaves a context describing a structure that 
 
 **Consequence:** `SC-SET-0008` joins the set family (`Codes.all` is 65); a hand-built `StructureSet`
 is defensively re-checked; the set's total reads never exceed `budget.cells()`; a successful
-rollback removes the `StructureContext` of every formed attempt (`rolledBack` still lists only the
-successful releases); a failed release does not skip the context removal; `SavedContexts` persists
-the removal. The record set is now 35 decisions (D-35). **Status (S6):** implemented; the focused
-kernel/adapter tests, the full `check` and `runGameTestServer` are green.
+rollback invalidates the `StructureContext` of every formed attempt via `StructureEvent.Broken`
+(`rolledBack` still lists only the successful releases); a failed release does not skip the
+invalidation. The record set is now 35 decisions (D-35). **Status (S6):** implemented; the focused
+kernel/adapter tests are green; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0).
 
 ### D-36 — Nested-extent lookup is generic per holder
 
@@ -952,7 +952,7 @@ structure is formed, moved or gone.
 and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` has an attempt overload.
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
 `AdversarialManagerTest`, `StructureLifecycleGameTest` and
-`StructureLifecycleAdversarialGameTest`, full `check` and 112/112 GameTests are green.
+`StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0).
 
 ## 3. Consequences a reviewer should attack
 
@@ -989,10 +989,10 @@ The record set is now 40 decisions (D-40). **Status:** implemented; `StructureMa
   (D-32) are implemented, and the spec index is green; what remains is the performance/cost pass and
   fresh visual review screenshots (D-02, `07-regeneration.md` §7).
 - A structure set is not atomic across structures (D-32): a later settle failure releases the
-  earlier claim rows in reverse order and removes their contexts through `ContextStore.remove`
-  (D-35). `StructureSetResult.rolledBack` names the releases that answered `Settled`; a failed
-  release or removal is a `SC-SET-0007` rollback failure, and a failed release does not skip the
-  context removal.
+  earlier claim rows in reverse order and invalidates their contexts through
+  `StructureEvent.Broken` (D-35). `StructureSetResult.rolledBack` names the releases that answered
+  `Settled`; a failed release or dispatch is a `SC-SET-0007` rollback failure, and a failed release
+  does not skip the invalidation.
 - The set shares one `Budget` across presence and every member attempt (D-35): presence charges
   `(1, 0)` per read, an attempt sees what remains, and an exhausted attempt stops the set. A host
   that wants an independent ceiling per structure must run one set per budget.

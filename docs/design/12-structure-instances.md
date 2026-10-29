@@ -133,6 +133,13 @@ Laws:
 - no automatic block-break detection, no chunk listening, no world save: the adapter does that and
   calls the manager.
 
+`findAt`, `findIn` and `instances` are **registry-wide**: they take no `World` and see every formed
+instance in every world held by that manager. `find(World, owner, siting)` is the only world-qualified
+tuple lookup. The adapter keeps one manager per level, so its registry is one world and those
+lookups are effectively per-level; a host that shares one manager across worlds must filter by
+`instance.id().world()` or use `find(World, ...)`. This is the documented multi-world lookup
+boundary, not a hidden world argument.
+
 The manager's serial is session-scoped and shared across worlds. `Loaded` raises the watermark to
 `max(restored serial)+1`; `Unloaded` drops only that world. If a host persists instances, it must
 also persist its own ordering or use a host-side UUID; the library does not write `nextSerial` to
@@ -151,6 +158,9 @@ The host supplies the world-frame `bounds`; the manager never interprets them. T
 - a piston that moves every claimed non-air cell by one direction dispatches `Moved` with the
   translated bounds and siting; the adapter translates the claim rows to the new siting, and if the
   new claims conflict it dispatches `Invalidated` and releases the old rows;
+- if the manager rejects that `Moved` (a target collision or another host rejection), the adapter
+  dispatches `Invalidated` for the stale instance and releases its old claims; it does not translate
+  the rows. This is the rejected-`Moved` path;
 - a level unload dispatches `Unloaded(world)`, dropping that world's manager state but keeping its
   persisted claim rows;
 - a host that restores its own instances dispatches `Loaded(world, instances)`.
@@ -201,8 +211,14 @@ no instance id survives the session.
   that formed the instance through a non-host manager must derive against that manager.
 - The adapter's `ServerState` owns one `StructureManager` per level; `SetCommand` and
   `StructureSetHost` call `begin`, `commit` and `Broken` instead of `allocateSerial` and
-  `contexts().remove`. The manager has `find(World, owner, siting)`; the two-argument `find` throws
-  when the tuple is present in more than one world.
+  `contexts().remove`. Rollback in `StructureSetHost` is `StructureEvent.Broken` through that bound
+  manager, not `ContextStore.remove`. The manager has `find(World, owner, siting)`; the two-argument
+  `find` throws when the tuple is present in more than one world.
+- Set-host rollback restores snapshotted old claim rows but cannot recreate a prior
+  `StructureInstance`/context already replaced by an earlier commit in the same run. Member commits
+  run only after every settle succeeds, so a settle failure keeps the old set; a commit-phase failure
+  is reachable only through a host-contract violation (draft committed into another manager, or a
+  manager rejecting a valid commit). That is a documented limitation, not atomic replace.
 - `StructureEvent.Loaded(World, List<StructureInstance>)` replaces one world's instances; the old
   world-less `Loaded(List)` shape is not supported.
 - `SavedContexts`, `SavedContextsLifecycleTest`, `allocateSerial` and `ContextStore.inMemory()`'s

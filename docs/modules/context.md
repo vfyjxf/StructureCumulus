@@ -152,7 +152,9 @@ and no stale-publish finding.
 absent; it never fabricates an empty context. After removal a later `context(instance)` reads the
 empty context at revision 0. The manager removes the instance and its context together; a set
 rollback dispatches `Broken` for every formed attempt, including one whose claim release failed
-(09 §10.3). On a draft, `remove` closes the attempt: it releases the `(world, owner, siting)`
+(09 §10.3); a prior instance already replaced by an earlier commit in the same set run is not
+reconstructed, so commit-phase failure is a documented host-contract limitation rather than atomic
+replace. On a draft, `remove` closes the attempt: it releases the `(world, owner, siting)`
 reservation, returns the old context, and subsequent `publish`/`remove`/`commit`/`abort` throw
 `IllegalStateException`; no instance is formed. `Broken`/`Invalidated` and a world unload close a
 draft the same way.
@@ -166,11 +168,16 @@ is independent, and a formed instance at the tuple in the same world may be repl
 tuple only when exactly one world holds it and throws on ambiguity. The settle pass publishes into
 the attempt. `commit(bounds)` forms the `StructureInstance`; `abort` discards the draft; `remove` on
 the draft closes it as above. The manager stores the world-frame `bounds` only for lifecycle lookup
-(`findAt`/`findIn`); it does not interpret them.
+(`findAt`/`findIn`); it does not interpret them. `findAt`, `findIn` and `instances` are
+registry-wide: they take no `World` and see every world held by the manager. `find(World, owner,
+siting)` is the world-qualified tuple lookup; the adapter's one-manager-per-level layout makes the
+registry-wide helpers per-level in production.
 
 The manager is in-memory and single-writer on the server thread. `Broken`/`Invalidated` remove the
 instance (or close a draft); `Moved` preserves the id and context and updates the spec siting and
-bounds, with collision checked inside the same world; `Loaded(World, List)` validates every restored
+bounds, with collision checked inside the same world. A rejected `Moved` is host-handled: the
+adapter dispatches `Invalidated` for the stale instance and releases its old claim key, without
+translating the rows; `Loaded(World, List)` validates every restored
 instance belongs to that world and has a unique id/siting before replacing only that world, closes
 that world's drafts and raises the serial watermark; other worlds are untouched. A rejected
 `Loaded` leaves the registry unchanged. `Unloaded(world)` removes that world's instances and drafts

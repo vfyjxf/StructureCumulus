@@ -52,7 +52,9 @@ public sealed interface Footprint {
 
 public record ClaimRow(LatticeKey cell, Sharing sharing, OwnerId owner, Siting siting,
                        NamespacedId bay) implements Comparable<ClaimRow> {
-    @Override public int compareTo(ClaimRow other);               // cell, owner, bay
+    @Override public int compareTo(ClaimRow other);               // cell, owner, bay,
+                                                                  // siting origin, placement orientation,
+                                                                  // placement offset, sharing
 }
 
 public record ClaimSet(java.util.List<ClaimRow> rows, long revision) {
@@ -115,7 +117,7 @@ order on `Sharing`; the matrix is the only rule and the adapter has no second pr
 
 ### 4.3 Order and identity
 
-`ClaimRow` order is `(cell, owner, bay)`, implemented once in `compareTo`; `ClaimSet` and
+`ClaimRow` order is `(cell, owner, bay, siting origin, placement orientation, placement offset, sharing)`, implemented once in `compareTo`; `ClaimSet` and
 `ClaimVerdict` sort by it. A row is identified by the full record; two bays of one owner at one siting
 may hold the same cell only when both are `shared` (the blueprint refuses an exclusive overlap), and
 the two rows stay distinct by `bay`. A settlement replaces every row of `(owner, siting)` in one

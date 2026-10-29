@@ -3,8 +3,8 @@
 > Status: implemented (S1, S2, S3, S4, S5 and S6); the H4 host-data round changes no set-layer rule.
 > This document remains the source of truth for the structure-set layer; the document IR, JSON
 > reader/dispatcher/writer, `StructureSetCompiler`, the host plan, the host orchestration, the SS4
-> stress suite, the S5 command/capture path and the S6 close-out (same-siting, `ContextStore.remove`
-> and one shared set budget) are on the tree. Visual review stays last and was not regenerated.
+> stress suite, the S5 command/capture path and the S6 close-out (same-siting, `StructureEvent.Broken`
+> rollback invalidation and one shared set budget) are on the tree. Visual review stays last and was not regenerated.
 
 ## 1. Purpose
 
@@ -428,18 +428,28 @@ Each settle is an independent kernel `settle`.
 If a settle fails:
 
 - release successfully settled structures in reverse order;
-- remove the `StructureContext` of every formed attempt through `ContextStore.remove(InstanceId)`,
-  regardless of the release verdict or a release throw; the removal returns the old context or
-  `null`;
+- dispatch `StructureEvent.Broken` through the bound `StructureManager` for every formed attempt
+  (and every settled draft), regardless of the release verdict or a release throw; the manager
+  removes the instance and its `StructureContext`; this is the rollback mechanism, not
+  `ContextStore.remove`;
 - report the original settle failure;
-- report release and context-removal failures with `SC-SET-0007`; one failed release or removal does
-  not stop the remaining rollbacks;
+- report release and `Broken`-dispatch failures with `SC-SET-0007`; one failed release or dispatch
+  does not stop the remaining rollbacks;
 - do not auto-retry.
 
-`release(owner, siting)` is coarse by contract (D-38) and advances the ledger revision. `ContextStore.remove` is the
-host-side invalidation the set needs: a formed structure's context is removed even when its release
-fails. `rolledBack` names only the attempts whose release answered `Settled`; the host owns any
-further invalidation policy (`06-verification.md` §3.3).
+`release(owner, siting)` is coarse by contract (D-38) and advances the ledger revision. The host-side
+invalidation is `StructureEvent.Broken` through the bound manager: a formed structure's context is
+removed even when its release fails. `rolledBack` names only the attempts whose release answered
+`Settled`; the host owns any further invalidation policy (`06-verification.md` §3.3).
+
+**Commit-phase limitation.** Rollback restores the old claim rows it snapshotted, but it does not
+recreate a prior `StructureInstance`/context that an earlier commit in the same run already replaced.
+Member commits run only after every settle succeeds; a *settle* failure therefore leaves the previous
+instances and rows in place. A *commit* failure can occur only after an earlier member committed and
+is only reachable through a host-contract violation (a draft committing into another manager, or a
+manager rejecting a valid commit); the new instance is removed, the old claim rows are restored, but
+the old manager instance is not reconstructed. This is a documented limitation, not an atomic
+replace guarantee.
 
 ### 10.4 Result
 
@@ -462,8 +472,9 @@ check/settle result's findings (a formed structure's warnings included). `claims
 filtered by `(owner, siting, bay)`; the ledger row set is ledger-wide and a `Formed.claims()` may
 carry rows of other structures. `settled` is the settle order and `rolledBack` is the release
 order. Rollback releases claims and removes the kernel context of every formed attempt: a failed
-release or a failed context removal stays in `rollbackFailures` as `SC-SET-0007`, and a failed
-release keeps its structure out of `rolledBack` while its context is still removed.
+release or a failed `Broken` dispatch stays in `rollbackFailures` as `SC-SET-0007`, and a failed
+release keeps its structure out of `rolledBack` while its context is still removed through the
+`Broken` dispatch.
 
 ### 10.5 Production command and one capture (S5)
 
@@ -553,8 +564,8 @@ the instances are allocated in check order root-first, and that one budget is sh
 every member attempt. `StructureSetHost.check` takes the same
 arguments, runs the same presence/link/check sequence and stops before the settle pass: it returns
 outcomes and set findings only, with empty `settled`, `rolledBack`, `rollbackFailures` and `claims`.
-The existing `run` signature is preserved. Rollback reaches the kernel store through
-`StructureKernel.contexts()` and calls `ContextStore.remove(instance)` for every formed attempt.
+The existing `run` signature is preserved. Rollback dispatches `StructureEvent.Broken` through the
+bound `StructureManager` for every formed attempt; it does not call `ContextStore.remove`.
 
 ## 12. Document pipeline
 
@@ -642,7 +653,7 @@ Document errors reuse existing codes:
 | S3 | `StructureSet`/`SatelliteSpec`/`LinkSpec`/`PresenceSpec`, host placement/link/presence/check/settle/rollback, adapter result | focused adapter/kernel tests |
 | S4 | docs, counts, stress scenarios | docs + focused regression |
 | S5 | production `set check`/`set settle`, one set capture, check-only host path, built-in demo set, real-level GameTests | focused adapter tests + `check` + `runGameTestServer` |
-| S6 | same-siting `SC-SET-0008`, `ContextStore.remove`/rollback invalidation, shared set budget, docs and counts | focused kernel/adapter tests + `check` + `runGameTestServer` |
+| S6 | same-siting `SC-SET-0008`, `StructureEvent.Broken` rollback invalidation, shared set budget, docs and counts | focused kernel/adapter tests + `check` + `runGameTestServer` |
 
 ### 16.1 Progress
 
@@ -684,9 +695,9 @@ Document errors reuse existing codes:
   type and no visual changes.
 - **S6** is implemented in the working tree after `8ba240e`. It closes the three set-layer gaps:
   `SC-SET-0008` (root/satellite placement collision) with the compiler, `StructureSet.place` and the
-  host's defensive check; `ContextStore.remove(InstanceId)` (interface, in-memory and
-  `StructureManager`), `StructureKernel.structures()`, and rollback invalidation of every formed attempt
-  independent of its release; and one set-scoped budget shared by presence and every member attempt.
+  host's defensive check; `StructureEvent.Broken` dispatched through the bound `StructureManager` and
+  `StructureKernel.structures()` for rollback invalidation of every formed attempt independent of its
+  release; and one set-scoped budget shared by presence and every member attempt.
   The focused tests are two new `StructureSetCompilerTest` cases (15 total), two `StructureSetPlanTest`
   cases (8), two `StructureSetHostTest` cases (26), the renamed/new budget cases in
   `LogicalSubnetworkSetStressTest` (9), the updated `StructureSetRollbackStressTest` (6), plus

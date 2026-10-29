@@ -290,6 +290,11 @@ public final class WatchEvents {
             Siting movedSiting = instance.siting().withOrigin(movedOrigin);
             StructureEvent moved = new StructureEvent.Moved(instance.id(), instance.siting(), movedSiting, movedBounds);
             if (!dispatchChecked(manager, moved)) {
+                dispatch(
+                    manager,
+                    new StructureEvent.Invalidated(instance.id(), "the manager rejected the moved siting")
+                );
+                release(level, instance);
                 continue;
             }
             if (!moveClaims(level, instance, movedSiting, dx, dy, dz)) {

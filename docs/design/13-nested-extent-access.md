@@ -2,7 +2,7 @@
 
 > Status: approved and implemented. This supplements D-36 and replaces the previous
 > capability-only `NestedExtentAccess`. The capability/attachment split is implemented in
-> `mc.capability`; 384 adapter unit tests and 112/112 GameTests are green.
+> `mc.capability`; 411 adapter unit tests and 126/126 GameTests are green.
 
 ## 1. Correction
 

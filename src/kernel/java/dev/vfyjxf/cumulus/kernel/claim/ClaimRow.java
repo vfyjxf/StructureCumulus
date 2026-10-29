@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.claim;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
+import dev.vfyjxf.cumulus.kernel.space.Placement;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 
 import java.util.Objects;
@@ -22,11 +23,32 @@ public record ClaimRow(LatticeKey cell, Sharing sharing, OwnerId owner, Siting s
 
     @Override
     public int compareTo(ClaimRow other) {
-        int byCell = cell.compareTo(other.cell);
-        if (byCell != 0) {
-            return byCell;
+        int result = cell.compareTo(other.cell);
+        if (result != 0) {
+            return result;
         }
-        int byOwner = owner.id().compareTo(other.owner.id());
-        return byOwner != 0 ? byOwner : bay.compareTo(other.bay);
+        result = owner.id().compareTo(other.owner.id());
+        if (result != 0) {
+            return result;
+        }
+        result = bay.compareTo(other.bay);
+        if (result != 0) {
+            return result;
+        }
+        result = siting.origin().compareTo(other.siting.origin());
+        if (result != 0) {
+            return result;
+        }
+        Placement placement = siting.placement();
+        Placement otherPlacement = other.siting.placement();
+        result = placement.orientation().compareTo(otherPlacement.orientation());
+        if (result != 0) {
+            return result;
+        }
+        result = placement.offset().compareTo(otherPlacement.offset());
+        if (result != 0) {
+            return result;
+        }
+        return sharing.compareTo(other.sharing);
     }
 }

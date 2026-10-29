@@ -248,7 +248,7 @@ for a claimable bay. A nested structure is checkable but never claimable: a nest
 subject, and a check that binds a nested body through `Focuses.occupant` fails at claim prediction
 with `SC-CLM-0004` before an `Admitted` exists. Rows are one per cell per bay; a cell may carry two
 rows only when both bays are `shared` (the blueprint refuses an exclusive overlap). `rows` is sorted
-by `(cell, owner, bay)`.
+by `(cell, owner, bay, siting origin, placement orientation, placement offset, sharing)`.
 
 `check` rejects a nested or non-root binding while folding the verdict; it never returns an
 `Admitted` that carries one. `settle` revalidates before deriving: each bay is this blueprint's; each

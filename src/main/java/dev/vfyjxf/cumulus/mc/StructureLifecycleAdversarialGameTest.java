@@ -500,11 +500,11 @@ public final class StructureLifecycleAdversarialGameTest {
     }
 
     /**
-     * A manager that rejects a Moved event (the target siting is already occupied) must not keep the
-     * claim translation that the adapter performed before dispatching it.
+     * A manager that rejects a Moved event (the target siting is already occupied) must not leave the
+     * stale instance or its old claim rows behind: the adapter invalidates it and releases its claims.
      */
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void rejectedPistonMoveMustNotLeaveTranslatedClaimsBehind(GameTestHelper helper) {
+    public void rejectedPistonMoveInvalidatesTheStaleInstanceAndReleasesItsClaims(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
@@ -527,18 +527,81 @@ public final class StructureLifecycleAdversarialGameTest {
         );
 
         StructureInstance afterReject = manager.find(moving.id());
-        boolean managerRejected = afterReject != null && afterReject.siting().equals(siting);
+        boolean staleInstanceLeft = afterReject != null;
         int oldRows = rows(ledger, origin).size();
         int targetRows = rows(ledger, target).size();
         long revisionDelta = ledger.revision() - before;
+        boolean occupantKept = manager.find(occupant.id()) != null;
         helper.assertTrue(
-            managerRejected && oldRows == 1 && targetRows == 0 && revisionDelta == 0L,
-            "a rejected Moved event must leave the old rows in place: managerAtOldSiting=" + managerRejected
-                    + ", oldRows=" + oldRows + ", translatedRows=" + targetRows + ", revisionDelta=" + revisionDelta
-                    + ", occupant=" + occupant.id()
+            !staleInstanceLeft && oldRows == 0 && targetRows == 0 && revisionDelta == 1L && occupantKept,
+            "a rejected Moved event must invalidate the stale instance and release its claims: staleInstance="
+                    + staleInstanceLeft + ", oldRows=" + oldRows + ", translatedRows=" + targetRows + ", revisionDelta="
+                    + revisionDelta + ", occupantKept=" + occupantKept + ", occupant=" + occupant.id()
         );
+
+        WatchEvents.pistonMoved(
+            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        );
+        assertEquals(helper, before + 1L, ledger.revision(), "a duplicate rejected pass releases nothing more");
         cleanup(manager, ledger, ownerA, siting);
         cleanup(manager, ledger, ownerA, occupied);
+        helper.succeed();
+    }
+
+    /**
+     * Focused regression for the rejected-move gap: the stale instance must be invalidated and the
+     * whole claim key released, including rows outside the moved bounds.
+     */
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void rejectedMoveRegressionInvalidatesAndReleasesTheWholeClaimKey(GameTestHelper helper) {
+        ServerState state = requireState();
+        ServerLevel level = helper.getLevel();
+        StructureManager manager = state.structures(level);
+        SavedClaims ledger = state.claims(level);
+        BlockPos pistonRel = new BlockPos(0, 1, 0);
+        BlockPos stoneRel = new BlockPos(1, 1, 0);
+        BlockPos extraRel = new BlockPos(1, 2, 0);
+        helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
+        helper.setBlock(stoneRel, Blocks.STONE);
+        LatticePoint origin = point(helper.absolutePos(stoneRel));
+        LatticePoint extraCell = point(helper.absolutePos(extraRel));
+        LatticePoint target = Objects.requireNonNull(origin.offset(1, 0, 0), "target cell");
+        Siting siting = Siting.of(origin, Orientation.identity);
+        Siting occupying = Siting.of(target, Orientation.identity);
+        StructureInstance stale = form(manager, state, level, ownerA, siting, origin);
+        StructureInstance occupant = form(manager, state, level, ownerA, occupying, target);
+        claimRows(ledger, ownerA, siting, List.of(origin, extraCell), Sharing.shared);
+        assertEquals(
+            helper,
+            2,
+            rows(ledger, origin).size() + rows(ledger, extraCell).size(),
+            "the key has two rows before the pass"
+        );
+        long before = ledger.revision();
+
+        WatchEvents.pistonMoved(
+            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        );
+
+        boolean staleInstanceLeft = manager.find(stale.id()) != null;
+        int oldRows = rows(ledger, origin).size();
+        int extraRows = rows(ledger, extraCell).size();
+        int targetRows = rows(ledger, target).size();
+        long revisionDelta = ledger.revision() - before;
+        boolean occupantKept = manager.find(occupant.id()) != null;
+        helper.assertTrue(
+            !staleInstanceLeft
+                    && oldRows == 0
+                    && extraRows == 0
+                    && targetRows == 0
+                    && revisionDelta == 1L
+                    && occupantKept,
+            "a rejected move must invalidate the instance and release its whole key: staleInstance=" + staleInstanceLeft
+                    + ", oldRows=" + oldRows + ", extraRows=" + extraRows + ", translatedRows=" + targetRows
+                    + ", revisionDelta=" + revisionDelta + ", occupantKept=" + occupantKept
+        );
+        cleanup(manager, ledger, ownerA, siting);
+        cleanup(manager, ledger, ownerA, occupying);
         helper.succeed();
     }
 
@@ -670,10 +733,6 @@ public final class StructureLifecycleAdversarialGameTest {
         @Override
         public boolean shouldInformAdmins() {
             return false;
-        }
-
-        private String text() {
-            return String.join("\n", messages);
         }
     }
 }

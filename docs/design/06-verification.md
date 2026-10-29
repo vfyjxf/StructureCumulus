@@ -36,12 +36,10 @@ one `SnapshotLevel` per frame and the capture wiring; H3 adds the adapter host e
 and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress group (§3.4). The
 T1–T3 trait-provider slice (D-34) then replaces the provider shape and the trait values. S5 adds the
 production set command and its one capture, the check-only host path and the set GameTests (§3.5). S6
-closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback
-invalidation, and one set budget shared by presence and every member attempt (§3.3). On the current
-working tree a full `./gradlew check` and `runGameTestServer` both pass: 351 kernel tests (44
-containers), 384 adapter unit tests (40 containers), 112/112 `@GameTest` methods, 0 failures, 0
-skipped.
-`tools/spec-check.py` is clean.
+closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `StructureEvent.Broken` rollback
+invalidation, and one set budget shared by presence and every member attempt (§3.3). The current
+suites total 382 kernel tests (48 containers), 411 adapter unit tests (43 containers) and 126
+`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0). `tools/spec-check.py` is clean.
 `Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
@@ -260,8 +258,8 @@ asserts the unload split. This is intentional, not a gap.
 The structure-set characterization suite, added in SS4: six adapter classes and 34 tests in
 `src/test/.../mc`, over the same in-memory `WorldView`, `ClaimLedger` and `ContextStore` as §3 and
 with no GameTest. SS4 added no kernel type, no code, no kernel scenario obligation and no decision;
-S6 then closes the two characterized gaps below with `SC-SET-0008`, `ContextStore.remove` and one
-shared set budget (D-35). The suite drives the adapter's `StructureSet.place` and `StructureSetHost`
+S6 then closes the two characterized gaps below with `SC-SET-0008`, `StructureEvent.Broken` rollback
+invalidation and one shared set budget (D-35). The suite drives the adapter's `StructureSet.place` and `StructureSetHost`
 against realistic member shapes and records every limitation it meets.
 
 | Class | Shape it drives | Tests |
@@ -279,7 +277,7 @@ tests:
 | Rule | Asserted by |
 | --- | --- |
 | Presence charges one cell per read and each attempt sees the set budget minus presence and the earlier admitted spends; a budget-exhausted attempt stops the set | `LogicalSubnetworkSetStressTest.presenceAndEveryStructureAttemptShareOneBudgetCeiling`, `aOneCellBudgetCannotCoverPresenceAndAnAttempt` |
-| A rollback removes the `StructureContext` of every formed attempt, including a failed-release root; a removal `RuntimeException` is `SC-SET-0007` and does not stop the other releases | `StructureSetRollbackStressTest.aSettleFailureReleasesInReverseOrder`, `aFailedReleaseReportsScSet0007AndKeepsTheRest`; `StructureSetHostTest.aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals`, `rollbackRemovesTheKernelContextOfEveryFormedAttempt` |
+| A rollback dispatches `StructureEvent.Broken` for every formed attempt, including a failed-release root; a dispatch `RuntimeException` is `SC-SET-0007` and does not stop the other releases | `StructureSetRollbackStressTest.aSettleFailureReleasesInReverseOrder`, `aFailedReleaseReportsScSet0007AndKeepsTheRest`; `StructureSetHostTest.aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals`, `rollbackRemovesTheKernelContextOfEveryFormedAttempt` |
 | A satellite siting equal to the root siting is rejected in the compiler, in `StructureSet.place` and defensively by the host; an origin satellite with a non-identity orientation is allowed | `StructureSetCompilerTest.aSatellitePlacedExactlyOnTheRootIsRejected`, `aSatelliteAtTheRootOriginWithANonIdentityOrientationIsAllowed`; `StructureSetPlanTest.aHandBuiltSatelliteOnTheRootSitingIsRejected`, `aSatelliteAtTheRootOriginWithANonIdentityOrientationIsAllowed`; `StructureSetHostTest.aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence` |
 
 **Boundaries, not gaps.** The host re-checks link distance, coverage and now same-siting, but not the
@@ -339,7 +337,7 @@ type, no code and no decision.
 ### 3.6 Adversarial close-out
 
 The 2026-10-29 adversarial round adds four kernel classes (80 tests) and three real-level GameTest
-classes (29 methods), and extends the manager lifecycle and claim/coverage edges. It adds no kernel
+classes (30 methods), and extends the manager lifecycle and claim/coverage edges. It adds no kernel
 type, no new code and no decision.
 
 | Suite | Class | What it drives | Tests |
@@ -349,7 +347,7 @@ type, no new code and no decision.
 | kernel | `AdversarialExpectationTest` | expectation combinators, absent/refused/trait states and typed host values | 13 |
 | kernel | `AdversarialFuzzTest` | deterministic small-model manager/claim/coverage sequences | 8 |
 | adapter | `CaptureAdversarialGameTest` | world-frame capture, over-cap boundary, lease invalidation, build-height child refusal, nested origin/provider/cut and manager bounds | 13 |
-| adapter | `StructureLifecycleAdversarialGameTest` | overlapping break, explosion, placement, same-siting settle replacement, piston full move/partial/destroy/conflict, level unload keeps claims, rejected move | 11 |
+| adapter | `StructureLifecycleAdversarialGameTest` | overlapping break, explosion, placement, same-siting settle replacement, piston full move/partial/destroy/conflict, level unload keeps claims, rejected move | 12 |
 | adapter | `StructureSetAdversarialGameTest` | check-only leaves no state, re-settle replacement, shared budget stop, duplicate placement, six-satellite set | 5 |
 
 **Corrected lifecycle (D-38/D-40).** The lifecycle wording is now:
@@ -361,7 +359,8 @@ type, no new code and no decision.
   `pistonPartialMoveInvalidatesAndReleasesTheOldClaims`,
   `pistonDestroyedPartInvalidatesAndReleasesTheOldClaims`,
   `pistonMoveClaimConflictInvalidatesAndKeepsTheIncumbent`,
-  `rejectedPistonMoveMustNotLeaveTranslatedClaimsBehind`.
+  `rejectedPistonMoveInvalidatesTheStaleInstanceAndReleasesItsClaims`,
+  `rejectedMoveRegressionInvalidatesAndReleasesTheWholeClaimKey`.
 - A level unload dispatches `Unloaded(world)` and drops only that world's in-memory manager instances
   and drafts; persisted claim rows stay. `StructureLifecycleAdversarialGameTest.levelUnloadDropsInstancesAndKeepsTheClaimRows`.
 - `StructureManager` keys are `(world, owner, siting)`: the same tuple in two worlds coexists;
@@ -385,6 +384,26 @@ read-context record), `AttachmentNestedExtentProvider<H, T>` adds the attachment
 read-only: it calls `getExistingDataOrNull` and never creates/writes an attachment. Covered by
 `NestedExtentTest` and the nested/capture GameTests (`NestedCaptureGameTest`,
 `CaptureAdversarialGameTest`); the full design is `docs/design/13-nested-extent-access.md`.
+
+### 3.7 Expanded-instance wave
+
+The expanded wave adds six suites (56 tests) over the N=10..100 shapes: kernel
+`ExpandedManagerTest` (12), `ExpandedManagerFuzzTest` (5), `ExpandedClaimMatrixTest` (12); adapter
+`ExpandedLifecycleTest` (14), `ExpandedSetTest` (9), `ExpandedInstanceFuzzTest` (4). It drives
+N=100 overlapping instances, 80/100-row claim matrices, 64-member sets, 32-member rollback and
+repeated re-settle. The wave's one production fix (P1b) is the rejected-`Moved` path in
+`WatchEvents`: a manager-rejected piston move dispatches `Invalidated` and releases the stale claim
+key instead of retaining the stale instance and rows; regression
+`rejectedMoveRegressionInvalidatesAndReleasesTheWholeClaimKey`. Total GameTests are 126/126.
+
+| Suite | Class | What it drives | Tests |
+| --- | --- | --- | --- |
+| kernel | `ExpandedManagerTest` | 100 overlapping instances, half-open `findAt`/`findIn`, replacement/move/broken/invalidated at scale, per-world `Loaded`/`Unloaded`, serial, contexts and draft reservations | 12 |
+| kernel | `ExpandedManagerFuzzTest` | world-scoped registry scripts, many overlapping instances, context isolation, load/unload draft closing, random event sequences | 5 |
+| kernel | `ExpandedClaimMatrixTest` | 80/100-row claim ordering, duplicate canonicalization, planner Box/Bound/Declared/None, siting translation, revisions and conflicts | 12 |
+| adapter | `ExpandedLifecycleTest` | overlapping break, one break/explosion fan-out, piston move/conflict, rejected moves, multi-world load/unload, duplicate events, claim release | 14 |
+| adapter | `ExpandedSetTest` | 64-member set, exact shared budget, 32-member rollback, release failure, failed/successful re-settle, competing owners and repeated sitings | 9 |
+| adapter | `ExpandedInstanceFuzzTest` | random claim/context/lifecycle scripts across worlds, exclusive conflicts, moves, unload/load and claim invariants | 4 |
 
 ## 4. Module tests
 
@@ -445,7 +464,7 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
     stays)
 15. Can a nested body or a non-root subject become a claim row? (engine: `SC-CLM-0004`)
 16. Can a satellite share the root siting? (compiler, `place` and host: `SC-SET-0008`)
-17. Can a rolled-back structure keep a context? (host rollback: `ContextStore.remove` for every
+17. Can a rolled-back structure keep a context? (host rollback: dispatch `StructureEvent.Broken` for every
     formed attempt, even a failed release)
 18. Can a set read more cells than its budget? (host: one set budget; presence `(1, 0)` and admitted
     spend are subtracted)
@@ -474,8 +493,7 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
 
 ## 7. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 112 `@GameTest` methods; the
-  full `runGameTestServer` is 112/112 on the working tree. The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 126 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the

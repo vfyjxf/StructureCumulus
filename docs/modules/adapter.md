@@ -69,7 +69,7 @@
   `StructureSetHost.check`, the built-in `set_root`/`set_wing`/`set_demo` documents with the
   `ServerState.findSet` builtin fallback, and the real-level `StructureSetHostGameTest`/`SetCommandGameTest`
   (`06-verification.md` §3.5). S6 adds `SC-SET-0008` at compile/placement/host, the shared set budget
-  and rollback context invalidation through `ContextStore.remove` (D-35). H1 adds `HostType`,
+  and rollback invalidation through `StructureEvent.Broken` on the bound `StructureManager` (D-35). H1 adds `HostType`,
   `WorldView.get` and `Expectations.host` and retires the descriptor properties; H2 adds the per-frame
   `SnapshotLevel`, the capture wiring, the typed `WorldView.get` dispatch, snapshot anchors and the
   digest content. H3 adds the `property`/`state`/`tag`/`fluid` expectation factories and catalog, the
@@ -285,7 +285,7 @@ opened it; the kernel never closes.
 ## 5. Claims
 
 `SavedClaims` is one `SavedData` per world (M3, committed at `d4b6d82`); rows are a flat list ordered
-by `(cell, owner, bay, siting, sharing)`; `revision` is a long in the same data. It is compatible with
+by `(cell, owner, bay, siting origin, placement orientation, placement offset, sharing)`; `revision` is a long in the same data. It is compatible with
 Model C: a refused read never creates a row, a nested body is never a claim binding (`engine` §7.5),
 and a failed check still writes nothing. The persisted row shape is unchanged. `settle` runs on the
 server thread and is one atomic replacement of `(owner, siting)` after checking `expectedRevision`
@@ -305,10 +305,13 @@ the narrow publish/read interface implemented by the manager and the attempt.
 is `Broken` and releases the claim rows; a placement is `Invalidated` and releases the rows; a piston
 that moves the whole claimed structure is `Moved`, translates the claim rows and invalidates on a
 conflict; a partial move/destroy is `Invalidated` and releases the rows; a level unload is
-`Unloaded`. `Loaded` exists for a host
+`Unloaded`. If the manager rejects a piston `Moved`, the adapter dispatches `Invalidated` for the
+stale instance and releases its old claim rows without translating them. `Loaded` exists for a host
 that restores its own instances, but this adapter has no persisted instances to restore. A manager
 rejects an event that would create a duplicate `(owner, siting)`; `Broken`/`Invalidated` are
-idempotent.
+idempotent. The kernel manager reports `findAt`/`findIn`/`instances` registry-wide (no `World`); the
+adapter's one-manager-per-level layout makes those results per-level. `find(World, owner, siting)` is
+the world-qualified tuple lookup.
 
 ## 7. Traits
 
@@ -870,10 +873,11 @@ a fresh `ClaimView` read for that structure's world bounds; the manager begins o
 `StructureAttempt` per checked structure, root first. Any failure before a settle returns with no settle.
 
 A settle failure stops the settle pass, releases the already-settled structures in reverse order and
-dispatches `Broken` for every formed attempt through `StructureManager`, regardless of the release
-verdict or a release throw. A release that
-throws or answers anything except `Settled` is reported as `SC-SET-0007` in `rollbackFailures`, as is
-a removal `RuntimeException`; the remaining releases and removals still run, and nothing is retried.
+dispatches `Broken` for every formed attempt through the bound `StructureManager`, regardless of the
+release verdict or a release throw. This is the rollback mechanism; it does not call
+`ContextStore.remove`. A release that throws or answers anything except `Settled` is reported as
+`SC-SET-0007` in `rollbackFailures`, as is a `Broken`-dispatch `RuntimeException`; the remaining
+releases and dispatches still run, and nothing is retried.
 `settled` is the successful settle order and `rolledBack` the successful release order. `setFindings`
 carries the presence and link findings, a rejected check or settle's findings, and every `Formed`
 structure's own findings (including warnings); `rollbackFailures` stays separate.
@@ -929,9 +933,13 @@ paths.
 There is no kernel multi-structure engine and no claim transaction across structures: the host plan
 and `StructureSetHost` remain a library entry point a host may drive without the command. Each settle
 is independent and a later satellite's CAS retry sees the earlier rows through the ledger. Rollback
-releases claims and removes the kernel context of every formed attempt through `ContextStore.remove`;
-`rolledBack` still names only the successful releases, and a failed release or removal is a
-`SC-SET-0007` rollback failure (D-35). A set has one shared budget: presence charges `(1, 0)` per
+releases claims and removes the kernel context of every formed attempt through
+`StructureEvent.Broken` on the bound `StructureManager`; `rolledBack` still names only the successful
+releases, and a failed release or `Broken` dispatch is a `SC-SET-0007` rollback failure (D-35). Rollback cannot recreate a previous `StructureInstance` that an
+earlier commit in the same run already replaced: member commits are deferred until every settle
+succeeds, so a settle failure keeps the previous set, while a commit-phase failure (only reachable via
+a host-contract violation) removes the committed prefix and restores old claim rows but not the old
+manager instance. A set has one shared budget: presence charges `(1, 0)` per
 read and each attempt receives the remainder, so the set's total reads stay within the run budget
 (09 §7.3). Same-siting is rejected (`SC-SET-0008`) in the compiler, in `StructureSet.place` and by
 the host's defensive check. The SS4 stress suite

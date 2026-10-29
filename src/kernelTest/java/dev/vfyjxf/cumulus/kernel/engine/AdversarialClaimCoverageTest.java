@@ -95,14 +95,14 @@ class AdversarialClaimCoverageTest {
     }
 
     @Test
-    void claimRowOrderIgnoresSitingAndKeepsSitingDistinctRows() {
+    void claimRowOrderIncludesSitingAndKeepsSitingDistinctRows() {
         ClaimRow first = row(origin, Sharing.shared, owner, identity, "bay");
         ClaimRow second = row(origin, Sharing.shared, owner, MagicFixtures.identity(LatticePoint.of(5, 0, 5)), "bay");
 
-        assertEquals(0, first.compareTo(second), "the documented order is (cell, owner, bay)");
+        assertTrue(first.compareTo(second) < 0, "siting is part of the total order");
         assertNotEquals(first, second, "different sitings are different rows");
 
-        ClaimSet set = new ClaimSet(List.of(first, second), 1);
+        ClaimSet set = new ClaimSet(List.of(second, first), 1);
         assertEquals(2, set.rows().size(), "a sorted set keeps both rows of one tie");
         assertEquals(first, set.rows().get(0));
         assertEquals(second, set.rows().get(1));
