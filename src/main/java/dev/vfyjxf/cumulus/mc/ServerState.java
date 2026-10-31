@@ -2,6 +2,9 @@ package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
 import dev.vfyjxf.cumulus.StructureCumulus;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.context.StructureContext;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
@@ -12,11 +15,16 @@ import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetCompileResult;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetCompiler;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
+import dev.vfyjxf.cumulus.kernel.space.Cuboid;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
+import dev.vfyjxf.cumulus.mc.visual.VisualClaim;
+import dev.vfyjxf.cumulus.mc.visual.VisualInstance;
+import dev.vfyjxf.cumulus.mc.visual.VisualSnapshot;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
@@ -24,7 +32,9 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -187,4 +197,47 @@ public final class ServerState {
     }
 
     private record LevelStore(SavedClaims claims, StructureManager structures, StructureKernel kernel) {}
+
+    /**
+     * Reads this level's formed instances and persisted claim rows without mutating either. The
+     * snapshot is taken on the server thread; the client only ever sees a serialized copy.
+     */
+    public VisualSnapshot visualSnapshot(ServerLevel level) {
+        LevelStore store = store(level);
+        StructureManager structures = store.structures();
+        List<VisualInstance> instances = new ArrayList<>();
+        for (StructureInstance instance : structures.instances()) {
+            StructureContext context = structures.context(instance.id());
+            instances.add(
+                new VisualInstance(
+                    instance.id(),
+                    instance.owner(),
+                    instance.siting(),
+                    instance.bounds(),
+                    context.revision(),
+                    context.spend(),
+                    context.findings().findings().stream().map(finding -> finding.code().text()).toList(),
+                    context.values().keySet().stream().map(key -> key.id().text()).toList(),
+                    context.values().size()
+                )
+            );
+        }
+        ClaimView view = store.claims().read(fullLattice());
+        List<VisualClaim> claims = new ArrayList<>(view.rows().size());
+        for (var row : view.rows()) {
+            claims.add(new VisualClaim(row.cell(), row.sharing(), row.owner(), row.siting(), row.bay()));
+        }
+        return new VisualSnapshot(world(level).id(), level.getGameTime(), view.revision(), instances, claims);
+    }
+
+    private static Cuboid fullLattice() {
+        return Cuboid.of(
+            LatticePoint.minXz,
+            LatticePoint.minY,
+            LatticePoint.minXz,
+            LatticePoint.maxXz,
+            LatticePoint.maxY,
+            LatticePoint.maxXz
+        );
+    }
 }

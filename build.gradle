@@ -35,6 +35,8 @@ tasks.named('clean', Delete) {
 
 version = project.mod_version
 group = project.maven_group
+project.ext.cloudlib_version = '0.1.11'
+project.ext.jei_version = '19.27.0.340'
 
 base {
     archivesName = mod_id
@@ -53,6 +55,20 @@ sourceSets {
         compileClasspath += sourceSets.kernel.output
         runtimeClasspath += sourceSets.kernel.output
     }
+    // The dev-only client-test composition: scenarios compile against the engine and CloudLib's
+    // harness API, and are loaded only by the harness runs as the structurecumulusuitest mod.
+    uitest {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+    // The scenario mod's identity; toml only, folded into the structurecumulusuitest mod.
+    uitestMod {}
+}
+
+configurations {
+    uitestImplementation.extendsFrom implementation
+    uitestCompileOnly.extendsFrom compileOnly
+    uitestRuntimeOnly.extendsFrom runtimeOnly
 }
 
 // The kernel is part of the mod's runtime output; without this the NeoForge run classpath
@@ -76,6 +92,10 @@ neoForge {
         structurecumulus {
             sourceSet(sourceSets.main)
         }
+        structurecumulusuitest {
+            sourceSet(sourceSets.uitest)
+            sourceSet(sourceSets.uitestMod)
+        }
     }
 
     unitTest {
@@ -88,6 +108,7 @@ neoForge {
         client {
             client()
             gameDirectory = project.file('runs/client')
+            loadedMods.add(neoForge.mods.structurecumulus)
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -95,6 +116,7 @@ neoForge {
             server()
             gameDirectory = project.file('runs/server')
             programArgument '--nogui'
+            loadedMods.add(neoForge.mods.structurecumulus)
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -102,6 +124,7 @@ neoForge {
             server()
             gameDirectory = project.file('runs/gameTest')
             programArgument '--nogui'
+            loadedMods.add(neoForge.mods.structurecumulus)
             systemProperty 'neoforge.gameTestServer', 'true'
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
@@ -114,15 +137,31 @@ neoForge {
     }
 }
 
+// Visual client-test runs are headless by default; only -PclTestWindowed opts back into a visible
+// window for the manual gallery. gradle/cloudlib-uitest.gradle consumes this default.
+project.ext.cloudlibUiTestHeadlessByDefault = true
+apply from: rootProject.file('gradle/cloudlib-uitest.gradle')
+
 repositories {
     mavenLocal()
     mavenCentral()
     maven { url = "https://maven.parchmentmc.org" }
+    maven { url = "https://maven.blamejared.com/" }
 }
 
 dependencies {
+    // CloudLib is the in-world UI engine; localRuntime hands the jar to FML mod discovery in dev.
+    implementation "dev.vfyjxf.cloudlib:cloudlib:${project.cloudlib_version}"
+    localRuntime "dev.vfyjxf.cloudlib:cloudlib:${project.cloudlib_version}"
+    // The harness API is compile-only for scenarios: the harness is a separately staged mod, never
+    // a production or normal-run runtime dependency.
+    uitestCompileOnly "dev.vfyjxf.cloudlib:cloudlib-uitest:${project.cloudlib_version}"
+    // CloudLib declares JEI as a required mod dependency.
+    localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${project.jei_version}"
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${project.jei_version}"
 
     // the kernel compiles on its own classpath and is consumed by the mod source set
     implementation sourceSets.kernel.output
@@ -184,7 +223,128 @@ tasks.register('kernelPurity') {
 }
 
 tasks.named('check') {
-    dependsOn 'kernelTest', 'kernelPurity'
+    dependsOn 'kernelTest', 'kernelPurity', 'compileUitestJava', 'verifyRunIsolation', 'verifyHarnessIsolation'
+}
+
+// The harness runs are the only compositions that load structurecumulusuitest, and the harness is a
+// mods-folder jar rather than a classpath entry. These gates pin both halves: what each run declares,
+// and which game directory each staging task owns. They cannot inspect the task graph under the
+// configuration cache, so the harness scripts record the directory -> staging task map.
+def harnessRuns = ['clientTests': 'stageClientTestsUiTestMod',
+                   'galleryClient': 'stageGalleryClientUiTestMod']
+def harnessRunMods = harnessRuns.keySet().collectEntries { name ->
+    [(name): neoForge.runs.named(name).map { run -> run.loadedMods.get()*.name.sort().join(',') }]
+}
+def harnessStagingDirs = project.ext.cloudlibUiTestStagedDirs
+if (harnessStagingDirs == null) {
+    throw new GradleException(
+        'gradle/cloudlib-uitest.gradle must run before the isolation gates: it records which run '
+            + 'directories stage the cloudlibuitest harness mod'
+    )
+}
+if (!harnessStagingDirs.keySet().containsAll(['runs/client-tests', 'runs/gallery-client'])) {
+    throw new GradleException(
+        'every harness run must have a staging directory, found: ' + harnessStagingDirs.keySet()
+    )
+}
+harnessStagingDirs.each { runDirName, stageTaskName ->
+    if (tasks.findByName(stageTaskName) == null) {
+        throw new GradleException(runDirName + ' names the staging task ' + stageTaskName + ', which does not exist')
+    }
+}
+def plainRunNames = ['client', 'server', 'gameTestServer']
+def plainRunDirs = plainRunNames.collectEntries { name ->
+    [(name): neoForge.runs.named(name).map { run -> run.gameDirectory.get().asFile.absolutePath }]
+}
+def plainRunMods = plainRunNames.collectEntries { name ->
+    [(name): neoForge.runs.named(name).map { run -> run.loadedMods.get()*.name.sort().join(',') }]
+}
+def galleryRunDir = neoForge.runs.named('galleryClient')
+    .map { run -> run.gameDirectory.get().asFile.absolutePath }
+def harnessStagingAbsoluteDirs = harnessStagingDirs.keySet().collect { new File(projectDir, it).absolutePath }
+
+tasks.register('verifyRunIsolation') {
+    group = 'verification'
+    description = 'Verifies that only the harness runs load the UI-test composition and stage its harness jar.'
+    inputs.property('harnessStagingDirs', harnessStagingDirs.collect { dir, task -> dir + '=' + task }.sort().join(','))
+    inputs.property('harnessStagingAbsoluteDirs', harnessStagingAbsoluteDirs.sort().join(','))
+    harnessRunMods.each { name, provider -> inputs.property('harnessRunMods.' + name, provider) }
+    plainRunMods.each { name, provider -> inputs.property('plainRunMods.' + name, provider) }
+    plainRunDirs.each { name, provider -> inputs.property('plainRunDir.' + name, provider) }
+    inputs.property('galleryRunDir', galleryRunDir)
+    doLast {
+        harnessRuns.each { runName, stageTaskName ->
+            def declared = harnessRunMods[runName].get()
+            if (declared != 'structurecumulus,structurecumulusuitest') {
+                throw new GradleException(
+                    'the ' + runName + ' harness run must load the engine and UI-test composition '
+                        + '(structurecumulus + structurecumulusuitest), found: ' + declared
+                )
+            }
+            if (harnessStagingDirs.find { it.value == stageTaskName } == null) {
+                throw new GradleException(
+                    'the ' + runName + ' harness run stages through ' + stageTaskName + ', which is not recorded'
+                )
+            }
+        }
+        if (!harnessStagingAbsoluteDirs.contains(galleryRunDir.get())) {
+            throw new GradleException(
+                'runGalleryClient must stage the cloudlibuitest harness mod, found game directory: ' + galleryRunDir.get()
+            )
+        }
+        plainRunNames.each { name ->
+            def mods = plainRunMods[name].get()
+            if (mods != 'structurecumulus') {
+                throw new GradleException(
+                    'the ' + name + ' run must load only the production mod, found: ' + mods
+                )
+            }
+            if (harnessStagingAbsoluteDirs.contains(plainRunDirs[name].get())) {
+                throw new GradleException(
+                    'the ' + name + " run's game directory must not stage the cloudlibuitest harness mod, "
+                        + 'found: ' + plainRunDirs[name].get()
+                )
+            }
+        }
+        logger.lifecycle(
+            'run isolation verified: harnessRuns=[{}] plainRunDirs=[{}] galleryRun=[{}]',
+            harnessRuns.keySet().collect { it + '=' + harnessRunMods[it].get() }.join(' '),
+            plainRunDirs.collect { it.key + '=' + it.value.get() }.join(' '),
+            galleryRunDir.get()
+        )
+    }
+}
+
+// The published jar and every normal run stay harness-free: no scenario classes and no
+// cloudlib-uitest artifact may reach either the jar or the production runtime classpath.
+def productionJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
+def productionRuntime = configurations.runtimeClasspath
+tasks.register('verifyHarnessIsolation') {
+    group = 'verification'
+    description = 'Verifies the production jar and runtime classpath carry no UI-test harness code.'
+    inputs.files(productionJar)
+    inputs.files(productionRuntime)
+    doLast {
+        def offenders = []
+        def jarFile = productionJar.get().asFile
+        new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+            zip.entries().each { entry ->
+                if (entry.name.startsWith('dev/vfyjxf/cumulus/uitest/')
+                        || entry.name.startsWith('META-INF/structurecumulusuitest')) {
+                    offenders.add(entry.name)
+                }
+            }
+        }
+        productionRuntime.files.each { file ->
+            if (file.name ==~ /cloudlib-uitest-.*\.jar/ || file.name ==~ /structurecumulusuitest.*\.jar/) {
+                offenders.add(file.absolutePath)
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException('the production jar/runtime carries harness code: ' + offenders)
+        }
+        logger.lifecycle('harness isolation verified: no scenario classes or cloudlib-uitest jar on the production side')
+    }
 }
 
 tasks.named('jar', Jar) {

@@ -1,0 +1,276 @@
+// The dev-only in-client UI test harness. It is inert on an ordinary build or run: the harness
+// mod is staged into its own run directory and the cloudlib.uitest.* system properties are only set
+// when -PclTest is present. The published jar never sees this source set or the harness artifact.
+//
+// Applied from build.gradle after the neoForge { runs { } } block.
+
+def clUiTestOutDir = layout.buildDirectory.dir('cloudlib-uitest')
+def clUiTestOut = clUiTestOutDir.get().asFile.absolutePath
+def clUiTestSelection = project.findProperty('clTest')?.toString()
+def clUiTestExclude = project.findProperty('clTestExclude')?.toString() ?: ''
+def clUiTestGuiScale = project.findProperty('clTestGuiScale')?.toString()
+def clUiTestWindow = project.findProperty('clTestWindow')?.toString()
+def clUiTestInputMode = project.findProperty('clTestInputMode')?.toString()
+def clUiTestWatchdogSec = project.findProperty('clTestWatchdogSec')?.toString()
+def clUiTestKeepOpen = project.hasProperty('clTestKeepOpen')
+def clUiTestUpdateGolden = project.hasProperty('clTestUpdateGolden')
+// Headless is the default so a visual run never steals the device window/focus. -PclTestWindowed
+// is the explicit human-gallery opt-out; it restores the visible window and skips the fml seed.
+def clUiTestWindowed = project.hasProperty('clTestWindowed')
+def clUiTestHeadless = project.ext.cloudlibUiTestHeadlessByDefault && !clUiTestWindowed
+def clUiTestThemes = project.findProperty('clThemes')?.toString()
+
+if (clUiTestHeadless && clUiTestInputMode != null && clUiTestInputMode.equalsIgnoreCase('REAL')) {
+    throw new GradleException(
+        'clientTests is headless by default and cannot be combined with -PclTestInputMode=REAL: '
+            + 'the real input driver moves the OS cursor and needs a visible, focused window. '
+            + 'Use -PclTestWindowed only for a manual windowed run.'
+    )
+}
+
+def clUiTestWindowWidth = null
+def clUiTestWindowHeight = null
+if (clUiTestWindow != null) {
+    def parts = clUiTestWindow.toLowerCase().split('x')
+    if (parts.length == 2) {
+        clUiTestWindowWidth = parts[0].trim()
+        clUiTestWindowHeight = parts[1].trim()
+    }
+}
+
+// FML writes/reads runs/client-tests/config/fml.toml before the client window exists. For a
+// headless run we temporarily force earlyWindowControl=false, preserving the user's file byte for
+// byte. The backup path is outside the report output so a failed previous run can be recovered
+// before the next seed.
+def clUiTestFmlDir = layout.buildDirectory.dir('cloudlib-uitest-fml').get().asFile
+def clUiTestFmlTarget = file('runs/client-tests/config/fml.toml')
+def clUiTestFmlBackup = new File(clUiTestFmlDir, 'fml.toml.backup')
+def clUiTestFmlAbsent = new File(clUiTestFmlDir, 'fml.toml.absent')
+
+def clRestoreUiTestFml = {
+    if (clUiTestFmlBackup.isFile()) {
+        clUiTestFmlTarget.parentFile.mkdirs()
+        java.nio.file.Files.copy(
+            clUiTestFmlBackup.toPath(),
+            clUiTestFmlTarget.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+        clUiTestFmlBackup.delete()
+        clUiTestFmlAbsent.delete()
+    } else if (clUiTestFmlAbsent.isFile()) {
+        clUiTestFmlTarget.delete()
+        clUiTestFmlAbsent.delete()
+    }
+}
+
+def clRecoverUiTestFml = {
+    clRestoreUiTestFml()
+}
+
+def clSeedUiTestFml = {
+    clUiTestFmlDir.mkdirs()
+    clUiTestFmlBackup.delete()
+    clUiTestFmlAbsent.delete()
+    if (clUiTestFmlTarget.isFile()) {
+        java.nio.file.Files.copy(
+            clUiTestFmlTarget.toPath(),
+            clUiTestFmlBackup.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+    } else {
+        clUiTestFmlAbsent.createNewFile()
+    }
+    def text = clUiTestFmlTarget.isFile()
+        ? clUiTestFmlTarget.getText('UTF-8')
+        : 'earlyWindowControl = false\n'
+    def seeded = text.replaceAll(/(?m)^earlyWindowControl\s*=.*$/, 'earlyWindowControl = false')
+    if (!seeded.contains('earlyWindowControl')) {
+        seeded = seeded + (seeded.endsWith('\n') ? '' : '\n') + 'earlyWindowControl = false\n'
+    }
+    clUiTestFmlTarget.parentFile.mkdirs()
+    clUiTestFmlTarget.setText(seeded, 'UTF-8')
+}
+
+configurations {
+    cloudlibUiTestMod {
+        canBeConsumed = false
+        canBeResolved = true
+        description = 'The published dev-only cloudlibuitest harness mod, staged into harness runs.'
+    }
+}
+
+dependencies {
+    cloudlibUiTestMod "dev.vfyjxf.cloudlib:cloudlib-uitest:${project.cloudlib_version}"
+}
+
+def clStageUiTestMod = { String taskName, String runDirName ->
+    def jarSet = configurations.cloudlibUiTestMod
+    def modsDir = layout.projectDirectory.dir(runDirName + '/mods')
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Stages the cloudlibuitest harness mod into ${runDirName}/mods."
+        def jars = jarSet
+        def target = modsDir
+        inputs.files(jars).withPropertyName('harnessMod')
+        outputs.dir(target).withPropertyName('modsDir')
+        doLast {
+            def dir = target.asFile
+            dir.mkdirs()
+            def existing = dir.listFiles()
+            if (existing != null) {
+                existing.findAll { it.isFile() && it.name ==~ /cloudlib-uitest-.*\.jar/ }.each { it.delete() }
+            }
+            jars.files.each { jarFile ->
+                java.nio.file.Files.copy(
+                    jarFile.toPath(),
+                    new File(dir, jarFile.name).toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+            logger.lifecycle('cloudlib-uitest harness mod staged in {} ({})', dir, jars.files*.name.join(', '))
+        }
+    }
+}
+
+def clStructureCumulusMod = neoForge.mods.structurecumulus
+def clStructureCumulusUiTestMod = neoForge.mods.structurecumulusuitest
+
+neoForge.runs {
+    clientTests {
+        client()
+        gameDirectory = project.file('runs/client-tests')
+        loadedMods.add(clStructureCumulusMod)
+        loadedMods.add(clStructureCumulusUiTestMod)
+        if (clUiTestSelection != null) {
+            systemProperty 'cloudlib.uitest.run', clUiTestSelection
+            systemProperty 'cloudlib.uitest.out', clUiTestOut
+            systemProperty 'cloudlib.uitest.exclude', clUiTestExclude
+            if (clUiTestGuiScale != null) systemProperty 'cloudlib.uitest.guiScale', clUiTestGuiScale
+            if (clUiTestWindowWidth != null) systemProperty 'cloudlib.uitest.windowWidth', clUiTestWindowWidth
+            if (clUiTestWindowHeight != null) systemProperty 'cloudlib.uitest.windowHeight', clUiTestWindowHeight
+            if (clUiTestInputMode != null) systemProperty 'cloudlib.uitest.inputMode', clUiTestInputMode
+            if (clUiTestWatchdogSec != null) systemProperty 'cloudlib.uitest.watchdogSec', clUiTestWatchdogSec
+            if (clUiTestKeepOpen) systemProperty 'cloudlib.uitest.keepOpen', 'true'
+            if (clUiTestUpdateGolden) systemProperty 'cloudlib.uitest.updateGolden', 'true'
+            if (clUiTestThemes != null) systemProperty 'cloudlib.uitest.themes', clUiTestThemes
+        }
+        // Headless by default; only -PclTestWindowed turns this off.
+        if (clUiTestHeadless) systemProperty 'cloudlib.uitest.headless', 'true'
+    }
+
+    galleryClient {
+        client()
+        gameDirectory = project.file('runs/gallery-client')
+        loadedMods.add(clStructureCumulusMod)
+        loadedMods.add(clStructureCumulusUiTestMod)
+        // The gallery is a human windowed run: it never sets headless and never seeds fml.toml.
+        systemProperty 'cloudlib.uitest.headless', 'false'
+    }
+
+    showcaseClient {
+        client()
+        gameDirectory = project.file('runs/showcase-client')
+        loadedMods.add(clStructureCumulusMod)
+        loadedMods.add(clStructureCumulusUiTestMod)
+        // The showcase is the human free-roam run: windowed, keep-open, and only this scenario.
+        systemProperty 'cloudlib.uitest.headless', 'false'
+        systemProperty 'cloudlib.uitest.run', 'visual.showcase'
+        systemProperty 'cloudlib.uitest.out', clUiTestOut
+        systemProperty 'cloudlib.uitest.keepOpen', 'true'
+        systemProperty 'cloudlib.uitest.windowWidth', '1920'
+        systemProperty 'cloudlib.uitest.windowHeight', '1080'
+        systemProperty 'cloudlib.uitest.guiScale', '2'
+    }
+}
+
+def clStageClientTestsMod = clStageUiTestMod('stageClientTestsUiTestMod', 'runs/client-tests')
+def clStageGalleryClientMod = clStageUiTestMod('stageGalleryClientUiTestMod', 'runs/gallery-client')
+def clStageShowcaseClientMod = clStageUiTestMod('stageShowcaseClientUiTestMod', 'runs/showcase-client')
+
+project.ext.cloudlibUiTestStagedDirs = [
+        'runs/client-tests'   : 'stageClientTestsUiTestMod',
+        'runs/gallery-client' : 'stageGalleryClientUiTestMod',
+        'runs/showcase-client': 'stageShowcaseClientUiTestMod'
+]
+
+tasks.matching { it.name == 'runGalleryClient' }.configureEach { task ->
+    task.dependsOn clStageGalleryClientMod
+}
+
+tasks.matching { it.name == 'runShowcaseClient' }.configureEach { task ->
+    task.dependsOn clStageShowcaseClientMod
+}
+
+tasks.register('showcaseClient') {
+    group = 'verification'
+    description = 'Runs only visual.showcase windowed; keepOpen leaves the client in free-roam.'
+    dependsOn 'runShowcaseClient'
+}
+
+def clUiTestCleanReport = tasks.register('cloudlibCleanUiTestReport', Delete) {
+    group = 'verification'
+    description = 'Deletes the previous CloudLib UI test run output.'
+    delete clUiTestOutDir
+}
+
+def clUiTestVerify = tasks.register('verifyUiTest') {
+    group = 'verification'
+    description = 'Reads the UI test report and fails unless every selected scenario passed.'
+    onlyIf { clUiTestSelection != null }
+    doLast {
+        def report = new File(clUiTestOut, 'report.json')
+        if (!report.isFile()) {
+            throw new GradleException(
+                "no UI test report at ${report} - the client crashed, never reached the runner, "
+                    + 'or -PclTest matched no scenarios'
+            )
+        }
+        def run = new groovy.json.JsonSlurper().parse(report)
+        def totals = run.totals
+        logger.lifecycle(
+            "cloudlib-uitest ${run.status}: ${totals.passed}/${totals.scenarios} scenarios passed, "
+                + "${totals.checks - totals.checksFailed}/${totals.checks} checks passed, "
+                + "${totals.captures} captures, ${run.durationMs} ms"
+        )
+        def failures = []
+        run.scenarios.each { scenario ->
+            if (scenario.status != 'PASS') {
+                failures.add("scenario ${scenario.name}: ${scenario.status}"
+                    + (scenario.message == null ? '' : " (${scenario.message})"))
+            }
+        }
+        if (!failures.isEmpty()) {
+            throw new GradleException('UI test failed:\n  ' + failures.join('\n  '))
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name != 'runClientTests' || clUiTestSelection == null) return
+    task.dependsOn clUiTestCleanReport
+    task.finalizedBy clUiTestVerify
+}
+
+def clUiTestRestoreFml = tasks.register('cloudlibRestoreUiTestFml') {
+    group = 'verification'
+    description = 'Restores runs/client-tests/config/fml.toml after a headless clientTests run.'
+    doLast {
+        clRestoreUiTestFml()
+    }
+}
+
+tasks.matching { it.name == 'runClientTests' }.configureEach { task ->
+    task.dependsOn clStageClientTestsMod
+    task.finalizedBy clUiTestRestoreFml
+    task.doFirst {
+        // Recover a backup left behind by an interrupted earlier run before taking a fresh one.
+        clRecoverUiTestFml()
+        if (clUiTestHeadless) {
+            clSeedUiTestFml()
+        }
+        if (clUiTestSelection == null) {
+            logger.lifecycle(
+                'runClientTests without -PclTest: the client boots with the harness mod loaded and runs no scenario'
+            )
+        }
+    }
+}

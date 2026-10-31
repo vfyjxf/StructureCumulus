@@ -1,0 +1,36 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "MIT License"
+
+# The visual client-test composition. It is never published: harness runs load it beside the
+# production mod and the staged cloudlibuitest jar.
+[[mods]]
+modId = "structurecumulusuitest"
+version = "0"
+displayName = "StructureCumulus Client Test Scenarios"
+description = '''
+    StructureCumulus's dev-only visual client-test scenarios. The CloudLib harness finds them by
+    annotation scan; nothing but a harness run loads this mod.
+'''
+authors = "vfyjxf_"
+
+[[dependencies.structurecumulusuitest]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.structurecumulusuitest]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.structurecumulusuitest]]
+modId = "structurecumulus"
+type = "required"
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "BOTH"
