@@ -73,7 +73,7 @@ export function Ledger() {
         no="04"
         kicker={zh ? 'claim / 写入路径' : 'Claims / the write path'}
         title={zh ? <>一行就是一个 cell。<em>plan 不是类型。</em></> : <>A row is a cell. <em>A plan is not a type.</em></>}
-        note={zh ? <>移动两个 bay、改变 sharing。矩阵是唯一的冲突规则；ledger 只比较一次 revision，只写一次。结构集合（D-32）增加的是 host 编排和 S5 的 set 命令，不是 kernel 事务；一次 union capture 不带 orientation、不做 orientation audit，所以 satellite cell 不会收到多余的 <code>SC-MC-0004</code>；S6 给 set 一个共享 budget，并让 rollback 通过 <code>ContextStore.remove</code> 失效 context（D-35）。</> : <>Move the two bays and change their sharing. The matrix is the only conflict rule; the ledger compares one revision and writes once. Structure sets (D-32) add host orchestration and the S5 set command, not a kernel transaction; the one union capture is unsited and runs no orientation audit, so a satellite cell gets no spurious <code>SC-MC-0004</code>; S6 gives the set one shared budget and lets rollback invalidate contexts through <code>ContextStore.remove</code> (D-35).</>}
+        note={zh ? <>移动两个 bay、改变 sharing。矩阵是唯一的冲突规则；ledger 只比较一次 revision，只写一次。结构集合（D-32）增加的是 host 编排和 S5 的 set 命令，不是 kernel 事务；一次 union capture 不带 orientation、不做 orientation audit，所以 satellite cell 不会收到多余的 <code>SC-MC-0004</code>；S6 给 set 一个共享 budget，D-40 让 rollback 通过 manager 的 <code>Broken</code> 事件失效每个 formed instance。claim release 以整个 <code>(owner, siting)</code> 为单位（D-38）。</> : <>Move the two bays and change their sharing. The matrix is the only conflict rule; the ledger compares one revision and writes once. Structure sets (D-32) add host orchestration and the S5 set command, not a kernel transaction; the one union capture is unsited and runs no orientation audit, so a satellite cell gets no spurious <code>SC-MC-0004</code>; S6 gives the set one shared budget and D-40 lets rollback invalidate each formed instance through the manager&rsquo;s <code>Broken</code> event. Claim release is whole-key (D-38): one <code>(owner, siting)</code> is one instance.</>}
       />
 
       <Reveal>
@@ -152,7 +152,7 @@ export function Ledger() {
             <div className="ledger-foot">
               <div><b>check</b>{zh ? '为报告预测 rows；Admitted 保留 bindings + revision' : 'predicts rows for the report; Admitted keeps bindings + revision'}</div>
               <div><b>settle</b>{zh ? '对 revision 做 CAS；写一次；Formed 携带 rows' : 'CAS on revision; writes once; Formed carries rows'}</div>
-              <div><b>release</b>{zh ? '第三个 writer；no-op 可以在 revision 0 settle' : 'the third writer; a no-op may settle at revision 0'}</div>
+              <div><b>release</b>{zh ? '第三个 writer；release 删除整个 (owner, siting) key（D-38）' : 'the third writer; release deletes the whole (owner, siting) key (D-38)'}</div>
             </div>
 
             <div className="ledger-result">
@@ -204,12 +204,12 @@ export function Ledger() {
               <CodeBlock code={SNIPPET} language="java" />
             </div>
             <div className="aside-rule" />
-            <div className="eyebrow">{zh ? '结构集合 / D-32 → D-35' : 'Structure sets / D-32 → D-35'}</div>
+            <div className="eyebrow">{zh ? '结构集合 / D-32 → D-40' : 'Structure sets / D-32 → D-40'}</div>
             <h4 style={{ fontFamily: 'var(--serif)', fontWeight: 400, fontSize: 24, letterSpacing: '-.03em', marginTop: 7 }}>
               {zh ? 'root + satellites，由 host 编排。' : 'Root + satellites, sequenced by the host.'}
             </h4>
             <p style={{ marginTop: 10, fontSize: 11, lineHeight: 1.55, color: 'var(--muted)' }}>
-              {zh ? <>kernel 仍然一次只 check、settle 一个 blueprint。<code>StructureSetHost</code> 负责 presence、link 校验、check-all、settle-all 和 release；S5 增加 <code>/cumulus set check|settle</code> 和一次不带 orientation 的 union capture（不做 orientation audit，不会为 satellite cell 产生多余的 <code>SC-MC-0004</code>），S6 让 presence 与每个成员 attempt 共享一个 budget，并在 rollback 时移除每个已形成的 context；同 siting 拒绝和一格 budget 由真实 level 的 <code>StructureSetHostGameTest</code> 覆盖。</> : <>The kernel still checks and settles one blueprint at a time. <code>StructureSetHost</code> owns presence, link validation, check-all, settle-all and release; S5 adds <code>/cumulus set check|settle</code> over one unsited union capture (no orientation audit, so no spurious <code>SC-MC-0004</code> for satellite cells), and S6 shares one budget across presence and every member attempt, removes each formed context on rollback, and adds the real-level <code>StructureSetHostGameTest</code> cases for the same-siting rejection and the one-cell budget.</>}
+              {zh ? <>kernel 仍然一次只 check、settle 一个 blueprint。<code>StructureSetHost</code> 负责 presence、link 校验、check-all、settle-all 和 release；S5 增加 <code>/cumulus set check|settle</code> 和一次不带 orientation 的 union capture（不做 orientation audit，不会为 satellite cell 产生多余的 <code>SC-MC-0004</code>）；S6 让 presence 与每个成员 attempt 共享一个 budget；D-40 让每个 formed 成员在 <code>StructureManager</code> 中拥有 instance，并在 rollback 时派发 <code>Broken</code>，从而一起移除 instance 和 context。claim release 以整个 <code>(owner, siting)</code> 为单位（D-38）。同 siting 拒绝和一格 budget 由真实 level 的 <code>StructureSetHostGameTest</code> 覆盖。</> : <>The kernel still checks and settles one blueprint at a time. <code>StructureSetHost</code> owns presence, link validation, check-all, settle-all and release; S5 adds <code>/cumulus set check|settle</code> over one unsited union capture (no orientation audit, so no spurious <code>SC-MC-0004</code> for satellite cells); S6 shares one budget across presence and every member attempt; D-40 gives each formed member an instance in the <code>StructureManager</code> and dispatches <code>Broken</code> on rollback, so the instance and its context are removed together. Claim release is whole <code>(owner, siting)</code> (D-38). The real-level <code>StructureSetHostGameTest</code> covers the same-siting rejection and the one-cell budget.</>}
             </p>
             <div className="key-stack" style={{ marginTop: 12 }}>
               <div><span className="k">order</span><span className="v">presence → links → check-all → settle-all → release</span></div>
@@ -217,9 +217,13 @@ export function Ledger() {
               <div><span className="k">capture</span><span className="v">{zh ? '不带 orientation · 不做 orientation audit · 无多余 SC-MC-0004' : 'unsited · no orientation audit · no spurious SC-MC-0004'}</span></div>
               <div><span className="k">budget</span><span className="v">{zh ? 'presence + 每个 attempt 共享一个 set budget' : 'one set budget: presence + every attempt'}</span></div>
               <div><span className="k">siting</span><span className="v">{zh ? 'satellite 不得与 root 同 siting · SC-SET-0008' : 'no satellite on the root siting · SC-SET-0008'}</span></div>
-              <div><span className="k">{zh ? '回滚' : 'rollback'}</span><span className="v">{zh ? '逆序；release + ContextStore.remove；失败是 SC-SET-0007' : 'reverse order; release + ContextStore.remove; failure is SC-SET-0007'}</span></div>
+              <div><span className="k">{zh ? '回滚' : 'rollback'}</span><span className="v">{zh ? '逆序；release + Broken；失败是 SC-SET-0007' : 'reverse order; release + Broken; failure is SC-SET-0007'}</span></div>
+              <div><span className="k">release</span><span className="v">{zh ? '整个 (owner, siting) · D-38' : 'whole (owner, siting) · D-38'}</span></div>
               <div><span className="k">claims</span><span className="v">{zh ? '按 (owner, siting, bay) 过滤' : 'filtered by (owner, siting, bay)'}</span></div>
-              <div><span className="k">context</span><span className="v">{zh ? 'rollback 时由 store 移除' : 'removed by the store on rollback'}</span></div>
+              <div><span className="k">manager</span><span className="v">{zh ? 'begin/commit/abort · 实例绑定 context' : 'begin/commit/abort · instance-bound context'}</span></div>
+              <div><span className="k">events</span><span className="v">Broken · Moved · Loaded · Unloaded · Invalidated</span></div>
+              <div><span className="k">lifecycle</span><span className="v">{zh ? 'Broken/Invalidated 释放 claims；完整 Moved 平移它们' : 'Broken/Invalidated release claims; a full Moved translates them'}</span></div>
+              <div><span className="k">context</span><span className="v">{zh ? '绑定 instance；随它一起移除' : 'bound to the instance; removed with it'}</span></div>
             </div>
             <div className="figure-label">
               <span>{zh ? '图 04 — 两个 owner，一个 cell' : 'Fig. 04 — two owners, one cell'}</span>

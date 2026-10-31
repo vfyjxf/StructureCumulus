@@ -33,7 +33,7 @@ LatticePoint origin();
     signature: `record Check<T>(NamespacedId id, Bay bay,
         Focus<T> focus, Expectation<T> expectation,
         @Nullable String description)`,
-    side: 'Match, Mismatch, Unreadable and Abstain never collapse. A mismatch is a refutation; unreadable is ignorance.',
+    side: 'Match, Mismatch, Unreadable and Abstain never collapse. A mismatch is a refutation; unreadable is ignorance. A focus also declares bindsClaimableSubject (D-37): a subject-binding focus that cannot claim is rejected at build with SC-BPT-0005 when the bay claims. NOTAIR is exactly not(air()); empty() and nonFluid() are opt-in leaves (D-39).',
   },
   {
     id: 'blueprint',
@@ -75,7 +75,7 @@ const ZH_CHAIN: Record<string, { role: string; detail: string; side: string }> =
   check: {
     role: '一个 focus × 一个 expectation',
     detail: 'focus 取一个 subject，expectation 检验它，check 是两者唯一相遇的地方。没有 predicate registry、没有 requirement 对象、没有第二条 dispatch 路径。',
-    side: 'Match、Mismatch、Unreadable、Abstain 永不合并。Mismatch 是反驳；Unreadable 是无知。',
+    side: 'Match、Mismatch、Unreadable、Abstain 永不合并。Mismatch 是反驳；Unreadable 是无知。focus 还声明 bindsClaimableSubject（D-37）：当 bay 会 claim 时，不能 claim 的 subject-binding focus 在 build 时以 SC-BPT-0005 被拒绝。NOTAIR 精确等于 not(air())；empty() 和 nonFluid() 是 opt-in leaf（D-39）。',
   },
   blueprint: {
     role: '完整声明',
@@ -177,19 +177,22 @@ export function ObjectModel() {
                 : (zh ? 'attempt 局部；从不发布' : 'attempt-local; never published')}
             </div>
             <div className="aside-rule" />
-            <div className="eyebrow">{zh ? 'host payload / D-33' : 'Host payload / D-33'}</div>
+            <div className="eyebrow">{zh ? 'host payload / D-33 · structure / D-40' : 'Host payload / D-33 · structure / D-40'}</div>
             <div className="key-stack" style={{ marginTop: 10 }}>
               <div><span className="k">read</span><span className="v">WorldView.get(pos, type)</span></div>
               <div><span className="k">bridge</span><span className="v">Expectations.host</span></div>
               <div><span className="k">descriptor</span><span className="v">(type, kind)</span></div>
               <div><span className="k">traits</span><span className="v">TraitProvider&lt;T, H&gt;</span></div>
               <div><span className="k">nested</span><span className="v">NestedExtentLookup</span></div>
+              <div><span className="k">instance</span><span className="v">StructureInstance</span></div>
+              <div><span className="k">manager</span><span className="v">StructureManager</span></div>
+              <div><span className="k">events</span><span className="v">Broken · Moved · Loaded · Unloaded · Invalidated</span></div>
               <div><span className="k">D-29</span><span className="v">{zh ? '已被取代' : 'superseded'}</span></div>
             </div>
             <p style={{ marginTop: 10 }}>
               {zh
-                ? <>一份不可变快照、多种类型化读取。descriptor 不再有 properties/tags；property、state、tag、fluid 是 adapter 在 <code>Expectations.host</code> 上的 leaf。capability trait 直接返回 <code>IItemHandler</code> / <code>IEnergyStorage</code> / <code>IFluidHandler</code>。nested extent 是同一套 per-holder 形状：一个 <code>NestedExtentLookup</code>、每个 holder 一个 <code>NestedExtentProvider</code>，以及一个 <code>CapabilityNestedExtentProvider</code>；旧的聚合 lookup 和 <code>CapabilityLookup</code> 已删除。</>
-                : <>One immutable snapshot, many typed reads. The descriptor has no properties or tags; property, state, tag and fluid are adapter leaves over <code>Expectations.host</code>. Capability traits return <code>IItemHandler</code>, <code>IEnergyStorage</code> and <code>IFluidHandler</code> directly. Nested extents follow the same per-holder shape: one <code>NestedExtentLookup</code>, a <code>NestedExtentProvider</code> per holder and one <code>CapabilityNestedExtentProvider</code>; the old aggregate lookup and <code>CapabilityLookup</code> are gone.</>}
+                ? <>一份不可变快照、多种类型化读取。descriptor 不再有 properties/tags；property、state、tag、fluid 是 adapter 在 <code>Expectations.host</code> 上的 leaf。capability trait 直接返回 <code>IItemHandler</code> / <code>IEnergyStorage</code> / <code>IFluidHandler</code>。nested extent 是同一套 per-holder 形状：一个 <code>NestedExtentLookup</code>、每个 holder 一个 <code>NestedExtentProvider</code>，以及一个 <code>CapabilityNestedExtentProvider</code>；旧的聚合 lookup 和 <code>CapabilityLookup</code> 已删除。D-40 把每个 <code>StructureContext</code> 绑定到它的 <code>StructureInstance</code>：<code>begin</code>/<code>commit</code> 是唯一的创建路径，manager 是 in-memory 的，库不持久化任何东西。</>
+                : <>One immutable snapshot, many typed reads. The descriptor has no properties or tags; property, state, tag and fluid are adapter leaves over <code>Expectations.host</code>. Capability traits return <code>IItemHandler</code>, <code>IEnergyStorage</code> and <code>IFluidHandler</code> directly. Nested extents follow the same per-holder shape: one <code>NestedExtentLookup</code>, a <code>NestedExtentProvider</code> per holder and one <code>CapabilityNestedExtentProvider</code>; the old aggregate lookup and <code>CapabilityLookup</code> are gone. D-40 binds each <code>StructureContext</code> to its <code>StructureInstance</code>: <code>begin</code>/<code>commit</code> is the only creation path, the manager is in-memory and the library persists nothing.</>}
             </p>
             <div className="aside-rule" />
             <div className="eyebrow">{zh ? '关于缺席' : 'A note on absence'}</div>

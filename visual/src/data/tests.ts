@@ -8,13 +8,14 @@ export type TestClass = {
 export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/claim/ClaimTest.java", "package": "claim", "className": "ClaimTest", "count": 5},
   {"file": "dev/vfyjxf/cumulus/kernel/context/ContextTest.java", "package": "context", "className": "ContextTest", "count": 4},
+  {"file": "dev/vfyjxf/cumulus/kernel/context/StructureManagerTest.java", "package": "context", "className": "StructureManagerTest", "count": 7},
   {"file": "dev/vfyjxf/cumulus/kernel/core/CoreTest.java", "package": "core", "className": "CoreTest", "count": 9},
   {"file": "dev/vfyjxf/cumulus/kernel/document/DocumentCompilerTest.java", "package": "document", "className": "DocumentCompilerTest", "count": 8},
   {"file": "dev/vfyjxf/cumulus/kernel/document/StructureSetCompilerTest.java", "package": "document", "className": "StructureSetCompilerTest", "count": 15},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/Ae2CpuScenarioTest.java", "package": "engine", "className": "Ae2CpuScenarioTest", "count": 5},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AggregateContextTest.java", "package": "engine", "className": "AggregateContextTest", "count": 7},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AstralAltarScenarioTest.java", "package": "engine", "className": "AstralAltarScenarioTest", "count": 3},
-  {"file": "dev/vfyjxf/cumulus/kernel/engine/BloodAltarScenarioTest.java", "package": "engine", "className": "BloodAltarScenarioTest", "count": 5},
+  {"file": "dev/vfyjxf/cumulus/kernel/engine/BloodAltarScenarioTest.java", "package": "engine", "className": "BloodAltarScenarioTest", "count": 6},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/CachedContextTest.java", "package": "engine", "className": "CachedContextTest", "count": 11},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/ClaimStressScenarioTest.java", "package": "engine", "className": "ClaimStressScenarioTest", "count": 5},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/ComputationsCountTest.java", "package": "engine", "className": "ComputationsCountTest", "count": 7},
@@ -49,14 +50,14 @@ export const testClasses: TestClass[] = [
 
 export const TEST_GROUPS = [
   {"name": "claim", "count": 5},
-  {"name": "context", "count": 4},
+  {"name": "context", "count": 11},
   {"name": "core", "count": 9},
   {"name": "document", "count": 23},
-  {"name": "engine", "count": 121},
+  {"name": "engine", "count": 122},
   {"name": "finding", "count": 35},
   {"name": "space", "count": 18},
   {"name": "structure", "count": 27},
   {"name": "world", "count": 19},
 ];
 
-export const TEST_COUNT = 261;
+export const TEST_COUNT = 269;

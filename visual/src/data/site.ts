@@ -61,8 +61,12 @@ export const REMOVED = [
   { term: 'blockEntityNbt / entityNbt', replacement: 'typed provider', why: 'A trait is the owning API value; serialization is not an API and no item holder exists.' },
   { term: 'Structure-set transaction', replacement: 'StructureSetHost', why: 'Root, satellites and links are host orchestration; the kernel still checks and settles one blueprint.' },
   { term: 'Per-attempt set budget', replacement: 'One shared set budget', why: 'Presence and every member attempt draw from the same ceiling; the set is the unit the host admitted.' },
-  { term: 'Kernel context rollback', replacement: 'ContextStore.remove', why: 'A set rollback releases claims and removes each formed StructureContext through the store; the kernel still has no transaction.' },
+  { term: 'Kernel context rollback', replacement: 'StructureManager.Broken', why: 'A set rollback releases claims and dispatches Broken; the manager removes the instance and its context together. The kernel still has no transaction.' },
   { term: 'CapabilityLookup', replacement: 'NestedExtentLookup', why: 'One per-holder registry replaces the aggregate block/entity lookup; a new subject kind adds a holder and a provider, not an interface method.' },
+  { term: 'SavedContexts', replacement: 'StructureManager', why: 'A context is bound to its StructureInstance; begin/commit is the only creation path, the manager is in-memory and the library persists nothing.' },
+  { term: 'NOTAIR = no fluid', replacement: 'not(air())', why: 'NOTAIR is exactly not(air()): water and lava are non-air and pass. empty() and nonFluid() are separate opt-in leaves (D-39).' },
+  { term: 'Per-bay claim release', replacement: 'Whole-key release', why: 'One siting is one instance; release deletes the whole (owner, siting) key and no row is released alone (D-38).' },
+  { term: 'Claimable by default', replacement: 'bindsClaimableSubject', why: 'A focus opts in; the build rejects a subject-binding focus that cannot claim when the bay claims (SC-BPT-0005, D-37).' },
 ];
 
 export const DOCS = [
@@ -79,6 +83,7 @@ export const DOCS = [
   { group: 'Design', file: 'docs/design/09-structure-sets.md', title: 'Structure sets' },
   { group: 'Design', file: 'docs/design/10-host-data.md', title: 'Host snapshot' },
   { group: 'Design', file: 'docs/design/11-trait-providers.md', title: 'Trait providers' },
+  { group: 'Design', file: 'docs/design/12-structure-instances.md', title: 'Structure instances' },
   { group: 'Modules', file: 'docs/modules/structure.md', title: 'structure' },
   { group: 'Modules', file: 'docs/modules/document.md', title: 'document' },
   { group: 'Modules', file: 'docs/modules/engine.md', title: 'engine' },
@@ -94,10 +99,10 @@ export const DOCS = [
 ];
 
 export const HERO_STATS = [
-  { value: '261', label: 'tests', note: 'kernel JUnit 5 · adapter 296 · GameTests 71/71' },
+  { value: '269', label: 'tests', note: 'kernel JUnit 5 · adapter 280 · GameTests 74/74' },
   { value: '65', label: 'codes', note: '13 kernel families · one Codes table' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
-  { value: '36', label: 'decisions', note: 'rulings, not preferences' },
+  { value: '40', label: 'decisions', note: 'D-40 · rulings, not preferences' },
 ];
 
 export const LAYERS = [
@@ -106,14 +111,18 @@ export const LAYERS = [
   { id: 'D-32', title: 'Structure sets', text: 'root + satellites + links + presence, sequenced by StructureSetHost; S5 ships /cumulus set check|settle over one unsited union capture (no orientation audit, so no spurious SC-MC-0004), and the kernel still has no set type.' },
   { id: 'D-33', title: 'Typed host snapshot', text: 'one snapshot per frame, HostType reads and Expectations.host; OccupantDescriptor is (type, kind) and D-29 is superseded.' },
   { id: 'D-34', title: 'Trait providers', text: 'TraitProvider<T, H>/TraitHolder per holder and one CapabilityTraitProvider class; capability traits return IItemHandler, IEnergyStorage and IFluidHandler. No NBT traits, no item holder.' },
-  { id: 'D-35', title: 'Set close-out', text: 'SC-SET-0008 rejects a satellite on the root siting (compiler, StructureSet.place, host check); presence and every attempt share one set budget; rollback removes formed contexts through ContextStore.remove. The real-level StructureSetHostGameTest covers the same-siting rejection and a one-cell shared budget.' },
+  { id: 'D-35', title: 'Set close-out', text: 'SC-SET-0008 rejects a satellite on the root siting (compiler, StructureSet.place, host check); presence and every attempt share one set budget; rollback invalidates formed contexts through the StructureManager Broken event (D-40). The real-level StructureSetHostGameTest covers the same-siting rejection and a one-cell shared budget.' },
   { id: 'D-36', title: 'Nested-extent lookup', text: 'NestedExtentHolder/Provider/Lookup replace the aggregate nested lookup: NestedExtentHolders.block/entity, one CapabilityNestedExtentProvider over NestedExtentAccesses, and the standard NestedExtentProviders. The old mc.NestedExtentLookup and CapabilityLookup are deleted.' },
+  { id: 'D-37', title: 'Claimable subjects', text: 'Focus.bindsClaimableSubject() defaults false; when a bay claims, BlueprintBuilder rejects a subject-binding focus that cannot back a claim (SC-BPT-0005). The runtime SC-CLM-0004 check remains the authority.' },
+  { id: 'D-38', title: 'Whole-key release', text: 'ClaimLedger.release(owner, siting) deletes every row of that key and is the only release API; one siting is one instance, so there is no per-bay or per-row release. WatchEvents releases the key on Broken/Invalidated and translates it on a full Moved; a conflict becomes Invalidated. A failed release is SC-SET-0007.' },
+  { id: 'D-39', title: 'Empty and non-fluid', text: 'Expectations.empty() matches air or a vanilla fluid block; nonFluid() matches everything else (air is non-fluid). NOTAIR stays exactly not(air()), so water and lava pass while air fails. No new code.' },
+  { id: 'D-40', title: 'Structure manager', text: 'StructureManager owns StructureSpec/Instance/Attempt/Event: begin/commit/abort, bounds lookup, Broken/Moved/Loaded/Unloaded/Invalidated, one formed instance per (owner, siting). The context is bound to the instance and the manager is in-memory; WatchEvents dispatches the adapter lifecycle.' },
 ];
 
 export const GATES = [
-  { label: 'Compile', value: 'PASS', note: 'gradlew check green at f84dba8' },
+  { label: 'Compile', value: 'PASS', note: 'gradlew check green at 70857d7 + the D-40 tree' },
   { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
-  { label: 'Tests', value: '261/261', note: 'kernel JUnit 5 · 39 containers; adapter 296 · GameTests 71/71' },
+  { label: 'Tests', value: '269/269', note: 'kernel JUnit 5 · 40 containers; adapter 280 · 35 containers; GameTests 74/74' },
   { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 65 codes' },
   { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
   { label: 'Determinism', value: 'PASS', note: 'DeterminismTest · canonical bytes, fixed point, compile runs' },
@@ -121,7 +130,7 @@ export const GATES = [
 
 export const PRINCIPLES = [
   { n: '01', title: 'One key', text: 'ContextKey<T> is the only identity for a context value. Two keys with the same id but different types are two keys.' },
-  { n: '02', title: 'One publication', text: 'A successful settle publishes INSTANCE once. A derive publishes one batch once. A set rollback removes formed contexts through ContextStore.remove; nothing else writes or removes one.' },
+  { n: '02', title: 'One publication', text: 'A successful settle publishes INSTANCE once into the structure attempt; commit binds it to the StructureInstance, and a derive publishes one batch once. The StructureManager owns the registry and the context lifecycle (D-40).' },
   { n: '03', title: 'One direction', text: 'A package may import only lower-ranked packages. The graph is checked; the table is the law.' },
   { n: '04', title: 'One predicate', text: 'ClaimMatrix.conflicts is the only conflict rule. A plan cannot encode a second one.' },
   { n: '05', title: 'One host read', text: 'A host value is one typed read from one immutable snapshot. The descriptor stays (type, kind); the kernel never names or models the value.' },

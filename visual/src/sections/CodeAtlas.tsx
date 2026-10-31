@@ -156,6 +156,9 @@ export function CodeAtlas() {
                 <strong>{zh ? '稳定身份' : 'Stable identity'}</strong>{" "}
                 {selectedCode.code} · {zh ? '永不复用，永不重编号' : 'never reused, never renumbered'}
               </div>
+              <p style={{ marginTop: 8, fontSize: 10, lineHeight: 1.5, color: 'var(--muted)' }}>
+                {zh ? 'D-37 重用 SC-BPT-0005，D-38 重用 SC-SET-0007；D-39 和 D-40 不新增 code。表仍是 65 条。' : 'D-37 reuses SC-BPT-0005 and D-38 reuses SC-SET-0007; D-39 and D-40 add no code. The table stays at 65.'}
+              </p>
             </div>
             <div className="aside-rule" />
             <div className="eyebrow">{zh ? 'adapter host codes / 不在 Codes.all' : 'Adapter host codes / outside Codes.all'}</div>

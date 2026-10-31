@@ -191,8 +191,8 @@ export const INVARIANTS = [
     id: 'publish',
     no: 'iv',
     title: 'One publication at settle',
-    detail: 'Settle publishes INSTANCE once; derive adds one batch after Formed and bumps the revision once. Nothing else writes.',
-    code: 'ContextStore',
+    detail: 'Settle publishes INSTANCE once into the StructureAttempt; commit binds the context to the StructureInstance; derive adds one batch after Formed and bumps the revision once. Nothing else writes.',
+    code: 'StructureManager',
     moments: ['settle'],
   },
   {

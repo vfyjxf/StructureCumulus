@@ -14,8 +14,8 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
         </h1>
         <p className="hero-lede">
           {zh
-            ? '十一个 kernel package。三个阶段。一个类型化 key。一份类型化 host 快照。blueprint 是值；settle 只写一次 claim、只发布一次 context；每个模块都要通过边的方向检查。'
-            : 'Eleven kernel packages. Three phases. One typed key. One typed host snapshot. A design where the blueprint is a value, every settlement writes claims once and publishes once, and every module is checked by the direction of its edges.'}
+            ? '十一个 kernel package。三个阶段。一个类型化 key。一份类型化 host 快照。一个 host 驱动的 structure manager。blueprint 是值；settle 只写一次 claim、只发布一次 context；每个模块都要通过边的方向检查。'
+            : 'Eleven kernel packages. Three phases. One typed key. One typed host snapshot. One host-driven structure manager. A design where the blueprint is a value, every settlement writes claims once and publishes once, and every module is checked by the direction of its edges.'}
         </p>
         <div className="hero-actions">
           <button className="btn btn-solid" type="button" onClick={() => onNavigate('lattice')}>
@@ -107,8 +107,8 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
       </div>
 
       <div className="hero-foot">
-        <span>{zh ? 'Review 于 2026.10.29 · kernel commit f84dba8' : 'Reviewed 2026.10.29 · kernel commit f84dba8'}</span>
-        <span>{zh ? '英文设计是唯一权威 · adapter H1–H4 / T1–T3 / N1 / S5–S6 · 71/71 GameTests' : 'English source only · adapter H1–H4 / T1–T3 / N1 / S5–S6 · 71/71 GameTests'}</span>
+        <span>{zh ? 'Review 于 2026.10.29 · D-40 tree at 70857d7' : 'Reviewed 2026.10.29 · D-40 tree at 70857d7'}</span>
+        <span>{zh ? '英文设计是唯一权威 · adapter H1–H4 / T1–T3 / N1–N5 / S5–S6 · 74/74 GameTests' : 'English source only · adapter H1–H4 / T1–T3 / N1–N5 / S5–S6 · 74/74 GameTests'}</span>
       </div>
     </header>
   );

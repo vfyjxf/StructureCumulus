@@ -48,7 +48,7 @@ export const ZH_INVARIANTS: Record<string, { title: string; detail: string }> = 
   },
   publish: {
     title: 'settle 时只发布一次',
-    detail: 'settle 发布一次 INSTANCE；derive 在 Formed 之后再加一个 batch，并且只推进一次 revision。没有别的地方写。',
+    detail: 'settle 向 StructureAttempt 发布一次 INSTANCE；commit 把 context 绑定到 StructureInstance；derive 在 Formed 之后再加一个 batch，并且只推进一次 revision。没有别的地方写。',
   },
   spend: {
     title: '一个 spend，一个 snapshot',

@@ -147,8 +147,8 @@ export function Workbench() {
         kicker={zh ? '完整示例 / 营火' : 'Worked example / campfire'}
         title={zh ? <>一次 attempt，<em>三个阶段</em>，然后 derive。</> : <>One attempt, <em>three phases</em>, then derive.</>}
         note={zh
-          ? <>完整的 3×3×3 营火 document 放在 Java builder 摘录旁边。走 COMPILE、CHECK、SETTLE；derive 是作用在 <strong>Formed</strong> 上的又一次纯折叠，不是第四个阶段。</>
-          : <>The complete 3×3×3 campfire document sits beside a Java builder excerpt. Walk COMPILE, CHECK and SETTLE; derive is one more pure fold on <strong>Formed</strong>, not a fourth phase.</>}
+          ? <>完整的 3×3×3 营火 document 放在 Java builder 摘录旁边。走 COMPILE、CHECK、SETTLE；settle 向 <code>StructureAttempt</code> 发布，<code>commit(bounds)</code> 形成带 bounds 的 <code>StructureInstance</code>（D-40）；derive 是作用在 <strong>Formed</strong> 上的又一次纯折叠，不是第四个阶段。</>
+          : <>The complete 3×3×3 campfire document sits beside a Java builder excerpt. Walk COMPILE, CHECK and SETTLE; the settle publishes into a <code>StructureAttempt</code> and <code>commit(bounds)</code> forms the bounds-bearing <code>StructureInstance</code> (D-40); derive is one more pure fold on <strong>Formed</strong>, not a fourth phase.</>}
       />
 
       <Reveal>

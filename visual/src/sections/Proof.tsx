@@ -26,17 +26,28 @@ const FALSIFIERS = [
   { claim: 'A missing section contribution is CTX-0001, not CTX-0006', gate: 'aMissingSectionContributionIsAComputationFailure', detail: 'unreadable fold stays a different code' },
   { claim: 'A host value missing from the snapshot is unreadable, not a mismatch', gate: 'aMissingHostValueIsUnreadableWithTheSuppliedAbsentCode', detail: 'missing snapshot value keeps the caller absent code' },
   { claim: 'The current attempt shadows a cached context value', gate: 'theCurrentAttemptValueShadowsTheCachedValue', detail: 'D-31 cache is host-owned and secondary' },
-  { claim: 'A structure-set settle failure releases earlier structures in reverse order', gate: 'aSettleFailureReleasesInReverseOrder', detail: 'claims released and contexts removed; a removal failure is SC-SET-0007' },
+  { claim: 'A structure-set settle failure releases earlier structures in reverse order', gate: 'aSettleFailureReleasesInReverseOrder', detail: 'claims released, then Broken for each formed instance; a removal failure is SC-SET-0007' },
   { claim: 'A set check admits both members and writes no row', gate: 'checkAllWritesNothingThenSettleAllWritesClaims', detail: 'one capture for the union bounds; settle writes the three cells' },
   { claim: 'A set command writes nothing on check and the claims on settle', gate: 'setCheckWritesNothingAndSetSettleWritesTheClaims', detail: 'the built-in structurecumulus:set_demo over the dispatcher' },
   { claim: 'A satellite placed exactly on the root is rejected', gate: 'aSatellitePlacedExactlyOnTheRootIsRejected', detail: 'SC-SET-0008 in the compiler, StructureSet.place and the host' },
   { claim: 'Presence and every member attempt share one set budget', gate: 'presenceAndEveryStructureAttemptShareOneBudgetCeiling', detail: 'presence (1) + root (1) + satellite (1) under Budget 3' },
   { claim: 'A hand-built set on the root siting is rejected before presence', gate: 'aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence', detail: 'real-level GameTest: SC-SET-0008, no outcome, instance, row or revision' },
   { claim: 'A one-cell set budget leaves the root check undecided', gate: 'aOneCellSetBudgetLeavesTheRootCheckUndecided', detail: 'real-level GameTest: presence takes the cell; the root is Undecided (SC-ENG-0001)' },
-  { claim: 'A set rollback removes every formed context', gate: 'rollbackRemovesTheKernelContextOfEveryFormedAttempt', detail: 'claims released and ContextStore.remove called' },
-  { claim: 'A failed context removal is SC-SET-0007 and does not stop the other rollbacks', gate: 'aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals', detail: 'the release verdict does not skip ContextStore.remove' },
+  { claim: 'A set rollback removes every formed instance and its context', gate: 'rollbackRemovesTheKernelContextOfEveryFormedAttempt', detail: 'claims released and Broken dispatched; the manager drops instance and context together' },
+  { claim: 'A failed context removal is SC-SET-0007 and does not stop the other rollbacks', gate: 'aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals', detail: 'the release verdict does not skip the manager Broken dispatch' },
   { claim: 'An envelope-only blueprint gets one derived bay and check', gate: 'anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck', detail: 'D-30; an empty set is a no-op' },
   { claim: 'A capability trait is the live capability object', gate: 'chestInventoryIsTheLiveCapability', detail: 'GameTest: IItemHandler, no copy' },
+  { claim: 'A subject-binding focus that cannot claim is rejected at build', gate: 'nestedAnySubjectBoundBodyFailsBuild', detail: 'D-37: SC-BPT-0005 when the bay footprint claims' },
+  { claim: 'Claim release deletes the whole (owner, siting) key', gate: 'releaseRemovesTheWholeOwnerSitingKey', detail: 'D-38: no per-bay or per-row release; duplicate rows collapse' },
+  { claim: 'Water in a NOTAIR slot is admitted', gate: 'waterInANotAirSlotIsAdmitted', detail: 'D-39: NOTAIR is exactly not(air()); water is non-air' },
+  { claim: 'empty and nonFluid classify air, water, lava and stone', gate: 'emptyAndNonFluidClassifyAirWaterLavaAndStone', detail: 'D-39: empty = air or fluid block; nonFluid = everything else' },
+  { claim: 'A committed attempt becomes a bounds-bearing instance', gate: 'beginPublishesCommitsAndFindsByCell', detail: 'D-40: begin reserves, settle publishes, commit(bounds) forms; findAt returns it' },
+  { claim: 'Abort drops the draft and releases the siting', gate: 'abortDropsTheDraftAndReleasesTheSiting', detail: 'D-40: one-shot commit/abort; the aborted serial is not reused' },
+  { claim: 'Moved keeps the id and context and rejects a collision', gate: 'movedKeepsIdAndContextAndRejectsACollision', detail: 'D-40: only the siting and bounds change' },
+  { claim: 'Broken and Invalidated are idempotent', gate: 'brokenAndInvalidatedAreIdempotent', detail: 'D-40: an unknown id is a no-op' },
+  { claim: 'Unloaded clears one world and Loaded raises the serial', gate: 'unloadedRemovesOnlyThatWorldAndLoadedRaisesTheSerial', detail: 'D-40: per-world registry; Loaded is the only bulk replace' },
+  { claim: 'A block placement dispatches Invalidated through WatchEvents', gate: 'blockPlaceDispatchesInvalidated', detail: 'D-40: the adapter detects and dispatches; D-38 releases the claim rows' },
+  { claim: 'A publish after commit updates the bound instance context', gate: 'publishAfterCommitUpdatesTheBoundInstance', detail: 'D-40: the manager replaces the whole StructureInstance record' },
 ];
 
 const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
@@ -48,23 +59,34 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
   aMissingSectionContributionIsAComputationFailure: { claim: '缺失 section contribution 是 CTX-0001，不是 CTX-0006', detail: 'unreadable fold 仍是另一个 code' },
   aMissingHostValueIsUnreadableWithTheSuppliedAbsentCode: { claim: '缺失的 host 值是 unreadable，不是 mismatch', detail: '缺失快照值保留 caller 的 absent code' },
   theCurrentAttemptValueShadowsTheCachedValue: { claim: '当前 attempt 会遮蔽 cached context 值', detail: 'D-31 缓存是 host 拥有且次级的' },
-  aSettleFailureReleasesInReverseOrder: { claim: 'set 的 settle 失败会按逆序释放已形成的结构', detail: '释放 claims 并移除 contexts；removal 失败是 SC-SET-0007' },
+  aSettleFailureReleasesInReverseOrder: { claim: 'set 的 settle 失败会按逆序释放已形成的结构', detail: '释放 claims，再对每个 formed instance 派发 Broken；removal 失败是 SC-SET-0007' },
   checkAllWritesNothingThenSettleAllWritesClaims: { claim: 'set check 准入两个成员，且不写任何 row', detail: 'union bounds 只 capture 一次；settle 写入三个 cell' },
   setCheckWritesNothingAndSetSettleWritesTheClaims: { claim: 'set 命令 check 不写，settle 写 claims', detail: 'dispatcher 上的内置 structurecumulus:set_demo' },
   aSatellitePlacedExactlyOnTheRootIsRejected: { claim: '正好落在 root 上的 satellite 会被拒绝', detail: 'compiler、StructureSet.place 和 host 都报 SC-SET-0008' },
   presenceAndEveryStructureAttemptShareOneBudgetCeiling: { claim: 'presence 和每个成员 attempt 共享一个 set budget', detail: 'Budget 3 下 presence (1) + root (1) + satellite (1)' },
   aHandBuiltSatelliteThatSharesTheRootSitingIsRejectedBeforePresence: { claim: '手写 set 的 satellite 若与 root 同 siting，会在 presence 前被拒绝', detail: '真实 level GameTest：SC-SET-0008，没有 outcome、instance、row 或 revision' },
   aOneCellSetBudgetLeavesTheRootCheckUndecided: { claim: '一格 set budget 会让 root check 变成 undecided', detail: '真实 level GameTest：presence 用掉唯一一格，root 是 Undecided（SC-ENG-0001）' },
-  rollbackRemovesTheKernelContextOfEveryFormedAttempt: { claim: 'set rollback 移除每个已形成的 context', detail: 'claims 释放并调用 ContextStore.remove' },
-  aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals: { claim: 'removal 失败是 SC-SET-0007，且不阻断其余 rollback', detail: 'release verdict 不会跳过 ContextStore.remove' },
+  rollbackRemovesTheKernelContextOfEveryFormedAttempt: { claim: 'set rollback 移除每个已形成的 instance 和它的 context', detail: 'claims 释放并派发 Broken；manager 一起移除 instance 和 context' },
+  aFailedContextRemovalIsScSet0007AndKeepsTheOtherRemovals: { claim: 'removal 失败是 SC-SET-0007，且不阻断其余 rollback', detail: 'release verdict 不会跳过 manager 的 Broken 派发' },
   anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck: { claim: '只有 envelope 的 blueprint 得到一个推导 bay 和 check', detail: 'D-30；空集合是 no-op' },
   chestInventoryIsTheLiveCapability: { claim: 'capability trait 就是 live capability 对象', detail: 'GameTest：IItemHandler，不做拷贝' },
+  nestedAnySubjectBoundBodyFailsBuild: { claim: '绑定 subject 但不能 claim 的 focus 在 build 时被拒绝', detail: 'D-37：bay footprint 会 claim 时报告 SC-BPT-0005' },
+  releaseRemovesTheWholeOwnerSitingKey: { claim: 'claim release 删除整个 (owner, siting) key', detail: 'D-38：没有 per-bay 或 per-row release；重复行会折叠' },
+  waterInANotAirSlotIsAdmitted: { claim: 'NOTAIR slot 中的 water 会被接纳', detail: 'D-39：NOTAIR 精确等于 not(air())；water 是 non-air' },
+  emptyAndNonFluidClassifyAirWaterLavaAndStone: { claim: 'empty 和 nonFluid 会分类 air、water、lava、stone', detail: 'D-39：empty = air 或 fluid block；nonFluid = 其余' },
+  beginPublishesCommitsAndFindsByCell: { claim: 'commit 后的 attempt 变成带 bounds 的 instance', detail: 'D-40：begin 预留、settle 发布、commit(bounds) 形成；findAt 能找到' },
+  abortDropsTheDraftAndReleasesTheSiting: { claim: 'abort 丢弃 draft 并释放 siting', detail: 'D-40：commit/abort 只能调用一次；aborted serial 不复用' },
+  movedKeepsIdAndContextAndRejectsACollision: { claim: 'Moved 保留 id 和 context，并拒绝 collision', detail: 'D-40：只有 siting 和 bounds 改变' },
+  brokenAndInvalidatedAreIdempotent: { claim: 'Broken 和 Invalidated 是幂等的', detail: 'D-40：未知 id 是 no-op' },
+  unloadedRemovesOnlyThatWorldAndLoadedRaisesTheSerial: { claim: 'Unloaded 只清一个 world，Loaded 抬高 serial', detail: 'D-40：per-world registry；Loaded 是唯一的批量替换' },
+  blockPlaceDispatchesInvalidated: { claim: 'block place 通过 WatchEvents 派发 Invalidated', detail: 'D-40：adapter 负责侦测和派发；D-38 释放 claim rows' },
+  publishAfterCommitUpdatesTheBoundInstance: { claim: 'commit 后的 publish 更新绑定的 instance context', detail: 'D-40：manager 整体替换 StructureInstance record' },
 };
 
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
-  261 tests / 261 successful / 0 failed
+  269 tests / 269 successful / 0 failed
 $ python3 tools/spec-check.py
   spec-check: ok
 $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
@@ -73,7 +95,7 @@ $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
 export function Proof() {
   const { zh } = useLanguage();
   const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState('D-22');
+  const [selected, setSelected] = useState('D-40');
   const [copied, setCopied] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -111,7 +133,7 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、261 个 kernel 测试（39 个 container）、296 个 adapter 单元测试（37 个 container）、71 个 GameTests、65 个 code、36 条决策（D-36）。adapter 已实现到 H1–H4、T1–T3、N1 和 S5/S6：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次不带 orientation、也不做 orientation audit 的 union capture、内置 set_demo）、<code>SC-SET-0008</code>/<code>ContextStore.remove</code>/共享 set budget（D-35）和按 holder 泛型的 nested-extent lookup（D-36；旧的 <code>mc.NestedExtentLookup</code> 与 <code>CapabilityLookup</code> 已删除）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在 <code>f84dba8</code> 都是绿的（71/71）。剩下 performance/cost pass 和新的 review screenshots。</> : <>Six gates, 261 kernel tests in 39 containers, 296 adapter unit tests in 37 containers, 71 GameTests, 65 codes and 36 decisions (D-36). The adapter is implemented through H1–H4, T1–T3, N1 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one unsited union capture with no orientation audit, the built-in set_demo), <code>SC-SET-0008</code>/<code>ContextStore.remove</code>/one shared set budget (D-35) and the generic per-holder nested-extent lookup (D-36; the old <code>mc.NestedExtentLookup</code> and <code>CapabilityLookup</code> are deleted). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green at <code>f84dba8</code> (71/71). Pending only a performance/cost pass and fresh review screenshots.</>}
+        note={zh ? <>六道 gate、269 个 kernel 测试（40 个 container）、280 个 adapter 单元测试（35 个 container）、74 个 GameTests、65 个 code、40 条决策（D-40）。adapter 已实现到 H1–H4、T1–T3、N1–N5 和 S5/S6：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次不带 orientation 的 union capture、内置 set_demo）、set 收束（D-35）、nested-extent lookup（D-36）、claimability（D-37）、whole-key release（D-38）、empty/nonFluid（D-39）和 host 驱动的 StructureManager（D-40：begin/commit/abort、context 绑定 instance、in-memory、WatchEvents 派发）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在 <code>70857d7</code> + D-40 tree 都是绿的（74/74）。剩下 performance/cost pass 和新的 review screenshots。</> : <>Six gates, 269 kernel tests in 40 containers, 280 adapter unit tests in 35 containers, 74 GameTests, 65 codes and 40 decisions (D-40). The adapter is implemented through H1–H4, T1–T3, N1–N5 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one unsited union capture, the built-in set_demo), the set close-out (D-35), the nested-extent lookup (D-36), claimability (D-37), whole-key release (D-38), empty/nonFluid (D-39) and the host-driven StructureManager (D-40: begin/commit/abort, instance-bound context, in-memory, WatchEvents dispatch). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green at <code>70857d7</code> + the D-40 tree (74/74). Pending only a performance/cost pass and fresh review screenshots.</>}
       />
 
       <Reveal>
@@ -140,7 +162,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '39 个 JUnit container · adapter 296 / 37 个 container · GameTests 71/71' : '39 JUnit containers · adapter 296 / 37 containers · GameTests 71/71'}
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '40 个 JUnit container · adapter 280 / 35 个 container · GameTests 74/74' : '40 JUnit containers · adapter 280 / 35 containers · GameTests 74/74'}
               </div>
             </div>
           </div>
@@ -153,7 +175,7 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green at f84dba8; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 71/71 (through N1 and S6).</div>
+            <div className="warn">check: ./gradlew check is green at 70857d7 + the D-40 tree; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 74/74 (through N5 and S6).</div>
             <div style={{ height: 14 }} />
             <div className="cmd">{zh ? '下一个攻击点：performance/cost pass，以及新的 review screenshots。' : 'Next attack: a performance/cost pass and fresh review screenshots.'}</div>
           </div>
@@ -163,7 +185,7 @@ export function Proof() {
       <Reveal delay={40}>
         <div style={{ marginTop: 26 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <div className="eyebrow">{zh ? '当前已实现的层 / D-30 … D-36' : 'Current implemented layers / D-30 … D-36'}</div>
+            <div className="eyebrow">{zh ? '当前 ruling / D-30 … D-40' : 'Current rulings / D-30 … D-40'}</div>
             <div className="mono muted">{zh ? 'host 层与 kernel 的边界' : 'the host boundary around the kernel'}</div>
           </div>
           <div className="gate-grid" style={{ marginTop: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>

@@ -204,15 +204,15 @@ export default function App() {
               </h3>
               <div className="footer-meta">
                 StructureCumulus / {zh ? '设计 review 1.2' : 'design review 1.2'}<br />
-                {zh ? '12 份设计文档 · 11 个 kernel 模块 + adapter 规范' : '12 design documents · 11 kernel modules + adapter spec'}<br />
+                {zh ? '13 份设计文档 · 11 个 kernel 模块 + adapter 规范' : '13 design documents · 11 kernel modules + adapter spec'}<br />
                 {zh ? <>kernel 11 个 package · {CODE_COUNT} 个 code · {TEST_COUNT} 个 kernel 测试</> : <>kernel 11 packages · {CODE_COUNT} codes · {TEST_COUNT} kernel tests</>}<br />
-                kernel commit f84dba8
+                D-40 tree at 70857d7
               </div>
             </div>
             <div className="footer-rule rule" />
             <div className="footer-small">
               <span>{zh ? '英文设计是唯一权威 · 中文是阅读层' : 'English only · no mirrored spec'}</span>
-              <span>{zh ? 'Adapter H1–H4 / T1–T3 / N1 / S5–S6 · 71/71 GameTests' : 'Adapter H1–H4 / T1–T3 / N1 / S5–S6 · 71/71 GameTests'}</span>
+              <span>{zh ? 'Adapter H1–H4 / T1–T3 / N1–N5 / S5–S6 · 74/74 GameTests' : 'Adapter H1–H4 / T1–T3 / N1–N5 / S5–S6 · 74/74 GameTests'}</span>
               <span>{zh ? '如果它们冲突，以设计为准。' : 'If they disagree, the design wins.'}</span>
             </div>
           </footer>

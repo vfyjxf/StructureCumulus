@@ -131,10 +131,51 @@ def extract_decisions() -> None:
             if prose:
                 paragraphs.append(re.sub(r"\s+", " ", prose))
         paragraph = next((part for part in paragraphs if len(part) > 30), "")
+        if ident == "D-02":
+            paragraph = ("Core kernel + document compiler + thin remedy SPI. The v1 round scoped the "
+                         "NeoForge adapter to modules/adapter.md and left it unimplemented at the time; "
+                         "no scheduler, no dirty index, no overlay renderer, no schematic importer and "
+                         "no client code. Current status (2026-10-29, D-40 tree): M1-M5e, S5/S6, "
+                         "H1-H4, T1-T3 and N1-N5 are implemented. D-40 replaces the old persisted "
+                         "context side table with the in-memory host-driven StructureManager. Pending only the "
+                         "performance/cost pass and fresh review screenshots. There is no regeneration "
+                         "milestone.")
         if ident == "D-20":
             paragraph = ("Twenty-four old questions are answered by deletion: no predicate/blueprint "
                          "cycle, no stage carrier, one ReadScope, one Coverage, one publication, one "
                          "conflict rule, one code table. The full table is in docs/design/05-decisions.md.")
+        if ident == "D-35":
+            paragraph = ("S6 closes the three structure-set gaps in one decision: a satellite may not "
+                         "share the root siting (A+), the set carries one budget across presence and "
+                         "every member attempt, and a rollback invalidates the contexts it formed. "
+                         "D-40 now implements that invalidation through the StructureManager's Broken "
+                         "event: the formed instance and its context are removed together, and "
+                         "ContextStore.remove remains the narrow store operation.")
+        if ident == "D-39":
+            paragraph = ("anyOccupant deliberately matches every occupant, including air; it is a "
+                         "\"the read succeeded\" leaf, not a NOTAIR test. D-39 adds Expectations.empty() "
+                         "(air or a vanilla fluid block) and Expectations.nonFluid() (any occupant that "
+                         "is not water or lava; air is non-fluid). NOTAIR stays exactly not(air()), so "
+                         "water and lava are non-air and pass while air fails; empty and nonFluid are "
+                         "opt-in leaves and do not redefine NOTAIR. The kernel OccupantSnapshot has no "
+                         "separate fluid state: classification is by the vanilla fluid block type, and "
+                         "a waterlogged block remains a solid block occupant. No new code: the leaves "
+                         "use SC-EXP-0001 and the not wrapper's SC-EXP-0002. BloodAltarScenarioTest "
+                         "admits water in its NOTAIR slot and classifies air, water, lava and stone.")
+        if ident == "D-40":
+            paragraph = ("StructureContext had no owning structure object: it was published into a "
+                         "ContextStore map and, historically, the adapter persisted that map in "
+                         "SavedContexts; the map had no automatic lifecycle and nextSerial existed only "
+                         "because the map could outlive the session. D-40 replaces the detached "
+                         "store with StructureManager: StructureSpec(owner, siting, structure) describes "
+                         "what to form; StructureInstance(id, spec, context, bounds) is the formed "
+                         "object and owns its context; begin(world, spec) reserves a draft "
+                         "StructureAttempt, the settle publishes into it, commit(bounds) forms the "
+                         "instance and abort() discards it; the host dispatches Broken, Moved, Loaded, "
+                         "Unloaded and Invalidated; the manager owns the registry and context lifecycle "
+                         "and is in-memory. The adapter deletes SavedContexts, its codecs and tests; no "
+                         "context is persisted, and WatchEvents dispatches breaks, explosions, "
+                         "placements, piston moves and level unloads.")
         if ident == "D-36":
             paragraph = ("The nested-extent seam is now generic per holder: NestedExtentHolder<H> and "
                          "NestedExtentHolders.block/entity name the subject, NestedExtentProvider<H> is "

@@ -27,7 +27,7 @@ export const ZH_MODULES: Record<ModuleId, { owns: string; law: string }> = {
 
 export const ZH_PRINCIPLES: Record<string, { title: string; text: string }> = {
   '01': { title: '一个 key', text: 'ContextKey<T> 是 context value 的唯一身份。同一个 id、不同的 Java 类型，就是两个 key。' },
-  '02': { title: '一次发布', text: '成功的 settle 只发布一次 INSTANCE；derive 只发布一个 batch 一次。set rollback 通过 ContextStore.remove 移除已形成的 context；没有别的地方写或移除 context。' },
+  '02': { title: '一次发布', text: '成功的 settle 向 structure attempt 只发布一次 INSTANCE；commit 把它绑定到 StructureInstance；derive 只发布一个 batch 一次。StructureManager 拥有 registry 和 context 生命周期（D-40）。' },
   '03': { title: '一个方向', text: 'package 只能 import rank 更低的 package。图会被检查；边表就是法律。' },
   '04': { title: '一个谓词', text: 'ClaimMatrix.conflicts 是唯一的冲突规则。plan 不能再编码第二个。' },
   '05': { title: '一次 host 读取', text: '一个 host 值就是一次来自不可变快照的类型化读取。descriptor 始终是 (type, kind)；kernel 从不命名或建模这个值。' },
@@ -52,8 +52,12 @@ export const ZH_REMOVED: Record<string, string> = {
   'blockEntityNbt / entityNbt': 'trait 就是所属 API 的值；序列化不是 API，也不存在 item holder。',
   'Structure-set transaction': 'root、satellites 和 links 都是 host 编排；kernel 仍然一次只 check、settle 一个 blueprint。',
   'Per-attempt set budget': 'presence 和每个成员 attempt 从同一个上限读取；set 才是 host 准入的单位。',
-  'Kernel context rollback': 'set rollback 释放 claims，并通过 store 移除每个已形成的 StructureContext；kernel 仍然没有事务。',
+  'Kernel context rollback': 'set rollback 释放 claims 并派发 Broken；manager 一起移除 instance 和它的 context。kernel 仍然没有事务。',
   CapabilityLookup: '一个 per-holder registry 取代聚合的 block/entity lookup；新增 subject kind 只需加 holder 和 provider，不改查找接口。',
+  SavedContexts: 'context 绑定到 StructureInstance；begin/commit 是唯一的创建路径，manager 是 in-memory 的，库不持久化任何东西。',
+  'NOTAIR = no fluid': 'NOTAIR 精确等于 not(air())：water 和 lava 是 non-air，因而通过。empty() 和 nonFluid() 是独立的 opt-in leaf（D-39）。',
+  'Per-bay claim release': '一个 siting 就是一个 instance；release 删除整个 (owner, siting) key，没有单独的行被释放（D-38）。',
+  'Claimable by default': 'focus 必须 opt in；当 bay 会 claim 时，build 拒绝不能 claim 的 subject-binding focus（SC-BPT-0005，D-37）。',
 };
 
 export const ZH_DOCS: Record<string, string> = {
@@ -70,6 +74,7 @@ export const ZH_DOCS: Record<string, string> = {
   'docs/design/09-structure-sets.md': '结构集合',
   'docs/design/10-host-data.md': 'host 快照',
   'docs/design/11-trait-providers.md': 'trait provider',
+  'docs/design/12-structure-instances.md': '结构实例与 manager',
   'docs/modules/structure.md': 'structure',
   'docs/modules/document.md': 'document',
   'docs/modules/engine.md': 'engine',
@@ -90,19 +95,19 @@ export const ZH_GROUPS: Record<string, string> = {
 };
 
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
-  Compile: { label: '编译', note: 'gradlew check 在 f84dba8 通过' },
+  Compile: { label: '编译', note: 'gradlew check 在 70857d7 + D-40 tree 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 39 个容器；adapter 296 · GameTests 71/71' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 40 个容器；adapter 280 / 35 个容器；GameTests 74/74' },
   'Spec index': { label: '规范索引', note: 'spec-check.py · 65 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 296 · GameTests 71/71' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 280 · GameTests 74/74' },
   codes: { label: '代码', note: '13 个 kernel family · 一张 Codes 表' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
-  decisions: { label: '决策', note: 'ruling，不是偏好' },
+  decisions: { label: '决策', note: 'D-40 · ruling，不是偏好' },
 };
 
 export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
@@ -128,10 +133,26 @@ export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
   },
   'D-35': {
     title: 'set 收束',
-    text: 'SC-SET-0008 拒绝与 root 同 siting 的 satellite（compiler、StructureSet.place、host check）；presence 和每个 attempt 共享一个 set budget；rollback 通过 ContextStore.remove 移除已形成的 context。真实 level 的 StructureSetHostGameTest 覆盖同 siting 拒绝和一格共享 budget。',
+    text: 'SC-SET-0008 拒绝与 root 同 siting 的 satellite（compiler、StructureSet.place、host check）；presence 和每个 attempt 共享一个 set budget；rollback 通过 StructureManager 的 Broken 事件失效已形成的 context（D-40）。真实 level 的 StructureSetHostGameTest 覆盖同 siting 拒绝和一格共享 budget。',
   },
   'D-36': {
     title: 'nested-extent lookup',
     text: 'NestedExtentHolder/Provider/Lookup 取代聚合的 nested lookup：NestedExtentHolders.block/entity，一个通过 NestedExtentAccesses 覆盖两种签名的 CapabilityNestedExtentProvider，以及标准的 NestedExtentProviders。旧的 mc.NestedExtentLookup 和 CapabilityLookup 已删除。',
+  },
+  'D-37': {
+    title: '可 claim 的 subject',
+    text: 'Focus.bindsClaimableSubject() 默认 false；当 bay 会 claim 时，BlueprintBuilder 拒绝不能支撑 claim 的 subject-binding focus（SC-BPT-0005）。运行时的 SC-CLM-0004 仍是权威。',
+  },
+  'D-38': {
+    title: 'whole-key release',
+    text: 'ClaimLedger.release(owner, siting) 删除该 key 的全部 rows，是唯一的 release API；一个 siting 就是一个 instance，所以没有 per-bay 或 per-row release。WatchEvents 在 Broken/Invalidated 时释放该 key，在完整 Moved 时平移它；冲突则变成 Invalidated。失败的 release 是 SC-SET-0007。',
+  },
+  'D-39': {
+    title: 'empty 与 non-fluid',
+    text: 'Expectations.empty() 匹配 air 或 vanilla fluid block；nonFluid() 匹配其余 occupant（air 是 non-fluid）。NOTAIR 精确等于 not(air())，所以 water/lava 通过、air 失败。没有新 code。',
+  },
+  'D-40': {
+    title: 'structure manager',
+    text: 'StructureManager 拥有 StructureSpec/Instance/Attempt/Event：begin/commit/abort、bounds lookup、Broken/Moved/Loaded/Unloaded/Invalidated，每个 (owner, siting) 一个 formed instance。context 绑定到 instance，manager 是 in-memory 的；WatchEvents 派发 adapter 生命周期。',
   },
 };
