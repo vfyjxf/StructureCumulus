@@ -962,12 +962,40 @@ class JsonDocumentTest {
     }
 
     @Test
+    void aDefinitionWithArgumentsIsRejected() {
+        String text = """
+                {"schemaVersion":1,"id":"test:definition_arguments","bounds":[0,0,0,1,1,1],
+                 "definitions":{"test:unit":{"bounds":[0,0,0,1,1,1],"arguments":{"k":1}}},
+                 "bays":[],"checks":[]}
+                """;
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        Finding finding = errors.stream().filter(f -> f.code().equals(FindingCode.of(FindingCode.Family.doc, 2)))
+                .findFirst().orElseThrow();
+        assertTrue(finding.message().contains("unknown member 'arguments'"), () -> finding.message());
+    }
+
+    @Test
+    void aDefinitionWithExtensionsIsRejected() {
+        String text = """
+                {"schemaVersion":1,"id":"test:definition_extensions","bounds":[0,0,0,1,1,1],
+                 "definitions":{"test:unit":{"bounds":[0,0,0,1,1,1],"extensions":{"test:vendor":{"v":1}}}},
+                 "bays":[],"checks":[]}
+                """;
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        Finding finding = errors.stream().filter(f -> f.code().equals(FindingCode.of(FindingCode.Family.doc, 2)))
+                .findFirst().orElseThrow();
+        assertTrue(finding.message().contains("unknown member 'extensions'"), () -> finding.message());
+    }
+
+    @Test
     void definitionsAndExtensionsAreOrdered() {
         String first = """
                 {"schemaVersion":1,"id":"test:order","bounds":[0,0,0,1,1,1],
                  "definitions":{
                    "test:z":{"bounds":[0,0,0,1,1,1]},
-                   "test:a":{"bounds":[0,0,0,1,1,1],"arguments":{"k":1}}},
+                   "test:a":{"bounds":[0,0,0,1,1,1]}},
                  "bays":[],"checks":[],
                  "extensions":{"test:z":{"v":1},"test:a":{"v":2}}}
                 """;

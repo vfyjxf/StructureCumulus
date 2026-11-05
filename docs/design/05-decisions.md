@@ -1148,6 +1148,28 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-63 — A document declaration the compiler ignores is an error
+
+Four shapes used to be accepted and dropped:
+
+- a bay that no check names — `Blueprint.bays()` is derived from checks, so the bay disappeared, and
+  with `envelope: true` its cells fell back into the envelope and had to be air;
+- a definition's `arguments` and `extensions` — parsed, then never read;
+- a definition that no placement reaches — its §4.2 obligations were never checked;
+- an external document used as a placement source with an unsupported `schemaVersion`.
+
+All four are errors now: the first two and the unplaced definition are `SC-DOC-0002`; the external
+version is `SC-DOC-0001`. A definition's `bounds` stays required and gains a meaning: its own bays
+and seams must lie inside it.
+
+**Why errors and not warnings.** A dropped declaration is invisible in the result: the structure
+matches with fewer cells than the author wrote, and the finding that eventually appears points at the
+envelope or at a neighbouring bay. Warnings do not survive that path.
+
+**Why not implement the dropped meanings.** A bay no check names has no obligation to state — its
+coverage is decided by checks; a definition's `arguments` and `extensions` would need placement-time
+semantics no document uses; an unreachable definition has no site.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

@@ -41,7 +41,9 @@ import dev.vfyjxf.cumulus.kernel.structure.SeamId;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -88,6 +90,11 @@ public final class DocumentCompiler {
         if (hasErrors(findings)) {
             return new CompileResult(FindingBundle.of(findings), null);
         }
+        rejectUnusedBays(flat, findings);
+        rejectUnplacedDefinitions(document, findings);
+        if (hasErrors(findings)) {
+            return new CompileResult(FindingBundle.of(findings), null);
+        }
 
         Map<NamespacedId, ContextKey<?>> keys = buildKeys(flat.keys, context, findings);
         Map<NamespacedId, Bay> bays = buildBays(flat.bays, flat.bounds, findings);
@@ -131,6 +138,53 @@ public final class DocumentCompiler {
                 documentLocus(document)
             );
             return new CompileResult(FindingBundle.of(findings), null);
+        }
+    }
+
+    private static void rejectUnusedBays(Flat flat, List<Finding> findings) {
+        Set<NamespacedId> named = new HashSet<>();
+        for (CheckSpec check : flat.checks) {
+            named.add(check.bay());
+        }
+        for (BaySpec bay : flat.bays) {
+            if (!named.contains(bay.id())) {
+                error(
+                    findings,
+                    Codes.documentField,
+                    "bay " + bay.id() + " is used by no check",
+                    bay.source(),
+                    null
+                );
+            }
+        }
+    }
+
+    private static void rejectUnplacedDefinitions(Document document, List<Finding> findings) {
+        Set<NamespacedId> reached = new HashSet<>();
+        Deque<NamespacedId> queue = new ArrayDeque<>();
+        for (PlacementSpec placement : document.root().placements()) {
+            queue.add(placement.definition());
+        }
+        while (!queue.isEmpty()) {
+            NamespacedId id = queue.removeFirst();
+            BlueprintSpec definition = document.definitions().get(id);
+            if (definition == null || !reached.add(id)) {
+                continue;
+            }
+            for (PlacementSpec placement : definition.placements()) {
+                queue.add(placement.definition());
+            }
+        }
+        for (NamespacedId id : document.definitions().keySet()) {
+            if (!reached.contains(id)) {
+                error(
+                    findings,
+                    Codes.documentField,
+                    "definition " + id + " is never placed",
+                    null,
+                    documentLocus(document)
+                );
+            }
         }
     }
 
@@ -184,6 +238,22 @@ public final class DocumentCompiler {
                 );
                 active.remove(key);
                 return;
+            }
+            CuboidSet inside = CuboidSet.empty();
+            for (BaySpec bay : spec.bays()) {
+                inside = inside.union(bay.cells());
+            }
+            for (SeamSpec seam : spec.seams()) {
+                inside = inside.union(CuboidSet.of(seam.cells()));
+            }
+            if (!spec.bounds().asSet().containsAll(inside)) {
+                error(
+                    findings,
+                    Codes.documentField,
+                    "definition " + spec.id() + " puts cells outside its own bounds",
+                    spec.source(),
+                    null
+                );
             }
         } else {
             flat.checks.addAll(spec.checks());
@@ -252,6 +322,17 @@ public final class DocumentCompiler {
                         findings,
                         Codes.definitionMissing,
                         "no definition " + placement.definition(),
+                        placement.source(),
+                        null
+                    );
+                    continue;
+                }
+                if (external.schemaVersion() != Document.currentVersion) {
+                    error(
+                        findings,
+                        Codes.schemaVersion,
+                        "definition " + placement.definition() + " uses schema version "
+                                + external.schemaVersion(),
                         placement.source(),
                         null
                     );

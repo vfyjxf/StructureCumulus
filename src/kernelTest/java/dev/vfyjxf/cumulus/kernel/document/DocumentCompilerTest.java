@@ -663,6 +663,246 @@ class DocumentCompilerTest {
         );
     }
 
+    @Test
+    void aBayNoCheckNamesIsRejected() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        for (boolean envelope : List.of(false, true)) {
+            BlueprintSpec root = new BlueprintSpec(
+                id("unused_bay"),
+                Cuboid.of(0, 0, 0, 2, 1, 1),
+                envelope,
+                Value.object(),
+                List.of(
+                    new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                ),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                List.of(),
+                Map.of(),
+                null
+            );
+            CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+            assertNull(result.blueprint(), "envelope=" + envelope);
+            List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+            assertEquals(1, found.size(), () -> "envelope=" + envelope + " " + result.findings().findings());
+            assertTrue(found.get(0).message().contains("used by no check"), () -> found.get(0).message());
+        }
+    }
+
+    @Test
+    void aDefinitionThatLeaksOutsideItsBoundsIsRejected() {
+        BlueprintSpec definition = new BlueprintSpec(
+            id("leaky"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(
+                new BaySpec(
+                    id("wall"),
+                    CuboidSet.of(Cuboid.of(1, 0, 0, 2, 1, 1)),
+                    Coverage.everyCell,
+                    Footprint.box(),
+                    Sharing.exclusive,
+                    null,
+                    null
+                )
+            ),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 3, 1, 1),
+            true,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("leaky"), LatticePoint.origin, id("placed"), null)),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler
+                .compile(new Document(1, root, Map.of(id("leaky"), definition), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("outside its own bounds"), () -> found.get(0).message());
+    }
+
+    @Test
+    void anUnplacedDefinitionIsRejected() {
+        BlueprintSpec ghost = new BlueprintSpec(
+            id("ghost"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            true,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler
+                .compile(new Document(1, root, Map.of(id("ghost"), ghost), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("is never placed"), () -> found.get(0).message());
+    }
+
+    @Test
+    void aDefinitionReachableThroughAnotherPlacementIsAccepted() {
+        BlueprintSpec leaf = new BlueprintSpec(
+            id("leaf"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        BlueprintSpec middle = new BlueprintSpec(
+            id("middle"),
+            Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("leaf"), LatticePoint.origin, id("inner"), null)),
+            Map.of(),
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 2, 1, 1),
+            true,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("middle"), LatticePoint.origin, id("outer"), null)),
+            Map.of(),
+            null
+        );
+        Document document = new Document(1, root, Map.of(id("middle"), middle, id("leaf"), leaf), Map.of());
+        CompileResult result = DocumentCompiler.compile(document, context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        assertNotNull(result.blueprint());
+    }
+
+    @Test
+    void anExternalDocumentWithAnotherSchemaVersionIsRejected() {
+        BlueprintSpec externalRoot = new BlueprintSpec(
+            id("external"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        Document external = new Document(2, externalRoot, Map.of(), Map.of());
+        Catalogs catalogs = Catalogs.builtin();
+        CompilerContext context = new CompilerContext(
+            catalogs.focuses(),
+            catalogs.expectations(),
+            catalogs.computations(),
+            Map.of(),
+            DocumentSource.of(Map.of(id("external"), external))
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            true,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("external"), LatticePoint.origin, id("ext"), null)),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context);
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 1));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("schema version"), () -> found.get(0).message());
+    }
+
     private static Document expectationDocument(NamespacedId expectationKind) {
         CuboidSet cell = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         BlueprintSpec root = new BlueprintSpec(

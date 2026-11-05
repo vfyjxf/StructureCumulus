@@ -76,7 +76,6 @@ public final class JsonReader implements DocumentReader {
 
     private static final Set<String> definitionMembers = Set.of(
         "bounds",
-        "arguments",
         "bays",
         "seams",
         "checks",
@@ -85,8 +84,7 @@ public final class JsonReader implements DocumentReader {
         "derivations",
         "anchors",
         "orientation",
-        "placements",
-        "extensions"
+        "placements"
     );
 
     private static final Set<String> bayMembers = Set

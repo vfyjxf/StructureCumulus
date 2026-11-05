@@ -224,7 +224,9 @@ A box is `[x, y, z, sizeX, sizeY, sizeZ]` (origin + size). A bay has `box` or `b
 canonicalises again.
 
 A definition is the same `BlueprintSpec` shape without `schemaVersion`; its `id` is the map key. A
-placement is `{"definition": "mymod:shell", "as": "mymod:south", "at": [0,0,0]}`. The compiler
+placement is `{"definition": "mymod:shell", "as": "mymod:south", "at": [0,0,0]}`. A placement may
+also name a document in the `DocumentSource` instead of a local definition; the placed spec is that
+document's root, and its `schemaVersion` must equal the current version (`SC-DOC-0001`). The compiler
 qualifies every placed bay/check/computation/seam id with the alias path: `alias.path + "/" + local`,
 and translates every placed cell by `at`. An anchor and the orientation policy come only from the
 root; a definition may not declare anchors (they would be duplicated or ambiguous).
@@ -264,10 +266,16 @@ single-writer. `whenAbsent` is decoded to the key type; a wrong kind is `SC-DOC-
 
 A `definitions` entry contributes **bays, seams and placements** only. Checks, computations, keys,
 derivations, anchors, the orientation policy and `envelope` are root-only; a definition that
-declares one is `SC-DOC-0002`. This keeps a placed definition a pure geometry unit: its bays and
+declares one is `SC-DOC-0002`. `arguments` and `extensions` are not members of a definition at all:
+the reader rejects them as unknown members (`SC-DOC-0002`). A definition's `bounds` is required and
+must contain the definition's own bays and seams; a cell outside them is `SC-DOC-0002`. This keeps a
+placed definition a pure geometry unit: its bays and
 seams are qualified with the alias path (`alias.path + "/" + local`) and translated by the placement
 offset, while every check and computation is written once in the root against the merged ids. Nested
 placements are allowed; a cycle is `SC-DOC-0009`.
+
+No declaration is dropped silently. A bay no check names — root or merged — is `SC-DOC-0002`, and a
+definition no placement reaches, directly or through another placement, is `SC-DOC-0002`.
 
 ### 4.3 Lowering
 
