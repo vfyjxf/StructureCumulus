@@ -22,20 +22,14 @@ import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
-import net.neoforged.neoforge.event.level.PistonEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.jspecify.annotations.NullMarked;
@@ -45,7 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** The mark counter: event-edged invalidation plus lazy entity and block-entity fingerprints. */
+/** The mark counter: funnel-edged invalidation plus lazy entity and block-entity fingerprints. */
 @NullMarked
 @GameTestHolder(Constants.modId)
 @PrefixGameTestTemplate(false)
@@ -198,21 +192,7 @@ public final class LeaseMarkCounterGameTest {
         helper.succeed();
     }
 
-    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void chunkUnloadHandlerInvalidatesTheLease(GameTestHelper helper) {
-        LevelCapture capture = new LevelCapture(helper.getLevel());
-        CaptureResult.Captured captured = captured(capture, cell(helper), SnapshotPolicy.minimal());
-        try (SnapshotLease lease = captured.lease()) {
-            LevelChunk chunk = helper.getLevel().getChunkAt(helper.absolutePos(BlockPos.ZERO));
-            WatchEvents.chunkUnloaded(new ChunkEvent.Unload(chunk));
-            helper.assertFalse(lease.isCurrent(), "a watched chunk unload invalidates");
-        } finally {
-            capture.close();
-        }
-        helper.succeed();
-    }
-
-    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100, batch = "unload")
     public void levelUnloadEpochInvalidatesARawCapture(GameTestHelper helper) {
         LevelCapture capture = new LevelCapture(helper.getLevel());
         CaptureResult.Captured captured = captured(capture, cell(helper), SnapshotPolicy.minimal());
@@ -337,7 +317,7 @@ public final class LeaseMarkCounterGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void blockEntityNbtChangeInvalidatesLazily(GameTestHelper helper) {
+    public void blockEntityChangeInvalidatesThroughTheHook(GameTestHelper helper) {
         BlockPos chestPos = new BlockPos(0, 1, 0);
         helper.setBlock(chestPos, Blocks.CHEST);
         ChestBlockEntity chest = helper.getBlockEntity(chestPos);
@@ -350,8 +330,8 @@ public final class LeaseMarkCounterGameTest {
             chest.setItem(0, new ItemStack(Items.DIAMOND, 2));
 
             helper.assertValueEqual(before, WatchEvents.dispatchCount(), "a block-entity data change fires no event");
-            helper.assertValueEqual(0L, watch(capture).marks(), "a block-entity data change does not mark");
-            helper.assertFalse(lease.isCurrent(), "the lazy NBT snapshot sees the change");
+            helper.assertValueEqual(1L, watch(capture).marks(), "the setChanged hook marks the watch");
+            helper.assertFalse(lease.isCurrent(), "the eager mark invalidates the lease");
         } finally {
             chest.setItem(0, ItemStack.EMPTY);
             capture.close();
@@ -388,35 +368,38 @@ public final class LeaseMarkCounterGameTest {
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void blockEntityDataOutsideTheRegionDoesNotInvalidate(GameTestHelper helper) {
         BlockPos watchedPos = new BlockPos(0, 1, 0);
-        BlockPos otherPos = new BlockPos(4, 1, 0);
         helper.setBlock(watchedPos, Blocks.CHEST);
-        helper.setBlock(otherPos, Blocks.CHEST);
-        ChestBlockEntity other = helper.getBlockEntity(otherPos);
+        BlockPos otherAbs = helper.absolutePos(watchedPos).offset(32, 0, 0);
+        helper.getLevel().setBlock(otherAbs, Blocks.CHEST.defaultBlockState(), 3);
+        ChestBlockEntity other = (ChestBlockEntity) helper.getLevel().getBlockEntity(otherAbs);
         LevelCapture capture = new LevelCapture(helper.getLevel());
         CaptureResult.Captured captured = captured(capture, around(helper, watchedPos, 1), SnapshotPolicy.minimal());
         try (SnapshotLease lease = captured.lease()) {
             other.setItem(0, new ItemStack(Items.DIAMOND, 2));
-            helper.assertTrue(lease.isCurrent(), "an uncaptured block entity is not compared");
+            helper.assertTrue(lease.isCurrent(), "a change in an unwatched chunk is not compared");
+            helper.assertValueEqual(0L, watch(capture).marks(), "an unwatched chunk never marks");
         } finally {
             other.setItem(0, ItemStack.EMPTY);
             capture.close();
             helper.setBlock(watchedPos, Blocks.AIR);
-            helper.setBlock(otherPos, Blocks.AIR);
+            helper.getLevel().setBlock(otherAbs, Blocks.AIR.defaultBlockState(), 3);
         }
         helper.succeed();
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void breakEventInvalidatesTheLease(GameTestHelper helper) {
+    public void blockChangeInvalidatesTheLease(GameTestHelper helper) {
         LevelCapture capture = new LevelCapture(helper.getLevel());
         CaptureResult.Captured captured = captured(capture, cell(helper), SnapshotPolicy.minimal());
         try (SnapshotLease lease = captured.lease()) {
-            Player player = helper.makeMockPlayer(GameType.SURVIVAL);
-            BlockState state = Blocks.STONE.defaultBlockState();
-            WatchEvents.blockBroken(
-                new BlockEvent.BreakEvent(helper.getLevel(), helper.absolutePos(BlockPos.ZERO), state, player)
+            CumulusHooks.blockChanged(
+                helper.getLevel(),
+                helper.absolutePos(BlockPos.ZERO),
+                Blocks.STONE.defaultBlockState(),
+                Blocks.AIR.defaultBlockState(),
+                false
             );
-            helper.assertFalse(lease.isCurrent(), "a break event in the watched chunk invalidates");
+            helper.assertFalse(lease.isCurrent(), "a block change in the watched chunk invalidates");
         } finally {
             capture.close();
         }
@@ -424,15 +407,18 @@ public final class LeaseMarkCounterGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void pistonEventInvalidatesTheLease(GameTestHelper helper) {
+    public void movingWriteInvalidatesTheLease(GameTestHelper helper) {
         LevelCapture capture = new LevelCapture(helper.getLevel());
         CaptureResult.Captured captured = captured(capture, cell(helper), SnapshotPolicy.minimal());
         try (SnapshotLease lease = captured.lease()) {
-            BlockPos pos = helper.absolutePos(BlockPos.ZERO);
-            WatchEvents.pistonMoved(
-                new PistonEvent.Pre(helper.getLevel(), pos, Direction.UP, PistonEvent.PistonMoveType.EXTEND)
+            CumulusHooks.blockChanged(
+                helper.getLevel(),
+                helper.absolutePos(BlockPos.ZERO),
+                Blocks.STONE.defaultBlockState(),
+                Blocks.AIR.defaultBlockState(),
+                true
             );
-            helper.assertFalse(lease.isCurrent(), "a piston move in the watched chunk invalidates");
+            helper.assertFalse(lease.isCurrent(), "a moving write in the watched chunk invalidates");
         } finally {
             capture.close();
         }

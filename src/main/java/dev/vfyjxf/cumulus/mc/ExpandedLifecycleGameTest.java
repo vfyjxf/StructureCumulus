@@ -36,24 +36,15 @@ import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Explosion;
-import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.piston.PistonBaseBlock;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
-import net.neoforged.neoforge.common.util.BlockSnapshot;
-import net.neoforged.neoforge.event.level.BlockEvent;
-import net.neoforged.neoforge.event.level.ExplosionEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
-import net.neoforged.neoforge.event.level.PistonEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.jspecify.annotations.NullMarked;
@@ -64,9 +55,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Expanded multi-instance lifecycle checks on a real level: one break, explosion, placement or
- * piston pass hits several overlapping instances and must release/translate each claim key exactly
- * once, with rejected and duplicate events leaving no partial state behind.
+ * Expanded multi-instance lifecycle checks on a real level: one funnel-reported write can hit
+ * several overlapping instances and must release each claim key exactly once, with duplicate
+ * writes leaving no partial state behind.
  */
 @NullMarked
 @GameTestHolder(Constants.modId)
@@ -104,14 +95,12 @@ public final class ExpandedLifecycleGameTest {
         long base = ledger.revision();
         assertEquals(helper, 3, rows(ledger, cell).size(), "three overlapping owners hold one cell");
 
-        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
-        WatchEvents.blockBroken(
-            new BlockEvent.BreakEvent(
-                level,
-                helper.absolutePos(BlockPos.ZERO),
-                Blocks.STONE.defaultBlockState(),
-                player
-            )
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(BlockPos.ZERO),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            false
         );
 
         assertTrue(helper, manager.find(first.id()) == null, "the first overlapping instance is broken");
@@ -123,13 +112,12 @@ public final class ExpandedLifecycleGameTest {
         assertTrue(helper, manager.context(first.id()).revision() == 0, "the first context is gone");
         assertTrue(helper, manager.context(third.id()).revision() == 0, "the third context is gone");
 
-        WatchEvents.blockBroken(
-            new BlockEvent.BreakEvent(
-                level,
-                helper.absolutePos(BlockPos.ZERO),
-                Blocks.STONE.defaultBlockState(),
-                player
-            )
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(BlockPos.ZERO),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            false
         );
         assertEquals(helper, base + 3, ledger.revision(), "a duplicate break releases nothing more");
         helper.succeed();
@@ -157,9 +145,12 @@ public final class ExpandedLifecycleGameTest {
         claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
 
-        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
-        WatchEvents.blockBroken(
-            new BlockEvent.BreakEvent(level, helper.absolutePos(firstRel), Blocks.STONE.defaultBlockState(), player)
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(firstRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            false
         );
 
         assertTrue(helper, manager.find(first.id()) == null);
@@ -174,8 +165,12 @@ public final class ExpandedLifecycleGameTest {
         assertEquals(helper, 1, rows(ledger, farCell).size(), "the far claim row stays");
         assertEquals(helper, base + 2, ledger.revision(), "only the two overlapping keys are released");
 
-        WatchEvents.blockBroken(
-            new BlockEvent.BreakEvent(level, helper.absolutePos(firstRel), Blocks.STONE.defaultBlockState(), player)
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(firstRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            false
         );
         assertEquals(helper, base + 2, ledger.revision(), "a duplicate break is idempotent");
         cleanup(manager, ledger, ownerA, firstSiting);
@@ -185,7 +180,7 @@ public final class ExpandedLifecycleGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void oneExplosionBreaksEveryTouchedInstanceOnlyOnce(GameTestHelper helper) {
+    public void destructionBreaksEveryTouchedInstanceOnlyOnce(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
@@ -214,43 +209,41 @@ public final class ExpandedLifecycleGameTest {
 
         BlockPos firstAbs = helper.absolutePos(firstRel);
         BlockPos secondAbs = helper.absolutePos(secondRel);
-        Explosion explosion = new Explosion(
+        CumulusHooks
+                .blockChanged(level, firstAbs, Blocks.STONE.defaultBlockState(), Blocks.AIR.defaultBlockState(), false);
+        CumulusHooks
+                .blockChanged(level, firstAbs, Blocks.STONE.defaultBlockState(), Blocks.AIR.defaultBlockState(), false);
+        CumulusHooks.blockChanged(
             level,
-            null,
-            firstAbs.getX() + 0.5D,
-            firstAbs.getY() + 0.5D,
-            firstAbs.getZ() + 0.5D,
-            1.0F,
-            false,
-            Explosion.BlockInteraction.DESTROY,
-            List.of(firstAbs, firstAbs, secondAbs)
+            secondAbs,
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            false
         );
-        WatchEvents.explosionDetonated(new ExplosionEvent.Detonate(level, explosion, List.of()));
 
         assertTrue(helper, manager.find(first.id()) == null, "the first overlapped instance is broken");
         assertTrue(helper, manager.find(second.id()) == null, "the second overlapped instance is broken");
         assertTrue(helper, manager.find(third.id()) == null, "the second cell instance is broken");
-        assertTrue(helper, manager.find(far.id()) != null, "an instance outside the affected blocks stays");
+        assertTrue(helper, manager.find(far.id()) != null, "an instance outside the affected cells stays");
         assertEquals(helper, 0, rows(ledger, firstCell).size());
         assertEquals(helper, 0, rows(ledger, secondCell).size());
         assertEquals(helper, 1, rows(ledger, farCell).size(), "the far claim row is untouched");
         assertEquals(helper, base + 3, ledger.revision(), "duplicate affected positions release once");
 
-        WatchEvents.explosionDetonated(new ExplosionEvent.Detonate(level, explosion, List.of()));
-        assertEquals(helper, base + 3, ledger.revision(), "a duplicate explosion releases nothing more");
+        CumulusHooks
+                .blockChanged(level, firstAbs, Blocks.STONE.defaultBlockState(), Blocks.AIR.defaultBlockState(), false);
+        assertEquals(helper, base + 3, ledger.revision(), "a duplicate write releases nothing more");
         cleanup(manager, ledger, ownerD, farSiting);
         helper.succeed();
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void onePistonMoveTranslatesEveryOverlappingInstance(GameTestHelper helper) {
+    public void onePistonPushBreaksEveryOverlappingInstance(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
         ClaimLedger ledger = state.claims(level);
-        BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
-        helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
         helper.setBlock(stoneRel, Blocks.STONE);
         LatticePoint origin = point(helper.absolutePos(stoneRel));
         Siting siting = Siting.of(origin, Orientation.identity);
@@ -261,47 +254,52 @@ public final class ExpandedLifecycleGameTest {
         claim(ledger, first.id(), siting, origin, Sharing.shared);
         claim(ledger, second.id(), siting, origin, Sharing.shared);
         long base = ledger.revision();
-        LatticePoint moved = Objects.requireNonNull(origin.offset(1, 0, 0), "moved cell");
 
-        WatchEvents.pistonMoved(
-            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(stoneRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
         );
 
-        StructureInstance movedFirst = manager.find(first.id());
-        StructureInstance movedSecond = manager.find(second.id());
-        assertTrue(helper, movedFirst != null && movedSecond != null, "a shared piston move keeps both instances");
-        if (movedFirst == null || movedSecond == null) {
-            return;
-        }
-        assertEquals(helper, moved, movedFirst.siting().origin(), "the first origin is translated");
-        assertEquals(helper, moved, movedSecond.siting().origin(), "the second origin is translated");
-        assertEquals(helper, CuboidSet.of(Cuboid.of(moved)), movedFirst.bounds());
-        assertEquals(helper, 3L, Objects.requireNonNull(movedFirst.context().get(count)));
-        assertEquals(helper, 5L, Objects.requireNonNull(movedSecond.context().get(count)));
-        assertEquals(helper, 0, rows(ledger, origin).size(), "both old claim rows are released");
-        assertEquals(helper, 2, rows(ledger, moved).size(), "both translated claim rows are written");
-        assertEquals(helper, base + 4, ledger.revision(), "each moved instance settles once and releases once");
-
-        WatchEvents.pistonMoved(
-            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        assertTrue(helper, manager.find(first.id()) == null, "a piston push breaks the first instance");
+        assertTrue(helper, manager.find(second.id()) == null, "a piston push breaks the second instance");
+        assertEquals(
+            helper,
+            0L,
+            manager.context(first.id()).revision(),
+            "the first context is dropped, not translated"
         );
-        assertEquals(helper, base + 4, ledger.revision(), "a duplicate piston pass translates nothing more");
-        cleanup(manager, ledger, ownerA, movedFirst.siting());
-        cleanup(manager, ledger, ownerB, movedSecond.siting());
+        assertEquals(
+            helper,
+            0L,
+            manager.context(second.id()).revision(),
+            "the second context is dropped, not translated"
+        );
+        assertEquals(helper, 0, rows(ledger, origin).size(), "both claim rows are released");
+        assertEquals(helper, base + 2, ledger.revision(), "each broken key bumps the revision once");
+
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(stoneRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
+        );
+        assertEquals(helper, base + 2, ledger.revision(), "a duplicate moving write releases nothing more");
         helper.succeed();
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void onePistonMoveMixesTranslatedPartialAndConflictingInstances(GameTestHelper helper) {
+    public void onePistonPushDropsEveryInstanceTouchingTheWrittenCells(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
         ClaimLedger ledger = state.claims(level);
-        BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos firstRel = new BlockPos(1, 1, 0);
         BlockPos secondRel = new BlockPos(2, 1, 0);
         BlockPos aboveRel = new BlockPos(1, 2, 0);
-        helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
         helper.setBlock(firstRel, Blocks.STONE);
         helper.setBlock(secondRel, Blocks.STONE);
         helper.setBlock(aboveRel, Blocks.STONE);
@@ -311,7 +309,7 @@ public final class ExpandedLifecycleGameTest {
         Siting firstSiting = Siting.of(firstCell, Orientation.identity);
         Siting secondSiting = Siting.of(secondCell, Orientation.identity);
         StructureInstance moving = form(manager, state, level, ownerA, firstSiting, firstCell);
-        StructureInstance translating = form(manager, state, level, ownerB, secondSiting, secondCell);
+        StructureInstance following = form(manager, state, level, ownerB, secondSiting, secondCell);
         StructureInstance partial = formBounds(
             manager,
             state,
@@ -321,112 +319,101 @@ public final class ExpandedLifecycleGameTest {
             CuboidSet.of(Cuboid.of(firstCell), Cuboid.of(aboveCell))
         );
         manager.publish(moving.id(), Map.of(count, 1L), FindingBundle.empty(), Spend.zero);
-        manager.publish(translating.id(), Map.of(count, 2L), FindingBundle.empty(), Spend.zero);
+        manager.publish(following.id(), Map.of(count, 2L), FindingBundle.empty(), Spend.zero);
         claim(ledger, moving.id(), firstSiting, firstCell, Sharing.shared);
-        claim(ledger, translating.id(), secondSiting, secondCell, Sharing.shared);
+        claim(ledger, following.id(), secondSiting, secondCell, Sharing.shared);
         claimRows(ledger, partial.id(), firstSiting, List.of(firstCell, aboveCell), Sharing.shared);
         long base = ledger.revision();
-        LatticePoint firstTarget = Objects.requireNonNull(firstCell.offset(1, 0, 0), "first target");
-        LatticePoint secondTarget = Objects.requireNonNull(secondCell.offset(1, 0, 0), "second target");
 
-        WatchEvents.pistonMoved(
-            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(firstRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
+        );
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(secondRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
         );
 
-        StructureInstance moved = manager.find(moving.id());
-        StructureInstance translated = manager.find(translating.id());
-        assertTrue(helper, moved != null, "the fully pushed instance moves");
-        assertTrue(helper, translated != null, "the second fully pushed instance moves");
-        assertTrue(helper, manager.find(partial.id()) == null, "a partly pushed instance is invalidated");
-        if (moved == null || translated == null) {
-            return;
-        }
-        assertEquals(helper, firstTarget, moved.siting().origin());
-        assertEquals(helper, secondTarget, translated.siting().origin());
+        assertTrue(helper, manager.find(moving.id()) == null, "the pushed instance is broken");
+        assertTrue(helper, manager.find(following.id()) == null, "the instance in the push chain is broken");
+        assertTrue(helper, manager.find(partial.id()) == null, "a partly pushed instance is broken");
         assertEquals(helper, 0, rows(ledger, firstCell).size(), "no claim row is left on the shared old cells");
         assertEquals(helper, 0, rows(ledger, aboveCell).size(), "the partial instance's above claim is released");
-        assertEquals(helper, 1, rows(ledger, firstTarget).size(), "the first translated row is written");
-        assertEquals(helper, 1, rows(ledger, secondTarget).size(), "the second translated row is written");
-        assertEquals(helper, base + 5, ledger.revision(), "two moves settle/release plus one invalidation release");
-        cleanup(manager, ledger, ownerA, moved.siting());
-        cleanup(manager, ledger, ownerB, translated.siting());
-        cleanup(manager, ledger, ownerC, firstSiting);
+        assertEquals(helper, 0, rows(ledger, secondCell).size(), "the second cell row is released");
+        assertEquals(helper, base + 3, ledger.revision(), "each broken key releases once");
         helper.succeed();
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void pistonMoveRejectedForOneInstanceInvalidatesAndReleasesItsClaims(GameTestHelper helper) {
+    public void pistonPushReleasesEachTouchedKeyExactlyOnce(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
         ClaimLedger ledger = state.claims(level);
-        BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
         BlockPos occupiedRel = new BlockPos(2, 1, 0);
-        helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
         helper.setBlock(stoneRel, Blocks.STONE);
+        helper.setBlock(occupiedRel, Blocks.STONE);
         LatticePoint origin = point(helper.absolutePos(stoneRel));
         LatticePoint occupied = point(helper.absolutePos(occupiedRel));
         Siting siting = Siting.of(origin, Orientation.identity);
         Siting occupying = Siting.of(occupied, Orientation.identity);
-        StructureInstance rejected = form(manager, state, level, ownerA, siting, origin);
-        StructureInstance moving = form(manager, state, level, ownerB, siting, origin);
+        StructureInstance first = form(manager, state, level, ownerA, siting, origin);
+        StructureInstance second = form(manager, state, level, ownerB, siting, origin);
         StructureInstance occupant = form(manager, state, level, ownerA, occupying, occupied);
-        claim(ledger, rejected.id(), siting, origin, Sharing.shared);
-        claim(ledger, moving.id(), siting, origin, Sharing.shared);
+        claim(ledger, first.id(), siting, origin, Sharing.shared);
+        claim(ledger, second.id(), siting, origin, Sharing.shared);
+        claim(ledger, occupant.id(), occupying, occupied, Sharing.exclusive);
         long base = ledger.revision();
 
-        WatchEvents.pistonMoved(
-            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(stoneRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
+        );
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(occupiedRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.MOVING_PISTON.defaultBlockState(),
+            true
         );
 
-        assertTrue(
-            helper,
-            manager.find(rejected.id()) == null,
-            "a rejected move invalidates the stale instance instead of leaving it behind"
-        );
-        assertEquals(helper, 0, rows(ledger, origin).size(), "the rejected instance's old claim row is released");
-        assertTrue(
-            helper,
-            rows(ledger, occupied).stream().noneMatch(row -> row.instance().equals(rejected.id())),
-            "no translated row is written for the rejection"
-        );
-        StructureInstance moved = manager.find(moving.id());
-        assertTrue(helper, moved != null, "the unblocked peer still moves");
-        if (moved == null) {
-            return;
-        }
-        assertEquals(helper, occupied, moved.siting().origin(), "the peer moves into the piston target");
-        assertEquals(helper, 1, rows(ledger, occupied).size(), "the peer translates its claim row");
-        assertEquals(
-            helper,
-            base + 3,
-            ledger.revision(),
-            "one invalidation release plus one accepted move settle/release"
-        );
-        assertTrue(helper, manager.find(occupant.id()) != null, "the blocking occupant is untouched");
+        assertTrue(helper, manager.find(first.id()) == null, "the first pushed instance is broken");
+        assertTrue(helper, manager.find(second.id()) == null, "the second pushed instance is broken");
+        assertTrue(helper, manager.find(occupant.id()) == null, "the occupant is invalidated by the incoming block");
+        assertEquals(helper, 0, rows(ledger, origin).size(), "the shared origin rows are released");
+        assertEquals(helper, 0, rows(ledger, occupied).size(), "the occupant row is released");
+        assertEquals(helper, base + 3, ledger.revision(), "each dropped key bumps the revision once");
 
-        WatchEvents.pistonMoved(
-            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(stoneRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
         );
-        assertEquals(helper, base + 3, ledger.revision(), "a duplicate rejected pass releases nothing more");
-        cleanup(manager, ledger, ownerA, siting);
-        cleanup(manager, ledger, ownerA, occupying);
-        cleanup(manager, ledger, ownerB, moved.siting());
+        assertEquals(helper, base + 3, ledger.revision(), "a duplicate pass releases nothing more");
         helper.succeed();
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void pistonMoveClaimConflictInvalidatesOnlyThatInstance(GameTestHelper helper) {
+    public void pistonPushKeepsABareIncumbentClaimRowUntouched(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
         ClaimLedger ledger = state.claims(level);
-        BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos firstRel = new BlockPos(1, 1, 0);
         BlockPos middleRel = new BlockPos(2, 1, 0);
         BlockPos lastRel = new BlockPos(3, 1, 0);
-        helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
         helper.setBlock(firstRel, Blocks.STONE);
         helper.setBlock(middleRel, Blocks.STONE);
         helper.setBlock(lastRel, Blocks.STONE);
@@ -443,37 +430,39 @@ public final class ExpandedLifecycleGameTest {
         claim(ledger, moving.id(), lastSiting, lastCell, Sharing.shared);
         claim(ledger, incumbentInstance, incumbentSiting, middleCell, Sharing.exclusive);
         long base = ledger.revision();
-        LatticePoint firstTarget = Objects.requireNonNull(firstCell.offset(1, 0, 0), "first target");
-        LatticePoint lastTarget = Objects.requireNonNull(lastCell.offset(1, 0, 0), "last target");
 
-        WatchEvents.pistonMoved(
-            new PistonEvent.Pre(level, helper.absolutePos(pistonRel), Direction.EAST, PistonEvent.PistonMoveType.EXTEND)
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(firstRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
+        );
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(middleRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.MOVING_PISTON.defaultBlockState(),
+            true
+        );
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(lastRel),
+            Blocks.STONE.defaultBlockState(),
+            Blocks.AIR.defaultBlockState(),
+            true
         );
 
-        assertTrue(
-            helper,
-            manager.find(conflicting.id()) == null,
-            "a conflicting translation invalidates the instance"
-        );
-        assertTrue(helper, rows(ledger, firstCell).isEmpty(), "the conflicting old row is released");
+        assertTrue(helper, manager.find(conflicting.id()) == null, "the pushed instance is broken");
+        assertTrue(helper, manager.find(moving.id()) == null, "the chain instance is broken");
+        assertTrue(helper, rows(ledger, firstCell).isEmpty(), "the pushed old row is released");
         assertEquals(helper, 1, rows(ledger, middleCell).size(), "the incumbent row survives");
         assertEquals(helper, incumbentInstance, rows(ledger, middleCell).get(0).instance());
-        assertTrue(
-            helper,
-            rows(ledger, firstTarget).stream().noneMatch(row -> row.instance().equals(conflicting.id())),
-            "no translated row from the invalidated instance remains"
-        );
-        StructureInstance moved = manager.find(moving.id());
-        assertTrue(helper, moved != null, "the non-conflicting instance still moves");
-        if (moved == null) {
-            return;
-        }
-        assertEquals(helper, lastTarget, moved.siting().origin());
-        assertEquals(helper, 1, rows(ledger, lastTarget).size(), "the non-conflicting row is translated");
-        assertEquals(helper, base + 3, ledger.revision(), "one invalidation release plus one move settle/release");
+        assertTrue(helper, rows(ledger, lastCell).isEmpty(), "the chain row is released");
+        assertEquals(helper, base + 2, ledger.revision(), "each broken key releases once");
         cleanup(manager, ledger, ownerA, firstSiting);
-        cleanup(manager, ledger, ownerB, moved.siting());
-        cleanup(manager, ledger, ownerC, incumbentSiting);
+        cleanup(manager, ledger, ownerB, lastSiting);
+        ledger.release(incumbentInstance);
         helper.succeed();
     }
 
@@ -529,7 +518,7 @@ public final class ExpandedLifecycleGameTest {
         helper.succeed();
     }
 
-    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100, batch = "unload")
     public void levelUnloadDropsEveryInstanceAndItsClaimRows(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
@@ -563,7 +552,8 @@ public final class ExpandedLifecycleGameTest {
         ClaimLedger reloaded = state.claims(level);
         assertTrue(
             helper,
-            reloaded.read(Cuboid.of(firstCell)).rows().isEmpty() && reloaded.read(Cuboid.of(secondCell)).rows().isEmpty(),
+            reloaded.read(Cuboid.of(firstCell)).rows().isEmpty()
+                    && reloaded.read(Cuboid.of(secondCell)).rows().isEmpty(),
             "the unload drops the store and its rows"
         );
         assertEquals(helper, 0L, reloaded.revision(), "a fresh store starts at revision zero");
@@ -598,20 +588,20 @@ public final class ExpandedLifecycleGameTest {
         claim(ledger, second.id(), firstSiting, firstCell, Sharing.shared);
         claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
-        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 
-        WatchEvents.blockPlaced(
-            new BlockEvent.EntityPlaceEvent(
-                BlockSnapshot.create(level.dimension(), level, helper.absolutePos(outsideRel)),
-                Blocks.AIR.defaultBlockState(),
-                player
-            )
+        CumulusHooks.blockChanged(
+            level,
+            helper.absolutePos(outsideRel),
+            Blocks.AIR.defaultBlockState(),
+            Blocks.STONE.defaultBlockState(),
+            false
         );
         assertTrue(helper, manager.find(first.id()) != null, "a placement outside every bounds is a no-op");
         assertEquals(helper, base, ledger.revision(), "an outside placement never touches claims");
 
-        BlockSnapshot firstSnapshot = BlockSnapshot.create(level.dimension(), level, helper.absolutePos(firstRel));
-        WatchEvents.blockPlaced(new BlockEvent.EntityPlaceEvent(firstSnapshot, Blocks.AIR.defaultBlockState(), player));
+        BlockPos firstAbs = helper.absolutePos(firstRel);
+        CumulusHooks
+                .blockChanged(level, firstAbs, Blocks.AIR.defaultBlockState(), Blocks.STONE.defaultBlockState(), false);
         assertTrue(helper, manager.find(first.id()) == null, "the first overlapping instance is invalidated");
         assertTrue(helper, manager.find(second.id()) == null, "the second overlapping instance is invalidated");
         assertTrue(helper, manager.find(far.id()) != null, "the far instance survives");
@@ -619,7 +609,8 @@ public final class ExpandedLifecycleGameTest {
         assertEquals(helper, 1, rows(ledger, farCell).size(), "the far row is untouched");
         assertEquals(helper, base + 2, ledger.revision(), "each invalidated key releases once");
 
-        WatchEvents.blockPlaced(new BlockEvent.EntityPlaceEvent(firstSnapshot, Blocks.AIR.defaultBlockState(), player));
+        CumulusHooks
+                .blockChanged(level, firstAbs, Blocks.AIR.defaultBlockState(), Blocks.STONE.defaultBlockState(), false);
         assertEquals(helper, base + 2, ledger.revision(), "a duplicate placement releases nothing more");
         cleanup(manager, ledger, ownerC, farSiting);
         helper.succeed();
@@ -678,7 +669,13 @@ public final class ExpandedLifecycleGameTest {
         return attempt.commit(bounds);
     }
 
-    private static void claim(ClaimLedger ledger, InstanceId instance, Siting siting, LatticePoint cell, Sharing sharing) {
+    private static void claim(
+        ClaimLedger ledger,
+        InstanceId instance,
+        Siting siting,
+        LatticePoint cell,
+        Sharing sharing
+    ) {
         claimRows(ledger, instance, siting, List.of(cell), sharing);
     }
 

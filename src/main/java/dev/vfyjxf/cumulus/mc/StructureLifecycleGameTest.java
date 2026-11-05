@@ -21,12 +21,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.common.util.BlockSnapshot;
-import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -53,8 +48,8 @@ public final class StructureLifecycleGameTest {
         ServerLevel level = helper.getLevel();
         BlockPos pos = helper.absolutePos(BlockPos.ZERO);
         StructureManager manager = state.structures(level);
-        StructureInstance instance = instance(manager, state, level, pos);
         helper.setBlock(BlockPos.ZERO, Blocks.STONE);
+        StructureInstance instance = instance(manager, state, level, pos);
         ClaimLedger ledger = state.claims(level);
         LatticePoint point = LatticePoint.of(pos.getX(), pos.getY(), pos.getZ());
         ledger.settle(
@@ -67,9 +62,7 @@ public final class StructureLifecycleGameTest {
             )
         );
 
-        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
-        BlockState broken = Blocks.STONE.defaultBlockState();
-        WatchEvents.blockBroken(new BlockEvent.BreakEvent(level, pos, broken, player));
+        CumulusHooks.blockChanged(level, pos, Blocks.STONE.defaultBlockState(), Blocks.AIR.defaultBlockState(), false);
 
         helper.assertTrue(manager.find(instance.id()) == null, "the broken structure is removed");
         helper.assertTrue(ledger.read(Cuboid.of(point)).rows().isEmpty(), "the broken structure releases its claims");
@@ -87,15 +80,14 @@ public final class StructureLifecycleGameTest {
         BlockPos pos = helper.absolutePos(BlockPos.ZERO);
         StructureManager manager = state.structures(level);
         StructureInstance instance = instance(manager, state, level, pos);
-        Player player = helper.makeMockPlayer(GameType.SURVIVAL);
-        BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
-        WatchEvents.blockPlaced(new BlockEvent.EntityPlaceEvent(snapshot, Blocks.AIR.defaultBlockState(), player));
+
+        CumulusHooks.blockChanged(level, pos, Blocks.AIR.defaultBlockState(), Blocks.STONE.defaultBlockState(), false);
 
         helper.assertTrue(manager.find(instance.id()) == null, "a placement invalidates the structure");
         helper.succeed();
     }
 
-    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100, batch = "unload")
     public void levelUnloadDispatchesUnloaded(GameTestHelper helper) {
         ServerState state = ServerState.current();
         if (state == null) {

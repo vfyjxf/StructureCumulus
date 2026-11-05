@@ -107,7 +107,7 @@ public final class LeaseLifecycleGameTest {
         helper.succeed();
     }
 
-    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100, batch = "unload")
     public void unloadReleasesOnlyTheManagedCapture(GameTestHelper helper) {
         ServerState state = ServerState.current();
         if (state == null) {
