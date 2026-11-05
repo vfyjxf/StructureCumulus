@@ -268,7 +268,8 @@ codes (`adapter` §3.2).
 ### 4.3 The bundle
 
 Builder order: stamp phase (already present), floor (`includeInfo=false` drops `info`), dedup by
-`(severity, phase, code, labels, notes)` keeping the first insertion, sort by
+`(severity, phase, code, message, labels, notes)` keeping the first insertion — a different message
+is a different finding, even under one code (D-67) — sort by
 `(severity.rank, phase.rank, code, primary locus, insertion)`, per-code cap and total cap over
 `warning`/`info` only, strip notes if `includeNotes=false`, append `SC-DIA-0001` when
 `elided + filtered > 0`. `error` is never capped. A smaller cap yields a prefix of a larger one.

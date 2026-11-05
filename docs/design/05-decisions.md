@@ -1289,6 +1289,19 @@ two rejection paths.
 and `MatchEngine.plannerFailure`'s message dispatch are gone; the planner's refusal sites carry their
 `CodeEntry` directly (`SC-SPC-0001`, `SC-CLM-0001`, `SC-CLM-0004`, `SC-CLM-0005`).
 
+### D-67 — A compile finding always points somewhere, and a different message is a different finding
+
+`DocumentCompiler` attaches a primary label to every finding it reports. When a declaration has no
+source span and no cell locus, the label covers the blueprint's own bounds — "somewhere in this
+blueprint" is still a place, and it is honest about what the compiler knows.
+
+`FindingBundle` adds the message to its dedup key. Two findings that differ only in the sentence they
+carry are two findings; before, both were unlabelled and collapsed into one, so an author with two
+missing definitions was told about one.
+
+**Why both.** The label alone fixes the law but not the collapse for findings that share a code and a
+dissimilar message; the key alone stops the collapse but leaves findings pointing nowhere.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

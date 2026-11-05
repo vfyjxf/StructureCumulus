@@ -303,10 +303,11 @@ hash-ordered collection. Equal documents produce equal blueprints (I-13).
 
 ### 4.4 Findings
 
-A `compile` finding carries a `definition` label when the reader supplied a span, otherwise a
-`local` label on the offending cells (or a label-less finding for a document-level failure). The
-compiler never throws for bad data; a reader that cannot parse returns `null` and appends
-`SC-DOC-0013`.
+A `compile` finding always carries a primary label: a `definition` label when the reader supplied a
+span, otherwise a `local` label on the offending cells, otherwise a `local` label over the whole
+blueprint bounds — a single origin cell when those bounds are empty (D-67). "Somewhere in this
+blueprint" is the floor; no compile finding is label-less. The compiler never throws for bad data;
+a reader that cannot parse returns `null` and appends `SC-DOC-0013`.
 
 ### 4.5 Structure sets
 
