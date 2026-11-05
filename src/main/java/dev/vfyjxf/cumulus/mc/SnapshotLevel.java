@@ -9,7 +9,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -115,8 +115,8 @@ final class SnapshotLevel implements BlockGetter {
         if (type.equals(HostTypes.fluidState)) {
             return (H) fluidState(pos.x(), pos.y(), pos.z());
         }
-        if (type.equals(HostTypes.entity)) {
-            return (H) entityAt(pos);
+        if (type.equals(HostTypes.entityType)) {
+            return (H) entityTypeAt(pos);
         }
         if (type.equals(HostTypes.blockEntity)) {
             return (H) blockEntityAt(pos);
@@ -182,13 +182,13 @@ final class SnapshotLevel implements BlockGetter {
         return blockEntities.get(new BlockPos(pos.x(), pos.y(), pos.z()));
     }
 
-    private @Nullable Entity entityAt(LatticePoint pos) {
+    private @Nullable EntityType<?> entityTypeAt(LatticePoint pos) {
         if (!contains(pos.x(), pos.y(), pos.z())) {
             return null;
         }
         for (CapturedEntity entity : entities) {
             if (entity.footprint().contains(pos)) {
-                return entity.entity();
+                return entity.entityType();
             }
         }
         return null;
@@ -240,13 +240,13 @@ final class SnapshotLevel implements BlockGetter {
         return key == null ? 0L : key.toString().hashCode();
     }
 
-    record CapturedEntity(UUID id, NamespacedId type, Cuboid footprint, Entity entity) {
+    record CapturedEntity(UUID id, NamespacedId type, Cuboid footprint, EntityType<?> entityType) {
 
         CapturedEntity {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(type, "type");
             Objects.requireNonNull(footprint, "footprint");
-            Objects.requireNonNull(entity, "entity");
+            Objects.requireNonNull(entityType, "entityType");
         }
     }
 }

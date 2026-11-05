@@ -317,7 +317,7 @@ class CaptureAdversarialTest {
             view.get(cell, HostTypes.fluidState),
             "the fluid state is the captured one"
         );
-        assertNull(view.get(cell, HostTypes.entity), "no entity was captured");
+        assertNull(view.get(cell, HostTypes.entityType), "no entity was captured");
         assertNull(view.get(cell, HostTypes.blockEntity), "no block entity was captured");
         assertNull(view.get(cell, HostType.of(NamespacedId.of("test", "custom"))), "an unknown host type answers null");
         BlockState outside = view.get(LatticePoint.of(9, 0, 0), HostTypes.blockState);

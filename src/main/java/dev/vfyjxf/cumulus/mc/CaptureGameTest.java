@@ -30,7 +30,6 @@ import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -192,8 +191,9 @@ public final class CaptureGameTest {
                 helper.fail("the block entity copy keeps a live level");
                 return;
             }
-            Entity entity = view.get(Objects.requireNonNull(water.offset(0, 1, 0), "entity cell"), HostTypes.entity);
-            if (entity == null || entity.getType() != EntityType.CHICKEN) {
+            EntityType<?> entityType = view
+                    .get(Objects.requireNonNull(water.offset(0, 1, 0), "entity cell"), HostTypes.entityType);
+            if (entityType != EntityType.CHICKEN) {
                 helper.fail("the chicken entity was not captured");
                 return;
             }

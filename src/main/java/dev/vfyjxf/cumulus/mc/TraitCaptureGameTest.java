@@ -53,6 +53,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /** GameTests for the three stable trait keys and the four-state trait slots. */
@@ -209,6 +210,38 @@ public final class TraitCaptureGameTest {
             helper.assertTrue(
                 occupant.slot(OccupantTraits.fluid.id()) instanceof TraitSlot.Absent,
                 "an entity without a fluid capability is absent"
+            );
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aCapturedEntityTypeOutlivesTheLiveEntity(GameTestHelper helper) {
+        BlockPos floor = new BlockPos(0, 1, 0);
+        helper.setBlock(floor, Blocks.STONE);
+        var chicken = helper.spawnWithNoFreeWill(EntityType.CHICKEN, new Vec3(0.5, 2.0, 0.5));
+        BlockPos world = helper.absolutePos(floor);
+        Cuboid bounds = Cuboid
+                .of(world.getX(), world.getY(), world.getZ(), world.getX() + 1, world.getY() + 2, world.getZ() + 1);
+
+        CaptureResult.Captured captured = capture(
+            new LevelCapture(helper.getLevel()),
+            bounds,
+            entityPolicy(Set.of())
+        );
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView view = lease.view();
+            LatticePoint entityCell = Objects.requireNonNull(point(world).offset(0, 1, 0), "entity cell");
+            helper.assertValueEqual(
+                EntityType.CHICKEN,
+                view.get(entityCell, HostTypes.entityType),
+                "the chicken type is captured"
+            );
+            chicken.discard();
+            helper.assertValueEqual(
+                EntityType.CHICKEN,
+                view.get(entityCell, HostTypes.entityType),
+                "the captured type answers after the live entity is gone"
             );
         }
         helper.succeed();

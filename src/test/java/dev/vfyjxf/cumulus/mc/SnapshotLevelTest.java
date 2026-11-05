@@ -8,7 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Marker;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -23,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -53,12 +53,11 @@ class SnapshotLevelTest {
         fluids[SnapshotLevel.fluidIndex(100, 200, 300)] = water.getFluidState();
         fluids[SnapshotLevel.fluidIndex(101, 200, 300)] = log.getFluidState();
         BlockEntity chest = BlockEntityType.CHEST.create(new BlockPos(0, 0, 0), Blocks.CHEST.defaultBlockState());
-        Entity marker = marker();
         SnapshotLevel.CapturedEntity captured = new SnapshotLevel.CapturedEntity(
-            marker.getUUID(),
-            NamespacedId.of("minecraft", "marker"),
+            UUID.nameUUIDFromBytes(new byte[]{1}),
+            NamespacedId.of("minecraft", "chicken"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
-            marker
+            EntityType.CHICKEN
         );
         long key = SnapshotLevel.worldSectionKey(100, 200, 300);
         SnapshotLevel snapshot = new SnapshotLevel(
@@ -79,9 +78,9 @@ class SnapshotLevelTest {
         assertEquals(water.getFluidState(), snapshot.get(LatticePoint.origin, HostTypes.fluidState));
         assertSame(chest, snapshot.getBlockEntity(new BlockPos(0, 0, 0)));
         assertSame(chest, snapshot.get(LatticePoint.origin, HostTypes.blockEntity));
-        assertSame(marker, snapshot.get(LatticePoint.origin, HostTypes.entity));
+        assertSame(EntityType.CHICKEN, snapshot.get(LatticePoint.origin, HostTypes.entityType));
         assertNull(snapshot.getBlockEntity(new BlockPos(1, 0, 0)));
-        assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entity));
+        assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entityType));
         assertNull(snapshot.get(LatticePoint.origin, HostType.of(NamespacedId.of("test", "unknown"))));
     }
 
@@ -94,7 +93,7 @@ class SnapshotLevelTest {
         assertTrue(snapshot.getBlockState(new BlockPos(0, 1, 0)).isAir());
         assertEquals(Fluids.EMPTY.defaultFluidState(), snapshot.getFluidState(new BlockPos(1, 0, 0)));
         assertNull(snapshot.getBlockEntity(new BlockPos(1, 0, 0)));
-        assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entity));
+        assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entityType));
         assertTrue(Objects.requireNonNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.blockState), "air").isAir());
         assertEquals(Fluids.EMPTY.defaultFluidState(), snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.fluidState));
     }
@@ -136,7 +135,7 @@ class SnapshotLevelTest {
     @Test
     void contentDigestTracksTheCapturedEntity() {
         SnapshotLevel without = snapshot(Blocks.STONE.defaultBlockState());
-        SnapshotLevel with = snapshot(Blocks.STONE.defaultBlockState(), marker());
+        SnapshotLevel with = snapshot(Blocks.STONE.defaultBlockState(), EntityType.CHICKEN);
 
         assertNotEquals(without.contentDigest(cell), with.contentDigest(cell));
     }
@@ -146,26 +145,30 @@ class SnapshotLevelTest {
         for (Field field : SnapshotLevel.class.getDeclaredFields()) {
             assertFalse(Level.class.isAssignableFrom(field.getType()), field.getName());
         }
+        for (RecordComponent component : SnapshotLevel.CapturedEntity.class.getRecordComponents()) {
+            assertFalse(Entity.class.isAssignableFrom(component.getType()), component.getName());
+            assertFalse(Level.class.isAssignableFrom(component.getType()), component.getName());
+        }
     }
 
     private static SnapshotLevel snapshot(BlockState state) {
         return snapshot(state, null);
     }
 
-    private static SnapshotLevel snapshot(BlockState state, @Nullable Entity entity) {
+    private static SnapshotLevel snapshot(BlockState state, @Nullable EntityType<?> entityType) {
         PalettedContainer<BlockState> states = states();
         states.set(0, 0, 0, state);
         FluidState[] fluids = fluids();
         fluids[SnapshotLevel.fluidIndex(0, 0, 0)] = state.getFluidState();
         long key = SnapshotLevel.worldSectionKey(0, 0, 0);
-        List<SnapshotLevel.CapturedEntity> entities = entity == null
+        List<SnapshotLevel.CapturedEntity> entities = entityType == null
                 ? List.of()
                 : List.of(
                     new SnapshotLevel.CapturedEntity(
                         UUID.nameUUIDFromBytes(new byte[]{1}),
-                        NamespacedId.of("minecraft", "marker"),
+                        NamespacedId.of("minecraft", "chicken"),
                         cell,
-                        entity
+                        entityType
                     )
                 );
         return new SnapshotLevel(
@@ -194,9 +197,5 @@ class SnapshotLevelTest {
                 * SnapshotLevel.sectionSize];
         Arrays.fill(fluids, Fluids.EMPTY.defaultFluidState());
         return fluids;
-    }
-
-    private static Marker marker() {
-        return new Marker(EntityType.MARKER, null);
     }
 }

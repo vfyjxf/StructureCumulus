@@ -23,9 +23,7 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Marker;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RotatedPillarBlock;
@@ -480,8 +478,7 @@ class LevelSnapshotTest {
         OccupantSnapshot block = occupant(snapshot, anchor, "water");
         SectionSnapshot section = SectionSnapshot.of(key, Map.of(anchor, block), 7L);
         BlockEntity chest = BlockEntityType.CHEST.create(new BlockPos(0, 0, 0), Blocks.CHEST.defaultBlockState());
-        Marker marker = new Marker(EntityType.MARKER, null);
-        SnapshotLevel host = hostSnapshot(bounds, water, chest, marker);
+        SnapshotLevel host = hostSnapshot(bounds, water, chest, EntityType.CHICKEN);
         FrameData data = new FrameData(
             snapshot,
             0,
@@ -500,11 +497,11 @@ class LevelSnapshotTest {
         assertSame(water, view.get(block.ref(), HostTypes.blockState));
         assertEquals(water.getFluidState(), view.get(anchor, HostTypes.fluidState));
         assertSame(chest, view.get(anchor, HostTypes.blockEntity));
-        assertSame(marker, view.get(anchor, HostTypes.entity));
+        assertSame(EntityType.CHICKEN, view.get(anchor, HostTypes.entityType));
         assertNull(view.get(anchor, HostType.of(NamespacedId.of("test", "unknown"))));
         assertTrue(Objects.requireNonNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockState), "air").isAir());
         assertEquals(Fluids.EMPTY.defaultFluidState(), view.get(LatticePoint.of(2, 0, 0), HostTypes.fluidState));
-        assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.entity));
+        assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.entityType));
         assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockEntity));
     }
 
@@ -515,7 +512,7 @@ class LevelSnapshotTest {
 
         assertNull(view.get(LatticePoint.origin, HostTypes.blockState));
         assertNull(view.get(LatticePoint.origin, HostTypes.fluidState));
-        assertNull(view.get(LatticePoint.origin, HostTypes.entity));
+        assertNull(view.get(LatticePoint.origin, HostTypes.entityType));
         assertNull(view.get(LatticePoint.origin, HostTypes.blockEntity));
     }
 
@@ -575,9 +572,9 @@ class LevelSnapshotTest {
         Cuboid bounds,
         BlockState state,
         @Nullable BlockEntity blockEntity,
-        @Nullable Entity entity
+        @Nullable EntityType<?> entityType
     ) {
-        return hostSnapshot(LatticePoint.origin, bounds, state, blockEntity, entity, LatticePoint.origin);
+        return hostSnapshot(LatticePoint.origin, bounds, state, blockEntity, entityType, LatticePoint.origin);
     }
 
     private static SnapshotLevel hostSnapshot(
@@ -585,7 +582,7 @@ class LevelSnapshotTest {
         Cuboid bounds,
         BlockState state,
         @Nullable BlockEntity blockEntity,
-        @Nullable Entity entity,
+        @Nullable EntityType<?> entityType,
         LatticePoint cell
     ) {
         int worldX = origin.x() + cell.x();
@@ -606,14 +603,14 @@ class LevelSnapshotTest {
         Map<BlockPos, BlockEntity> blockEntities = blockEntity == null
                 ? Map.of()
                 : Map.of(new BlockPos(cell.x(), cell.y(), cell.z()), blockEntity);
-        List<SnapshotLevel.CapturedEntity> entities = entity == null
+        List<SnapshotLevel.CapturedEntity> entities = entityType == null
                 ? List.of()
                 : List.of(
                     new SnapshotLevel.CapturedEntity(
-                        entity.getUUID(),
-                        NamespacedId.of("minecraft", "marker"),
+                        UUID.nameUUIDFromBytes(new byte[]{1}),
+                        NamespacedId.of("minecraft", "chicken"),
                         Cuboid.of(cell),
-                        entity
+                        entityType
                     )
                 );
         return new SnapshotLevel(

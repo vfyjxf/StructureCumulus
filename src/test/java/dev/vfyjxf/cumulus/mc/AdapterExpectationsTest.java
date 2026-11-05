@@ -60,9 +60,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.Marker;
 import net.minecraft.world.level.block.AbstractFurnaceBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -86,6 +84,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -232,7 +231,7 @@ class AdapterExpectationsTest {
 
         CountingView entityTag = new CountingView(matching());
         assertEquals("match", reply(AdapterExpectations.entityTag(EntityTypeTags.UNDEAD), entityTag, entityCell));
-        assertEquals(Map.of(HostTypes.entity, 1), entityTag.reads());
+        assertEquals(Map.of(HostTypes.entityType, 1), entityTag.reads());
 
         CountingView fluid = new CountingView(matching());
         assertEquals("match", reply(AdapterExpectations.fluid(Fluids.WATER), fluid, waterCell));
@@ -449,10 +448,9 @@ class AdapterExpectationsTest {
 
     private static LevelSnapshot matching() {
         BlockState water = Blocks.WATER.defaultBlockState();
-        // A Marker carries the zombie type without a live level, which is all the tag read needs.
         return snapshot(
             Map.of(furnaceCell, furnace(true), logCell, Blocks.OAK_LOG.defaultBlockState(), waterCell, water),
-            List.of(entity(entityCell, new Marker(EntityType.ZOMBIE, null)))
+            List.of(entity(entityCell, EntityType.ZOMBIE))
         );
     }
 
@@ -468,7 +466,7 @@ class AdapterExpectationsTest {
                 waterCell,
                 lava
             ),
-            List.of(entity(entityCell, new Marker(EntityType.MARKER, null)))
+            List.of(entity(entityCell, EntityType.MARKER))
         );
     }
 
@@ -522,10 +520,10 @@ class AdapterExpectationsTest {
         return new LevelSnapshot(snapshot, SnapshotPolicy.minimal(), data);
     }
 
-    private static SnapshotLevel.CapturedEntity entity(LatticePoint cell, Entity entity) {
-        var location = Objects.requireNonNull(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()), "entity type id");
+    private static SnapshotLevel.CapturedEntity entity(LatticePoint cell, EntityType<?> entityType) {
+        var location = Objects.requireNonNull(BuiltInRegistries.ENTITY_TYPE.getKey(entityType), "entity type id");
         NamespacedId type = NamespacedId.of(location.getNamespace(), location.getPath());
-        return new SnapshotLevel.CapturedEntity(entity.getUUID(), type, Cuboid.of(cell), entity);
+        return new SnapshotLevel.CapturedEntity(UUID.nameUUIDFromBytes(new byte[]{1}), type, Cuboid.of(cell), entityType);
     }
 
     private static OccupantSnapshot occupant(LatticePoint cell) {

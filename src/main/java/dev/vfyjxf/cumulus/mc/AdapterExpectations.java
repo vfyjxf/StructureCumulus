@@ -109,8 +109,8 @@ final class AdapterExpectations {
     static Expectation<OccupantSnapshot> entityTag(TagKey<EntityType<?>> tag) {
         Objects.requireNonNull(tag, "tag");
         return Expectations.host(
-            HostTypes.entity,
-            (entity, cell) -> entity.getType().is(tag),
+            HostTypes.entityType,
+            (entityType, cell) -> entityType.is(tag),
             AdapterCodes.tagMismatch,
             AdapterCodes.valueNotCaptured,
             "expected entity tag " + tag.location()
