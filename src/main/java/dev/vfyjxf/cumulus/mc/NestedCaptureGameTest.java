@@ -46,6 +46,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -426,6 +427,295 @@ public final class NestedCaptureGameTest {
             }
             helper.assertTrue(child.nested(localInner) != null, "the grandchild fits the shared ceiling");
         }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aSeventeenDeepNestStopsAtSixteen(GameTestHelper helper) {
+        BlockPos base = helper.absolutePos(new BlockPos(0, 1, 0));
+        List<BlockPos> chain = new ArrayList<>();
+        FakeLookup lookup = new FakeLookup();
+        for (int level = 0; level <= 16; level++) {
+            BlockPos cell = helper.absolutePos(new BlockPos(level % 4, 1, level / 4));
+            helper.setBlock(new BlockPos(level % 4, 1, level / 4), Blocks.STONE);
+            chain.add(cell);
+            BlockPos next = level == 16
+                    ? cell
+                    : helper.absolutePos(new BlockPos((level + 1) % 4, 1, (level + 1) / 4));
+            lookup.blocks.put(cell, extent("test:chain_" + level, next, 1, 1, 1, next));
+        }
+        Cuboid bounds = cellAround(chain.get(0));
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
+                .capture(new CaptureRequest(bounds, policy(maxElements, SnapshotPolicy.defaultMaxDepth, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the chain capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView frame = lease.view();
+            for (int level = 1; level <= 16; level++) {
+                LatticePoint anchor = level == 1
+                        ? LatticePoint.of(base.getX(), base.getY(), base.getZ())
+                        : LatticePoint.origin;
+                WorldView next = frame.nested(anchor);
+                if (next == null) {
+                    helper.fail("the chain broke at level " + level);
+                    return;
+                }
+                helper.assertValueEqual(level, next.frame(), "the level " + level + " frame number");
+                helper.assertValueEqual(level, next.depth(), "the level " + level + " depth");
+                frame = next;
+            }
+            helper.assertTrue(frame.nested(LatticePoint.origin) == null, "the seventeenth body opens no frame");
+            helper.assertValueEqual(
+                1,
+                frame.occupants(frame.bounds(), OccupantFilter.ofKind(OccupantKind.nested)).size(),
+                "the cap frame keeps the seventeenth body"
+            );
+        }
+        helper.assertValueEqual(1, captured.report().size(), "one cut entry");
+        var entry = captured.report().entries().get(0);
+        helper.assertValueEqual(AdapterCodes.cut, entry.code(), "the cut code");
+        helper.assertTrue(
+            entry.notes().stream().anyMatch(note -> note.equals("reason: depth")),
+            "the cut names the depth ceiling"
+        );
+        BlockPos deepest = chain.get(16);
+        helper.assertTrue(
+            entry.notes()
+                    .stream()
+                    .anyMatch(note -> note.contains("anchor: (" + deepest.getX() + "," + deepest.getY() + "," + deepest.getZ() + ")")),
+            "the cut sits at the deepest anchor"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void everySiblingIsCapturedBeforeAnyChild(GameTestHelper helper) {
+        BlockPos first = new BlockPos(0, 1, 0);
+        BlockPos second = new BlockPos(1, 1, 0);
+        helper.setBlock(first, Blocks.STONE);
+        helper.setBlock(second, Blocks.STONE);
+        BlockPos firstChildCell = new BlockPos(0, 2, 0);
+        BlockPos secondChildCell = new BlockPos(1, 2, 0);
+        helper.setBlock(firstChildCell, Blocks.STONE);
+        helper.setBlock(secondChildCell, Blocks.STONE);
+        BlockPos worldFirst = helper.absolutePos(first);
+        BlockPos worldSecond = helper.absolutePos(second);
+        BlockPos worldFirstChild = helper.absolutePos(firstChildCell);
+        BlockPos worldSecondChild = helper.absolutePos(secondChildCell);
+        FakeLookup lookup = new FakeLookup();
+        lookup.blocks.put(worldFirst, extent("test:sibling_first", worldFirstChild, 1, 1, 1, worldFirstChild));
+        lookup.blocks.put(worldSecond, extent("test:sibling_second", worldSecondChild, 1, 1, 1, worldSecondChild));
+        lookup.blocks.put(worldFirstChild, extent("test:sibling_grand_first", worldFirstChild, 1, 1, 1, worldFirstChild));
+        lookup.blocks.put(
+            worldSecondChild,
+            extent("test:sibling_grand_second", worldSecondChild, 1, 1, 1, worldSecondChild)
+        );
+        Cuboid bounds = Cuboid.of(
+            worldFirst.getX(),
+            worldFirst.getY(),
+            worldFirst.getZ(),
+            worldSecond.getX() + 1,
+            worldFirst.getY() + 1,
+            worldFirst.getZ() + 1
+        );
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
+                .capture(new CaptureRequest(bounds, policy(4, SnapshotPolicy.defaultMaxDepth, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the sibling capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView view = lease.view();
+            WorldView firstChild = view.nested(LatticePoint.of(worldFirst.getX(), worldFirst.getY(), worldFirst.getZ()));
+            WorldView secondChild = view
+                    .nested(LatticePoint.of(worldSecond.getX(), worldSecond.getY(), worldSecond.getZ()));
+            if (firstChild == null || secondChild == null) {
+                helper.fail("a sibling was starved by a sibling's child");
+                return;
+            }
+            helper.assertValueEqual(1, firstChild.frame(), "the first sibling frame number");
+            helper.assertValueEqual(2, secondChild.frame(), "the second sibling frame number");
+            helper.assertTrue(firstChild.nested(LatticePoint.origin) == null, "the first grandchild is cut");
+            helper.assertTrue(secondChild.nested(LatticePoint.origin) == null, "the second grandchild is cut");
+            helper.assertValueEqual(
+                1,
+                firstChild.occupants(firstChild.bounds(), OccupantFilter.ofKind(OccupantKind.nested)).size(),
+                "the first cut grandchild keeps its body"
+            );
+            helper.assertValueEqual(
+                1,
+                secondChild.occupants(secondChild.bounds(), OccupantFilter.ofKind(OccupantKind.nested)).size(),
+                "the second cut grandchild keeps its body"
+            );
+        }
+        helper.assertValueEqual(2, captured.report().size(), "two budget cuts");
+        helper.assertTrue(
+            captured.report()
+                    .entries()
+                    .stream()
+                    .allMatch(entry -> entry.notes().stream().anyMatch(note -> note.equals("reason: budget"))),
+            "every cut names the budget"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aBlueprintWithoutNestedFocusNeverQueriesProviders(GameTestHelper helper) {
+        BlockPos anchor = new BlockPos(0, 1, 0);
+        helper.setBlock(anchor, Blocks.STONE);
+        BlockPos worldAnchor = helper.absolutePos(anchor);
+        Entity chicken = helper.spawnWithNoFreeWill(EntityType.CHICKEN, new Vec3(0.5, 1.0, 0.5));
+        FakeLookup lookup = new FakeLookup();
+        lookup.blocks.put(worldAnchor, extent("test:nested", worldAnchor, 1, 1, 1, worldAnchor));
+        lookup.entities.put(chicken.getUUID(), extent("test:entity_nested", worldAnchor, 1, 1, 1, worldAnchor));
+        Cuboid bounds = cellAround(worldAnchor);
+        SnapshotPolicy policy = new SnapshotPolicy(
+            maxElements,
+            SnapshotPolicy.defaultMaxDepth,
+            Set.of(OccupantKind.entity),
+            Set.of(),
+            List.of()
+        );
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
+                .capture(new CaptureRequest(bounds, policy));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the entity-kind capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            helper.assertValueEqual(
+                1,
+                lease.view().occupants(bounds, OccupantFilter.ofKind(OccupantKind.entity)).size(),
+                "the entity kind still captures the body"
+            );
+            helper.assertTrue(
+                lease.view().occupants(bounds, OccupantFilter.ofKind(OccupantKind.nested)).isEmpty(),
+                "no nested body is declared without the nested kind"
+            );
+        }
+        helper.assertValueEqual(0, lookup.blockQueries, "the block provider is never queried");
+        helper.assertValueEqual(0, lookup.entityQueries, "the entity provider is never queried");
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void theCapFrameQueriesOnceButBuildsNoChild(GameTestHelper helper) {
+        BlockPos base = new BlockPos(0, 1, 0);
+        helper.setBlock(base, Blocks.STONE);
+        helper.setBlock(new BlockPos(1, 1, 0), Blocks.STONE);
+        helper.setBlock(new BlockPos(2, 1, 0), Blocks.STONE);
+        BlockPos worldBase = helper.absolutePos(base);
+        BlockPos first = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos second = helper.absolutePos(new BlockPos(2, 1, 0));
+        FakeLookup lookup = new FakeLookup();
+        lookup.blocks.put(worldBase, extent("test:cap_first", first, 1, 1, 1, first));
+        lookup.blocks.put(first, extent("test:cap_second", second, 1, 1, 1, second));
+        lookup.blocks.put(second, extent("test:cap_third", second, 1, 1, 1, second));
+
+        CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
+                .capture(new CaptureRequest(cellAround(worldBase), policy(maxElements, 2, false)));
+        if (!(result instanceof CaptureResult.Captured captured)) {
+            helper.fail("the cap capture failed: " + result);
+            return;
+        }
+        try (SnapshotLease lease = captured.lease()) {
+            WorldView child = lease.view().nested(LatticePoint.of(worldBase.getX(), worldBase.getY(), worldBase.getZ()));
+            if (child == null) {
+                helper.fail("the first child is missing");
+                return;
+            }
+            WorldView cap = child.nested(LatticePoint.origin);
+            if (cap == null) {
+                helper.fail("the cap frame is missing");
+                return;
+            }
+            helper.assertValueEqual(2, cap.depth(), "the cap depth");
+            helper.assertTrue(cap.nested(LatticePoint.origin) == null, "the cap frame builds no child");
+            helper.assertValueEqual(
+                1,
+                cap.occupants(cap.bounds(), OccupantFilter.ofKind(OccupantKind.nested)).size(),
+                "the cap frame keeps its discovered body"
+            );
+        }
+        helper.assertValueEqual(1, lookup.queriesAt(second), "the cap frame queries its anchor once");
+        helper.assertValueEqual(3, lookup.blockQueries, "each frame queries exactly its own cell");
+        helper.assertValueEqual(1, captured.report().size(), "one depth cut");
+        helper.assertTrue(
+            captured.report().entries().get(0).notes().stream().anyMatch(note -> note.equals("reason: depth")),
+            "the cut names the depth ceiling"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void theOrderIsDeterministic(GameTestHelper helper) {
+        BlockPos first = new BlockPos(0, 1, 0);
+        BlockPos second = new BlockPos(1, 1, 0);
+        BlockPos third = new BlockPos(2, 1, 0);
+        for (BlockPos cell : List.of(first, second, third, new BlockPos(0, 2, 0), new BlockPos(1, 2, 0))) {
+            helper.setBlock(cell, Blocks.STONE);
+        }
+        BlockPos worldFirst = helper.absolutePos(first);
+        BlockPos worldSecond = helper.absolutePos(second);
+        BlockPos worldThird = helper.absolutePos(third);
+        BlockPos worldFirstChild = helper.absolutePos(new BlockPos(0, 2, 0));
+        BlockPos worldSecondChild = helper.absolutePos(new BlockPos(1, 2, 0));
+        FakeLookup lookup = new FakeLookup();
+        lookup.blocks.put(worldFirst, extent("test:order_first", worldFirstChild, 1, 1, 1, worldFirstChild));
+        lookup.blocks.put(worldSecond, extent("test:order_second", worldSecondChild, 1, 1, 1, worldSecondChild));
+        lookup.blocks.put(
+            worldThird,
+            extent("test:order_third", new BlockPos(2, 2, 0), 1, 1, 1, helper.absolutePos(new BlockPos(2, 2, 0)))
+        );
+        lookup.blocks.put(worldFirstChild, extent("test:order_grand_first", worldFirstChild, 1, 1, 1, worldFirstChild));
+        lookup.blocks.put(
+            worldSecondChild,
+            extent("test:order_grand_second", worldSecondChild, 1, 1, 1, worldSecondChild)
+        );
+        Cuboid bounds = Cuboid.of(
+            worldFirst.getX(),
+            worldFirst.getY(),
+            worldFirst.getZ(),
+            worldThird.getX() + 1,
+            worldFirst.getY() + 1,
+            worldFirst.getZ() + 1
+        );
+
+        List<CaptureResult.Captured> runs = new ArrayList<>();
+        for (int attempt = 0; attempt < 2; attempt++) {
+            CaptureResult result = new LevelCapture(helper.getLevel(), lookup.lookup())
+                    .capture(new CaptureRequest(bounds, policy(5, SnapshotPolicy.defaultMaxDepth, false)));
+            if (!(result instanceof CaptureResult.Captured captured)) {
+                helper.fail("the order capture " + attempt + " failed: " + result);
+                return;
+            }
+            runs.add(captured);
+        }
+        for (CaptureResult.Captured run : runs) {
+            try (SnapshotLease lease = run.lease()) {
+                WorldView view = lease.view();
+                WorldView firstChild = view.nested(LatticePoint.of(worldFirst.getX(), worldFirst.getY(), worldFirst.getZ()));
+                WorldView secondChild = view
+                        .nested(LatticePoint.of(worldSecond.getX(), worldSecond.getY(), worldSecond.getZ()));
+                if (firstChild == null || secondChild == null) {
+                    helper.fail("a sibling the budget admits is missing");
+                    return;
+                }
+                helper.assertValueEqual(1, firstChild.frame(), "the first sibling frame number");
+                helper.assertValueEqual(2, secondChild.frame(), "the second sibling frame number");
+                helper.assertTrue(
+                    view.nested(LatticePoint.of(worldThird.getX(), worldThird.getY(), worldThird.getZ())) == null,
+                    "the third sibling is cut by the budget"
+                );
+            }
+        }
+        helper.assertValueEqual(runs.get(0).report(), runs.get(1).report(), "two captures cut the same set in order");
+        helper.assertValueEqual(3, runs.get(0).report().size(), "three cuts in level order");
         helper.succeed();
     }
 
@@ -1327,6 +1617,7 @@ public final class NestedCaptureGameTest {
                     @Override
                     public @Nullable NestedExtent get(BlockNestedExtentContext actual, @Nullable Direction context) {
                         blockQueries++;
+                        blockQueriesByPos.merge(actual.pos(), 1, Integer::sum);
                         if (throwingBlocks.contains(actual.pos())) {
                             throw new IllegalStateException("fake block provider");
                         }
@@ -1349,6 +1640,11 @@ public final class NestedCaptureGameTest {
                 }).build();
         private int blockQueries;
         private int entityQueries;
+        private final Map<BlockPos, Integer> blockQueriesByPos = new HashMap<>();
+
+        private int queriesAt(BlockPos pos) {
+            return blockQueriesByPos.getOrDefault(pos, 0);
+        }
 
         private NestedExtentLookup lookup() {
             return lookup;
