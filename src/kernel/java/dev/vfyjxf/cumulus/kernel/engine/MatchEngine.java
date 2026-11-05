@@ -951,17 +951,28 @@ public final class MatchEngine {
 
         private void contribute(ContextKey<?> key, SectionKey section, Object value) {
             if (!key.type().isInstance(value)) {
+                CuboidSet region = computationRegion(key, section);
                 findings.add(
                     code(
                         Codes.designDefect,
                         Phase.check,
                         "a section of " + key.id() + " produced " + value.getClass().getName(),
-                        Locus.local(computationRegion(key, section))
+                        Locus.local(region)
                     )
                 );
+                missing(key, region, true);
                 return;
             }
             contributions.computeIfAbsent(key, ignored -> new TreeMap<>()).put(section, value);
+        }
+
+        private CuboidSet computationRegion(ContextKey<?> key) {
+            for (Computation<?> computation : request.blueprint().computations()) {
+                if (computation.output().equals(key)) {
+                    return computation.region();
+                }
+            }
+            return request.blueprint().bayCells();
         }
 
         private CuboidSet computationRegion(ContextKey<?> key, SectionKey section) {
@@ -1020,9 +1031,28 @@ public final class MatchEngine {
                 findings.add(code(Codes.designDefect, phase, "a contributed key has no merge: " + key.id(), null));
                 return;
             }
+            CuboidSet region = computationRegion(key);
             Object combined = null;
-            for (Object part : parts.values()) {
-                combined = combined == null ? part : merge.combine(combined, part);
+            try {
+                for (Object part : parts.values()) {
+                    combined = combined == null ? part : merge.combine(combined, part);
+                }
+            } catch (RuntimeException failure) {
+                findings.add(extensionFailure(phase, key.id(), failure, Locus.local(region)));
+                missing(key, region, true);
+                return;
+            }
+            if (combined != null && !key.type().isInstance(combined)) {
+                findings.add(
+                    code(
+                        Codes.designDefect,
+                        phase,
+                        "merging " + key.id() + " produced " + combined.getClass().getName(),
+                        Locus.local(region)
+                    )
+                );
+                missing(key, region, true);
+                return;
             }
             values.put(key, combined);
         }
