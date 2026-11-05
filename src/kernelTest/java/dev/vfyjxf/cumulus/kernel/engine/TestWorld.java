@@ -26,8 +26,6 @@ import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -63,6 +61,8 @@ final class TestWorld {
     static final class View implements WorldView {
 
         private final Map<LatticePoint, OccupantSnapshot> occupants = new LinkedHashMap<>();
+        private final Map<OccupantRef, OccupantSnapshot> bodiesByRef = new LinkedHashMap<>();
+        private final Map<LatticePoint, OccupantSnapshot> bodiesByCell = new LinkedHashMap<>();
         private final Map<LatticePoint, ReadRefusal> refused = new LinkedHashMap<>();
         private final Set<SectionKey> refusedSections = new LinkedHashSet<>();
         private int sectionSize = 16;
@@ -78,6 +78,27 @@ final class TestWorld {
         View put(OccupantSnapshot occupant) {
             occupants.put(occupant.ref().anchor(), occupant);
             return this;
+        }
+
+        View putBody(OccupantSnapshot body) {
+            bodiesByRef.put(body.ref(), body);
+            for (int x = body.footprint().min().x(); x < body.footprint().max().x(); x++) {
+                for (int y = body.footprint().min().y(); y < body.footprint().max().y(); y++) {
+                    for (int z = body.footprint().min().z(); z < body.footprint().max().z(); z++) {
+                        LatticePoint cell = LatticePoint.of(x, y, z);
+                        OccupantSnapshot current = bodiesByCell.get(cell);
+                        if (current == null || bodyOrder(body, current) < 0) {
+                            bodiesByCell.put(cell, body);
+                        }
+                    }
+                }
+            }
+            return this;
+        }
+
+        private static int bodyOrder(OccupantSnapshot left, OccupantSnapshot right) {
+            int byVolume = Long.compare(left.footprint().volume(), right.footprint().volume());
+            return byVolume != 0 ? byVolume : left.ref().compareTo(right.ref());
         }
 
         View air(LatticePoint cell) {
@@ -206,7 +227,31 @@ final class TestWorld {
                 case SectionSlot.Partial partial -> partial.section().occupantAt(cell);
                 default -> null;
             };
+            OccupantSnapshot body = bodiesByCell.get(cell);
+            if (body != null) {
+                return new CellRead.Found(body);
+            }
             return new CellRead.Found(occupant == null ? airOccupant(cell) : occupant);
+        }
+
+        @Override
+        public @Nullable OccupantSnapshot cellOccupant(LatticePoint cell) {
+            if (!bounds.contains(cell)) {
+                return null;
+            }
+            SectionSlot slot = slot(sectionOf(cell));
+            if (!slot.readable()) {
+                return null;
+            }
+            if (slot instanceof SectionSlot.Partial partial && partial.unreadable().containsKey(cell)) {
+                return null;
+            }
+            OccupantSnapshot occupant = switch (slot) {
+                case SectionSlot.Present present -> present.section().occupantAt(cell);
+                case SectionSlot.Partial partial -> partial.section().occupantAt(cell);
+                default -> null;
+            };
+            return occupant == null ? airOccupant(cell) : occupant;
         }
 
         @Override
@@ -214,23 +259,31 @@ final class TestWorld {
             if (!ref.snapshot().equals(snapshot) || ref.frame() != 0) {
                 return null;
             }
+            OccupantSnapshot body = bodiesByRef.get(ref);
+            if (body != null) {
+                return body;
+            }
             OccupantSnapshot candidate = occupants.get(ref.anchor());
             return candidate != null && candidate.ref().equals(ref) ? candidate : null;
         }
 
         @Override
         public List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter) {
-            List<OccupantSnapshot> result = new ArrayList<>();
+            Map<OccupantRef, OccupantSnapshot> found = new TreeMap<>();
             for (OccupantSnapshot occupant : occupants.values()) {
                 if (refused.containsKey(occupant.ref().anchor())) {
                     continue;
                 }
                 if (occupant.footprint().intersects(box) && filter.matches(occupant)) {
-                    result.add(occupant);
+                    found.putIfAbsent(occupant.ref(), occupant);
                 }
             }
-            result.sort(Comparator.comparing(OccupantSnapshot::ref));
-            return List.copyOf(result);
+            for (OccupantSnapshot body : bodiesByRef.values()) {
+                if (body.footprint().intersects(box) && filter.matches(body)) {
+                    found.putIfAbsent(body.ref(), body);
+                }
+            }
+            return List.copyOf(found.values());
         }
 
         @Override

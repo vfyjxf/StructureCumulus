@@ -38,6 +38,7 @@ public final class BlueprintBuilder {
     private Value arguments = Value.object();
     private @Nullable SourceSpan source;
     private boolean envelope;
+    private boolean envelopeEntities;
 
     BlueprintBuilder(NamespacedId id) {
         this.id = Objects.requireNonNull(id, "id");
@@ -51,6 +52,12 @@ public final class BlueprintBuilder {
     /** Requires every bounds cell no bay or declared footprint covers to hold strict air. */
     public BlueprintBuilder envelope() {
         this.envelope = true;
+        return this;
+    }
+
+    /** Makes the derived envelope count entities as foreign and adds the entity kind to its reads. */
+    public BlueprintBuilder envelopeEntities() {
+        this.envelopeEntities = true;
         return this;
     }
 
@@ -174,7 +181,7 @@ public final class BlueprintBuilder {
                         envelopeId,
                         bay,
                         Focuses.bay(),
-                        Expectations.eachCell(Expectations.envelopeAir()),
+                        envelopeEntities ? Expectations.envelopeEntities() : Expectations.envelopeCells(),
                         envelopeDescription
                     )
                 );

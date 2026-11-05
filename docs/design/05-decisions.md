@@ -1186,6 +1186,24 @@ counts to zero rather than reporting missing. A default is only needed by a cust
 that deliberately answers `Missing` for readable sections — and that case is better written as
 "answer zero".
 
+### D-55 — The envelope judges cells; entities are opt-in
+
+The derived envelope judges the occupant stored at each cell: block state, fluid and block entity. An
+entity covering an envelope cell is transparent by default; a blueprint that wants entities rejected
+sets `envelopeEntities`, which also adds the entity kind to its read scope so the host captures them.
+
+**Why not "whatever the host captured".** Read kinds are the union over every check, so the same
+envelope could start rejecting animals after an unrelated check declared the entity kind. A check's
+verdict must not depend on its neighbours.
+
+**Why entities are opt-in.** An envelope is a claim about blocks. Animals wander and players walk;
+failing every large structure while a mob is inside makes the feature unusable and forces an entity
+scan the author did not ask for.
+
+**Why a second read.** `read(cell)` answers the body covering the cell, which would hide a foreign
+block under it. `cellOccupant(cell)` answers what the cell stores; a host that captures bodies must
+answer both, and one that cannot answers "undecided" rather than guessing.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

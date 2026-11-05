@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.structure;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.finding.Label;
@@ -13,8 +14,10 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.world.CellRead;
 import dev.vfyjxf.cumulus.kernel.world.HostType;
+import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.ReadRefusal;
+import dev.vfyjxf.cumulus.kernel.world.ReadStatus;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.TraitSlot;
 import org.jspecify.annotations.Nullable;
@@ -121,7 +124,15 @@ public final class Expectations {
     }
 
     public static Expectation<BayView> eachCell(Expectation<OccupantSnapshot> element) {
-        return new EachCell(element);
+        return new EachCell(element, EachCell.Mode.author);
+    }
+
+    static Expectation<BayView> envelopeCells() {
+        return new EachCell(envelopeAir(), EachCell.Mode.cells);
+    }
+
+    static Expectation<BayView> envelopeEntities() {
+        return new EachCell(envelopeAir(), EachCell.Mode.entities);
     }
 
     public static <T> Expectation<T> custom(
@@ -717,7 +728,11 @@ public final class Expectations {
         }
     }
 
-    private record EachCell(Expectation<OccupantSnapshot> element) implements Expectation<BayView> {
+    private record EachCell(Expectation<OccupantSnapshot> element, Mode mode) implements Expectation<BayView> {
+
+        private enum Mode {
+            author, cells, entities
+        }
 
         private EachCell {
             Objects.requireNonNull(element, "element");
@@ -741,7 +756,14 @@ public final class Expectations {
                                 unreadableCells.put(cell, refused.refusal());
                                 continue;
                             }
-                            OccupantSnapshot occupant = ((CellRead.Found) read).occupant();
+                            OccupantSnapshot occupant = mode == Mode.cells
+                                    ? ctx.cellOccupant(cell)
+                                    : ((CellRead.Found) read).occupant();
+                            if (occupant == null) {
+                                unreadable = true;
+                                unreadableCells.put(cell, undecided());
+                                continue;
+                            }
                             ExpectationContext<OccupantSnapshot> sub = ctx
                                     .withSubject(occupant, occupant.isAir() ? List.of() : List.of(occupant));
                             Reply reply = element.test(sub);
@@ -795,7 +817,15 @@ public final class Expectations {
 
         @Override
         public ReadScope reads() {
-            return element.reads();
+            return switch (mode) {
+                case author -> element.reads();
+                case cells -> ReadScope.none();
+                case entities -> ReadScope.none().withKinds(Set.of(OccupantKind.entity));
+            };
+        }
+
+        private static ReadRefusal undecided() {
+            return new ReadRefusal(ReadStatus.notCaptured, Codes.unreadableRead.code());
         }
     }
 
