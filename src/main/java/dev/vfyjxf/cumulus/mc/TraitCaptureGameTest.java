@@ -93,6 +93,34 @@ public final class TraitCaptureGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aTraitStillSeesTheLiveContents(GameTestHelper helper) {
+        BlockPos chestPos = new BlockPos(0, 1, 0);
+        helper.setBlock(chestPos, Blocks.CHEST);
+        ChestBlockEntity chest = helper.getBlockEntity(chestPos);
+        BlockPos world = helper.absolutePos(chestPos);
+
+        CaptureResult.Captured captured = capture(
+            new LevelCapture(helper.getLevel()),
+            box(world),
+            policy(Set.of(OccupantTraits.inventory.id()))
+        );
+        try (SnapshotLease lease = captured.lease()) {
+            IItemHandler handler = inventory(occupant(lease.view(), point(world)));
+            chest.setItem(0, new ItemStack(Items.DIAMOND, 2));
+            helper.assertTrue(handler.getStackInSlot(0).is(Items.DIAMOND), "the trait reads the changed contents");
+            helper.getLevel().getChunkAt(world).removeBlockEntity(world);
+            helper.assertTrue(
+                handler.getStackInSlot(0).is(Items.DIAMOND),
+                "the captured handle keeps answering its own state"
+            );
+            helper.assertTrue(lease.isCurrent(), "no block-entity change invalidates the lease");
+        } finally {
+            helper.setBlock(chestPos, Blocks.AIR);
+        }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void plainStoneCellHasAbsentTraits(GameTestHelper helper) {
         BlockPos stonePos = new BlockPos(0, 1, 0);
         helper.setBlock(stonePos, Blocks.STONE);

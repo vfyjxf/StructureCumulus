@@ -39,7 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** The mark counter: funnel-edged invalidation plus lazy entity and block-entity fingerprints. */
+/** The mark counter: funnel-edged invalidation plus lazy entity fingerprints. */
 @NullMarked
 @GameTestHolder(Constants.modId)
 @PrefixGameTestTemplate(false)
@@ -317,72 +317,22 @@ public final class LeaseMarkCounterGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void blockEntityChangeInvalidatesThroughTheHook(GameTestHelper helper) {
+    public void aBlockEntityChangeDoesNotInvalidateTheLease(GameTestHelper helper) {
         BlockPos chestPos = new BlockPos(0, 1, 0);
         helper.setBlock(chestPos, Blocks.CHEST);
         ChestBlockEntity chest = helper.getBlockEntity(chestPos);
         LevelCapture capture = new LevelCapture(helper.getLevel());
         CaptureResult.Captured captured = captured(capture, around(helper, chestPos, 1), SnapshotPolicy.minimal());
         try (SnapshotLease lease = captured.lease()) {
-            helper.assertTrue(lease.isCurrent(), "the untouched block entity is current");
-            long before = WatchEvents.dispatchCount();
-
             chest.setItem(0, new ItemStack(Items.DIAMOND, 2));
-
-            helper.assertValueEqual(before, WatchEvents.dispatchCount(), "a block-entity data change fires no event");
-            helper.assertValueEqual(1L, watch(capture).marks(), "the setChanged hook marks the watch");
-            helper.assertFalse(lease.isCurrent(), "the eager mark invalidates the lease");
-        } finally {
-            chest.setItem(0, ItemStack.EMPTY);
-            capture.close();
-            helper.setBlock(chestPos, Blocks.AIR);
-        }
-        helper.succeed();
-    }
-
-    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void blockEntityRemovalWithoutEventInvalidatesLazily(GameTestHelper helper) {
-        BlockPos chestPos = new BlockPos(0, 1, 0);
-        helper.setBlock(chestPos, Blocks.CHEST);
-        LevelCapture capture = new LevelCapture(helper.getLevel());
-        CaptureResult.Captured captured = captured(capture, around(helper, chestPos, 1), SnapshotPolicy.minimal());
-        try (SnapshotLease lease = captured.lease()) {
-            long before = WatchEvents.dispatchCount();
             LevelChunk chunk = helper.getLevel().getChunkAt(helper.absolutePos(chestPos));
             chunk.removeBlockEntity(helper.absolutePos(chestPos));
 
-            helper.assertValueEqual(
-                before,
-                WatchEvents.dispatchCount(),
-                "a direct block-entity removal fires no event"
-            );
-            helper.assertValueEqual(0L, watch(capture).marks(), "a direct block-entity removal does not mark");
-            helper.assertFalse(lease.isCurrent(), "the lazy lookup sees the missing block entity");
+            helper.assertValueEqual(0L, watch(capture).marks(), "a block-entity change never marks");
+            helper.assertTrue(lease.isCurrent(), "a block entity that changes without a block change keeps the lease");
         } finally {
             capture.close();
             helper.setBlock(chestPos, Blocks.AIR);
-        }
-        helper.succeed();
-    }
-
-    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void blockEntityDataOutsideTheRegionDoesNotInvalidate(GameTestHelper helper) {
-        BlockPos watchedPos = new BlockPos(0, 1, 0);
-        helper.setBlock(watchedPos, Blocks.CHEST);
-        BlockPos otherAbs = helper.absolutePos(watchedPos).offset(32, 0, 0);
-        helper.getLevel().setBlock(otherAbs, Blocks.CHEST.defaultBlockState(), 3);
-        ChestBlockEntity other = (ChestBlockEntity) helper.getLevel().getBlockEntity(otherAbs);
-        LevelCapture capture = new LevelCapture(helper.getLevel());
-        CaptureResult.Captured captured = captured(capture, around(helper, watchedPos, 1), SnapshotPolicy.minimal());
-        try (SnapshotLease lease = captured.lease()) {
-            other.setItem(0, new ItemStack(Items.DIAMOND, 2));
-            helper.assertTrue(lease.isCurrent(), "a change in an unwatched chunk is not compared");
-            helper.assertValueEqual(0L, watch(capture).marks(), "an unwatched chunk never marks");
-        } finally {
-            other.setItem(0, ItemStack.EMPTY);
-            capture.close();
-            helper.setBlock(watchedPos, Blocks.AIR);
-            helper.getLevel().setBlock(otherAbs, Blocks.AIR.defaultBlockState(), 3);
         }
         helper.succeed();
     }

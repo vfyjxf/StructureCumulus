@@ -15,9 +15,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The observation funnel (D-47): every server-side block write passes through {@link #blockChanged}
- * and every block-entity data change through {@link #blockEntityChanged}, both called from mixins on
- * the write methods rather than from intent events.
+ * The observation funnel (D-47): every server-side block write passes through {@link #blockChanged},
+ * called from a mixin on the write method rather than from intent events.
  */
 @NullMarked
 public final class CumulusHooks {
@@ -53,15 +52,6 @@ public final class CumulusHooks {
             dispatch(current, level, pos, hits, state.isAir());
         } catch (RuntimeException failure) {
             StructureCumulus.logger.warn("block change at {} was not handled", pos, failure);
-        }
-    }
-
-    /** Feeds the watch only: content changes never invalidate the instance itself (D-41). */
-    public static void blockEntityChanged(ServerLevel level, BlockPos pos) {
-        try {
-            LevelWatch.blockChanged(level, pos);
-        } catch (RuntimeException failure) {
-            StructureCumulus.logger.warn("block entity change at {} was not handled", pos, failure);
         }
     }
 

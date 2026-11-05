@@ -527,9 +527,6 @@ public final class LevelCapture implements WorldCapture {
                                 ? OccupantDescriptors.block(context.snapshot(), frame, cell, state, traits)
                                 : OccupantDescriptors.blockEntity(context.snapshot(), frame, cell, blockEntity, traits);
                         occupants.put(cell, occupant);
-                        if (blockEntity != null) {
-                            watch.blockEntity(worldPos, blockEntity, level.registryAccess());
-                        }
                         if (nestedEnabled && (!state.hasBlockEntity() || blockEntity != null)) {
                             NestedExtent extent = blockExtent(worldPos, state, blockEntity);
                             if (extent != null) {
