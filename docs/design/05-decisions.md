@@ -1214,6 +1214,20 @@ holds for every settle that happens, but a settle whose plan owns nothing no lon
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
+### D-75 — Determinism is proven across processes, and the order dependence is removed at the source
+
+Two `Set.copyOf` sites decide the iteration order of a public collection: `SnapshotPolicy.kinds`,
+`SnapshotPolicy.traits` and `ComputationSpec.inputs`. They become ordered immutable sets, so the order
+is defined rather than inherited from identity hashes.
+
+On top of that, a gate renders one fixed scenario to a canonical text, runs it in three separate JVM
+processes, and compares every run with a golden file. The same scenario in one process proves nothing:
+identity hashes repeat within a process, so any hash-order dependence passes.
+
+**Why both.** The source fix makes the output correct; the gate makes it stay correct. The gate alone
+would pin today's accidental order in a file; the fix alone would regress the first time someone adds a
+`Set.copyOf`.
+
 ### D-79 — A rollback releases what the set wrote; it never restores the previous occupant
 
 When a structure set fails partway it releases the members it already settled and invalidates their

@@ -12,11 +12,21 @@
 | **Tests** | JUnit 5 over `src/kernelTest/java` | every test in §3 passes; no `@Disabled` |
 | **Spec index** | `tools/spec-check.py` | every documented public type and `SC-` code has a producer; no extra public type |
 | **No stubs** | grep | no `TODO`, `FIXME`, `UnsupportedOperationException`, empty public method body |
-| **Determinism** | golden test | two runs over one tuple produce equal values, orders and spend |
+| **Determinism** | `determinismCheck` (three JVM processes vs `tools/golden/determinism.txt`) | one fixed scenario renders the same canonical text in three separate JVMs, equal to the golden file |
 
 Gradle is the shipping build (`./gradlew check`, including Spotless and the kernel gates). A
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
+
+The **Determinism** gate is `determinismCheck` (D-75): `DeterminismDump` in `kernelTest` renders one
+fixed bay + checks + computation + three derivations + anchor scenario through check, settle to an
+in-memory ledger and derive, and prints canonical `blueprint`/`finding`/`claim`/`context`/`frame`
+lines. The digest line folds the iteration order of `SnapshotPolicy.kinds`/`traits` and
+`ComputationSpec.inputs`. The task runs the dump in three separate JVM processes under different
+`-XX:hashCode` modes — the hash salt repeats inside one process, so a same-process comparison cannot
+catch a hash-order leak — and every run must equal `tools/golden/determinism.txt`; `-PupdateGolden`
+rewrites the golden from the first run, `-PskipDeterminism` skips the gate. Reintroducing a
+`Set.copyOf` at either site fails the gate in at least one process.
 
 Current evidence (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): M1, M2a, M2b, M2c, M2d and
 M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
