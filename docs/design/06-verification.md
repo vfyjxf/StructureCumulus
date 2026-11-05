@@ -10,7 +10,7 @@
 | **Compile** | `javac --release 21` over `src/kernel/java` with JSpecify only | every public signature in the module files exists and compiles |
 | **Purity** | `kernelPurity` text scan + no Minecraft on the kernel classpath | no `net.minecraft`, `net.neoforged`, `com.mojang` under `kernel.**` |
 | **Tests** | JUnit 5 over `src/kernelTest/java` | every test in §3 passes; no `@Disabled` |
-| **Spec index** | `tools/spec-check.py` | every documented public type and `SC-` code has a producer; no extra public type |
+| **Spec index** | `tools/spec-check.py` | every documented public type and `SC-` code has a producer; no extra public type; the producer table matches `Codes.all` row for row |
 | **No stubs** | grep | no `TODO`, `FIXME`, `UnsupportedOperationException`, empty public method body |
 | **Determinism** | golden test | two runs over one tuple produce equal values, orders and spend |
 
@@ -424,18 +424,27 @@ modules; they are listed in their sections and in `adapter.md` §13/§3.2, not i
 
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. `Codes.all` has 65 entries in this revision, matching the
-registry. A test reads `Codes.all` and asserts:
+The authoritative table is `finding.md` §6: one row per code with its severity, label policy
+(`P`/`–`/`T`), meaning, owning module and every emit site (D-69). `Codes.all` has 66 entries in this
+revision, matching the registry. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
-- every code appears exactly once in the producer table (a hand-maintained `Map<FindingCode,String>`
-  in the test, checked against `Codes.all`; the `SC-MC-*` wildcard row is excluded from the map);
+- every code appears exactly once in the producer table (a hand-maintained mirror in `CodesTest`
+  carrying code, severity, label policy and owning module, checked against `Codes.all`; the
+  `SC-MC-*` rows are excluded from the mirror);
+- the label policy is one of `P`, `–`, `T`, the owning module is a kernel module name or `adapter`,
+  and `T` appears only on `SC-CHK-0001` and `SC-SPI-0003`;
 - no producer row names a code absent from `Codes.all`;
 - `SC-MC-*` are absent from `Codes.all` (adapter-only), including the capture-report codes
   `SC-MC-0003`/`0004`/`0005` that M5e ships (D-28); the adapter registers them in its own code
   catalog, which is not the kernel registry;
 - a relayed host code is not allocated by the kernel, and a relayed code already in `Codes.all` is
   replaced by `SC-OCC-0004` with a note — the same guard covers a `CaptureReport` entry.
+
+`tools/spec-check.py` parses the same table and the `Codes.java` declarations, so a missing row, an
+extra row, a severity disagreement or an unreadable label policy fails the spec index without a
+build; it also reports a registered code that no kernel or adapter source references (an unproduced
+code).
 
 A code with no producer is deleted, not reserved. An unknown addon code is legal; it is not in
 `Codes.all`.
