@@ -99,7 +99,7 @@
 | `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value → `(type, kind)` descriptor; entity body identity; nested body |
-| `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the declared `AnchorSpec.value` is compared at the definition origin; a missing state is `SC-MC-0010`; no live read |
+| `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the allowed orientation that maps the declared heading to the observed one wins; a missing state is `SC-MC-0010`; no live read |
 | `OccupantTraits` | — | the three stable capability trait keys and generic provider dispatch into four-state slots |
 | `TraitLookup` | final class (`trait`) | immutable registry keyed by `(trait id, holder id)`; `builtin()` and sequential plugin-loaded `load(Logger)`; `provider(id, holder)`, `knows(id)` |
 | `TraitProvider<T, H>` | interface (`trait`) | one typed provider: `key()`, `holder()`, `get(actual, capture)` |
@@ -766,9 +766,15 @@ the capture report is the only trace of the capability; the check's own value ex
 H3 host factories, which read the snapshot rather than a descriptor. The audit transform is the
 inverse-orientation `OrientationMapping.transform` result described above, not a descriptor
 publication: a value check compares the captured world state, so a host that needs definition-frame
-values must capture them (D-33). `FocusContext.siting()` is unchanged. The definition origin's anchor property is read from the captured anchor `BlockState` (the
-phase-1 capture is not audited) and its declared `AnchorSpec.value` is compared there, case-insensitively;
-a mismatch is `SC-BPT-0006` anchor-invalid, and `SC-MC-0004` never becomes a `ReadRefusal`.
+values must capture them (D-33). `FocusContext.siting()` is unchanged. The definition origin's
+anchor property is read from the captured anchor `BlockState` (the phase-1 capture is not audited):
+the captured value is the observed heading, `AnchorSpec.value` names the declared heading in the
+blueprint's own coordinates (D-68), and `OrientationPolicy.select(declared, observed)` picks the
+allowed orientation that maps one to the other. A value on either side that is not a heading, or
+no admissible orientation, is `SC-BPT-0006` anchor-invalid, and `SC-MC-0004` never becomes a
+`ReadRefusal`. A document written for the pre-D-68 rule changes meaning: its `value` named the
+world orientation the drawing was made for, and it must be rewritten to the blueprint-frame
+heading.
 
 ## 11. Commands and lifecycle
 
@@ -790,8 +796,10 @@ unloads.
   sited bounds are the capture the orientation audit runs on. The phase-1 view is closed after
   resolution. The capture policy maps the blueprint's entity windows through that siting, dropping a
   window that leaves the lattice (`CommandSupport.policy(Blueprint, Siting)`). The anchor property
-  still selects the orientation, and `AnchorSpec.value` is now a real constraint: a captured value
-  that differs from the declaration (case-insensitively) is `SC-BPT-0006` anchor-invalid. An
+  still selects the orientation: the captured value is the observed heading, `AnchorSpec.value` is
+  the declared heading in the blueprint's own frame (D-68), and the allowed orientation that maps
+  one to the other wins; a value on either side that is not a heading, or no admissible
+  orientation, is `SC-BPT-0006` anchor-invalid. An
   uncaptured anchor state is `SC-MC-0010`, the same host-value-not-captured code as the expectation
   absent value; `SC-MC-0001` remains the capture refusal (§3.2, §12).
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and

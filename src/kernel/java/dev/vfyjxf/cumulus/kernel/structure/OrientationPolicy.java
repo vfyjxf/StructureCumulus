@@ -40,9 +40,9 @@ public record OrientationPolicy(NamespacedId primaryRole, List<Orientation> allo
         return new Builder(primaryRole);
     }
 
-    public @Nullable Orientation select(Heading anchorHeading) {
+    public @Nullable Orientation select(Heading declared, Heading observed) {
         for (Orientation orientation : allowed) {
-            if (orientation.apply(Heading.north) == anchorHeading) {
+            if (orientation.apply(declared) == observed) {
                 return orientation;
             }
         }

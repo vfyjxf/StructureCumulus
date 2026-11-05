@@ -582,9 +582,9 @@ class CaptureAdversarialTest {
         );
         LevelSnapshot eastView = view(cellBounds, Map.of(), host(LatticePoint.origin, cellBounds, Map.of(cell, east)));
 
-        SitingResult rejected = McAnchors.resolve(anchorBlueprint("facing", "south"), LatticePoint.origin, southView);
-        assertFalse(rejected.succeeded(), "the policy allows only none and clockwise");
-        SitingResult accepted = McAnchors.resolve(anchorBlueprint("facing", "east"), LatticePoint.origin, eastView);
+        SitingResult rejected = McAnchors.resolve(anchorBlueprint("facing", "north"), LatticePoint.origin, southView);
+        assertFalse(rejected.succeeded(), "no allowed turn maps north to south");
+        SitingResult accepted = McAnchors.resolve(anchorBlueprint("facing", "north"), LatticePoint.origin, eastView);
         assertTrue(accepted.succeeded(), "east resolves through the clockwise turn");
         assertEquals(
             Orientation.of(Turn.clockwise, Tilt.level, Flip.none),
@@ -643,19 +643,20 @@ class CaptureAdversarialTest {
         OrientationPolicy policy = OrientationPolicy.builder(NamespacedId.of("test", "role"))
                 .allow(candidates.get(1), candidates.get(0)).build();
 
-        assertEquals(candidates.get(0), policy.select(heading), "the lowest ordinal wins");
+        assertEquals(candidates.get(0), policy.select(Heading.north, heading), "the lowest ordinal wins");
         assertEquals(2, policy.allowed().size(), "both orientations stay allowed");
         OrientationPolicy uprightOnly = OrientationPolicy.builder(NamespacedId.of("test", "role"))
                 .allowTurns(Turn.none, Turn.clockwise).build();
         assertEquals(
             Orientation.identity,
-            uprightOnly.select(Heading.north),
+            uprightOnly.select(Heading.north, Heading.north),
             "the identity is the first north image among the upright turns"
         );
         assertNull(
             OrientationPolicy.builder(NamespacedId.of("test", "other"))
-                    .allow(Orientation.of(Turn.none, Tilt.pitchUp, Flip.none)).build().select(Heading.east),
-            "a heading no allowed orientation faces answers null"
+                    .allow(Orientation.of(Turn.none, Tilt.pitchUp, Flip.none)).build()
+                    .select(Heading.north, Heading.east),
+            "no allowed orientation turns the declared heading into the observed one"
         );
         assertEquals(48, Orientation.all().size(), "all 48 orientations");
     }

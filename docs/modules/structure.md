@@ -40,7 +40,7 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `Focuses` | final class | the shipped focus kinds |
 | `Expectations` | final class | the shipped combinators, leaves, the host bridge and the typed context test |
 | `Seam` / `SeamId` / `SeamKind` | record / record / enum | a declared connectable edge |
-| `AnchorSpec` / `AnchorRoles` | record / final class | one declared property value at the definition origin |
+| `AnchorSpec` / `AnchorRoles` | record / final class | the anchor's heading in the blueprint's own coordinates |
 | `OrientationPolicy` | record | allowed orientations + primary role + upright promise |
 | `DerivationSpec` | record | deriver id + args + output key id + order |
 | `Blueprint` | final class | immutable compiled template with a cached plan |
@@ -248,7 +248,7 @@ public final class AnchorRoles {
 public record OrientationPolicy(NamespacedId primaryRole, java.util.List<Orientation> allowed,
                                 boolean uprightOnly) {
     public static Builder builder(NamespacedId primaryRole);
-    public @Nullable Orientation select(Heading anchorHeading);
+    public @Nullable Orientation select(Heading declared, Heading observed);
 
     public interface Builder {
         Builder allow(Orientation... orientations);
@@ -620,21 +620,21 @@ a `build()` throw after a clean compile is a kernel defect.
 
 ### 4.9 Anchors and orientation
 
-The anchor cell is the definition origin, supplied by the caller. `OrientationPolicy.select` scans
-`allowed` in `Orientation.all()` order and returns the first `o` with
-`o.apply(Heading.north) == anchorHeading`; `null` means no admissible pose. `allowed` is non-empty,
-duplicate-free and in canonical order; `uprightOnly` is a build-time promise (`o.apply(up) == up`),
-not a match-time filter. A blueprint with no anchor has a null orientation policy and takes a
-`Siting` directly.
+The anchor cell is the definition origin, supplied by the caller. `AnchorSpec.value` names the
+anchor's heading in the blueprint's own coordinates (D-68); at check time the host reads the
+heading actually present at the anchor cell and `OrientationPolicy.select(declared, observed)`
+scans `allowed` in `Orientation.all()` order for the first `o` with
+`o.apply(declared) == observed`; `null` means no admissible pose. One blueprint therefore matches
+every allowed turn. `allowed` is non-empty, duplicate-free and in canonical order; `uprightOnly`
+is a build-time promise (`o.apply(up) == up`), not a match-time filter. A blueprint with no anchor
+has a null orientation policy and takes a `Siting` directly.
 
 `AnchorSpec` and `OrientationPolicy` are declarations, not a kernel read. The host resolves the
-anchor cell against its snapshot and answers a `SitingResult`. `AnchorSpec.value` is a real
-constraint, not a comment: the host compares it case-insensitively against the captured property
-value at the definition origin, and a value that differs is the host's anchor-invalid
-`SC-BPT-0006`, alongside an air cell, a missing property, a value that is not a heading, no
-admissible orientation and a null policy. An uncaptured anchor cell is the host's unreadable answer.
-The kernel has no `Anchors` resolver and no live anchor read. There is no fallback heading and no
-search (`adapter` §3, §11).
+anchor cell against its snapshot and answers a `SitingResult`. The host's anchor-invalid
+`SC-BPT-0006` covers an air cell, a missing property, an observed or declared value that is not a
+heading, no admissible orientation and a null policy. An uncaptured anchor cell is the host's
+unreadable answer. The kernel has no `Anchors` resolver and no live anchor read. There is no
+fallback heading and no search (`adapter` §3, §11).
 
 ### 4.10 Computations
 

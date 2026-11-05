@@ -1228,6 +1228,22 @@ were dead code.
 not a compile error; it matches nothing at match time. This is the one place a document names a
 registry object without resolving it.
 
+### D-68 — An anchor's value is a heading in the definition frame
+
+`AnchorSpec.value` names the anchor's heading in the blueprint's own coordinates. At check time the
+host reads the heading actually present at the anchor cell and asks the orientation policy for the
+allowed orientation that maps one to the other. One blueprint therefore matches every allowed turn.
+
+**What was wrong.** The same value was also the expected property value, so the literal comparison
+ran before any orientation was considered: placing the blueprint turned by 90° compared the
+observed `east` against the declared `north` and failed, and a policy that allowed every turn could
+only ever select the identity.
+
+**What it costs.** A document written for the old rule changes meaning: its `value` used to
+describe the world orientation it was drawn for. No shipped datapack declares an anchor (`grep`
+over `src/main/resources/data`), so the breakage is confined to third-party documents, which the
+module docs call out.
+
 ### D-70 — The set host documents the shape the code has
 
 `StructureSetHost` takes the manager it works against and one function that reserves a draft per

@@ -313,24 +313,29 @@ public final class McAnchors {
         if (state == null) {
             return failure(..., SC_MC_0010, "the anchor block state was not captured");
         }
-        String value = state.getValue(property);
-        if (!value.equalsIgnoreCase(spec.value())) {
-            return failure(..., anchorInvalid, "anchor property does not equal the declared value");
+        Heading observed = heading(state.getValue(property));
+        Heading declared = heading(spec.value());
+        if (observed == null || declared == null) {
+            return failure(..., anchorInvalid, "the value is not a heading");
         }
+        Orientation orientation = policy.select(declared, observed);
         ...
     }
 }
 ```
 
 - `AnchorSpec` and `OrientationPolicy` remain kernel declarations;
-- `AnchorSpec.value` is a real constraint;
+- `AnchorSpec.value` names the anchor's heading in the blueprint's own coordinates (D-68);
+- the orientation is the allowed one with `o.apply(declared) == observed`, so one blueprint
+  matches every allowed turn;
 - the anchor cell is captured with the same world snapshot;
 - no live world read.
 
 The phase-1 command capture supplies the anchor cell's view, so `McAnchors` reads the captured
 `BlockState`; a missing state is `AdapterCodes.valueNotCaptured` (`SC-MC-0010`), never a live read and
-never `SC-MC-0001`. `AnchorSpec.value` is compared case-insensitively against the captured property
-value at the definition origin, and a mismatch is `Codes.anchorInvalid` (`SC-BPT-0006`). `SC-MC-0001`
+never `SC-MC-0001`. The observed heading is parsed from the captured property value and
+`select(declared, observed)` picks the orientation; a value on either side that is not a heading, or
+no admissible orientation, is `Codes.anchorInvalid` (`SC-BPT-0006`). `SC-MC-0001`
 remains the capture refusal (an unloaded chunk or a refused section, §3); `SC-MC-0010` is both the
 host expectation absent code and the anchor's missing-state answer.
 

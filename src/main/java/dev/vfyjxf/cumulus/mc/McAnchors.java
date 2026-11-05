@@ -51,20 +51,21 @@ public final class McAnchors {
         if (value == null) {
             return failure(origin, Codes.anchorInvalid, "the anchor has no property " + spec.property());
         }
-        if (!value.equalsIgnoreCase(spec.value())) {
+        Heading observed = heading(value);
+        if (observed == null) {
+            return failure(origin, Codes.anchorInvalid, "the property is not a heading: " + value);
+        }
+        Heading declared = heading(spec.value());
+        if (declared == null) {
+            return failure(origin, Codes.anchorInvalid, "the declared value is not a heading: " + spec.value());
+        }
+        Orientation orientation = policy.select(declared, observed);
+        if (orientation == null) {
             return failure(
                 origin,
                 Codes.anchorInvalid,
-                "the anchor property " + spec.property() + " is " + value + ", not " + spec.value()
+                "no allowed orientation turns " + declared + " into " + observed
             );
-        }
-        Heading heading = heading(value);
-        if (heading == null) {
-            return failure(origin, Codes.anchorInvalid, "the property is not a heading: " + value);
-        }
-        Orientation orientation = policy.select(heading);
-        if (orientation == null) {
-            return failure(origin, Codes.anchorInvalid, "no allowed orientation faces " + heading);
         }
         return new SitingResult(Outcome.found(Siting.of(origin, orientation)), FindingBundle.empty());
     }
