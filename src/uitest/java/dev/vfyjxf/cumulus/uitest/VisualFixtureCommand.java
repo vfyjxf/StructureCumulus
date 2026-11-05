@@ -121,8 +121,7 @@ final class VisualFixtureCommand {
                                     Commands.argument("origin", BlockPosArgument.blockPos())
                                             .executes(context -> stage(context, VisualFixtureSupport::stagePair))
                                 )
-                            )
-                            .then(Commands.literal("unload").executes(context -> {
+                            ).then(Commands.literal("unload").executes(context -> {
                                 return VisualFixtureSupport.unloadFixture(context.getSource().getLevel()) ? 1 : 0;
                             })).then(Commands.literal("load").executes(context -> {
                                 return VisualFixtureSupport.loadFixture(context.getSource().getLevel()) ? 1 : 0;

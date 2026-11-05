@@ -79,7 +79,13 @@ class AdversarialClaimCoverageTest {
                                 for (LatticePoint leftCell : cells) {
                                     for (LatticePoint rightCell : cells) {
                                         ClaimRow left = row(leftCell, leftSharing, leftInstance, leftSiting, "left");
-                                        ClaimRow right = row(rightCell, rightSharing, rightInstance, rightSiting, "right");
+                                        ClaimRow right = row(
+                                            rightCell,
+                                            rightSharing,
+                                            rightInstance,
+                                            rightSiting,
+                                            "right"
+                                        );
                                         boolean expected = leftCell.equals(rightCell)
                                                 && !leftInstance.equals(rightInstance)
                                                 && (leftSharing.blocks() || rightSharing.blocks());
@@ -102,7 +108,13 @@ class AdversarialClaimCoverageTest {
     @Test
     void claimRowOrderIncludesSitingAndKeepsSitingDistinctRows() {
         ClaimRow first = row(origin, Sharing.shared, instance, identity, "bay");
-        ClaimRow second = row(origin, Sharing.shared, instance, MagicFixtures.identity(LatticePoint.of(5, 0, 5)), "bay");
+        ClaimRow second = row(
+            origin,
+            Sharing.shared,
+            instance,
+            MagicFixtures.identity(LatticePoint.of(5, 0, 5)),
+            "bay"
+        );
 
         assertTrue(first.compareTo(second) < 0, "siting is part of the total order");
         assertNotEquals(first, second, "different sitings are different rows");
@@ -274,8 +286,12 @@ class AdversarialClaimCoverageTest {
         OccupantSnapshot block = TestWorld.block(TestWorld.stone, origin);
         OccupantSnapshot second = TestWorld.block(TestWorld.stone, LatticePoint.of(0, 1, 0));
 
-        ClaimPlanner.Derived derived = ClaimPlanner
-                .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(block, second, block))));
+        ClaimPlanner.Derived derived = ClaimPlanner.derive(
+            blueprint,
+            identity,
+            instance,
+            List.of(new BayBinding(boundBay, List.of(block, second, block)))
+        );
         assertEquals(2, derived.rows().size(), "two distinct footprints yield two rows and duplicates do not add rows");
 
         OccupantSnapshot nested = nestedOccupant(origin, 0);
@@ -317,7 +333,8 @@ class AdversarialClaimCoverageTest {
             () -> assertEquals(1, derived.rows().size(), "an air subject contributes no claimed cell"),
             () -> assertThrows(
                 IllegalArgumentException.class,
-                () -> ClaimPlanner.derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(air)))),
+                () -> ClaimPlanner
+                        .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(air)))),
                 "an exclusive Bound footprint with only air subjects must be SC-CLM-0005"
             )
         );
@@ -560,8 +577,7 @@ class AdversarialClaimCoverageTest {
             Sharing.shared
         );
         BlueprintBuilder builder = Blueprint.builder(id("p1")).bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
-                .check(Check.of(id("p1_box_check"), box, Focuses.occupant(origin), Expectations.anyOccupant()))
-                .check(
+                .check(Check.of(id("p1_box_check"), box, Focuses.occupant(origin), Expectations.anyOccupant())).check(
                     Check.of(
                         id("p1_declared_check"),
                         declared,
@@ -594,19 +610,18 @@ class AdversarialClaimCoverageTest {
                     Footprint.declared(rightOwned),
                     rightSharing
                 );
-                BlueprintBuilder builder = Blueprint.builder(id("two_declared_" + where.replace('/', '_')))
-                        .bounds(Cuboid.of(0, 0, 0, 3, 1, 1))
-                        .check(
-                            Check.of(id("two_declared_left_check"), left, Focuses.occupant(origin), Expectations.anyOccupant())
-                        )
-                        .check(
-                            Check.of(
-                                id("two_declared_right_check"),
-                                right,
-                                Focuses.occupant(LatticePoint.of(1, 0, 0)),
-                                Expectations.anyOccupant()
-                            )
-                        );
+                BlueprintBuilder builder = Blueprint.builder(id("two_declared_" + where.replace('/', '_'))).bounds(
+                    Cuboid.of(0, 0, 0, 3, 1, 1)
+                ).check(
+                    Check.of(id("two_declared_left_check"), left, Focuses.occupant(origin), Expectations.anyOccupant())
+                ).check(
+                    Check.of(
+                        id("two_declared_right_check"),
+                        right,
+                        Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                        Expectations.anyOccupant()
+                    )
+                );
                 if (leftSharing == Sharing.exclusive || rightSharing == Sharing.exclusive) {
                     IllegalArgumentException rejected = assertThrows(
                         IllegalArgumentException.class,
@@ -626,27 +641,52 @@ class AdversarialClaimCoverageTest {
         CuboidSet inner = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
         CuboidSet span = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
         Bay box = MagicFixtures.bay(id("relax_box"), inner, Coverage.everyCell, Footprint.box(), Sharing.shared);
-        Bay declared = MagicFixtures
-                .bay(id("relax_declared"), span, Coverage.everyCell, Footprint.declared(span.subtract(inner)), Sharing.exclusive);
+        Bay declared = MagicFixtures.bay(
+            id("relax_declared"),
+            span,
+            Coverage.everyCell,
+            Footprint.declared(span.subtract(inner)),
+            Sharing.exclusive
+        );
         Blueprint declaredBlueprint = blueprint(
             "relax_declared_cells",
             Cuboid.of(0, 0, 0, 3, 1, 1),
             Check.of(id("relax_box_0"), box, Focuses.occupant(origin), Expectations.anyOccupant()),
             Check.of(id("relax_box_1"), box, Focuses.occupant(LatticePoint.of(1, 0, 0)), Expectations.anyOccupant()),
             Check.of(id("relax_declared_0"), declared, Focuses.occupant(origin), Expectations.anyOccupant()),
-            Check.of(id("relax_declared_1"), declared, Focuses.occupant(LatticePoint.of(1, 0, 0)), Expectations.anyOccupant()),
-            Check.of(id("relax_declared_2"), declared, Focuses.occupant(LatticePoint.of(2, 0, 0)), Expectations.anyOccupant())
+            Check.of(
+                id("relax_declared_1"),
+                declared,
+                Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                Expectations.anyOccupant()
+            ),
+            Check.of(
+                id("relax_declared_2"),
+                declared,
+                Focuses.occupant(LatticePoint.of(2, 0, 0)),
+                Expectations.anyOccupant()
+            )
         );
         assertNotNull(declaredBlueprint, "bay cells may overlap when the owned sets do not");
 
-        Bay bound = MagicFixtures
-                .bay(id("relax_bound"), CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1)), Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Bay bound = MagicFixtures.bay(
+            id("relax_bound"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1)),
+            Coverage.everyCell,
+            Footprint.bound(),
+            Sharing.exclusive
+        );
         assertNotNull(
             blueprint(
                 "relax_bound_cells",
                 Cuboid.of(0, 0, 0, 2, 1, 1),
                 Check.of(id("relax_bound_0"), bound, Focuses.occupant(origin), Expectations.anyOccupant()),
-                Check.of(id("relax_bound_1"), bound, Focuses.occupant(LatticePoint.of(1, 0, 0)), Expectations.anyOccupant())
+                Check.of(
+                    id("relax_bound_1"),
+                    bound,
+                    Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                    Expectations.anyOccupant()
+                )
             ),
             "a Bound bay's cells are not its owned set at build"
         );
@@ -687,8 +727,12 @@ class AdversarialClaimCoverageTest {
         OccupantSnapshot block = TestWorld.block(TestWorld.stone, origin);
         IllegalArgumentException rejected = assertThrows(
             IllegalArgumentException.class,
-            () -> ClaimPlanner
-                    .derive(blueprint, identity, instance, List.of(new BayBinding(left, List.of(block)), new BayBinding(right, List.of(block))))
+            () -> ClaimPlanner.derive(
+                blueprint,
+                identity,
+                instance,
+                List.of(new BayBinding(left, List.of(block)), new BayBinding(right, List.of(block)))
+            )
         );
         assertTrue(Objects.requireNonNull(rejected.getMessage(), "message").contains("SC-CLM-0001"));
 
@@ -713,14 +757,20 @@ class AdversarialClaimCoverageTest {
         CuboidSet inner = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
         CuboidSet span = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
         Bay box = MagicFixtures.bay(id("cover_box"), inner, Coverage.everyCell, Footprint.box(), Sharing.shared);
-        Bay bound = MagicFixtures.bay(id("cover_bound"), span, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Bay bound = MagicFixtures
+                .bay(id("cover_bound"), span, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
         Blueprint blueprint = blueprint(
             "bound_cover",
             Cuboid.of(0, 0, 0, 3, 1, 1),
             Check.of(id("cover_box_0"), box, Focuses.occupant(origin), Expectations.anyOccupant()),
             Check.of(id("cover_box_1"), box, Focuses.occupant(LatticePoint.of(1, 0, 0)), Expectations.anyOccupant()),
             Check.of(id("cover_bound_0"), bound, Focuses.occupant(origin), Expectations.anyOccupant()),
-            Check.of(id("cover_bound_1"), bound, Focuses.occupant(LatticePoint.of(1, 0, 0)), Expectations.anyOccupant()),
+            Check.of(
+                id("cover_bound_1"),
+                bound,
+                Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                Expectations.anyOccupant()
+            ),
             Check.of(id("cover_bound_2"), bound, Focuses.occupant(LatticePoint.of(2, 0, 0)), Expectations.anyOccupant())
         );
         TestWorld.View view = MagicFixtures.view().air(origin).air(LatticePoint.of(1, 0, 0))

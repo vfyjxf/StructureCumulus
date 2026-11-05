@@ -41,7 +41,6 @@ import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.id;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.leftId;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.leftParent;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.leftSatellite;
-import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.owner;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.plug;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.port;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.preheaterBlueprint;

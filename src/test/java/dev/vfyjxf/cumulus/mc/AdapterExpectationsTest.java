@@ -523,7 +523,12 @@ class AdapterExpectationsTest {
     private static SnapshotLevel.CapturedEntity entity(LatticePoint cell, EntityType<?> entityType) {
         var location = Objects.requireNonNull(BuiltInRegistries.ENTITY_TYPE.getKey(entityType), "entity type id");
         NamespacedId type = NamespacedId.of(location.getNamespace(), location.getPath());
-        return new SnapshotLevel.CapturedEntity(UUID.nameUUIDFromBytes(new byte[]{1}), type, Cuboid.of(cell), entityType);
+        return new SnapshotLevel.CapturedEntity(
+            UUID.nameUUIDFromBytes(new byte[]{1}),
+            type,
+            Cuboid.of(cell),
+            entityType
+        );
     }
 
     private static OccupantSnapshot occupant(LatticePoint cell) {

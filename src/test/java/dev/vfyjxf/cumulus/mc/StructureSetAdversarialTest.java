@@ -670,9 +670,7 @@ class StructureSetAdversarialTest {
         InstanceId previousRoot = fixture.instance(0);
         assertEquals(3, fixture.ledger.rows().size());
 
-        StructureSet narrower = place(
-            busyCompiled(List.of(satSpec(id("fail_sat"), LatticePoint.of(10, 0, 0), false)))
-        );
+        StructureSet narrower = place(busyCompiled(List.of(satSpec(id("fail_sat"), LatticePoint.of(10, 0, 0), false))));
         StructureSet.Satellite failing = narrower.satellite(id("fail_sat"));
         assertNotNull(failing);
         fixture.view.put(world(rootSiting(), LatticePoint.origin), rootBlock);

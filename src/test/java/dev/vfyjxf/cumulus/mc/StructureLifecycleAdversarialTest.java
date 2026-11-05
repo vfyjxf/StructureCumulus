@@ -263,7 +263,8 @@ class StructureLifecycleAdversarialTest {
         for (ClaimRow row : old.rows()) {
             LatticePoint next = row.cell().point().offset(10, 0, 0);
             assertNotNull(next);
-            translated.add(new ClaimRow(LatticeKey.of(next), row.sharing(), movedOrigin, row.bay(), translatedInstance));
+            translated
+                    .add(new ClaimRow(LatticeKey.of(next), row.sharing(), movedOrigin, row.bay(), translatedInstance));
         }
         settle(ledger, translatedInstance, translated);
         assertEquals(2, ledger.revision(), "the translated settle bumps once");

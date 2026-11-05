@@ -97,7 +97,11 @@ class ClaimStressScenarioTest {
         assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(second, siting, airView(), ledger));
         assertEquals(1, TestWorld.rows(ledger).size(), "the whole instance is replaced, not merged");
         assertEquals(revision + 1, ledger.revision(), "the replacement bumps the revision once");
-        assertEquals(LatticePoint.of(1, 0, 0).key(), TestWorld.rows(ledger).get(0).cell(), "the new cell is the only row");
+        assertEquals(
+            LatticePoint.of(1, 0, 0).key(),
+            TestWorld.rows(ledger).get(0).cell(),
+            "the new cell is the only row"
+        );
     }
 
     @Test

@@ -57,7 +57,11 @@ class ContributionCompletenessTest {
             MatchResult.Undecided.class,
             MatchEngine.check(request(blueprint, fourSectionView()))
         );
-        assertEquals(UndecidedReason.unreadable, undecided.reason(), "a check that requires the key answers Unreadable");
+        assertEquals(
+            UndecidedReason.unreadable,
+            undecided.reason(),
+            "a check that requires the key answers Unreadable"
+        );
         assertTrue(MagicFixtures.hasCode(undecided, Codes.designDefect), "the wrong type is SC-ENG-0004");
         assertTrue(MagicFixtures.hasCode(undecided, Codes.keyAbsent), "the required key is reported absent");
         MatchOutcome outcome = Objects.requireNonNull(undecided.partial());
@@ -124,8 +128,7 @@ class ContributionCompletenessTest {
         assertTrue(MagicFixtures.hasCode(undecided, Codes.designDefect), "the merged value is SC-ENG-0004");
         assertTrue(
             undecided.findings().findings().stream().anyMatch(
-                finding -> finding.code().equals(Codes.designDefect.code())
-                        && finding.message().startsWith("merging ")
+                finding -> finding.code().equals(Codes.designDefect.code()) && finding.message().startsWith("merging ")
             ),
             "the fold itself is named as the defect"
         );
