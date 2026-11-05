@@ -757,7 +757,8 @@ in `Codes.all`.
 - Envelope: empty `E` no-op and equality with the plain build; uncovered cells and declared
   footprints; envelope-only blueprint; reserved id collision; two builds; `SC-EXP-0006` metadata;
   fusion void, AE2 empty envelope, PNC port, GT widened ring, unreadable, budget and outside-bounds
-  scenarios.
+  scenarios; an entity over an air cell is transparent, the block under it still fails, and
+  `envelopeEntities` rejects the entity while adding the `entity` kind to `reads()`.
 - Content count: predicate match, non-air, multi-section sum, one multi-cell body counted once by its
   anchor, a refused slice Missing with a relayed refusal and never a zero, a readable no-match slice
   zero, merge/region constructor errors.

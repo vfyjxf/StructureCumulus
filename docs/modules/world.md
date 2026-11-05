@@ -510,6 +510,8 @@ The kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value cod
 
 - `read` outside `bounds` is `outOfBounds`, never air; inside, `Found`/`Unreadable` agree with the
   derived `occupant`/`refusalAt`/`statusOf`.
+- `cellOccupant`: the stored cell answers the block under a captured body while `read` narrows to
+  the body; a readable empty cell answers air; outside `bounds` is `null`.
 - `Partial`: a refused cell is unreadable, its neighbours are readable, the map is non-empty and lies
   in the section; a missing cell outside the map is air.
 - Refused section: every cell unreadable with the slot's code; `occupant` null for all of them.
