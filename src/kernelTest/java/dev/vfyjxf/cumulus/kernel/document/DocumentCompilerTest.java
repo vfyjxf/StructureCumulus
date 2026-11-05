@@ -852,6 +852,103 @@ class DocumentCompilerTest {
     }
 
     @Test
+    void aCompileFailureWithoutASpanStillHasALabel() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        BlueprintSpec root = new BlueprintSpec(
+            id("spanless"),
+            Cuboid.of(0, 0, 0, 3, 1, 1),
+            false,
+            true,
+            Value.object(),
+            List.of(new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        assertEquals(2, result.findings().size(), () -> result.findings().findings().toString());
+        for (Finding finding : result.findings().findings()) {
+            assertTrue(finding.hasPrimary(), () -> finding.toString());
+            assertEquals(
+                CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1)),
+                Objects.requireNonNull(finding.primaryLabel(), "primary").locus().cells()
+            );
+        }
+    }
+
+    @Test
+    void anEmptyBoundsBlueprintStillGetsALabel() {
+        BlueprintSpec root = new BlueprintSpec(
+            id("flat"),
+            Cuboid.of(0, 0, 0, 0, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        Finding finding = Objects.requireNonNull(result.findings().primary(), "primary");
+        assertTrue(finding.hasPrimary(), () -> finding.toString());
+        assertEquals(
+            CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+            Objects.requireNonNull(finding.primaryLabel(), "primary").locus().cells()
+        );
+    }
+
+    @Test
+    void twoMissingDefinitionsAreBothReported() {
+        BlueprintSpec root = new BlueprintSpec(
+            id("two_ghosts"),
+            Cuboid.of(0, 0, 0, 4, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(
+                new PlacementSpec(id("ghost_a"), LatticePoint.origin, id("a"), null),
+                new PlacementSpec(id("ghost_b"), LatticePoint.of(2, 0, 0), id("b"), null)
+            ),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(Codes.definitionMissing.code());
+        assertEquals(2, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("ghost_a"), () -> found.get(0).message());
+        assertTrue(found.get(1).message().contains("ghost_b"), () -> found.get(1).message());
+        for (Finding finding : found) {
+            assertTrue(finding.hasPrimary(), () -> finding.toString());
+        }
+    }
+
+    @Test
     void aDefinitionReachableThroughAnotherPlacementIsAccepted() {
         BlueprintSpec leaf = new BlueprintSpec(
             id("leaf"),
