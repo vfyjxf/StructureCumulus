@@ -860,7 +860,9 @@ public final class MatchEngine {
         String message = rejected.getMessage() == null ? "claim planning failed" : rejected.getMessage();
         CodeEntry entry = message.contains("SC-SPC-0001")
                 ? Codes.locusUnmapped
-                : message.contains("SC-CLM-0005") ? Codes.boundEmpty : Codes.bindingInvalid;
+                : message.contains("SC-CLM-0001")
+                        ? Codes.claimConflict
+                        : message.contains("SC-CLM-0005") ? Codes.boundEmpty : Codes.bindingInvalid;
         return code(entry, phase, message, locus);
     }
 
