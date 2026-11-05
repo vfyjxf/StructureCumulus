@@ -167,19 +167,22 @@ settle(request, admitted, ledger, attempt):
       failure -> Failed(plannerFailure)
 
   // ---- the one fallible write ----
-  if ledger == null:
-      if !derived.rows().isEmpty()                    -> Undecided(ledgerUnavailable)
-      else: revision = 0                              // no ledger and zero rows: Formed
+  if derived.rows().isEmpty():
+      // an empty plan owns nothing: dropping the key is a release, never a settle (D-60)
+      if ledger == null: revision = 0               // no ledger and no rows: Formed
+      else: verdict = ledger.release(request.instance())
+            !Settled                                -> Undecided(ledgerUnavailable)
+            revision = verdict.revision()           // unchanged when the key was already absent
+  else if ledger == null                            -> Undecided(ledgerUnavailable)
   else:
       verdict = ledger.settle(new SettleRequest(request.instance(), derived.rows(),
                                                 admitted.ledgerRevision()))
       if RevisionMoved:
-          empty row set: retry once at ledger.revision(); there is no matrix to run
-          non-empty: fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
+          fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
               matrix(rows, fresh.rows()) conflict -> Failed(SC-CLM-0001); retry once at fresh.revision()
           moved twice                                 -> Undecided(ledgerMoved)
       if Conflict                                     -> Failed(SC-CLM-0001) with incumbents
-      revision = settled.revision()
+      revision = settled.revision()                   // unchanged when the content matched (D-60)
 
   // ---- after the write: total, no throw point ----
   context = attempt.publish(instance, instanceValues, findings, spend)
@@ -234,9 +237,11 @@ review defect, never a silent widening. `spend` is the sum of every charge.
 
 ### 7.3 Result
 
-`Admitted` is not a structure: no claims, no `ClaimSet`, no `Formed`. `Formed` exists only after a
-`Settled` (or an empty-row registration that needed no ledger) and carries the claims, the context
-revision and the ledger revision. `Failed` has at least one `error` finding. `Undecided` carries a
+`Admitted` is not a structure: no claims, no `ClaimSet`, no `Formed`. `Formed` exists only after the
+ledger answered — a `Settled` (a settle whose content matched counts, and keeps the revision), a
+`release` of the instance's key when the derived plan owns nothing (D-60), or no ledger and no rows
+at all — and carries the claims, the context revision and the ledger revision; the ledger revision
+may equal the one the check read. `Failed` has at least one `error` finding. `Undecided` carries a
 reason and, when available, a partial outcome. `Dropped` means the snapshot was no longer current;
 the attempt read nothing that can be trusted. A `Partial` section does not make an attempt
 `Undecided` by itself: the computation's `Missing` propagates through the normal fold, and the

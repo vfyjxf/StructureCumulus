@@ -1148,6 +1148,31 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-60 — Dropping a key is a release; a settle that changes nothing is not a write
+
+When the planner derives no rows, the engine releases the instance's key instead of settling an empty
+request. `SettleRequest` therefore rejects an empty row list in its constructor: "own nothing" is a
+release, not a degenerate settle, and no host has to implement that edge case.
+
+`settle` compares the resulting ledger content with the current content and writes only when they
+differ. A settle that changes nothing answers `Settled(revision, rows)` with the revision unchanged.
+`release` already behaved this way.
+
+Revision therefore means "the content version", not "the number of writes": it changes exactly when
+the rows a reader can see change. CAS stays first — a stale `expectedRevision` is refused even when
+the content happens to match, because the caller's view is stale and it must re-read.
+
+**Why release and not an empty settle.** An empty request makes correctness depend on every host
+implementing "empty means clear" the same way; a host that reads it as "nothing to do" keeps stale
+rows forever. `release` already means "drop this instance's rows" and is implemented once.
+
+**Why idempotence is safe.** No production path branches on "the revision changed"; only tests count
+bumps. A host that still bumps on a no-op stays correct — it only invalidates readers it need not.
+
+**Supersedes:** the zero-row half of D-42's write rule — exactly one compare-and-set per settle still
+holds for every settle that happens, but a settle whose plan owns nothing no longer happens; it is a
+`release`.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
