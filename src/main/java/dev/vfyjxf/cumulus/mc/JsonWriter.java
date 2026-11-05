@@ -209,7 +209,6 @@ public final class JsonWriter implements DocumentWriter {
         JsonArray array = new JsonArray();
         for (ComputationSpec computation : computations) {
             JsonObject json = new JsonObject();
-            json.addProperty("id", JsonVocabulary.idText(computation.id()));
             json.addProperty("kind", JsonVocabulary.idText(computation.kind()));
             json.addProperty("output", JsonVocabulary.idText(computation.output()));
             if (computation.bay() != null) {

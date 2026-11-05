@@ -612,7 +612,7 @@ public final class JsonReader implements DocumentReader {
             if (object == null) {
                 return null;
             }
-            NamespacedId id = id(object, "id", path);
+            NamespacedId id = optionalId(object, "id", path);
             NamespacedId kind = id(object, "kind", path);
             NamespacedId output = id(object, "output", path);
             NamespacedId bay = optionalId(object, "bay", path);
@@ -624,10 +624,10 @@ public final class JsonReader implements DocumentReader {
             }
             Set<NamespacedId> inputs = ids(object, "inputs", path);
             Value args = args(object, path, computationMembers);
-            if (id == null || kind == null || output == null || args == null) {
+            if (kind == null || output == null || args == null) {
                 return null;
             }
-            return new ComputationSpec(id, kind, args, region, bay, output, inputs, span(path));
+            return new ComputationSpec(id == null ? output : id, kind, args, region, bay, output, inputs, span(path));
         }
 
         private List<KeySpec> keys(JsonObject object, String path) {

@@ -93,7 +93,7 @@ class JsonDocumentTest {
                  "description": "the portal"}
               ],
               "computations": [
-                {"id": "cells", "kind": "count", "output": "test:count",
+                {"id": "test:count", "kind": "count", "output": "test:count",
                  "region": [[0,0,0,5,1,5]], "inputs": ["test:count"], "extra": {"nested": true}}
               ],
               "keys": [
@@ -137,7 +137,7 @@ class JsonDocumentTest {
                    {"kind": "any_occupant"}]}}
               ],
               "computations": [
-                {"id": "air_cells", "kind": "air", "region": [[1,1,1,1,1,1]],
+                {"kind": "air", "region": [[1,1,1,1,1,1]],
                  "output": "mymod:air_cells"}
               ],
               "keys": [
