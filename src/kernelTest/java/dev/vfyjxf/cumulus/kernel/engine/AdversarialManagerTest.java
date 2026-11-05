@@ -346,55 +346,6 @@ class AdversarialManagerTest {
     }
 
     @Test
-    void movedPreservesIdentityAndContextAndRejectsStaleOrCollidingFrom() {
-        StructureManager manager = StructureManager.create();
-        StructureInstance formed = begin(manager, worldA, siting(0, 0, 0)).commit(bounds);
-        manager.publish(formed.id(), Map.of(count, 7L), FindingBundle.empty(), Spend.zero);
-        StructureContext before = Objects.requireNonNull(manager.find(formed.id()), "formed").context();
-
-        Siting movedTo = siting(10, 64, 10);
-        CuboidSet movedBounds = CuboidSet.of(Cuboid.of(10, 64, 10, 12, 66, 12));
-        manager.onEvent(new StructureEvent.Moved(formed.id(), siting(0, 0, 0), movedTo, movedBounds));
-
-        StructureInstance moved = manager.find(formed.id());
-        assertNotNull(moved);
-        assertEquals(formed.id(), moved.id());
-        assertEquals(before, moved.context(), "Moved preserves the id and context");
-        assertEquals(movedTo, moved.siting());
-        assertEquals(movedBounds, moved.bounds());
-        assertEquals(moved, manager.find(owner, movedTo));
-        assertNull(manager.find(owner, siting(0, 0, 0)));
-        assertTrue(manager.findAt(LatticePoint.of(10, 64, 10)).contains(moved));
-        assertTrue(manager.findAt(LatticePoint.of(0, 0, 0)).isEmpty());
-
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(formed.id(), siting(0, 0, 0), siting(20, 0, 0), bounds)),
-            "a stale from is rejected"
-        );
-
-        StructureInstance other = begin(manager, worldA, siting(20, 0, 0)).commit(bounds);
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(formed.id(), movedTo, other.siting(), bounds)),
-            "a move onto another instance's siting is rejected"
-        );
-        assertEquals(
-            movedTo,
-            Objects.requireNonNull(manager.find(formed.id()), "formed").siting(),
-            "a rejected move leaves the instance in place"
-        );
-
-        CuboidSet secondBounds = CuboidSet.of(Cuboid.of(10, 64, 10, 11, 65, 11));
-        manager.onEvent(new StructureEvent.Moved(formed.id(), movedTo, movedTo, secondBounds));
-        assertEquals(
-            secondBounds,
-            Objects.requireNonNull(manager.find(formed.id()), "formed").bounds(),
-            "moving to the same siting only updates bounds"
-        );
-    }
-
-    @Test
     void unloadedIsolatesWorldsAndInvalidatesThatWorldsDrafts() {
         StructureManager manager = StructureManager.create();
         StructureInstance formedA = begin(manager, worldA, siting(0, 0, 0)).commit(bounds);
@@ -617,10 +568,6 @@ class AdversarialManagerTest {
         assertThrows(NullPointerException.class, () -> new StructureSpec(owner, null, id("blueprint")));
         assertThrows(NullPointerException.class, () -> new StructureSpec(owner, siting(0, 0, 0), null));
         assertThrows(NullPointerException.class, () -> new StructureEvent.Broken(null));
-        assertThrows(
-            NullPointerException.class,
-            () -> new StructureEvent.Moved(null, siting(0, 0, 0), siting(1, 0, 0), bounds)
-        );
         assertThrows(NullPointerException.class, () -> new StructureEvent.Loaded(null, List.of()));
         assertThrows(NullPointerException.class, () -> new StructureEvent.Loaded(worldA, null));
         assertThrows(NullPointerException.class, () -> new StructureEvent.Unloaded(null));
@@ -805,13 +752,6 @@ class AdversarialManagerTest {
             "the manager never derives bounds from the siting"
         );
         assertEquals(List.of(instance), manager.findIn(farBounds));
-
-        CuboidSet movedBounds = CuboidSet.of(Cuboid.of(50, 0, 50, 51, 1, 51));
-        manager.onEvent(
-            new StructureEvent.Moved(instance.id(), siting(100, 64, 100), siting(100, 64, 100), movedBounds)
-        );
-        StructureInstance moved = Objects.requireNonNull(manager.find(instance.id()), "moved");
-        assertEquals(List.of(moved), manager.findAt(LatticePoint.of(50, 0, 50)));
     }
 
     @Test
@@ -826,25 +766,6 @@ class AdversarialManagerTest {
         assertTrue(manager.findIn(CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1))).isEmpty());
         assertEquals(instance, manager.find(instance.id()));
         assertEquals(List.of(), manager.findIn(CuboidSet.empty()));
-    }
-
-    @Test
-    void movedRejectsUnknownIdsAndDraftIds() {
-        StructureManager manager = StructureManager.create();
-        InstanceId unknown = new InstanceId(worldA, 999);
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(unknown, siting(0, 0, 0), siting(1, 0, 0), bounds)),
-            "a move for an unknown id is rejected"
-        );
-
-        StructureAttempt draft = begin(manager, worldA, siting(0, 0, 0));
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(draft.id(), siting(0, 0, 0), siting(1, 0, 0), bounds)),
-            "a draft is not a formed instance and cannot move"
-        );
-        draft.abort();
     }
 
     @Test

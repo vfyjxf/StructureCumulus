@@ -1,8 +1,8 @@
 # StructureCumulus — design of record
 
-This directory is the **source of truth** for StructureCumulus. The kernel under `src/kernel/java`
-is generated from these files and is allowed to be deleted and regenerated at any time. A fact that
-is not in this directory is not part of the design.
+This directory is the **source of truth** for StructureCumulus. The code under `src/kernel/java` and
+`src/main/java` is corrected to match these files; it is never deleted and rebuilt from them. A fact
+that is not in this directory is not part of the design.
 
 The design set is deliberately smaller than a specification suite: one constitution, one model,
 one module graph, one API tour, one decision record, and one file per module. Every module file is
@@ -19,7 +19,8 @@ table defines who may emit each finding code.
 5. [design/04-api.md](design/04-api.md) — the surfaces and the worked examples a user writes.
 6. [design/05-decisions.md](design/05-decisions.md) — every ruling that replaced an older one.
 7. [design/06-verification.md](design/06-verification.md) — gates, scenario tests, code producers.
-8. [design/07-regeneration.md](design/07-regeneration.md) — how the kernel is rebuilt from this set.
+8. [design/07-regeneration.md](design/07-regeneration.md) — how a drifted kernel is brought back
+   into agreement (correction, not rebuild).
 9. [design/08-context-cache.md](design/08-context-cache.md) — the host-owned cached-context port.
 10. [design/09-structure-sets.md](design/09-structure-sets.md) — root/satellite structure sets and links.
 11. [design/10-host-data.md](design/10-host-data.md) — host data capture and MC-specific checks.
@@ -105,25 +106,26 @@ Then the module files, in dependency order:
   union capture and check-only host path, the built-in `set_root`/`set_wing`/`set_demo` documents and
   the real-level set GameTests (`design/06-verification.md` §3.5). S6 closes the set layer: the
   `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
-  budget shared by presence and every member attempt (D-35). The tree registers 269
-  kernel tests in 40 containers, 280 adapter unit tests in 35 containers and 74 `@GameTest` methods;
-  a full `./gradlew check` and `runGameTestServer` on the S6 working tree are both green (269
-  kernel tests, 280 adapter tests, 74/74 GameTests). Pending only: the
+  budget shared by presence and every member attempt (D-35). The tree registers 382
+  kernel tests in 48 containers, 411 adapter unit tests in 43 containers and 126 `@GameTest` methods;
+  a full `./gradlew check` and `runGameTestServer` on the expanded wave are both green (382
+  kernel tests, 411 adapter tests, 126/126 GameTests). Pending only: the
   performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
-  There is no regeneration milestone.
+  No regeneration milestone exists or is planned: the code is corrected against this set in place.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
-- Code status: `src/kernel/java` is generated from these files; `src/main/java` is the mod entry and
-  the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-29, S6 working tree): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 269 kernel JUnit 5 tests (40 test
-  containers), 280 adapter unit tests (35 containers) and 74 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (269 kernel tests, 280 adapter
-  tests, 74/74 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
+- Code status: `src/kernel/java` follows these files and is corrected to them; `src/main/java` is the
+  mod entry and the adapter. The adapter is the only place allowed to name Minecraft.
+- Verification (2026-10-29, expanded wave): the kernel compiles with
+  `javac --release 21` and JSpecify only. The tree registers 382 kernel JUnit 5 tests (48 test
+  containers), 411 adapter unit tests (43 containers) and 126 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (382 kernel tests, 411 adapter
+  tests, 126/126 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
   and the decision record has 40 decisions (D-40; D-29 superseded).
 
 ## The one rule
 
-**If the code and this directory disagree, this directory wins and the code is regenerated.**
-A change to a public shape is a change to a module file first; the code follows in the same commit,
-or in a regeneration run.
+**If the code and this directory disagree, this directory wins and the code is corrected.**
+A change to a public shape is a change to a module file first; the code follows in the same commit.
+Nothing is regenerated: no file is deleted because the set changed, and no skeleton is compiled as a
+substitute for the real source.

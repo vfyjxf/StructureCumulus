@@ -25,7 +25,7 @@
 | `StructureAttempt` | interface | a draft `ContextStore`; `id`, `spec`, `commit(bounds)`, `abort` |
 | `StructureManager` | interface | in-memory registry; `begin`, world-scoped `find`, `findAt`/`findIn`, `instances`, `onEvent` |
 | `InMemoryStructureManager` | final class, package-private | the server-thread registry behind `StructureManager.create()` |
-| `StructureEvent` | sealed interface | `Broken`, `Moved`, `Loaded`, `Unloaded`, `Invalidated` |
+| `StructureEvent` | sealed interface | `Broken`, `Loaded`, `Unloaded`, `Invalidated` |
 | `CachedContext` | interface | host-owned read port: `<T> @Nullable T get(NamespacedId id, Class<T> type)` |
 | `Deriver<T>` | interface | context-only producer of one key |
 | `DeriveContext` | interface | what a deriver sees: base context, budget, findings |
@@ -83,7 +83,6 @@ public interface StructureManager extends ContextStore {
 }
 public sealed interface StructureEvent {
     record Broken(InstanceId id) implements StructureEvent {}
-    record Moved(InstanceId id, Siting from, Siting to, CuboidSet bounds) implements StructureEvent {}
     record Loaded(World world, java.util.List<StructureInstance> instances) implements StructureEvent {}
     record Unloaded(World world) implements StructureEvent {}
     record Invalidated(InstanceId id, String reason) implements StructureEvent {}
@@ -174,10 +173,8 @@ siting)` is the world-qualified tuple lookup; the adapter's one-manager-per-leve
 registry-wide helpers per-level in production.
 
 The manager is in-memory and single-writer on the server thread. `Broken`/`Invalidated` remove the
-instance (or close a draft); `Moved` preserves the id and context and updates the spec siting and
-bounds, with collision checked inside the same world. A rejected `Moved` is host-handled: the
-adapter dispatches `Invalidated` for the stale instance and releases its old claim key, without
-translating the rows; `Loaded(World, List)` validates every restored
+instance (or close a draft); a structure that a piston pushes is invalidated, not translated, so
+there is no move event; `Loaded(World, List)` validates every restored
 instance belongs to that world and has a unique id/siting before replacing only that world, closes
 that world's drafts and raises the serial watermark; other worlds are untouched. A rejected
 `Loaded` leaves the registry unchanged. `Unloaded(world)` removes that world's instances and drafts

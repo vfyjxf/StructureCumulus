@@ -428,16 +428,15 @@ class ExpandedManagerFuzzTest {
 
         private void run(int steps) {
             for (int step = 0; step < steps; step++) {
-                int op = random.nextInt(15);
+                int op = random.nextInt(13);
                 switch (op) {
                     case 0, 1, 2, 3 -> beginDraft();
                     case 4, 5, 6 -> commitDraft();
                     case 7 -> abortDraft();
-                    case 8, 9 -> moveFormed();
-                    case 10 -> brokenOrInvalidated();
-                    case 11 -> unloadWorld();
-                    case 12 -> loadedWorld();
-                    case 13 -> removeTarget();
+                    case 8 -> brokenOrInvalidated();
+                    case 9 -> unloadWorld();
+                    case 10 -> loadedWorld();
+                    case 11 -> removeTarget();
                     default -> publishTarget();
                 }
                 assertRegistry(step);
@@ -558,40 +557,6 @@ class ExpandedManagerFuzzTest {
                 where() + " match values are never published"
             );
             assertEquals(locked, manager.context(target), where() + " a rejected publish writes nothing");
-        }
-
-        private void moveFormed() {
-            List<StructureInstance> formed = manager.instances();
-            if (formed.isEmpty()) {
-                return;
-            }
-            StructureInstance instance = formed.get(random.nextInt(formed.size()));
-            Siting target = sitings[random.nextInt(sitings.length)];
-            CuboidSet bounds = boundsAt(target, random.nextInt(3));
-            StructureInstance occupant = manager.find(instance.id().world(), instance.owner(), target);
-            List<StructureInstance> before = manager.instances();
-            if (occupant != null && !occupant.id().equals(instance.id())) {
-                assertThrows(
-                    IllegalArgumentException.class,
-                    () -> manager.onEvent(new StructureEvent.Moved(instance.id(), instance.siting(), target, bounds)),
-                    where() + " a moved collision is rejected inside the world"
-                );
-                assertEquals(before, manager.instances(), where() + " a rejected move writes nothing");
-                return;
-            }
-            StructureContext context = instance.context();
-            manager.onEvent(new StructureEvent.Moved(instance.id(), instance.siting(), target, bounds));
-            StructureInstance moved = Objects.requireNonNull(manager.find(instance.id()), where());
-            assertEquals(context, moved.context(), where() + " Moved preserves the id and context");
-            assertEquals(target, moved.siting(), where() + " Moved updates the siting");
-            assertEquals(bounds, moved.bounds(), where() + " Moved updates the bounds");
-            assertEquals(moved, manager.find(instance.id().world(), instance.owner(), target), where() + " new tuple");
-            if (!instance.siting().equals(target)) {
-                assertNull(
-                    manager.find(instance.id().world(), instance.owner(), instance.siting()),
-                    where() + " the old tuple is released in its world"
-                );
-            }
         }
 
         private void brokenOrInvalidated() {

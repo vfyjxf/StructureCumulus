@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimMatrix;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimSet;
@@ -8,7 +9,7 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.core.OwnerId;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
@@ -40,8 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Expanded N-row claim matrix, planner, ordering and ledger stress. */
 class ExpandedClaimMatrixTest {
 
-    private static final OwnerId owner = OwnerId.of(MagicFixtures.id("owner"));
-    private static final OwnerId other = OwnerId.of(MagicFixtures.id("other"));
+    private static final InstanceId instance = MagicFixtures.instance;
+    private static final InstanceId otherInstance = MagicFixtures.rivalInstance;
     private static final Siting siting = MagicFixtures.turn(LatticePoint.origin, Turn.none);
     private static final Siting otherSiting = MagicFixtures.turn(LatticePoint.of(10, 0, 0), Turn.none);
 
@@ -53,9 +54,9 @@ class ExpandedClaimMatrixTest {
                 new ClaimRow(
                     LatticeKey.of(LatticePoint.of(i % 5, (i / 5) % 3, 0)),
                     i % 2 == 0 ? Sharing.exclusive : Sharing.shared,
-                    i % 3 == 0 ? owner : other,
                     i % 4 == 0 ? otherSiting : siting,
-                    MagicFixtures.id("bay_" + (i % 7))
+                    MagicFixtures.id("bay_" + (i % 7)),
+                    i % 3 == 0 ? instance : otherInstance
                 )
             );
         }
@@ -64,7 +65,7 @@ class ExpandedClaimMatrixTest {
             assertFalse(ClaimMatrix.conflicts(a, a), "a row never conflicts with itself");
             for (ClaimRow b : rows) {
                 boolean expected = a.cell().equals(b.cell())
-                        && !(a.owner().equals(b.owner()) && a.siting().equals(b.siting()))
+                        && !a.instance().equals(b.instance())
                         && (a.sharing().blocks() || b.sharing().blocks());
                 assertEquals(expected, ClaimMatrix.conflicts(a, b), "matrix is exact for " + a + " vs " + b);
                 assertEquals(ClaimMatrix.conflicts(a, b), ClaimMatrix.conflicts(b, a), "matrix is symmetric");
@@ -76,38 +77,26 @@ class ExpandedClaimMatrixTest {
     void sharedAndExclusiveOverlapStayExactAtOneHundredRows() {
         LatticePoint cell = LatticePoint.of(3, 4, 5);
         for (int i = 0; i < 50; i++) {
-            ClaimRow shared = row(cell, Sharing.shared, i % 2 == 0 ? owner : other, siting, "shared_" + i);
-            ClaimRow exclusive = row(
-                cell,
-                Sharing.exclusive,
-                i % 2 == 0 ? owner : other,
-                otherSiting,
-                "exclusive_" + i
-            );
+            ClaimRow shared = row(cell, Sharing.shared, instance, siting, "shared_" + i);
+            ClaimRow exclusive = row(cell, Sharing.exclusive, otherInstance, otherSiting, "exclusive_" + i);
             assertFalse(ClaimMatrix.conflicts(shared, shared));
             assertTrue(ClaimMatrix.conflicts(shared, exclusive));
             assertTrue(ClaimMatrix.conflicts(exclusive, shared));
-            ClaimRow otherExclusive = row(
-                cell,
-                Sharing.exclusive,
-                i % 2 == 0 ? other : owner,
-                otherSiting,
-                "other_exclusive_" + i
-            );
+            ClaimRow otherExclusive = row(cell, Sharing.exclusive, instance, otherSiting, "other_exclusive_" + i);
             assertTrue(ClaimMatrix.conflicts(exclusive, otherExclusive), "two distinct exclusive rows conflict");
         }
         for (int i = 0; i < 10; i++) {
-            ClaimRow a = row(cell, Sharing.shared, owner, siting, "same_key_" + i);
-            ClaimRow b = row(cell, Sharing.exclusive, owner, siting, "same_key_" + i);
-            assertFalse(ClaimMatrix.conflicts(a, b), "same owner/siting is one lifecycle object even across sharing");
+            ClaimRow a = row(cell, Sharing.shared, instance, siting, "same_key_" + i);
+            ClaimRow b = row(cell, Sharing.exclusive, instance, siting, "same_key_" + i);
+            assertFalse(ClaimMatrix.conflicts(a, b), "one instance is one lifecycle object even across sharing");
         }
     }
 
     @Test
-    void distinctRowsWithTheSameCellOwnerAndBayAreCanonicalAcrossInputOrders() {
+    void distinctRowsWithTheSameCellBayAndSharingAreCanonicalAcrossInputOrders() {
         LatticePoint cell = LatticePoint.of(7, 0, 0);
-        ClaimRow first = row(cell, Sharing.shared, owner, siting, "tied_bay");
-        ClaimRow second = row(cell, Sharing.shared, owner, otherSiting, "tied_bay");
+        ClaimRow first = row(cell, Sharing.shared, instance, siting, "tied_bay");
+        ClaimRow second = row(cell, Sharing.shared, otherInstance, otherSiting, "tied_bay");
 
         ClaimSet forward = new ClaimSet(List.of(first, second), 1);
         ClaimSet backward = new ClaimSet(List.of(second, first), 1);
@@ -116,12 +105,14 @@ class ExpandedClaimMatrixTest {
         ClaimVerdict.Settled forwardSettled = new ClaimVerdict.Settled(1, List.of(first, second));
         ClaimVerdict.Settled backwardSettled = new ClaimVerdict.Settled(1, List.of(second, first));
 
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
-        assertTrue(ledger.settle(new SettleRequest(owner, siting, List.of(first), 0)) instanceof ClaimVerdict.Settled);
+        ClaimLedger ledger = MagicFixtures.ledger();
         assertTrue(
-            ledger.settle(new SettleRequest(owner, otherSiting, List.of(second), 1)) instanceof ClaimVerdict.Settled
+            ledger.settle(new SettleRequest(instance, List.of(first), 0)) instanceof ClaimVerdict.Settled
         );
-        ClaimSet ledgerSet = ledger.set();
+        assertTrue(
+            ledger.settle(new SettleRequest(otherInstance, List.of(second), 1)) instanceof ClaimVerdict.Settled
+        );
+        ClaimSet ledgerSet = new ClaimSet(TestWorld.rows(ledger), ledger.revision());
         assertEquals(2, ledgerSet.rows().size(), "the ledger can hold both tied rows");
         ClaimSet ledgerReversed = new ClaimSet(
             List.of(ledgerSet.rows().get(1), ledgerSet.rows().get(0)),
@@ -148,7 +139,7 @@ class ExpandedClaimMatrixTest {
                 row(
                     LatticePoint.of(i % 10, (i / 10) % 10, 0),
                     i % 2 == 0 ? Sharing.shared : Sharing.exclusive,
-                    i % 2 == 0 ? owner : other,
+                    i % 2 == 0 ? instance : otherInstance,
                     i % 3 == 0 ? otherSiting : siting,
                     "bay_" + i
                 )
@@ -198,14 +189,14 @@ class ExpandedClaimMatrixTest {
         }
         Blueprint blueprint = blueprint("boxes", Cuboid.of(0, 0, 0, 40, 1, 1), checks);
 
-        ClaimPlanner.Derived derived = ClaimPlanner.derive(blueprint, siting, owner, List.of());
+        ClaimPlanner.Derived derived = ClaimPlanner.derive(blueprint, siting, instance, List.of());
 
         assertEquals(expectedRows, derived.rows().size());
         assertEquals(expectedOwned, derived.footprint());
         assertSorted(derived.rows());
         assertEquals(expectedRows, derived.rows().stream().map(ClaimRow::cell).distinct().count());
         for (ClaimRow row : derived.rows()) {
-            assertEquals(owner, row.owner());
+            assertEquals(instance, row.instance());
             assertEquals(siting, row.siting());
         }
     }
@@ -247,7 +238,7 @@ class ExpandedClaimMatrixTest {
         }
 
         ClaimPlanner.Derived derived = ClaimPlanner
-                .derive(blueprint, siting, owner, List.of(new BayBinding(bay, subjects)));
+                .derive(blueprint, siting, instance, List.of(new BayBinding(bay, subjects)));
 
         assertEquals(nonAir.size(), derived.rows().size(), "air is ignored and duplicate subjects are idempotent");
         assertEquals(nonAir, cells(derived.rows()));
@@ -275,7 +266,7 @@ class ExpandedClaimMatrixTest {
             () -> ClaimPlanner.derive(
                 emptyBlueprint,
                 siting,
-                owner,
+                instance,
                 List.of(new BayBinding(emptyBay, List.of(TestWorld.airOccupant(LatticePoint.origin))))
             ),
             "an exclusive Bound with no non-air subject is SC-CLM-0005"
@@ -307,14 +298,14 @@ class ExpandedClaimMatrixTest {
         }
         Blueprint blueprint = blueprint("overlap", Cuboid.of(0, 0, 0, 4, 1, 1), checks);
 
-        ClaimPlanner.Derived derived = ClaimPlanner.derive(blueprint, siting, owner, List.of());
+        ClaimPlanner.Derived derived = ClaimPlanner.derive(blueprint, siting, instance, List.of());
 
         assertEquals(40, derived.rows().size());
         assertEquals(CuboidSet.of(Cuboid.of(cell)), derived.footprint());
         assertSorted(derived.rows());
         for (ClaimRow row : derived.rows()) {
             assertEquals(Sharing.shared, row.sharing());
-            assertEquals(owner, row.owner());
+            assertEquals(instance, row.instance());
             assertEquals(siting, row.siting());
         }
         for (int i = 0; i < derived.rows().size(); i++) {
@@ -348,7 +339,7 @@ class ExpandedClaimMatrixTest {
             expected = expected.union(declared);
         }
         Blueprint declaredBlueprint = blueprint("declared", Cuboid.of(0, 0, 0, 41, 1, 1), declaredChecks);
-        ClaimPlanner.Derived declared = ClaimPlanner.derive(declaredBlueprint, siting, owner, List.of());
+        ClaimPlanner.Derived declared = ClaimPlanner.derive(declaredBlueprint, siting, instance, List.of());
         assertEquals(expected, declared.footprint());
         assertEquals(cells(declared.rows()), cells(expected));
         assertSorted(declared.rows());
@@ -370,7 +361,7 @@ class ExpandedClaimMatrixTest {
                 Expectations.eachCell(Expectations.anyOccupant())
             )
         );
-        ClaimPlanner.Derived none = ClaimPlanner.derive(noneBlueprint, siting, owner, List.of());
+        ClaimPlanner.Derived none = ClaimPlanner.derive(noneBlueprint, siting, instance, List.of());
         assertTrue(none.rows().isEmpty());
         assertEquals(CuboidSet.empty(), none.footprint());
     }
@@ -401,7 +392,7 @@ class ExpandedClaimMatrixTest {
         Blueprint blueprint = blueprint("siting", Cuboid.of(0, 0, 0, 11, 1, 1), checks);
         Siting turned = MagicFixtures.turn(LatticePoint.of(5, 6, 7), Turn.clockwise);
 
-        ClaimPlanner.Derived derived = ClaimPlanner.derive(blueprint, turned, owner, List.of());
+        ClaimPlanner.Derived derived = ClaimPlanner.derive(blueprint, turned, instance, List.of());
 
         CuboidSet expected = Objects.requireNonNull(turned.toWorld(local), "world cells");
         assertEquals(expected, derived.footprint());
@@ -412,16 +403,18 @@ class ExpandedClaimMatrixTest {
     }
 
     @Test
-    void ledgerRevisionsAndWholeKeyReplacementAtScale() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
-        List<ClaimRow> rows = new ArrayList<>();
+    void ledgerRevisionsAndWholeInstanceReplacementAtScale() {
+        ClaimLedger ledger = MagicFixtures.ledger();
+        List<InstanceId> instances = new ArrayList<>();
         List<Siting> sitings = new ArrayList<>();
         for (int i = 0; i < 30; i++) {
+            InstanceId eachInstance = new InstanceId(TestWorld.world, 100 + i);
+            instances.add(eachInstance);
             Siting each = MagicFixtures.turn(LatticePoint.of(i * 10, 0, 0), Turn.none);
             sitings.add(each);
-            ClaimRow row = row(LatticePoint.of(i, 0, 0), Sharing.shared, owner, each, "ledger_bay_" + i);
-            rows.add(row);
-            ClaimVerdict verdict = ledger.settle(new SettleRequest(owner, each, List.of(row), ledger.revision()));
+            ClaimRow row = row(LatticePoint.of(i, 0, 0), Sharing.shared, eachInstance, each, "ledger_bay_" + i);
+            ClaimVerdict verdict = ledger
+                    .settle(new SettleRequest(eachInstance, List.of(row), ledger.revision()));
             assertTrue(verdict instanceof ClaimVerdict.Settled);
             assertEquals(i + 1, ((ClaimVerdict.Settled) verdict).revision());
         }
@@ -429,51 +422,52 @@ class ExpandedClaimMatrixTest {
         assertEquals(30, ledger.read(Cuboid.of(0, 0, 0, 30, 1, 1)).revision());
 
         List<ClaimRow> replacement = List.of(
-            row(LatticePoint.of(0, 0, 0), Sharing.shared, owner, sitings.get(0), "ledger_bay_0"),
-            row(LatticePoint.of(1, 0, 0), Sharing.shared, owner, sitings.get(0), "ledger_bay_1")
+            row(LatticePoint.of(0, 0, 0), Sharing.shared, instances.get(0), sitings.get(0), "ledger_bay_0"),
+            row(LatticePoint.of(1, 0, 0), Sharing.shared, instances.get(0), sitings.get(0), "ledger_bay_1")
         );
-        ClaimVerdict replaced = ledger.settle(new SettleRequest(owner, sitings.get(0), replacement, ledger.revision()));
+        ClaimVerdict replaced = ledger
+                .settle(new SettleRequest(instances.get(0), replacement, ledger.revision()));
         assertTrue(replaced instanceof ClaimVerdict.Settled);
-        assertEquals(31, ledger.read(Cuboid.of(0, 0, 0, 30, 1, 1)).rows().size(), "the whole key is replaced");
+        assertEquals(31, ledger.read(Cuboid.of(0, 0, 0, 30, 1, 1)).rows().size(), "the whole instance is replaced");
         assertEquals(31, ledger.revision());
 
-        ClaimVerdict stale = ledger.settle(new SettleRequest(owner, sitings.get(0), replacement, 0));
+        ClaimVerdict stale = ledger.settle(new SettleRequest(instances.get(0), replacement, 0));
         assertTrue(stale instanceof ClaimVerdict.RevisionMoved);
 
         for (int i = 0; i < 10; i++) {
-            ClaimVerdict released = ledger.release(owner, sitings.get(0));
+            ClaimVerdict released = ledger.release(instances.get(0));
             assertTrue(released instanceof ClaimVerdict.Settled);
         }
         assertEquals(29, ledger.read(Cuboid.of(0, 0, 0, 30, 1, 1)).rows().size());
-        assertEquals(32, ledger.revision(), "release of an absent key does not bump the revision");
+        assertEquals(32, ledger.revision(), "release of an absent instance does not bump the revision");
     }
 
     @Test
-    void sharedOwnersAndExclusiveConflictAtScale() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+    void sharedInstancesAndExclusiveConflictAtScale() {
+        ClaimLedger ledger = MagicFixtures.ledger();
         int cells = 10;
         for (int c = 0; c < cells; c++) {
             for (int o = 0; o < 5; o++) {
-                OwnerId current = OwnerId.of(MagicFixtures.id("shared_owner_" + o));
+                InstanceId current = new InstanceId(TestWorld.world, 1_000 + c * 5L + o);
                 Siting each = MagicFixtures.turn(LatticePoint.of(c * 100 + o * 10, 0, 0), Turn.none);
                 ClaimRow row = row(LatticePoint.of(c, 0, 0), Sharing.shared, current, each, "shared_" + o);
-                ClaimVerdict verdict = ledger.settle(new SettleRequest(current, each, List.of(row), ledger.revision()));
+                ClaimVerdict verdict = ledger.settle(new SettleRequest(current, List.of(row), ledger.revision()));
                 assertTrue(verdict instanceof ClaimVerdict.Settled, "shared rows coexist at " + c + "/" + o);
             }
         }
         assertEquals(cells * 5, ledger.read(Cuboid.of(0, 0, 0, cells, 1, 1)).rows().size());
         long before = ledger.revision();
 
-        OwnerId exclusiveOwner = OwnerId.of(MagicFixtures.id("exclusive_owner"));
+        InstanceId exclusiveInstance = new InstanceId(TestWorld.world, 9_999);
         ClaimRow exclusive = row(
             LatticePoint.of(0, 0, 0),
             Sharing.exclusive,
-            exclusiveOwner,
+            exclusiveInstance,
             otherSiting,
             "exclusive_bay"
         );
         ClaimVerdict conflict = ledger
-                .settle(new SettleRequest(exclusiveOwner, otherSiting, List.of(exclusive), ledger.revision()));
+                .settle(new SettleRequest(exclusiveInstance, List.of(exclusive), ledger.revision()));
         assertTrue(conflict instanceof ClaimVerdict.Conflict);
         assertEquals(before, ledger.revision(), "a conflict leaves the ledger untouched");
         assertEquals(cells * 5, ledger.read(Cuboid.of(0, 0, 0, cells, 1, 1)).rows().size());
@@ -481,7 +475,7 @@ class ExpandedClaimMatrixTest {
 
     @Test
     void duplicateRowsAndRevisionGuardsAtScale() {
-        ClaimRow row = row(LatticePoint.of(1, 1, 1), Sharing.exclusive, owner, siting, "duplicate_bay");
+        ClaimRow row = row(LatticePoint.of(1, 1, 1), Sharing.exclusive, instance, siting, "duplicate_bay");
         ClaimSet set = new ClaimSet(List.of(row, row, row, row), 1);
         assertEquals(4, set.rows().size(), "duplicate rows are a representation detail and stay");
         assertEquals(1, set.revision());
@@ -490,8 +484,8 @@ class ExpandedClaimMatrixTest {
         assertEquals(0, new ClaimSet(List.of(), 0).revision());
     }
 
-    private static ClaimRow row(LatticePoint cell, Sharing sharing, OwnerId owner, Siting siting, String bay) {
-        return new ClaimRow(LatticeKey.of(cell), sharing, owner, siting, MagicFixtures.id(bay));
+    private static ClaimRow row(LatticePoint cell, Sharing sharing, InstanceId instance, Siting siting, String bay) {
+        return new ClaimRow(LatticeKey.of(cell), sharing, siting, MagicFixtures.id(bay), instance);
     }
 
     private static Blueprint blueprint(String path, Cuboid bounds, Check<?>... checks) {

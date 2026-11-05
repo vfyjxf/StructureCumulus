@@ -1,7 +1,8 @@
 package dev.vfyjxf.cumulus.kernel.claim;
 
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.core.OwnerId;
+import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -21,25 +22,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ClaimRowOrderingTest {
 
     private static final LatticeKey cell = LatticeKey.of(LatticePoint.origin);
-    private static final OwnerId owner = OwnerId.of(NamespacedId.of("ordering_owner"));
+    private static final InstanceId instance = new InstanceId(World.of(NamespacedId.of("ordering")), 1);
+    private static final InstanceId otherInstance = new InstanceId(World.of(NamespacedId.of("ordering")), 2);
     private static final NamespacedId bay = NamespacedId.of("ordering_bay");
     private static final Siting baseSiting = Siting.of(LatticePoint.origin, Orientation.identity);
 
     @Test
     void compareToUsesEveryRecordFieldIncludingSitingAndSharing() {
-        ClaimRow base = row(Sharing.exclusive, owner, baseSiting, bay);
-        ClaimRow cellVariant = row(Sharing.exclusive, owner, baseSiting, bay, LatticeKey.of(LatticePoint.of(1, 0, 0)));
-        ClaimRow ownerVariant = row(Sharing.exclusive, OwnerId.of(NamespacedId.of("z_owner")), baseSiting, bay);
-        ClaimRow bayVariant = row(Sharing.exclusive, owner, baseSiting, NamespacedId.of("z_bay"));
+        ClaimRow base = row(Sharing.exclusive, instance, baseSiting, bay);
+        ClaimRow cellVariant = row(Sharing.exclusive, instance, baseSiting, bay, LatticeKey.of(LatticePoint.of(1, 0, 0)));
+        ClaimRow instanceVariant = row(Sharing.exclusive, otherInstance, baseSiting, bay);
+        ClaimRow bayVariant = row(Sharing.exclusive, instance, baseSiting, NamespacedId.of("z_bay"));
         ClaimRow originVariant = row(
             Sharing.exclusive,
-            owner,
+            instance,
             Siting.of(LatticePoint.of(1, 0, 0), Orientation.identity),
             bay
         );
         ClaimRow orientationVariant = row(
             Sharing.exclusive,
-            owner,
+            instance,
             Siting.of(
                 LatticePoint.origin,
                 new Placement(Orientation.of(Turn.clockwise, Tilt.level, Flip.none), LatticePoint.origin)
@@ -48,25 +50,25 @@ class ClaimRowOrderingTest {
         );
         ClaimRow offsetVariant = row(
             Sharing.exclusive,
-            owner,
+            instance,
             Siting.of(LatticePoint.origin, new Placement(Orientation.identity, LatticePoint.of(1, 0, 0))),
             bay
         );
-        ClaimRow sharingVariant = row(Sharing.shared, owner, baseSiting, bay);
+        ClaimRow sharingVariant = row(Sharing.shared, instance, baseSiting, bay);
 
         assertLess(base, cellVariant);
-        assertLess(base, ownerVariant);
+        assertLess(base, instanceVariant);
         assertLess(base, bayVariant);
         assertLess(base, originVariant);
         assertLess(base, orientationVariant);
         assertLess(base, offsetVariant);
         assertLess(base, sharingVariant, "sharing is compared after the existing keys");
 
-        ClaimRow duplicate = row(Sharing.exclusive, owner, baseSiting, bay);
+        ClaimRow duplicate = row(Sharing.exclusive, instance, baseSiting, bay);
         assertEquals(base, duplicate);
         assertEquals(0, base.compareTo(duplicate), "equal records compare equal");
         assertNotEquals(base, cellVariant);
-        assertNotEquals(base, ownerVariant);
+        assertNotEquals(base, instanceVariant);
         assertNotEquals(base, bayVariant);
         assertNotEquals(base, originVariant);
         assertNotEquals(base, orientationVariant);
@@ -76,7 +78,7 @@ class ClaimRowOrderingTest {
         List<ClaimRow> rows = List.of(
             base,
             cellVariant,
-            ownerVariant,
+            instanceVariant,
             bayVariant,
             originVariant,
             orientationVariant,
@@ -101,14 +103,14 @@ class ClaimRowOrderingTest {
 
     @Test
     void forwardAndReverseInputsProduceTheSameCanonicalRows() {
-        ClaimRow firstSiting = row(Sharing.shared, owner, baseSiting, bay);
+        ClaimRow firstSiting = row(Sharing.shared, instance, baseSiting, bay);
         ClaimRow secondSiting = row(
             Sharing.shared,
-            owner,
+            instance,
             Siting.of(LatticePoint.of(10, 0, 0), Orientation.identity),
             bay
         );
-        ClaimRow exclusiveAtFirstSiting = row(Sharing.exclusive, owner, baseSiting, bay);
+        ClaimRow exclusiveAtFirstSiting = row(Sharing.exclusive, instance, baseSiting, bay);
         List<ClaimRow> forward = List.of(firstSiting, secondSiting, exclusiveAtFirstSiting);
         List<ClaimRow> reverse = List.of(exclusiveAtFirstSiting, secondSiting, firstSiting);
 
@@ -131,12 +133,12 @@ class ClaimRowOrderingTest {
         assertLess(firstSiting, secondSiting);
     }
 
-    private static ClaimRow row(Sharing sharing, OwnerId owner, Siting siting, NamespacedId bay) {
-        return row(sharing, owner, siting, bay, cell);
+    private static ClaimRow row(Sharing sharing, InstanceId instance, Siting siting, NamespacedId bay) {
+        return row(sharing, instance, siting, bay, cell);
     }
 
-    private static ClaimRow row(Sharing sharing, OwnerId owner, Siting siting, NamespacedId bay, LatticeKey cell) {
-        return new ClaimRow(cell, sharing, owner, siting, bay);
+    private static ClaimRow row(Sharing sharing, InstanceId instance, Siting siting, NamespacedId bay, LatticeKey cell) {
+        return new ClaimRow(cell, sharing, siting, bay, instance);
     }
 
     private static void assertLess(ClaimRow first, ClaimRow second) {

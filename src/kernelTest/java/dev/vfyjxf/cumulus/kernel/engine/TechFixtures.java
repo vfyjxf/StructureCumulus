@@ -119,8 +119,8 @@ final class TechFixtures {
         return new TestWorld.View();
     }
 
-    static TestWorld.Ledger ledger() {
-        return new TestWorld.Ledger();
+    static ClaimLedger ledger() {
+        return ClaimLedger.inMemory(TestWorld.world);
     }
 
     static ClaimView emptyClaims() {
@@ -162,7 +162,7 @@ final class TechFixtures {
         return check(blueprint, siting, view, emptyClaims());
     }
 
-    static MatchResult settle(Blueprint blueprint, Siting siting, TestWorld.View view, TestWorld.Ledger ledger) {
+    static MatchResult settle(Blueprint blueprint, Siting siting, TestWorld.View view, ClaimLedger ledger) {
         return settle(blueprint, siting, view, ledger, owner, instance);
     }
 
@@ -170,7 +170,7 @@ final class TechFixtures {
         Blueprint blueprint,
         Siting siting,
         TestWorld.View view,
-        TestWorld.Ledger ledger,
+        ClaimLedger ledger,
         OwnerId requestOwner,
         InstanceId requestInstance
     ) {

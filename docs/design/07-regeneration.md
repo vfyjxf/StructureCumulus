@@ -1,15 +1,16 @@
-# 07 — Regeneration
+# 07 — Correction
 
-> How the kernel is rebuilt from this set, in what order, and what "done" means. The old kernel is
-> deleted before the first line of the new one is written; there is no migration.
+> How code that drifted from this set is brought back into agreement, in what order, and what "done"
+> means. Nothing is rebuilt: the set is corrected first and the code follows in the same commit. The
+> file name predates this rule; the protocol is correction, not regeneration.
 
 ## 1. Inputs and outputs
 
 **Input:** this `docs/` set only. The archived baseline is evidence for a claim about the *old* code,
-never a source of a new signature. A generator may read `src/kernelTest` only to reuse a fixture
+never a source of a new signature. A correction may read `src/kernelTest` only to reuse a fixture
 idea, not an API.
 
-**Output:** `src/kernel/java/dev/vfyjxf/cumulus/kernel/{core,space,finding,world,claim,structure,
+**Output:** the existing tree, edited in place — `src/kernel/java/dev/vfyjxf/cumulus/kernel/{core,space,finding,world,claim,structure,
 context,document,engine,remedy,spi}`, `src/kernelTest/java`, and the `src/main/java` mod entry with
 the adapter. Committed: M1 (host + `/cumulus check` + capture-check: `LevelCapture`,
 `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState` lifecycle, in-memory
@@ -41,25 +42,27 @@ values. S5 of the structure-set close-out adds the production `set check`/`set s
 one union capture and the check-only host path (`09-structure-sets.md` §16). S6 closes the set layer:
 `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
 budget shared by presence and every member attempt. The tree registers
-**269 kernel tests in 40 containers, 280 adapter unit tests in 35 containers and 74 `@GameTest`
+**382 kernel tests in 48 containers, 411 adapter unit tests in 43 containers and 126 `@GameTest`
 methods**; `Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Pending only:
 the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
-There is no regeneration milestone.
+No regeneration milestone exists or is planned: the code is corrected against this set in place.
 
 ## 2. The order
 
-1. **Freeze the type index.** Every module file's section 3 is the contract. Extract the public and
-   public-nested type names; compare across files for duplicates; freeze.
-2. **Write the skeleton.** One file per type, package-correct, JSpecify `@NullMarked`, all signatures,
-   bodies returning `null`/`0`/`List.of()` or a package-private placeholder. Compile with
-   `javac --release 21` and JSpecify only. This proves the set is self-consistent before behaviour.
-3. **Implement in dependency order.** `core` → `space` → `finding`/`world` → `claim` → `structure` →
-   `context` → `document` → `engine` → `remedy` → `spi`. A module may not change a signature from the
-   skeleton; a signature that cannot express its behaviour is a **design amendment**, recorded in
-   `05-decisions.md` before the code changes.
-4. **Test as you go.** Each module's §7 tests; then the §3 scenarios. A scenario that needs a
-   signature change stops the run and amends the design.
-5. **Delete the old code and tests before step 2.** Git history and the archive keep the evidence.
+1. **Name the drift.** For every divergence, decide which side is wrong. A public shape the set does
+   not contain is a **conformance defect**: the code changes. A shape the set contains that cannot be
+   compiled, or that cannot express its own behaviour, is a **design defect**: the set changes.
+2. **Amend the set first when the set is wrong.** A design defect is recorded in `05-decisions.md`
+   and fixed in the owning module file before any code changes. The amendment names the type, the old
+   shape, the new shape, the consequence and the affected modules.
+3. **Correct in dependency order.** `core` → `space` → `finding`/`world` → `claim` → `structure` →
+   `context` → `document` → `engine` → `remedy` → `spi`, then `mc`. A module may not invent a public
+   member to make a correction cheaper; a signature that cannot express its behaviour is an
+   amendment, not a local workaround.
+4. **Correct the tests in the same commit.** Each module's §7 obligations and the §3 scenarios the
+   module feeds. A correction that leaves an obligation unproven is not done.
+5. **Never keep two shapes.** No compatibility shim, no deprecated overload, no flag: the old shape
+   is removed in the commit that lands the new one. Git history keeps the evidence.
 6. **Run the gates.** Compile, purity, tests, spec index, no stubs.
 
 ## 3. What a module implementer gets
@@ -67,9 +70,9 @@ There is no regeneration milestone.
 A brief contains:
 
 - the module file and the two neighbouring files it depends on;
-- the skeleton files already on disk (compile them first);
+- the current code in that package and the exact drift to correct;
 - the exact package, `@NullMarked`, and the JSpecify rule;
-- the constraint: no new public type, no new public method, no signature change; report a gap;
+- the constraint: no new public type, no new public member, no signature change; report a gap;
 - the test obligations from the module file and the scenarios it feeds;
 - the SourceScout rule is irrelevant here (this is this repo's own code); no other project is read.
 
@@ -83,25 +86,25 @@ module file.
 | 1 | `javac --release 21` over `src/kernel/java`, JSpecify only | exit 0, zero errors |
 | 2 | no Minecraft/NeoForge/Mojang name under `kernel.**` | purity scan; compile classpath |
 | 3 | `src/kernelTest/java` compiles and all tests pass | JUnit launcher; 0 failures, 0 skipped |
-| 4 | the sixteen scenarios in `06-verification.md` §3 and the §3.1/§3.2/§3.3/§3.4 stress groups pass | named test classes |
-| 5 | every public type in code is in a module file, and vice versa | `tools/spec-check.py` |
+| 4 | the scenarios in `06-verification.md` §3 and the §3.1–§3.7 stress groups pass | named test classes |
+| 5 | every public type in code is in a module file, and vice versa | `tools/spec-check.py`; member review against §3 |
 | 6 | every `SC-` code in code is in `Codes.all`, and every `Codes.all` entry is in a producer row | registry test |
 | 7 | no `TODO`/`FIXME`/`UnsupportedOperationException`/empty public body | grep |
 | 8 | two runs over one tuple are equal | golden test |
 | 9 | the campfire/furnace examples in `04-api.md` compile as test sources, and the host kinds compile only through the adapter catalog | `ScenarioTest`; the document form in `DocumentCompilerTest`/`AdapterExpectationsTest` |
-| 10 | the old `docs/spec`, `docs/design-notes`, `docs/guide.zh.md`, `docs/README.zh.md` and the old
-    kernel sources are gone | `git status`; only the new set remains |
+| 10 | no second shape survives: no deprecated alias, no compatibility overload, no `TODO` in a corrected area | `git diff`; grep |
 
 The spec index is green at v1.2: every documented type is implemented, every `SC-` code in code is
 in `Codes.all`, and every `Codes.all` entry has a producer row. The M5e capture-report amendment was
 applied docs-first and its carrier landed, so the index is green again; there is no pending signature
 block and no suppressed gate (`06-verification.md` §1).
 
-## 5. Regeneration is not a one-way door
+## 5. The set is amended, not frozen
 
-The design is expected to be amended. The rule is: **amend the module file and the decision record
-first, then regenerate the affected skeleton and module.** A code patch that outruns the document is
-the exact failure this set exists to prevent.
+The design is expected to change. The rule is: **amend the module file and the decision record first,
+then correct the affected module and its tests.** A code patch that outruns the document is the exact
+failure this set exists to prevent; a document that outruns the code is a pending block, and a pending
+block is not allowed to survive a commit.
 
 ## 6. The fallback if a signature is wrong
 
@@ -109,8 +112,8 @@ the exact failure this set exists to prevent.
 2. Write a one-paragraph amendment in `05-decisions.md`: the type, the old shape, the new shape, the
    consequence, the affected modules.
 3. Update the module file and the type index.
-4. Re-extract the skeleton for the affected type; compile the whole kernel.
-5. Resume the implementation; the old code path is deleted, not kept behind a flag.
+4. Correct the affected type and every call site; compile the whole kernel.
+5. Remove the old code path in the same commit; it is never kept behind a flag.
 
 ## 7. What the next round owes
 

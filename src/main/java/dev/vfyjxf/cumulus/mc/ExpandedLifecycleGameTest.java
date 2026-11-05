@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
@@ -13,6 +14,7 @@ import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
@@ -89,16 +91,16 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         helper.setBlock(BlockPos.ZERO, Blocks.STONE);
         LatticePoint cell = point(helper.absolutePos(BlockPos.ZERO));
         Siting siting = Siting.of(cell, Orientation.identity);
         StructureInstance first = form(manager, state, level, ownerA, siting, cell);
         StructureInstance second = form(manager, state, level, ownerB, siting, cell);
         StructureInstance third = form(manager, state, level, ownerC, siting, cell);
-        claim(ledger, ownerA, siting, cell, Sharing.shared);
-        claim(ledger, ownerB, siting, cell, Sharing.shared);
-        claim(ledger, ownerC, siting, cell, Sharing.shared);
+        claim(ledger, first.id(), siting, cell, Sharing.shared);
+        claim(ledger, second.id(), siting, cell, Sharing.shared);
+        claim(ledger, third.id(), siting, cell, Sharing.shared);
         long base = ledger.revision();
         assertEquals(helper, 3, rows(ledger, cell).size(), "three overlapping owners hold one cell");
 
@@ -138,7 +140,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos firstRel = BlockPos.ZERO;
         BlockPos farRel = new BlockPos(4, 0, 0);
         helper.setBlock(firstRel, Blocks.STONE);
@@ -150,9 +152,9 @@ public final class ExpandedLifecycleGameTest {
         StructureInstance first = form(manager, state, level, ownerA, firstSiting, firstCell);
         StructureInstance second = form(manager, state, level, ownerB, firstSiting, firstCell);
         StructureInstance far = form(manager, state, level, ownerC, farSiting, farCell);
-        claim(ledger, ownerA, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerB, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerC, farSiting, farCell, Sharing.shared);
+        claim(ledger, first.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, second.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
 
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
@@ -187,7 +189,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos firstRel = BlockPos.ZERO;
         BlockPos secondRel = new BlockPos(4, 0, 0);
         BlockPos farRel = new BlockPos(8, 0, 0);
@@ -204,10 +206,10 @@ public final class ExpandedLifecycleGameTest {
         StructureInstance second = form(manager, state, level, ownerB, firstSiting, firstCell);
         StructureInstance third = form(manager, state, level, ownerC, secondSiting, secondCell);
         StructureInstance far = form(manager, state, level, ownerD, farSiting, farCell);
-        claim(ledger, ownerA, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerB, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerC, secondSiting, secondCell, Sharing.shared);
-        claim(ledger, ownerD, farSiting, farCell, Sharing.shared);
+        claim(ledger, first.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, second.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, third.id(), secondSiting, secondCell, Sharing.shared);
+        claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
 
         BlockPos firstAbs = helper.absolutePos(firstRel);
@@ -245,7 +247,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
         helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
@@ -256,8 +258,8 @@ public final class ExpandedLifecycleGameTest {
         StructureInstance second = form(manager, state, level, ownerB, siting, origin);
         manager.publish(first.id(), Map.of(count, 3L), FindingBundle.empty(), Spend.zero);
         manager.publish(second.id(), Map.of(count, 5L), FindingBundle.empty(), Spend.zero);
-        claim(ledger, ownerA, siting, origin, Sharing.shared);
-        claim(ledger, ownerB, siting, origin, Sharing.shared);
+        claim(ledger, first.id(), siting, origin, Sharing.shared);
+        claim(ledger, second.id(), siting, origin, Sharing.shared);
         long base = ledger.revision();
         LatticePoint moved = Objects.requireNonNull(origin.offset(1, 0, 0), "moved cell");
 
@@ -294,7 +296,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos firstRel = new BlockPos(1, 1, 0);
         BlockPos secondRel = new BlockPos(2, 1, 0);
@@ -320,9 +322,9 @@ public final class ExpandedLifecycleGameTest {
         );
         manager.publish(moving.id(), Map.of(count, 1L), FindingBundle.empty(), Spend.zero);
         manager.publish(translating.id(), Map.of(count, 2L), FindingBundle.empty(), Spend.zero);
-        claim(ledger, ownerA, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerB, secondSiting, secondCell, Sharing.shared);
-        claimRows(ledger, ownerC, firstSiting, List.of(firstCell, aboveCell), Sharing.shared);
+        claim(ledger, moving.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, translating.id(), secondSiting, secondCell, Sharing.shared);
+        claimRows(ledger, partial.id(), firstSiting, List.of(firstCell, aboveCell), Sharing.shared);
         long base = ledger.revision();
         LatticePoint firstTarget = Objects.requireNonNull(firstCell.offset(1, 0, 0), "first target");
         LatticePoint secondTarget = Objects.requireNonNull(secondCell.offset(1, 0, 0), "second target");
@@ -357,7 +359,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
         BlockPos occupiedRel = new BlockPos(2, 1, 0);
@@ -370,8 +372,8 @@ public final class ExpandedLifecycleGameTest {
         StructureInstance rejected = form(manager, state, level, ownerA, siting, origin);
         StructureInstance moving = form(manager, state, level, ownerB, siting, origin);
         StructureInstance occupant = form(manager, state, level, ownerA, occupying, occupied);
-        claim(ledger, ownerA, siting, origin, Sharing.shared);
-        claim(ledger, ownerB, siting, origin, Sharing.shared);
+        claim(ledger, rejected.id(), siting, origin, Sharing.shared);
+        claim(ledger, moving.id(), siting, origin, Sharing.shared);
         long base = ledger.revision();
 
         WatchEvents.pistonMoved(
@@ -386,7 +388,7 @@ public final class ExpandedLifecycleGameTest {
         assertEquals(helper, 0, rows(ledger, origin).size(), "the rejected instance's old claim row is released");
         assertTrue(
             helper,
-            rows(ledger, occupied).stream().noneMatch(row -> row.owner().equals(ownerA)),
+            rows(ledger, occupied).stream().noneMatch(row -> row.instance().equals(rejected.id())),
             "no translated row is written for the rejection"
         );
         StructureInstance moved = manager.find(moving.id());
@@ -419,7 +421,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos firstRel = new BlockPos(1, 1, 0);
         BlockPos middleRel = new BlockPos(2, 1, 0);
@@ -436,9 +438,10 @@ public final class ExpandedLifecycleGameTest {
         Siting incumbentSiting = Siting.of(middleCell, Orientation.identity);
         StructureInstance conflicting = form(manager, state, level, ownerA, firstSiting, firstCell);
         StructureInstance moving = form(manager, state, level, ownerB, lastSiting, lastCell);
-        claim(ledger, ownerA, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerB, lastSiting, lastCell, Sharing.shared);
-        claim(ledger, ownerC, incumbentSiting, middleCell, Sharing.exclusive);
+        InstanceId incumbentInstance = new InstanceId(state.world(level), 1_000_000L);
+        claim(ledger, conflicting.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, moving.id(), lastSiting, lastCell, Sharing.shared);
+        claim(ledger, incumbentInstance, incumbentSiting, middleCell, Sharing.exclusive);
         long base = ledger.revision();
         LatticePoint firstTarget = Objects.requireNonNull(firstCell.offset(1, 0, 0), "first target");
         LatticePoint lastTarget = Objects.requireNonNull(lastCell.offset(1, 0, 0), "last target");
@@ -454,10 +457,10 @@ public final class ExpandedLifecycleGameTest {
         );
         assertTrue(helper, rows(ledger, firstCell).isEmpty(), "the conflicting old row is released");
         assertEquals(helper, 1, rows(ledger, middleCell).size(), "the incumbent row survives");
-        assertEquals(helper, ownerC, rows(ledger, middleCell).get(0).owner());
+        assertEquals(helper, incumbentInstance, rows(ledger, middleCell).get(0).instance());
         assertTrue(
             helper,
-            rows(ledger, firstTarget).stream().noneMatch(row -> row.owner().equals(ownerA)),
+            rows(ledger, firstTarget).stream().noneMatch(row -> row.instance().equals(conflicting.id())),
             "no translated row from the invalidated instance remains"
         );
         StructureInstance moved = manager.find(moving.id());
@@ -479,7 +482,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos originRel = BlockPos.ZERO;
         BlockPos peerRel = new BlockPos(4, 0, 0);
         helper.setBlock(originRel, Blocks.STONE);
@@ -488,7 +491,7 @@ public final class ExpandedLifecycleGameTest {
         Siting siting = Siting.of(origin, Orientation.identity);
         Siting peerSiting = Siting.of(peerCell, Orientation.identity);
         StructureInstance peer = form(manager, state, level, ownerB, peerSiting, peerCell);
-        claim(ledger, ownerB, peerSiting, peerCell, Sharing.shared);
+        claim(ledger, peer.id(), peerSiting, peerCell, Sharing.shared);
         cleanup(manager, ledger, state.owner(), siting);
         long base = ledger.revision();
         CommandSourceStack source = stack(helper, helper.absolutePos(originRel), new RecordingSource());
@@ -527,11 +530,11 @@ public final class ExpandedLifecycleGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void levelUnloadDropsEveryInstanceAndKeepsAllClaimRows(GameTestHelper helper) {
+    public void levelUnloadDropsEveryInstanceAndItsClaimRows(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos firstRel = BlockPos.ZERO;
         BlockPos secondRel = new BlockPos(4, 0, 0);
         helper.setBlock(firstRel, Blocks.STONE);
@@ -544,24 +547,26 @@ public final class ExpandedLifecycleGameTest {
         StructureInstance second = form(manager, state, level, ownerB, secondSiting, secondCell);
         StructureAttempt draft = manager
                 .begin(state.world(level), new StructureSpec(ownerC, firstSiting, cellBlueprintId));
-        claim(ledger, ownerA, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerB, secondSiting, secondCell, Sharing.shared);
-        long base = ledger.revision();
+        claim(ledger, first.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, second.id(), secondSiting, secondCell, Sharing.shared);
         long maxSerial = Math.max(first.id().serial(), second.id().serial());
 
-        WatchEvents.levelUnloaded(new LevelEvent.Unload(level));
+        ServerState.unload(new LevelEvent.Unload(level));
 
         assertTrue(helper, manager.find(first.id()) == null, "an unload drops the first instance");
         assertTrue(helper, manager.find(second.id()) == null, "an unload drops the second instance");
         assertTrue(helper, manager.findAt(firstCell).isEmpty(), "the unloaded registry is empty");
         assertThrowsClosed(helper, draft);
-        assertEquals(helper, base, ledger.revision(), "an unload never releases persisted claims");
-        assertEquals(helper, 1, rows(ledger, firstCell).size(), "the first claim row survives the unload");
-        assertEquals(helper, 1, rows(ledger, secondCell).size(), "the second claim row survives the unload");
 
         WatchEvents.levelLoaded(new LevelEvent.Load(level));
         assertTrue(helper, manager.findAt(firstCell).isEmpty(), "a load installs an empty registry");
-        assertEquals(helper, base, ledger.revision(), "a load never touches claim rows");
+        ClaimLedger reloaded = state.claims(level);
+        assertTrue(
+            helper,
+            reloaded.read(Cuboid.of(firstCell)).rows().isEmpty() && reloaded.read(Cuboid.of(secondCell)).rows().isEmpty(),
+            "the unload drops the store and its rows"
+        );
+        assertEquals(helper, 0L, reloaded.revision(), "a fresh store starts at revision zero");
         StructureAttempt next = manager
                 .begin(state.world(level), new StructureSpec(ownerD, secondSiting, cellBlueprintId));
         assertTrue(helper, next.id().serial() > maxSerial, "the serial continues across unload and load");
@@ -576,7 +581,7 @@ public final class ExpandedLifecycleGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos firstRel = BlockPos.ZERO;
         BlockPos farRel = new BlockPos(4, 0, 0);
         BlockPos outsideRel = new BlockPos(8, 0, 0);
@@ -589,9 +594,9 @@ public final class ExpandedLifecycleGameTest {
         StructureInstance first = form(manager, state, level, ownerA, firstSiting, firstCell);
         StructureInstance second = form(manager, state, level, ownerB, firstSiting, firstCell);
         StructureInstance far = form(manager, state, level, ownerC, farSiting, farCell);
-        claim(ledger, ownerA, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerB, firstSiting, firstCell, Sharing.shared);
-        claim(ledger, ownerC, farSiting, farCell, Sharing.shared);
+        claim(ledger, first.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, second.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
 
@@ -673,13 +678,13 @@ public final class ExpandedLifecycleGameTest {
         return attempt.commit(bounds);
     }
 
-    private static void claim(SavedClaims ledger, OwnerId owner, Siting siting, LatticePoint cell, Sharing sharing) {
-        claimRows(ledger, owner, siting, List.of(cell), sharing);
+    private static void claim(ClaimLedger ledger, InstanceId instance, Siting siting, LatticePoint cell, Sharing sharing) {
+        claimRows(ledger, instance, siting, List.of(cell), sharing);
     }
 
     private static void claimRows(
-        SavedClaims ledger,
-        OwnerId owner,
+        ClaimLedger ledger,
+        InstanceId instance,
         Siting siting,
         List<LatticePoint> cells,
         Sharing sharing
@@ -687,24 +692,25 @@ public final class ExpandedLifecycleGameTest {
         long expected = ledger.revision();
         List<ClaimRow> rows = new ArrayList<>(cells.size());
         for (LatticePoint cell : cells) {
-            rows.add(new ClaimRow(LatticeKey.of(cell), sharing, owner, siting, claimBay));
+            rows.add(new ClaimRow(LatticeKey.of(cell), sharing, siting, claimBay, instance));
         }
-        ClaimVerdict verdict = ledger.settle(new SettleRequest(owner, siting, rows, expected));
+        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance, rows, expected));
         if (!(verdict instanceof ClaimVerdict.Settled)) {
             throw new GameTestAssertException("the setup settle was rejected: " + verdict);
         }
     }
 
-    private static List<ClaimRow> rows(SavedClaims ledger, LatticePoint cell) {
+    private static List<ClaimRow> rows(ClaimLedger ledger, LatticePoint cell) {
         return ledger.read(Cuboid.of(cell)).rows();
     }
 
-    private static void cleanup(StructureManager manager, SavedClaims ledger, OwnerId owner, Siting siting) {
+    private static void cleanup(StructureManager manager, ClaimLedger ledger, OwnerId owner, Siting siting) {
         StructureInstance instance = manager.find(owner, siting);
-        if (instance != null) {
-            manager.onEvent(new StructureEvent.Broken(instance.id()));
+        if (instance == null) {
+            return;
         }
-        ledger.release(owner, siting);
+        manager.onEvent(new StructureEvent.Broken(instance.id()));
+        ledger.release(instance.id());
     }
 
     private static LatticePoint point(BlockPos pos) {

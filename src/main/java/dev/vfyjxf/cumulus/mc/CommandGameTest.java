@@ -2,8 +2,10 @@ package dev.vfyjxf.cumulus.mc;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -92,8 +94,8 @@ public final class CommandGameTest {
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
         LatticePoint point = LatticePoint.of(origin.getX(), origin.getY(), origin.getZ());
         Siting siting = Siting.of(point, Orientation.identity);
-        SavedClaims ledger = state.claims(level);
-        ledger.release(state.owner(), siting);
+        ClaimLedger ledger = state.claims(level);
+        release(ledger, state, level, siting);
         RecordingSource recording = new RecordingSource();
         CommandSourceStack source = stack(helper, origin, recording);
         String claims = "cumulus claims " + origin.getX() + " " + origin.getY() + " " + origin.getZ() + " "
@@ -116,7 +118,7 @@ public final class CommandGameTest {
             helper.assertTrue(recording.text().contains(bayId.text()), "the settled bay is named");
             helper.assertValueEqual(revision, ledger.revision(), "claims reads the ledger without writing");
         } finally {
-            ledger.release(state.owner(), siting);
+            release(ledger, state, level, siting);
         }
         helper.succeed();
     }
@@ -201,6 +203,13 @@ public final class CommandGameTest {
 
         private void clear() {
             messages.clear();
+        }
+    }
+
+    private static void release(ClaimLedger ledger, ServerState state, ServerLevel level, Siting siting) {
+        StructureInstance instance = state.structures(level).find(state.world(level), state.owner(), siting);
+        if (instance != null) {
+            ledger.release(instance.id());
         }
     }
 }

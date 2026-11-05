@@ -7,7 +7,7 @@ public final class ClaimMatrix {
         if (!a.cell().equals(b.cell())) {
             return false;
         }
-        if (a.owner().equals(b.owner()) && a.siting().equals(b.siting())) {
+        if (a.instance().equals(b.instance())) {
             return false;
         }
         return a.sharing().blocks() || b.sharing().blocks();

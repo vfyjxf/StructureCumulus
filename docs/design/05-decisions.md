@@ -6,7 +6,7 @@
 
 ## 1. Process decisions
 
-### D-01 — The design is the source; the kernel is generated
+### D-01 — The design is the source; the kernel is generated (generation retired 2026-10-31)
 
 The old code, its tests and the old `docs/spec` set are reference material. The new kernel is written
 from this design set, compiled, and tested; the old kernel is deleted rather than migrated. A public
@@ -19,6 +19,14 @@ section. The acceptance gate is the regenerated kernel.
 **Amendment (v1.2).** The v1.1 pending block is implemented: Model C and body identity in
 `cb06aa8`/`64d04ce`, the nested capability in `f3e0338`/`d6aefc2`. The banned "design is ahead of
 the code" section remains banned; a future pending block needs the same decision ID and gate record.
+
+**Amendment (2026-10-31).** The generation half is retired. The kernel is corrected to this set in
+place; it is never deleted and rebuilt from it, and no skeleton is compiled as a substitute for the
+real source (`docs/README.md`, "The one rule"). "Regeneration defect" reads **conformance defect**
+throughout the set, and `07-regeneration.md` now specifies correction rather than rebuild. What
+survives is the part that mattered: a public shape is a module-file change first, and code that
+outruns the document is the defect this set exists to prevent. The acceptance gate is conformance to
+the set, not a regenerated kernel.
 
 ### D-02 — Scope of v1
 
@@ -892,7 +900,8 @@ representation detail and collapse on reload.
 and keeps the ledger's compare-and-set model simple.
 
 **Consequence:** there is no per-bay or per-cell release. A caller that needs finer invalidation must
-settle the new row set instead. A piston full move translates the rows to the new siting and then
+settle the new row set instead. **Superseded in part by D-45** — the key is the instance, not
+`(owner, siting)` — **and by D-44** — a world unload drops the rows instead of keeping them. A piston full move translates the rows to the new siting and then
 releases the old key; a partial/destroyed piston result is a removal and releases the key. A world
 unload neither removes nor rewrites claim rows. The record set is now 38 decisions (D-38).
 **Status:** decided; `SavedClaimsLifecycleTest` characterizes the whole-key removal and duplicate-row
@@ -936,7 +945,7 @@ existed only because the map could outlive the session. D-40 replaces the detach
   context, bounds)` is the formed object and owns its latest context;
 - `StructureManager.begin(world, spec)` reserves a draft `StructureAttempt`; the settle pass publishes
   into the draft; `commit(bounds)` forms the instance; `abort()` discards it;
-- the host dispatches `Broken`, `Moved`, `Loaded`, `Unloaded` and `Invalidated`; the manager owns the
+- the host dispatches `Broken`, `Loaded`, `Unloaded` and `Invalidated`; the manager owns the
   registry and the context lifecycle;
 - the manager is in-memory. The adapter deletes `SavedContexts`, its codecs and tests; no context is
   persisted. A host that wants durable non-derived values persists them itself and restores through
@@ -953,6 +962,32 @@ and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` h
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
 `AdversarialManagerTest`, `StructureLifecycleGameTest` and
 `StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0).
+
+### D-44 — Claims are session-scoped
+
+A claim ledger lives exactly as long as the structure instances that own its rows: the adapter persists
+neither, so a restart starts with an empty manager and an empty ledger. `ClaimLedger.inMemory(World)` is
+the shipped implementation and the mod registers no `SavedData`.
+
+**The asymmetry it removes.** M3 shipped a persisted ledger while D-40 shipped an in-memory manager, so
+a row could outlive its instance. Such a row can be neither checked, released nor invalidated; its only
+remaining effect is blocking other structures on cells no operation can refer to.
+
+**Durability is a host concern.** `Loaded` exists for a host that restores its own instances; a host
+that also wants durable claims re-settles its restored instances and the planner re-derives the rows.
+
+### D-45 — A claim belongs to an instance
+
+`ClaimRow` carries `instance` instead of `owner`; `SettleRequest` is `(instance, rows, expectedRevision)`;
+`ClaimLedger.release` takes an `InstanceId`; `ClaimMatrix` conflicts only between different instances.
+`OwnerId` stays on `StructureSpec`, on `MatchRequest` and in the manager's reservation lookups, and
+`/cumulus claims` resolves an owner through the manager, printing `unknown` when the instance is gone.
+
+**A move is a removal.** With the instance as the key there is no second identity to reconcile when a
+structure is pushed: the adapter invalidates it and releases its rows, and a rebuild is a fresh settle.
+
+> Numbering note: D-41…D-43 and D-46 are still proposals carried by
+> `Data/StructureCumulus/plan-2026-11-01/`; they enter this file when their code lands.
 
 ## 3. Consequences a reviewer should attack
 

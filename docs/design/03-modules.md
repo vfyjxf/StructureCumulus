@@ -152,7 +152,7 @@ Every module file has exactly these sections:
 7. **Tests** — the falsification obligations.
 8. **Dependencies** — the exact edges, and what is deliberately not imported.
 
-A signature in section 3 that is absent from code is a regeneration defect; a public member in code
+A signature in section 3 that is absent from code is a conformance defect; a public member in code
 that is absent from section 3 is a design defect. There is no pending signature block in v1.2; the
 spec index is green (`06-verification.md` §1). A slice is nonetheless amended docs-first
 (`07-regeneration.md` §5), as the M5e capture report (D-28) was: `world` §3/§4.10 landed before its

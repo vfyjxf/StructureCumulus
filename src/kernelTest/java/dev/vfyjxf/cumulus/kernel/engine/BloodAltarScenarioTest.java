@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -60,19 +61,19 @@ class BloodAltarScenarioTest {
     @Test
     void tierTwoPrefixFormsFiveClaimRows() {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(prefixBlueprint("blood/tier_two", Footprint.box()), siting, prefixView(siting), ledger)
         );
         assertEquals(5, formed.claims().rows().size(), "the tier II prefix claims five cells");
-        assertEquals(5, ledger.all().size(), "the ledger holds five rows");
+        assertEquals(5, TestWorld.rows(ledger).size(), "the ledger holds five rows");
     }
 
     @Test
     void tierThreePrefixRequiresTheTierThreeExtension() {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult missing = MagicFixtures
                 .settle(tierThreeBlueprint("blood/tier_three_missing"), siting, prefixView(siting), ledger);
         MatchResult.Failed failed = assertInstanceOf(
@@ -81,15 +82,15 @@ class BloodAltarScenarioTest {
             "the tier III extension is missing"
         );
         assertTrue(MagicFixtures.hasCode(failed, Codes.expected), "the missing extension is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "the failed tier III check writes nothing");
+        assertEquals(0, TestWorld.rows(ledger).size(), "the failed tier III check writes nothing");
 
-        TestWorld.Ledger fullLedger = MagicFixtures.ledger();
+        ClaimLedger fullLedger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(tierThreeBlueprint("blood/tier_three_full"), siting, tierThreeView(siting), fullLedger)
         );
         assertEquals(9, formed.claims().rows().size(), "the tier III altar claims nine cells");
-        assertEquals(9, fullLedger.all().size(), "the ledger holds nine rows");
+        assertEquals(9, TestWorld.rows(fullLedger).size(), "the ledger holds nine rows");
     }
 
     @Test
@@ -195,7 +196,7 @@ class BloodAltarScenarioTest {
         assertTrue(MagicFixtures.hasCode(failed, code));
     }
 
-    private record ViewPair(TestWorld.View view, TestWorld.Ledger ledger) {}
+    private record ViewPair(TestWorld.View view, ClaimLedger ledger) {}
 
     private static Blueprint footprintBlueprint(String path, Footprint footprint) {
         CuboidSet cells = CuboidSet.of(Cuboid.of(-1, 0, -1, 2, 1, 2));

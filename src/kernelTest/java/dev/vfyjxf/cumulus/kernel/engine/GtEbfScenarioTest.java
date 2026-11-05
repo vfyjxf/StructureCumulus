@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -58,7 +59,7 @@ class GtEbfScenarioTest {
             Siting siting = TechFixtures.turn(LatticePoint.origin, turn);
             TestWorld.View view = TechFixtures.view();
             ebf.fill(view, siting, legend);
-            TestWorld.Ledger ledger = TechFixtures.ledger();
+            ClaimLedger ledger = TechFixtures.ledger();
             MatchResult outcome = TechFixtures.settle(blueprint, siting, view, ledger);
             MatchResult.Formed formed = assertInstanceOf(
                 MatchResult.Formed.class,
@@ -68,7 +69,7 @@ class GtEbfScenarioTest {
             assertEquals(36, formed.claims().rows().size(), "thirty-six cells at " + turn);
             Set<LatticeKey> expected = TechFixtures.worldKeys(siting, ebf.cells(casing, hot, cold));
             assertEquals(expected, new LinkedHashSet<>(TechFixtures.rowKeys(formed)), "sited claim cells at " + turn);
-            assertEquals(36, ledger.all().size(), "the ledger holds the same cells at " + turn);
+            assertEquals(36, TestWorld.rows(ledger).size(), "the ledger holds the same cells at " + turn);
         }
     }
 
@@ -79,11 +80,11 @@ class GtEbfScenarioTest {
         ebf.fill(view, siting, legend);
         LatticePoint missing = LatticePoint.of(0, 1, 0);
         view.air(TechFixtures.world(siting, missing));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(mixedCoilBlueprint("gt/ebf_missing_casing"), siting, view, ledger);
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "the missing casing is air");
         assertTrue(TechFixtures.hasCode(failed, Codes.expected), "the missing casing is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no rows");
         assertEquals(0L, ledger.revision(), "a failed check does not move the ledger");
     }
 
@@ -93,7 +94,7 @@ class GtEbfScenarioTest {
         TestWorld.View view = TechFixtures.view();
         ebf.fill(view, siting, legend);
         TechFixtures.put(view, siting, LatticePoint.of(-1, 0, 0), TechFixtures.hatch);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult outcome = TechFixtures.settle(mixedCoilBlueprint("gt/ebf_extra_hatch"), siting, view, ledger);
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,

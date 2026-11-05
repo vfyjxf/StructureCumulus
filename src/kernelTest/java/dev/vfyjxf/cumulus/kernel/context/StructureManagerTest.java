@@ -93,38 +93,6 @@ class StructureManagerTest {
     }
 
     @Test
-    void movedKeepsIdAndContextAndRejectsACollision() {
-        StructureManager manager = StructureManager.create();
-        StructureInstance instance = manager.begin(world, new StructureSpec(owner, siting, blueprint)).commit(bounds);
-        manager.publish(instance.id(), Map.of(count, 7L), FindingBundle.empty(), Spend.zero);
-
-        Siting movedTo = Siting.of(LatticePoint.of(10, 64, 10), Orientation.identity);
-        CuboidSet movedBounds = CuboidSet.of(Cuboid.of(10, 64, 10, 12, 65, 12));
-        manager.onEvent(new StructureEvent.Moved(instance.id(), siting, movedTo, movedBounds));
-
-        StructureInstance moved = manager.find(instance.id());
-        assertNotNull(moved);
-        assertEquals(movedTo, moved.siting());
-        assertEquals(movedBounds, moved.bounds());
-        assertEquals(7L, moved.context().get(count));
-        assertEquals(moved, manager.find(owner, movedTo));
-        assertNull(manager.find(owner, siting));
-
-        StructureInstance other = manager.begin(
-            world,
-            new StructureSpec(
-                owner,
-                Siting.of(LatticePoint.of(20, 64, 20), Orientation.identity),
-                NamespacedId.of("test", "other")
-            )
-        ).commit(CuboidSet.of(Cuboid.of(20, 64, 20, 21, 65, 21)));
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(other.id(), other.siting(), movedTo, movedBounds))
-        );
-    }
-
-    @Test
     void brokenAndInvalidatedAreIdempotent() {
         StructureManager manager = StructureManager.create();
         StructureInstance instance = manager.begin(world, new StructureSpec(owner, siting, blueprint)).commit(bounds);

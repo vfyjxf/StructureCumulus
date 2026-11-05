@@ -19,15 +19,6 @@ public sealed interface StructureEvent {
         }
     }
 
-    record Moved(InstanceId id, Siting from, Siting to, CuboidSet bounds) implements StructureEvent {
-        public Moved {
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(from, "from");
-            Objects.requireNonNull(to, "to");
-            Objects.requireNonNull(bounds, "bounds");
-        }
-    }
-
     /** Replaces one world's restored instances; other worlds are untouched. */
     record Loaded(World world, List<StructureInstance> instances) implements StructureEvent {
         public Loaded {

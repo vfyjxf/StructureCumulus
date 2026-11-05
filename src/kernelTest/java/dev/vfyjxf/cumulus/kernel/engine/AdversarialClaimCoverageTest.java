@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimMatrix;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimSet;
@@ -8,6 +9,7 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
@@ -57,26 +59,28 @@ class AdversarialClaimCoverageTest {
     private static final CuboidSet oneCell = CuboidSet.of(Cuboid.of(origin));
     private static final OwnerId owner = MagicFixtures.owner;
     private static final OwnerId rival = MagicFixtures.rival;
+    private static final InstanceId instance = MagicFixtures.instance;
+    private static final InstanceId rivalInstance = MagicFixtures.rivalInstance;
     private static final Siting identity = MagicFixtures.identity(origin);
 
     @Test
     void claimMatrixIsSymmetricAndFollowsTheConflictRuleExactly() {
         List<Sharing> sharings = List.of(Sharing.shared, Sharing.exclusive);
-        List<OwnerId> owners = List.of(owner, rival);
+        List<InstanceId> instances = List.of(instance, rivalInstance);
         List<Siting> sitings = List.of(identity, MagicFixtures.identity(LatticePoint.of(1, 0, 0)));
         List<LatticePoint> cells = List.of(origin, LatticePoint.of(0, 1, 0));
         for (Sharing leftSharing : sharings) {
             for (Sharing rightSharing : sharings) {
-                for (OwnerId leftOwner : owners) {
-                    for (OwnerId rightOwner : owners) {
+                for (InstanceId leftInstance : instances) {
+                    for (InstanceId rightInstance : instances) {
                         for (Siting leftSiting : sitings) {
                             for (Siting rightSiting : sitings) {
                                 for (LatticePoint leftCell : cells) {
                                     for (LatticePoint rightCell : cells) {
-                                        ClaimRow left = row(leftCell, leftSharing, leftOwner, leftSiting, "left");
-                                        ClaimRow right = row(rightCell, rightSharing, rightOwner, rightSiting, "right");
+                                        ClaimRow left = row(leftCell, leftSharing, leftInstance, leftSiting, "left");
+                                        ClaimRow right = row(rightCell, rightSharing, rightInstance, rightSiting, "right");
                                         boolean expected = leftCell.equals(rightCell)
-                                                && !(leftOwner.equals(rightOwner) && leftSiting.equals(rightSiting))
+                                                && !leftInstance.equals(rightInstance)
                                                 && (leftSharing.blocks() || rightSharing.blocks());
                                         assertEquals(expected, ClaimMatrix.conflicts(left, right));
                                         assertEquals(
@@ -96,8 +100,8 @@ class AdversarialClaimCoverageTest {
 
     @Test
     void claimRowOrderIncludesSitingAndKeepsSitingDistinctRows() {
-        ClaimRow first = row(origin, Sharing.shared, owner, identity, "bay");
-        ClaimRow second = row(origin, Sharing.shared, owner, MagicFixtures.identity(LatticePoint.of(5, 0, 5)), "bay");
+        ClaimRow first = row(origin, Sharing.shared, instance, identity, "bay");
+        ClaimRow second = row(origin, Sharing.shared, instance, MagicFixtures.identity(LatticePoint.of(5, 0, 5)), "bay");
 
         assertTrue(first.compareTo(second) < 0, "siting is part of the total order");
         assertNotEquals(first, second, "different sitings are different rows");
@@ -117,8 +121,8 @@ class AdversarialClaimCoverageTest {
 
     @Test
     void claimSetViewAndSettleRequestCanonicalizeAndGuardTheirShapes() {
-        ClaimRow laterCell = row(LatticePoint.of(1, 0, 0), Sharing.shared, owner, identity, "b");
-        ClaimRow earlierCell = row(origin, Sharing.shared, owner, identity, "a");
+        ClaimRow laterCell = row(LatticePoint.of(1, 0, 0), Sharing.shared, instance, identity, "b");
+        ClaimRow earlierCell = row(origin, Sharing.shared, instance, identity, "a");
         ClaimSet set = new ClaimSet(List.of(laterCell, earlierCell), 2);
         assertEquals(List.of(earlierCell, laterCell), set.rows(), "rows sort by cell first");
         assertThrows(IllegalArgumentException.class, () -> new ClaimSet(List.of(), -1));
@@ -132,19 +136,19 @@ class AdversarialClaimCoverageTest {
         assertThrows(IllegalArgumentException.class, () -> new ClaimView(List.of(earlierCell), 0, false));
         assertThrows(IllegalArgumentException.class, () -> new ClaimView(List.of(), -1, true));
 
-        ClaimRow duplicate = row(origin, Sharing.shared, owner, identity, "dupe");
-        SettleRequest request = new SettleRequest(owner, identity, List.of(duplicate, duplicate), 0);
+        ClaimRow duplicate = row(origin, Sharing.shared, instance, identity, "dupe");
+        SettleRequest request = new SettleRequest(instance, List.of(duplicate, duplicate), 0);
         assertEquals(2, request.rows().size(), "duplicate rows are a representation detail, not a constructor error");
         assertThrows(
             IllegalArgumentException.class,
-            () -> new SettleRequest(owner, identity, List.of(row(origin, Sharing.shared, rival, identity, "x")), 0)
+            () -> new SettleRequest(instance, List.of(row(origin, Sharing.shared, rivalInstance, identity, "x")), 0)
         );
-        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(owner, identity, List.of(), -1));
+        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instance, List.of(), -1));
     }
 
     @Test
     void claimVerdictsRejectImpossibleShapes() {
-        ClaimRow row = row(origin, Sharing.shared, owner, identity, "bay");
+        ClaimRow row = row(origin, Sharing.shared, instance, identity, "bay");
         ClaimVerdict.Settled empty = new ClaimVerdict.Settled(0, List.of());
         assertTrue(empty.rows().isEmpty());
         assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Settled(0, List.of(row)));
@@ -163,54 +167,54 @@ class AdversarialClaimCoverageTest {
     }
 
     @Test
-    void theLedgerSettleIsACompareAndSetOverTheWholeOwnerSitingKey() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
-        ClaimRow shared = row(origin, Sharing.shared, owner, identity, "shared");
-        ClaimRow exclusive = row(origin, Sharing.exclusive, rival, identity, "rival");
+    void theLedgerSettleIsACompareAndSetOverTheWholeInstanceKey() {
+        ClaimLedger ledger = MagicFixtures.ledger();
+        ClaimRow shared = row(origin, Sharing.shared, instance, identity, "shared");
+        ClaimRow exclusive = row(origin, Sharing.exclusive, rivalInstance, identity, "rival");
 
         ClaimVerdict.Settled first = assertInstanceOf(
             ClaimVerdict.Settled.class,
-            ledger.settle(new SettleRequest(owner, identity, List.of(shared), 0))
+            ledger.settle(new SettleRequest(instance, List.of(shared), 0))
         );
         assertEquals(1, first.revision());
-        assertEquals(List.of(shared), ledger.all());
+        assertEquals(List.of(shared), TestWorld.rows(ledger));
 
         ClaimVerdict.RevisionMoved stale = assertInstanceOf(
             ClaimVerdict.RevisionMoved.class,
-            ledger.settle(new SettleRequest(owner, identity, List.of(shared), 0))
+            ledger.settle(new SettleRequest(instance, List.of(shared), 0))
         );
         assertEquals(new ClaimVerdict.RevisionMoved(0, 1), stale);
         assertEquals(1, ledger.revision(), "a stale CAS writes nothing");
 
         ClaimVerdict.Conflict conflict = assertInstanceOf(
             ClaimVerdict.Conflict.class,
-            ledger.settle(new SettleRequest(rival, identity, List.of(exclusive), 1))
+            ledger.settle(new SettleRequest(rivalInstance, List.of(exclusive), 1))
         );
         assertEquals(List.of(shared), conflict.incumbents(), "the incumbent row is carried");
         assertEquals(1, ledger.revision(), "a conflict writes nothing");
-        assertEquals(List.of(shared), ledger.all(), "the ledger bytes are untouched");
+        assertEquals(List.of(shared), TestWorld.rows(ledger), "the ledger bytes are untouched");
 
-        ClaimVerdict.Settled absent = assertInstanceOf(ClaimVerdict.Settled.class, ledger.release(rival, identity));
-        assertEquals(List.of(shared), absent.rows(), "the release leaves the other key's row");
+        assertInstanceOf(ClaimVerdict.Settled.class, ledger.release(rivalInstance));
+        assertEquals(List.of(shared), TestWorld.rows(ledger), "the release leaves the other instance's row");
         assertEquals(1, ledger.revision(), "an absent release does not bump the revision");
     }
 
     @Test
-    void aDuplicateRowKeyKeepsEveryRowAndReleaseDropsTheWholeKey() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
-        ClaimRow first = row(origin, Sharing.shared, owner, identity, "bay_a");
-        ClaimRow second = row(origin, Sharing.shared, owner, identity, "bay_b");
+    void aDuplicateRowKeyKeepsEveryRowAndReleaseDropsTheWholeInstance() {
+        ClaimLedger ledger = MagicFixtures.ledger();
+        ClaimRow first = row(origin, Sharing.shared, instance, identity, "bay_a");
+        ClaimRow second = row(origin, Sharing.shared, instance, identity, "bay_b");
         ClaimVerdict.Settled settled = assertInstanceOf(
             ClaimVerdict.Settled.class,
-            ledger.settle(new SettleRequest(owner, identity, List.of(first, second), 0))
+            ledger.settle(new SettleRequest(instance, List.of(first, second), 0))
         );
         assertEquals(2, settled.rows().size());
-        assertEquals(2, ledger.all().size(), "one key can hold two rows of two different bays");
+        assertEquals(2, TestWorld.rows(ledger).size(), "one instance can hold two rows of two different bays");
 
-        ClaimVerdict.Settled released = assertInstanceOf(ClaimVerdict.Settled.class, ledger.release(owner, identity));
+        ClaimVerdict.Settled released = assertInstanceOf(ClaimVerdict.Settled.class, ledger.release(instance));
         assertEquals(2, released.revision());
-        assertTrue(ledger.all().isEmpty(), "release removes the whole key, both duplicate rows");
-        ClaimVerdict.Settled again = assertInstanceOf(ClaimVerdict.Settled.class, ledger.release(owner, identity));
+        assertTrue(TestWorld.rows(ledger).isEmpty(), "release removes the whole instance, both duplicate rows");
+        ClaimVerdict.Settled again = assertInstanceOf(ClaimVerdict.Settled.class, ledger.release(instance));
         assertEquals(2, again.revision(), "a second release is a no-op");
     }
 
@@ -237,7 +241,7 @@ class AdversarialClaimCoverageTest {
         ClaimPlanner.Derived derived = ClaimPlanner.derive(
             blueprint,
             siting,
-            owner,
+            instance,
             List.of(new BayBinding(boxBay, List.of()), new BayBinding(declaredBay, List.of()))
         );
 
@@ -263,13 +267,13 @@ class AdversarialClaimCoverageTest {
         OccupantSnapshot second = TestWorld.block(TestWorld.stone, LatticePoint.of(0, 1, 0));
 
         ClaimPlanner.Derived derived = ClaimPlanner
-                .derive(blueprint, identity, owner, List.of(new BayBinding(boundBay, List.of(block, second, block))));
+                .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(block, second, block))));
         assertEquals(2, derived.rows().size(), "two distinct footprints yield two rows and duplicates do not add rows");
 
         OccupantSnapshot nested = nestedOccupant(origin, 0);
         IllegalArgumentException nestedFailure = assertThrows(
             IllegalArgumentException.class,
-            () -> ClaimPlanner.derive(blueprint, identity, owner, List.of(new BayBinding(boundBay, List.of(nested))))
+            () -> ClaimPlanner.derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(nested))))
         );
         assertTrue(Objects.requireNonNull(nestedFailure.getMessage(), "message").contains("SC-CLM-0004"));
 
@@ -277,7 +281,7 @@ class AdversarialClaimCoverageTest {
         IllegalArgumentException frameFailure = assertThrows(
             IllegalArgumentException.class,
             () -> ClaimPlanner
-                    .derive(blueprint, identity, owner, List.of(new BayBinding(boundBay, List.of(childFrame))))
+                    .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(childFrame))))
         );
         assertTrue(Objects.requireNonNull(frameFailure.getMessage(), "message").contains("SC-CLM-0004"));
     }
@@ -300,12 +304,12 @@ class AdversarialClaimCoverageTest {
         OccupantSnapshot air = TestWorld.airOccupant(LatticePoint.of(0, 0, 1));
 
         ClaimPlanner.Derived derived = ClaimPlanner
-                .derive(blueprint, identity, owner, List.of(new BayBinding(boundBay, List.of(block, air))));
+                .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(block, air))));
         assertAll(
             () -> assertEquals(1, derived.rows().size(), "an air subject contributes no claimed cell"),
             () -> assertThrows(
                 IllegalArgumentException.class,
-                () -> ClaimPlanner.derive(blueprint, identity, owner, List.of(new BayBinding(boundBay, List.of(air)))),
+                () -> ClaimPlanner.derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(air)))),
                 "an exclusive Bound footprint with only air subjects must be SC-CLM-0005"
             )
         );
@@ -323,7 +327,7 @@ class AdversarialClaimCoverageTest {
 
         IllegalArgumentException failure = assertThrows(
             IllegalArgumentException.class,
-            () -> ClaimPlanner.derive(blueprint, identity, owner, List.of(new BayBinding(boundBay, List.of())))
+            () -> ClaimPlanner.derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of())))
         );
         assertTrue(Objects.requireNonNull(failure.getMessage(), "message").contains("SC-CLM-0005"));
     }
@@ -346,7 +350,7 @@ class AdversarialClaimCoverageTest {
             Check.of(id("any_check"), boundBay, occupantFocus(origin, true), Expectations.anyOccupant())
         );
         TestWorld.View view = MagicFixtures.view().put(TestWorld.block(TestWorld.stone, origin));
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(claimable, identity, view, ledger)
@@ -389,7 +393,7 @@ class AdversarialClaimCoverageTest {
             )
         );
         TestWorld.View view = MagicFixtures.view().put(TestWorld.block(TestWorld.stone, origin));
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(matching, identity, view, ledger)
@@ -419,7 +423,7 @@ class AdversarialClaimCoverageTest {
             Check.of(id("every_box_check"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()))
         );
         TestWorld.View view = MagicFixtures.view().put(TestWorld.block(TestWorld.stone, origin));
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(blueprint, identity, view, ledger)
@@ -438,13 +442,13 @@ class AdversarialClaimCoverageTest {
             Check.of(id("none_check"), sharedNone, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()))
         );
         TestWorld.View view = MagicFixtures.view().air(origin);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(none, identity, view, ledger)
         );
         assertTrue(formed.claims().rows().isEmpty(), "Footprint.None claims nothing");
-        assertTrue(ledger.all().isEmpty(), "a None footprint writes no ledger row");
+        assertTrue(TestWorld.rows(ledger).isEmpty(), "a None footprint writes no ledger row");
         assertEquals(0, ledger.revision(), "a None-only settlement consumes no ledger revision");
 
         Bay exclusiveNone = MagicFixtures
@@ -475,13 +479,13 @@ class AdversarialClaimCoverageTest {
         Siting siting = MagicFixtures.turn(LatticePoint.of(10, 0, 10), Turn.clockwise);
 
         ClaimPlanner.Derived derived = ClaimPlanner
-                .derive(blueprint, siting, owner, List.of(new BayBinding(bay, List.of())));
+                .derive(blueprint, siting, instance, List.of(new BayBinding(bay, List.of())));
         CuboidSet expected = Objects.requireNonNull(siting.toWorld(bayCells), "rotated bay");
         assertEquals(keys(expected), keys(derived.rows()));
         assertEquals(expected, derived.footprint());
         for (ClaimRow row : derived.rows()) {
             assertEquals(siting, row.siting());
-            assertEquals(owner, row.owner());
+            assertEquals(instance, row.instance());
             assertEquals(bay.id(), row.bay());
         }
     }
@@ -499,7 +503,7 @@ class AdversarialClaimCoverageTest {
 
         IllegalArgumentException failure = assertThrows(
             IllegalArgumentException.class,
-            () -> ClaimPlanner.derive(blueprint, edge, owner, List.of(new BayBinding(bay, List.of())))
+            () -> ClaimPlanner.derive(blueprint, edge, instance, List.of(new BayBinding(bay, List.of())))
         );
         assertTrue(Objects.requireNonNull(failure.getMessage(), "message").contains("SC-SPC-0001"));
     }
@@ -516,13 +520,13 @@ class AdversarialClaimCoverageTest {
             Check.of(id("overlap_b_check"), second, Focuses.occupant(origin), Expectations.anyOccupant())
         );
         TestWorld.View view = MagicFixtures.view().put(TestWorld.block(TestWorld.stone, origin));
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(duplicate, identity, view, ledger)
         );
         assertEquals(2, formed.claims().rows().size(), "two shared bays write two rows for one cell");
-        assertEquals(2, ledger.all().size());
+        assertEquals(2, TestWorld.rows(ledger).size());
         assertEquals(1, ledger.revision());
 
         Bay exclusive = MagicFixtures
@@ -540,8 +544,8 @@ class AdversarialClaimCoverageTest {
         return MagicFixtures.id(path);
     }
 
-    private static ClaimRow row(LatticePoint cell, Sharing sharing, OwnerId owner, Siting siting, String bay) {
-        return new ClaimRow(LatticeKey.of(cell), sharing, owner, siting, id(bay));
+    private static ClaimRow row(LatticePoint cell, Sharing sharing, InstanceId instance, Siting siting, String bay) {
+        return new ClaimRow(LatticeKey.of(cell), sharing, siting, id(bay), instance);
     }
 
     private static Cuboid boundingBox(CuboidSet cells) {

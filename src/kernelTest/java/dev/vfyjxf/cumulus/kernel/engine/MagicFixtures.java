@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
@@ -88,8 +89,8 @@ final class MagicFixtures {
         return new TestWorld.View();
     }
 
-    static TestWorld.Ledger ledger() {
-        return new TestWorld.Ledger();
+    static ClaimLedger ledger() {
+        return ClaimLedger.inMemory(TestWorld.world);
     }
 
     static LatticePoint world(Siting siting, LatticePoint local) {
@@ -190,7 +191,7 @@ final class MagicFixtures {
         return MatchEngine.check(request(blueprint, siting, view, claims, requestOwner, requestInstance));
     }
 
-    static MatchResult settle(Blueprint blueprint, Siting siting, TestWorld.View view, TestWorld.Ledger ledger) {
+    static MatchResult settle(Blueprint blueprint, Siting siting, TestWorld.View view, ClaimLedger ledger) {
         ClaimView claims = ledger.read(worldBounds(blueprint, siting));
         MatchRequest request = request(blueprint, siting, view, claims);
         MatchResult checked = MatchEngine.check(request);

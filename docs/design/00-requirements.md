@@ -50,7 +50,7 @@ extension path is one interface and one catalog registration. The host path is f
 | **N-05** | The kernel has no static mutable state; a kernel is a value created from frozen catalogs. |
 | **N-06** | A public type is reachable from a worked example or a host port. A type used only by the engine is package-private. |
 | **N-07** | Every finding code has exactly one producer and one explanation; an unproduced code is deleted. |
-| **N-08** | The design is the source: a public signature in code that is not in a module file is a regeneration defect. |
+| **N-08** | The design is the source: a public signature in code that is not in a module file is a conformance defect. |
 
 ## 5. Invariants
 
@@ -73,7 +73,7 @@ internally consistent.
 | **I-12** | Two instances publishing one key never collide; context is per instance. | `InstanceId` key in `ContextStore`; `StructureContext`. |
 | **I-13** | A document and a Java builder produce equal blueprints for equal content. | `document` compile tests; `Blueprint` structural equality. |
 | **I-14** | Errors are never capped; only warnings and info may be elided, and the elision is counted. | `FindingBundle` pipeline. |
-| **I-15** | The design set is the only source of public shape. | `07-regeneration.md` gates. |
+| **I-15** | The design set is the only source of public shape. | `07-regeneration.md` §2/§4 gates; the member review against §3. |
 
 ## 6. Non-goals
 

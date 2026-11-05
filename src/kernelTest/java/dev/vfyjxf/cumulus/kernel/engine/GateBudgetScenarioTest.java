@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -57,7 +58,7 @@ class GateBudgetScenarioTest {
     void aLeaseInvalidatedBeforeSettleDropsTheWrite() {
         TestWorld.View view = airView();
         TestWorld.Lease lease = new TestWorld.Lease(view);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         ContextStore contexts = ContextStore.inMemory();
         MatchRequest request = request(blueprint(), lease, Budget.unbounded());
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
@@ -74,7 +75,7 @@ class GateBudgetScenarioTest {
     void aTinyBudgetIsUndecidedAndWritesNothing() {
         TestWorld.View view = airView();
         TestWorld.Lease lease = new TestWorld.Lease(view);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         ContextStore contexts = ContextStore.inMemory();
         MatchRequest request = request(blueprint(), lease, Budget.of(0, 0));
         MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, MatchEngine.check(request));
@@ -83,9 +84,9 @@ class GateBudgetScenarioTest {
         assertNoWrites(ledger, contexts);
     }
 
-    private static void assertNoWrites(TestWorld.Ledger ledger, ContextStore contexts) {
+    private static void assertNoWrites(ClaimLedger ledger, ContextStore contexts) {
         assertEquals(0L, ledger.revision(), "no ledger revision");
-        assertEquals(0, ledger.all().size(), "no ledger rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "no ledger rows");
         assertEquals(0L, contexts.context(MagicFixtures.instance).revision(), "no context revision");
         assertTrue(contexts.context(MagicFixtures.instance).values().isEmpty(), "no context values");
     }

@@ -356,7 +356,7 @@ public final class MatchEngine {
         }
         ClaimPlanner.Derived derived;
         try {
-            derived = ClaimPlanner.derive(request.blueprint(), request.siting(), request.owner(), outcome.bindings());
+            derived = ClaimPlanner.derive(request.blueprint(), request.siting(), request.instance(), outcome.bindings());
         } catch (IllegalArgumentException rejected) {
             session.findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
@@ -414,7 +414,7 @@ public final class MatchEngine {
         ClaimPlanner.Derived derived;
         try {
             derived = ClaimPlanner
-                    .derive(request.blueprint(), request.siting(), request.owner(), admitted.outcome().bindings());
+                    .derive(request.blueprint(), request.siting(), request.instance(), admitted.outcome().bindings());
         } catch (IllegalArgumentException rejected) {
             findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(findings));
@@ -445,7 +445,7 @@ public final class MatchEngine {
             );
         }
         ClaimVerdict verdict = ledger.settle(
-            new SettleRequest(request.owner(), request.siting(), derived.rows(), admitted.ledgerRevision())
+            new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision())
         );
         if (verdict instanceof ClaimVerdict.RevisionMoved) {
             Cuboid readBox = derived.footprint().bounds();
@@ -467,7 +467,7 @@ public final class MatchEngine {
                 return new MatchResult.Failed(phase, FindingBundle.of(findings));
             }
             verdict = ledger
-                    .settle(new SettleRequest(request.owner(), request.siting(), derived.rows(), fresh.revision()));
+                    .settle(new SettleRequest(request.instance(), derived.rows(), fresh.revision()));
         }
         if (verdict instanceof ClaimVerdict.RevisionMoved moved) {
             findings.add(
@@ -738,7 +738,7 @@ public final class MatchEngine {
                 if (!ClaimMatrix.conflicts(row, incumbent)) {
                     continue;
                 }
-                String pair = row.bay() + "|" + incumbent.owner().id() + "|" + incumbent.bay();
+                String pair = row.bay() + "|" + incumbent.instance() + "|" + incumbent.bay();
                 Conflict conflict = byPair
                         .computeIfAbsent(pair, ignored -> new Conflict(row, incumbent, CuboidSet.empty()));
                 conflict.cells = conflict.cells.union(Cuboid.of(row.cell().point()));
@@ -750,7 +750,7 @@ public final class MatchEngine {
             findings.add(
                 Finding.builder(Codes.claimConflict).phase(phase)
                         .message(
-                            conflict.incumbent.owner().id() + ":" + conflict.incumbent.bay() + " already holds "
+                            conflict.incumbent.instance() + ":" + conflict.incumbent.bay() + " already holds "
                                     + conflict.cells.volume() + " cell(s) of " + conflict.requested.bay()
                         ).label(Label.primary(locus, "contested cells"))
                         .note("this bay asks " + conflict.requested.sharing(), locus)

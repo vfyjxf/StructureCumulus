@@ -54,11 +54,11 @@ once. There are no context tiers, no stage frames, and no per-phase store writes
 
 ## Law 6 — Claims are derived, compared and replaced
 
-A `ClaimRow` is produced only by `ClaimPlanner` from `(blueprint, siting, owner, bindings)`. The
-caller cannot hand rows to `settle`. One ledger handle answers for one world. One predicate decides
-conflict: a cell is contested when either row is `exclusive` and the rows differ in
-`(owner, siting)`. One compare-and-set replaces every row of `(owner, siting)`; a revision move is
-re-read once, then reported.
+A `ClaimRow` is produced only by `ClaimPlanner` from `(blueprint, siting, instance, bindings)`. The
+caller cannot hand rows to `settle`. One ledger handle answers for one world, and it lives and dies
+with that world's structure state. One predicate decides conflict: a cell is contested when either
+row is `exclusive` and the two rows belong to different instances. One compare-and-set replaces
+every row of one instance; a revision move is re-read once, then reported.
 
 ## Law 7 — Findings are the only report channel
 
@@ -91,11 +91,12 @@ For a fixed `(blueprint, snapshotId, siting, owner, budget, claims revision, cat
 result value, the finding order and the spend are identical across runs and JVMs. All ordered
 collections are built in a defined order; ties are broken by declaration index, never by hash.
 
-## Law 12 — The design is executable
+## Law 12 — The design is normative
 
-Every public signature in a module file is normative. The skeleton extracted from this set compiles
-with `javac --release 21` and JSpecify only. Code that is not in the set is a regeneration defect,
-and a signature that cannot be compiled from the set is a design defect.
+Every public signature in a module file is normative, and the code is corrected to it. A public
+member in code that is absent from the set is a conformance defect; a signature in the set that does
+not describe a compilable Java shape is a design defect. Nothing is regenerated: a drifted module is
+corrected in place, never deleted and rebuilt from the set.
 
 ## What is explicitly not a law
 

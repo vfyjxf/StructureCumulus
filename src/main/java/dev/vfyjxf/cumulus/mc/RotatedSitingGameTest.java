@@ -1,9 +1,11 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -135,8 +137,8 @@ public final class RotatedSitingGameTest {
         BlockPos secondPos = new BlockPos(second.x(), second.y(), second.z());
         level.setBlock(origin, anchorState, 3);
         level.setBlock(secondPos, Blocks.AIR.defaultBlockState(), 3);
-        SavedClaims ledger = state.claims(level);
-        ledger.release(state.owner(), siting);
+        ClaimLedger ledger = state.claims(level);
+        release(ledger, state, level, siting);
         RecordingSource recording = new RecordingSource();
         CommandSourceStack source = stack(helper, origin, recording);
         try {
@@ -168,7 +170,7 @@ public final class RotatedSitingGameTest {
             helper.assertTrue(cells.contains(LatticeKey.of(point)), "the anchor cell row is claimed");
             helper.assertTrue(cells.contains(LatticeKey.of(second)), "the rotated cell row is claimed");
         } finally {
-            ledger.release(state.owner(), siting);
+            release(ledger, state, level, siting);
             level.removeBlock(origin, false);
             level.removeBlock(secondPos, false);
         }
@@ -231,6 +233,13 @@ public final class RotatedSitingGameTest {
 
         private String text() {
             return String.join("\n", messages);
+        }
+    }
+
+    private static void release(ClaimLedger ledger, ServerState state, ServerLevel level, Siting siting) {
+        StructureInstance instance = state.structures(level).find(state.world(level), state.owner(), siting);
+        if (instance != null) {
+            ledger.release(instance.id());
         }
     }
 }

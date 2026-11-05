@@ -142,7 +142,6 @@ final class InMemoryStructureManager implements StructureManager {
                     draft.close();
                 }
             }
-            case StructureEvent.Moved moved -> move(moved);
             case StructureEvent.Loaded loaded -> load(loaded.world(), loaded.instances());
             case StructureEvent.Unloaded unloaded -> unload(unloaded.world());
             case StructureEvent.Invalidated invalidated -> {
@@ -153,32 +152,6 @@ final class InMemoryStructureManager implements StructureManager {
                 }
             }
         }
-    }
-
-    private void move(StructureEvent.Moved moved) {
-        StructureInstance instance = instances.get(moved.id());
-        if (instance == null) {
-            throw new IllegalArgumentException("no structure instance " + moved.id());
-        }
-        if (!instance.siting().equals(moved.from())) {
-            throw new IllegalArgumentException("the structure is not at " + moved.from());
-        }
-        World world = instance.id().world();
-        SitingKey target = new SitingKey(world, instance.owner(), moved.to());
-        InstanceId occupant = bySiting.get(target);
-        if (occupant != null && !occupant.equals(instance.id())) {
-            throw new IllegalArgumentException("a structure already occupies " + target);
-        }
-        StructureSpec spec = new StructureSpec(instance.owner(), moved.to(), instance.spec().structure());
-        StructureInstance movedInstance = new StructureInstance(
-            instance.id(),
-            spec,
-            instance.context(),
-            moved.bounds()
-        );
-        bySiting.remove(new SitingKey(world, instance.owner(), instance.siting()));
-        instances.put(instance.id(), movedInstance);
-        bySiting.put(target, instance.id());
     }
 
     private void load(World world, List<StructureInstance> restored) {

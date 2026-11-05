@@ -1,8 +1,10 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Value;
@@ -77,11 +79,11 @@ public final class StructureSetHostGameTest {
             helper.fail("the wing is not placed");
             return;
         }
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         Siting rootSiting = plan.rootSiting();
         Siting wingSiting = wing.siting();
         try {
-            release(ledger, state, rootSiting, wingSiting);
+            release(ledger, state, level, rootSiting, wingSiting);
             long revision = ledger.revision();
             SnapshotLease lease = capture(state, level, plan);
             if (lease == null) {
@@ -136,7 +138,7 @@ public final class StructureSetHostGameTest {
                 );
             }
         } finally {
-            release(ledger, state, rootSiting, wingSiting);
+            release(ledger, state, level, rootSiting, wingSiting);
         }
         helper.succeed();
     }
@@ -159,11 +161,11 @@ public final class StructureSetHostGameTest {
             helper.fail("the wing is not placed");
             return;
         }
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         Siting rootSiting = plan.rootSiting();
         Siting wingSiting = wing.siting();
         try {
-            release(ledger, state, rootSiting, wingSiting);
+            release(ledger, state, level, rootSiting, wingSiting);
             long revision = ledger.revision();
             SnapshotLease lease = capture(state, level, plan);
             if (lease == null) {
@@ -197,7 +199,7 @@ public final class StructureSetHostGameTest {
                 );
             }
         } finally {
-            release(ledger, state, rootSiting, wingSiting);
+            release(ledger, state, level, rootSiting, wingSiting);
         }
         helper.succeed();
     }
@@ -227,7 +229,7 @@ public final class StructureSetHostGameTest {
             plan.rootBounds(),
             List.of(new StructureSet.Satellite(wingId, wing.compiled(), rootSiting, onRoot, onRoot.asSet()))
         );
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         long revision = ledger.revision();
         AtomicInteger instances = new AtomicInteger();
         SnapshotLease lease = capture(state, level, plan);
@@ -277,11 +279,11 @@ public final class StructureSetHostGameTest {
             helper.fail("the wing is not placed");
             return;
         }
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         Siting rootSiting = plan.rootSiting();
         Siting wingSiting = wing.siting();
         try {
-            release(ledger, state, rootSiting, wingSiting);
+            release(ledger, state, level, rootSiting, wingSiting);
             long revision = ledger.revision();
             SnapshotLease lease = capture(state, level, plan);
             if (lease == null) {
@@ -313,14 +315,21 @@ public final class StructureSetHostGameTest {
                 );
             }
         } finally {
-            release(ledger, state, rootSiting, wingSiting);
+            release(ledger, state, level, rootSiting, wingSiting);
         }
         helper.succeed();
     }
 
-    private static void release(SavedClaims ledger, ServerState state, Siting root, Siting wing) {
-        ledger.release(state.owner(), root);
-        ledger.release(state.owner(), wing);
+    private static void release(ClaimLedger ledger, ServerState state, ServerLevel level, Siting root, Siting wing) {
+        release(ledger, state, level, root);
+        release(ledger, state, level, wing);
+    }
+
+    private static void release(ClaimLedger ledger, ServerState state, ServerLevel level, Siting siting) {
+        StructureInstance instance = state.structures(level).find(state.world(level), state.owner(), siting);
+        if (instance != null) {
+            ledger.release(instance.id());
+        }
     }
 
     private static @Nullable SnapshotLease capture(ServerState state, ServerLevel level, StructureSet plan) {

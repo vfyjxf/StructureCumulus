@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
@@ -233,7 +234,7 @@ class AdversarialFuzzTest {
                             .get(random.nextInt((int) bayCells.volume()));
                     view.refuse(Objects.requireNonNull(siting.toWorld(local), where + " refused cell"));
                 }
-                TestWorld.Ledger ledger = MagicFixtures.ledger();
+                ClaimLedger ledger = MagicFixtures.ledger();
                 MatchRequest request = MatchRequest.of(
                     blueprint,
                     siting,
@@ -247,7 +248,7 @@ class AdversarialFuzzTest {
                 if (refused) {
                     assertInstanceOf(MatchResult.Undecided.class, checked, where + " a refused bay cell is unreadable");
                     assertEquals(0L, ledger.revision(), where + " a failed check writes no claim");
-                    assertTrue(ledger.all().isEmpty(), where + " a failed check leaves the ledger empty");
+                    assertTrue(TestWorld.rows(ledger).isEmpty(), where + " a failed check leaves the ledger empty");
                     continue;
                 }
                 MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, checked, where);
@@ -257,19 +258,19 @@ class AdversarialFuzzTest {
                     MatchEngine.settle(request, admitted, ledger, contexts),
                     where
                 );
-                List<ClaimRow> expected = expectedRows(blueprint, siting, MagicFixtures.owner);
-                List<ClaimRow> own = ownRows(formed, blueprint, siting, MagicFixtures.owner);
+                List<ClaimRow> expected = expectedRows(blueprint, siting, MagicFixtures.instance);
+                List<ClaimRow> own = ownRows(formed, blueprint, MagicFixtures.instance);
                 assertEquals(expected, own, where + " rows for this structure");
                 assertRowLaws(own, where);
-                assertEquals(expected, sorted(ledger.all()), where + " ledger rows");
+                assertEquals(expected, sorted(TestWorld.rows(ledger)), where + " ledger rows");
                 MatchResult.Formed again = assertInstanceOf(
                     MatchResult.Formed.class,
                     MatchEngine.settle(request, admitted, ledger, contexts),
                     where + " a re-settle replaces the same key"
                 );
-                List<ClaimRow> ownAgain = ownRows(again, blueprint, siting, MagicFixtures.owner);
+                List<ClaimRow> ownAgain = ownRows(again, blueprint, MagicFixtures.instance);
                 assertEquals(expected, ownAgain, where + " re-settle row set");
-                assertEquals(expected, sorted(ledger.all()), where + " no duplicate rows after a re-settle");
+                assertEquals(expected, sorted(TestWorld.rows(ledger)), where + " no duplicate rows after a re-settle");
                 assertEquals(expected.isEmpty() ? 0L : 2L, ledger.revision(), where + " revision count");
                 assertRowLaws(ownAgain, where);
             }
@@ -290,7 +291,7 @@ class AdversarialFuzzTest {
                 Blueprint blueprint = occupantBlueprint(blueprintId, bayId, bounds, ours);
                 Blueprint rivalBlueprint = occupantBlueprint(id("rival"), rivalBayId, bounds, rival);
                 TestWorld.View view = MagicFixtures.view().put(TestWorld.block(TestWorld.stone, worldCell));
-                TestWorld.Ledger ledger = MagicFixtures.ledger();
+                ClaimLedger ledger = MagicFixtures.ledger();
                 ContextStore contexts = ContextStore.inMemory();
                 MatchRequest rivalRequest = MatchRequest.of(
                     rivalBlueprint,
@@ -336,8 +337,8 @@ class AdversarialFuzzTest {
                         MatchEngine.settle(request, admitted, ledger, contexts),
                         where
                     );
-                    assertEquals(1, ownRows(formed, blueprint, siting, MagicFixtures.owner).size(), where);
-                    assertEquals(2, ledger.all().size(), where + " shared/shared rows coexist");
+                    assertEquals(1, ownRows(formed, blueprint, MagicFixtures.instance).size(), where);
+                    assertEquals(2, TestWorld.rows(ledger).size(), where + " shared/shared rows coexist");
                 }
             }
         }
@@ -386,7 +387,7 @@ class AdversarialFuzzTest {
                 } else {
                     Blueprint blueprint = overlap.build();
                     TestWorld.View view = MagicFixtures.view();
-                    TestWorld.Ledger ledger = MagicFixtures.ledger();
+                    ClaimLedger ledger = MagicFixtures.ledger();
                     MatchRequest request = MatchRequest.of(
                         blueprint,
                         sitings[0],
@@ -406,9 +407,9 @@ class AdversarialFuzzTest {
                         MatchEngine.settle(request, admitted, ledger, ContextStore.inMemory()),
                         where
                     );
-                    List<ClaimRow> own = ownRows(formed, blueprint, sitings[0], MagicFixtures.owner);
+                    List<ClaimRow> own = ownRows(formed, blueprint, MagicFixtures.instance);
                     assertRowLaws(own, where + " shared overlap");
-                    assertEquals(expectedRows(blueprint, sitings[0], MagicFixtures.owner), own, where + " shared rows");
+                    assertEquals(expectedRows(blueprint, sitings[0], MagicFixtures.instance), own, where + " shared rows");
                     assertTrue(
                         own.stream().anyMatch(row -> row.cell().equals(LatticeKey.of(sharedCell))),
                         where + " shared cell row"
@@ -620,18 +621,17 @@ class AdversarialFuzzTest {
 
         private void run() {
             for (int step = 0; step < 90; step++) {
-                int op = random.nextInt(13);
+                int op = random.nextInt(11);
                 switch (op) {
                     case 0, 1 -> begin();
                     case 2 -> commit();
                     case 3 -> abort();
                     case 4 -> publishDraft();
                     case 5 -> publishFormed();
-                    case 6, 7 -> move();
-                    case 8 -> removeEvent();
-                    case 9 -> unload();
-                    case 10 -> loaded();
-                    case 11 -> removeContext();
+                    case 6 -> removeEvent();
+                    case 7 -> unload();
+                    case 8 -> loaded();
+                    case 9 -> removeContext();
                     default -> reuseClosed();
                 }
                 assertRegistry(step);
@@ -750,44 +750,6 @@ class AdversarialFuzzTest {
             StructureInstance updated = Objects.requireNonNull(manager.find(instance.id()), where());
             assertEquals(after, updated.context(), where() + " a formed publish replaces the whole context");
             assertEquals(instance.bounds(), updated.bounds(), where() + " a formed publish keeps the bounds");
-        }
-
-        private void move() {
-            if (manager.instances().isEmpty()) {
-                return;
-            }
-            StructureInstance instance = randomElement(manager.instances());
-            Siting target = sitings[random.nextInt(sitings.length)];
-            Siting from = instance.siting();
-            StructureInstance occupant = manager.find(instance.id().world(), instance.owner(), target);
-            List<StructureInstance> before = manager.instances();
-            if (occupant != null && !occupant.id().equals(instance.id())) {
-                assertThrows(
-                    IllegalArgumentException.class,
-                    () -> manager.onEvent(new StructureEvent.Moved(instance.id(), from, target, boundsAt(target, 1))),
-                    where() + " a moved collision is rejected"
-                );
-                assertEquals(before, manager.instances(), where() + " a rejected move writes nothing");
-                return;
-            }
-            StructureContext context = instance.context();
-            CuboidSet bounds = boundsAt(target, random.nextInt(3));
-            manager.onEvent(new StructureEvent.Moved(instance.id(), from, target, bounds));
-            StructureInstance moved = Objects.requireNonNull(manager.find(instance.id()), where());
-            assertEquals(context, moved.context(), where() + " Moved preserves the id and the context");
-            assertEquals(target, moved.siting(), where() + " Moved updates the siting");
-            assertEquals(bounds, moved.bounds(), where() + " Moved updates the bounds");
-            assertEquals(
-                moved,
-                manager.find(instance.id().world(), instance.owner(), target),
-                where() + " the new siting is registered"
-            );
-            if (!from.equals(target)) {
-                assertNull(
-                    manager.find(instance.id().world(), instance.owner(), from),
-                    where() + " the old siting is released"
-                );
-            }
         }
 
         private void removeEvent() {
@@ -1091,7 +1053,7 @@ class AdversarialFuzzTest {
                 .build();
     }
 
-    private static List<ClaimRow> expectedRows(Blueprint blueprint, Siting siting, OwnerId rowOwner) {
+    private static List<ClaimRow> expectedRows(Blueprint blueprint, Siting siting, InstanceId rowInstance) {
         List<ClaimRow> rows = new ArrayList<>();
         for (Bay bay : blueprint.bays()) {
             CuboidSet owned = switch (bay.footprint()) {
@@ -1108,9 +1070,9 @@ class AdversarialFuzzTest {
                                 new ClaimRow(
                                     LatticeKey.of(LatticePoint.of(x, y, z)),
                                     bay.sharing(),
-                                    rowOwner,
                                     siting,
-                                    bay.id()
+                                    bay.id(),
+                                    rowInstance
                                 )
                             );
                         }
@@ -1127,15 +1089,10 @@ class AdversarialFuzzTest {
         return Objects.requireNonNull(world, "the test siting maps every cell");
     }
 
-    private static List<ClaimRow> ownRows(
-        MatchResult.Formed formed,
-        Blueprint blueprint,
-        Siting siting,
-        OwnerId rowOwner
-    ) {
+    private static List<ClaimRow> ownRows(MatchResult.Formed formed, Blueprint blueprint, InstanceId rowInstance) {
         List<ClaimRow> rows = new ArrayList<>();
         for (ClaimRow row : formed.claims().rows()) {
-            if (row.owner().equals(rowOwner) && row.siting().equals(siting) && blueprint.bay(row.bay()) != null) {
+            if (row.instance().equals(rowInstance) && blueprint.bay(row.bay()) != null) {
                 rows.add(row);
             }
         }

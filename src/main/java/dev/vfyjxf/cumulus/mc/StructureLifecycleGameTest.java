@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -54,13 +55,14 @@ public final class StructureLifecycleGameTest {
         StructureManager manager = state.structures(level);
         StructureInstance instance = instance(manager, state, level, pos);
         helper.setBlock(BlockPos.ZERO, Blocks.STONE);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         LatticePoint point = LatticePoint.of(pos.getX(), pos.getY(), pos.getZ());
         ledger.settle(
             new SettleRequest(
-                owner,
-                Siting.of(point, Orientation.identity),
-                List.of(new ClaimRow(LatticeKey.of(point), Sharing.exclusive, owner, instance.siting(), blueprint)),
+                instance.id(),
+                List.of(
+                    new ClaimRow(LatticeKey.of(point), Sharing.exclusive, instance.siting(), blueprint, instance.id())
+                ),
                 ledger.revision()
             )
         );
@@ -105,7 +107,7 @@ public final class StructureLifecycleGameTest {
         StructureManager manager = state.structures(level);
         StructureInstance instance = instance(manager, state, level, pos);
 
-        WatchEvents.levelUnloaded(new LevelEvent.Unload(level));
+        ServerState.unload(new LevelEvent.Unload(level));
 
         helper.assertTrue(manager.find(instance.id()) == null, "the unloaded world drops the structure");
         helper.succeed();

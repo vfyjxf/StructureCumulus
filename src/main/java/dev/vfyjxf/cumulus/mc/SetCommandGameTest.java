@@ -2,6 +2,8 @@ package dev.vfyjxf.cumulus.mc;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
@@ -41,15 +43,15 @@ public final class SetCommandGameTest {
         LatticePoint point = LatticePoint.of(origin.getX(), origin.getY(), origin.getZ());
         helper.setBlock(new BlockPos(0, 0, 0), Blocks.STONE);
         helper.setBlock(new BlockPos(1, 0, 0), Blocks.STONE);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         Siting rootSiting = Siting.of(point, Orientation.identity);
         Siting wingSiting = Siting.of(LatticePoint.of(point.x() + 1, point.y(), point.z()), Orientation.identity);
         Cuboid covered = Cuboid.of(point.x(), point.y(), point.z(), point.x() + 2, point.y() + 1, point.z() + 1);
         String set = BuiltinDocuments.setDemoId().text();
         String arguments = origin.getX() + " " + origin.getY() + " " + origin.getZ();
         try {
-            ledger.release(state.owner(), rootSiting);
-            ledger.release(state.owner(), wingSiting);
+            release(ledger, state, level, rootSiting);
+            release(ledger, state, level, wingSiting);
             long revision = ledger.revision();
             RecordingSource recording = new RecordingSource();
             CommandSourceStack source = stack(helper, origin, recording);
@@ -100,8 +102,8 @@ public final class SetCommandGameTest {
             helper.assertValueEqual(2, ledger.read(covered).rows().size(), "the settled rows");
             helper.assertValueEqual(revision + 2, ledger.revision(), "each settled structure bumps the revision once");
         } finally {
-            ledger.release(state.owner(), rootSiting);
-            ledger.release(state.owner(), wingSiting);
+            release(ledger, state, level, rootSiting);
+            release(ledger, state, level, wingSiting);
         }
         helper.succeed();
     }
@@ -118,15 +120,15 @@ public final class SetCommandGameTest {
         LatticePoint point = LatticePoint.of(origin.getX(), origin.getY(), origin.getZ());
         helper.setBlock(new BlockPos(0, 0, 0), Blocks.STONE);
         helper.setBlock(new BlockPos(1, 0, 0), Blocks.AIR);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         Siting rootSiting = Siting.of(point, Orientation.identity);
         Siting wingSiting = Siting.of(LatticePoint.of(point.x() + 1, point.y(), point.z()), Orientation.identity);
         Cuboid covered = Cuboid.of(point.x(), point.y(), point.z(), point.x() + 2, point.y() + 1, point.z() + 1);
         String set = BuiltinDocuments.setDemoId().text();
         String arguments = origin.getX() + " " + origin.getY() + " " + origin.getZ();
         try {
-            ledger.release(state.owner(), rootSiting);
-            ledger.release(state.owner(), wingSiting);
+            release(ledger, state, level, rootSiting);
+            release(ledger, state, level, wingSiting);
             long revision = ledger.revision();
             RecordingSource recording = new RecordingSource();
             CommandSourceStack source = stack(helper, origin, recording);
@@ -158,8 +160,8 @@ public final class SetCommandGameTest {
             helper.assertValueEqual(revision, ledger.revision(), "a failed set settle moves no revision");
             helper.assertValueEqual(0, ledger.read(covered).rows().size(), "a failed set settle writes no row");
         } finally {
-            ledger.release(state.owner(), rootSiting);
-            ledger.release(state.owner(), wingSiting);
+            release(ledger, state, level, rootSiting);
+            release(ledger, state, level, wingSiting);
         }
         helper.succeed();
     }
@@ -184,6 +186,13 @@ public final class SetCommandGameTest {
         } catch (CommandSyntaxException failure) {
             helper.fail("the command did not parse: " + failure.getMessage());
             return 0;
+        }
+    }
+
+    private static void release(ClaimLedger ledger, ServerState state, ServerLevel level, Siting siting) {
+        StructureInstance instance = state.structures(level).find(state.world(level), state.owner(), siting);
+        if (instance != null) {
+            ledger.release(instance.id());
         }
     }
 

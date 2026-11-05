@@ -760,28 +760,6 @@ class CaptureAdversarialTest {
     }
 
     @Test
-    void aMovedInstanceReplacesItsBoundsAndSitingLifetime() {
-        StructureManager manager = StructureManager.create();
-        Siting from = Siting.of(LatticePoint.origin, Orientation.identity);
-        Siting to = Siting.of(LatticePoint.of(20, 0, 0), Orientation.identity);
-        StructureInstance instance = commit(manager, from, CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)));
-
-        manager.onEvent(new StructureEvent.Moved(instance.id(), from, to, CuboidSet.of(Cuboid.of(20, 0, 0, 21, 1, 1))));
-
-        StructureInstance moved = Objects.requireNonNull(manager.find(instance.id()), "the moved instance");
-        assertEquals(to, moved.siting(), "the siting moved");
-        assertEquals(CuboidSet.of(Cuboid.of(20, 0, 0, 21, 1, 1)), moved.bounds(), "the bounds moved with it");
-        assertNull(manager.find(owner, from), "the old siting is free");
-        assertNotNull(manager.find(owner, to), "the new siting is held");
-        assertTrue(manager.findAt(LatticePoint.origin).isEmpty(), "the old cell no longer finds it");
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(instance.id(), from, to, moved.bounds())),
-            "a move from the wrong siting is rejected"
-        );
-    }
-
-    @Test
     void unloadIsWorldScopedAndLoadRestoresTheSerial() {
         StructureManager manager = StructureManager.create();
         World firstWorld = World.of(NamespacedId.of("test", "first_world"));

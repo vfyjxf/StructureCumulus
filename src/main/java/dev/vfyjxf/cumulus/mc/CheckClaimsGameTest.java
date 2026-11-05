@@ -1,12 +1,13 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -47,7 +48,6 @@ public final class CheckClaimsGameTest {
     private static final NamespacedId blueprintId = NamespacedId.of(Constants.modId, "check_claims_cell");
     private static final NamespacedId bayId = NamespacedId.of(Constants.modId, "check_claims_bay");
     private static final NamespacedId checkId = NamespacedId.of(Constants.modId, "check_claims_check");
-    private static final NamespacedId otherOwnerId = NamespacedId.of(Constants.modId, "check_claims_owner");
     private static final NamespacedId otherBayId = NamespacedId.of(Constants.modId, "check_claims_incumbent");
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
@@ -63,8 +63,8 @@ public final class CheckClaimsGameTest {
         Siting siting = Siting.of(point, Orientation.identity);
         RecordingSource recording = new RecordingSource();
         CommandSourceStack source = stack(helper, origin, recording);
-        SavedClaims ledger = state.claims(level);
-        OwnerId other = OwnerId.of(otherOwnerId);
+        ClaimLedger ledger = state.claims(level);
+        InstanceId incumbentInstance = new InstanceId(ledger.world(), 1_000_000L);
         try {
             long cleanRevision = ledger.revision();
             MatchResult clean = CumulusCommand.check(source, state, level, cellBlueprint(), point);
@@ -74,8 +74,14 @@ public final class CheckClaimsGameTest {
             }
             helper.assertValueEqual(cleanRevision, ledger.revision(), "a clean check does not write the ledger");
 
-            ClaimRow incumbent = new ClaimRow(LatticeKey.of(point), Sharing.exclusive, other, siting, otherBayId);
-            ledger.settle(new SettleRequest(other, siting, List.of(incumbent), ledger.revision()));
+            ClaimRow incumbentRow = new ClaimRow(
+                LatticeKey.of(point),
+                Sharing.exclusive,
+                siting,
+                otherBayId,
+                incumbentInstance
+            );
+            ledger.settle(new SettleRequest(incumbentInstance, List.of(incumbentRow), ledger.revision()));
             long claimedRevision = ledger.revision();
             MatchResult contested = CumulusCommand.check(source, state, level, cellBlueprint(), point);
             if (!(contested instanceof MatchResult.Failed)) {
@@ -92,7 +98,7 @@ public final class CheckClaimsGameTest {
             helper.assertValueEqual(claimedRevision, ledger.revision(), "a failed check does not write the ledger");
             helper.assertValueEqual(1, ledger.read(Cuboid.of(point)).rows().size(), "the incumbent row is untouched");
         } finally {
-            ledger.release(other, siting);
+            ledger.release(incumbentInstance);
         }
         helper.succeed();
     }

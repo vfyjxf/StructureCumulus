@@ -602,6 +602,7 @@ final class StructureSetTestSupport {
         int settleCalls;
         int releaseCalls;
         final List<Siting> released = new ArrayList<>();
+        private final Map<InstanceId, Siting> sitings = new LinkedHashMap<>();
 
         void seed(ClaimRow... seeded) {
             for (ClaimRow row : seeded) {
@@ -623,7 +624,9 @@ final class StructureSetTestSupport {
         @Override
         public ClaimVerdict settle(SettleRequest request) {
             settleCalls++;
-            if (request.siting().equals(movingSiting)) {
+            Siting requestSiting = request.rows().isEmpty() ? null : request.rows().get(0).siting();
+            if (requestSiting != null && requestSiting.equals(movingSiting)
+                    && !sitings.containsKey(request.instance())) {
                 return new ClaimVerdict.RevisionMoved(request.expectedRevision(), revision + 1);
             }
             if (request.expectedRevision() != revision) {
@@ -649,21 +652,25 @@ final class StructureSetTestSupport {
                     }
                 }
             }
-            rows.removeIf(row -> row.owner().equals(request.owner()) && row.siting().equals(request.siting()));
+            rows.removeIf(row -> row.instance().equals(request.instance()));
             rows.addAll(request.rows());
             rows.sort(ClaimRow::compareTo);
+            if (requestSiting != null) {
+                sitings.put(request.instance(), requestSiting);
+            }
             revision++;
             return new ClaimVerdict.Settled(revision, ledgerWide ? List.copyOf(rows) : List.copyOf(request.rows()));
         }
 
         @Override
-        public ClaimVerdict release(OwnerId owner, Siting siting) {
+        public ClaimVerdict release(InstanceId instance) {
             releaseCalls++;
+            Siting siting = sitings.get(instance);
             released.add(siting);
-            if (siting.equals(throwingRelease)) {
+            if (siting != null && siting.equals(throwingRelease)) {
                 throw new IllegalStateException("release refused by the test ledger");
             }
-            rows.removeIf(row -> row.owner().equals(owner) && row.siting().equals(siting));
+            rows.removeIf(row -> row.instance().equals(instance));
             revision++;
             return new ClaimVerdict.Settled(revision, List.of());
         }

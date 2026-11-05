@@ -3,11 +3,13 @@ package dev.vfyjxf.cumulus.mc;
 import com.mojang.brigadier.context.CommandContext;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import org.jspecify.annotations.NullMarked;
 
 /** The claims subcommand: the ledger rows inside one box, in claim order. */
@@ -34,15 +36,18 @@ final class ClaimsCommand {
         String header = "claims " + from.toShortString() + " .. " + to.toShortString() + ": " + view.rows().size()
                 + " row(s), revision " + view.revision() + (view.available() ? "" : ", unavailable");
         source.sendSuccess(() -> Component.literal(header), false);
+        ServerLevel level = source.getLevel();
         for (ClaimRow row : view.rows()) {
-            source.sendSuccess(() -> Component.literal(describe(row)), false);
+            source.sendSuccess(() -> Component.literal(describe(state, level, row)), false);
         }
         return 1;
     }
 
-    private static String describe(ClaimRow row) {
-        return "  " + row.cell().point() + " " + row.sharing() + " " + row.owner().id().text() + " " + row.bay().text()
-                + " at " + row.siting().origin();
+    private static String describe(ServerState state, ServerLevel level, ClaimRow row) {
+        StructureInstance instance = state.structures(level).find(row.instance());
+        String owner = instance == null ? "unknown" : instance.owner().id().text();
+        return "  " + row.cell().point() + " " + row.sharing() + " " + owner + " " + row.bay().text() + " at "
+                + row.siting().origin();
     }
 
     private ClaimsCommand() {}

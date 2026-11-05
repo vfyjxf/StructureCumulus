@@ -2,10 +2,12 @@ package dev.vfyjxf.cumulus.mc;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -77,8 +79,8 @@ public final class SettleCommandGameTest {
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
         LatticePoint point = LatticePoint.of(origin.getX(), origin.getY(), origin.getZ());
         Siting siting = Siting.of(point, Orientation.identity);
-        SavedClaims ledger = state.claims(level);
-        ledger.release(state.owner(), siting);
+        ClaimLedger ledger = state.claims(level);
+        release(ledger, state, level, siting);
         RecordingSource recording = new RecordingSource();
         CommandSourceStack source = stack(helper, origin, recording);
         try {
@@ -91,7 +93,11 @@ public final class SettleCommandGameTest {
             ClaimView held = ledger.read(Cuboid.of(point));
             helper.assertValueEqual(1, held.rows().size(), "the claim row is visible");
             ClaimRow row = held.rows().get(0);
-            helper.assertValueEqual(state.owner(), row.owner(), "the row owner");
+            StructureInstance formedInstance = state.structures(level).find(state.world(level), state.owner(), siting);
+            helper.assertTrue(
+                formedInstance != null && formedInstance.id().equals(row.instance()),
+                "the row belongs to the formed instance"
+            );
             helper.assertValueEqual(point, row.siting().origin(), "the siting origin");
             helper.assertValueEqual(bayId, row.bay(), "the row bay");
             helper.assertValueEqual(Sharing.exclusive, row.sharing(), "the row sharing");
@@ -116,7 +122,7 @@ public final class SettleCommandGameTest {
             helper.assertValueEqual(1, untouched.rows().size(), "a failed check writes no row");
             helper.assertValueEqual(revision + 1, untouched.revision(), "a failed check does not move the revision");
         } finally {
-            ledger.release(state.owner(), siting);
+            release(ledger, state, level, siting);
         }
         helper.succeed();
     }
@@ -186,6 +192,13 @@ public final class SettleCommandGameTest {
 
         private String text() {
             return String.join("\n", messages);
+        }
+    }
+
+    private static void release(ClaimLedger ledger, ServerState state, ServerLevel level, Siting siting) {
+        StructureInstance instance = state.structures(level).find(state.world(level), state.owner(), siting);
+        if (instance != null) {
+            ledger.release(instance.id());
         }
     }
 }

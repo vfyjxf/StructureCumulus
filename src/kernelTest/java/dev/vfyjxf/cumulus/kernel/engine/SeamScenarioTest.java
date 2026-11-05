@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -45,21 +46,21 @@ class SeamScenarioTest {
         assertEquals(1, withSeam.seams().size(), "the seam is declared");
         assertEquals(seamCell, withSeam.seams().get(0).cells().min(), "the seam covers the declared air cell");
 
-        TestWorld.Ledger seamLedger = MagicFixtures.ledger();
+        ClaimLedger seamLedger = MagicFixtures.ledger();
         MatchResult.Formed withFormed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(withSeam, siting, view, seamLedger)
         );
         TestWorld.View controlView = MagicFixtures.view();
         MagicFixtures.air(controlView, siting, seamCell);
-        TestWorld.Ledger plainLedger = MagicFixtures.ledger();
+        ClaimLedger plainLedger = MagicFixtures.ledger();
         MatchResult.Formed plainFormed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(withoutSeam, siting, controlView, plainLedger)
         );
         assertEquals(1, withFormed.claims().rows().size(), "the seam is never claimed");
         assertEquals(1, plainFormed.claims().rows().size(), "the no-seam control claims one cell");
-        assertEquals(1, seamLedger.all().size(), "the seam does not add a row");
+        assertEquals(1, TestWorld.rows(seamLedger).size(), "the seam does not add a row");
         assertEquals(
             plainFormed.claims().rows().get(0).cell(),
             withFormed.claims().rows().get(0).cell(),

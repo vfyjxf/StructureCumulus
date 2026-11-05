@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -295,7 +296,7 @@ class ReadModelTest {
 
         IllegalArgumentException rejected = assertThrows(
             IllegalArgumentException.class,
-            () -> ClaimPlanner.derive(blueprint, atOrigin, owner, List.of(new BayBinding(bay, List.of(nested))))
+            () -> ClaimPlanner.derive(blueprint, atOrigin, instance, List.of(new BayBinding(bay, List.of(nested))))
         );
         assertTrue(Objects.requireNonNull(rejected.getMessage(), "message").contains("SC-CLM-0004"));
     }
@@ -328,7 +329,7 @@ class ReadModelTest {
 
         MatchResult.Failed failed = assertInstanceOf(
             MatchResult.Failed.class,
-            MatchEngine.settle(request, forged, new TestWorld.Ledger(), ContextStore.inMemory())
+            MatchEngine.settle(request, forged, ClaimLedger.inMemory(TestWorld.world), ContextStore.inMemory())
         );
         assertEquals(
             Codes.bindingInvalid.code(),

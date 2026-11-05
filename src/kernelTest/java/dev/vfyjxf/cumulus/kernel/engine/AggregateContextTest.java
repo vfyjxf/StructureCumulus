@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -218,7 +219,7 @@ class AggregateContextTest {
             called.set(true);
             return Outcome.found(1L);
         }));
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         ContextStore contexts = ContextStore.inMemory();
         TestWorld.Lease lease = new TestWorld.Lease(MagicFixtures.view());
         MatchRequest request = MatchRequest.of(
@@ -236,7 +237,7 @@ class AggregateContextTest {
         assertFalse(called.get(), "the aggregate must not run when its charge is refused");
         assertEquals(Spend.zero, Objects.requireNonNull(undecided.partial()).spend());
         assertEquals(0L, ledger.revision());
-        assertTrue(ledger.all().isEmpty());
+        assertTrue(TestWorld.rows(ledger).isEmpty());
         assertEquals(0L, contexts.context(MagicFixtures.instance).revision());
         assertTrue(contexts.context(MagicFixtures.instance).values().isEmpty());
     }

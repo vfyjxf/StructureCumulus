@@ -217,7 +217,7 @@ public final class LeaseMarkCounterGameTest {
         LevelCapture capture = new LevelCapture(helper.getLevel());
         CaptureResult.Captured captured = captured(capture, cell(helper), SnapshotPolicy.minimal());
         try (SnapshotLease lease = captured.lease()) {
-            WatchEvents.levelUnloaded(new LevelEvent.Unload(helper.getLevel()));
+            ServerState.unload(new LevelEvent.Unload(helper.getLevel()));
             helper.assertFalse(lease.isCurrent(), "the level epoch invalidates every capture");
         } finally {
             capture.close();

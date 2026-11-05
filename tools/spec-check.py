@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Check that every module's documented public types are in code and vice versa.
 
-This is a name-level gate, not a signature gate; the compile of the skeleton is the signature gate.
+This is a name-level gate, not a signature gate: it compares type names, not members. Member-level
+conformance is a review obligation (`07-regeneration.md` §4, row 5).
 Examples inside a module file are excluded by reading only the block after '## 3. Signatures'.
 """
 from __future__ import annotations
@@ -60,7 +61,7 @@ def main() -> int:
         missing_in_code = sorted(doc - code)
         internal = {"BasicExpectationContext", "InMemoryStore", "BuiltinCodes",
                     "BuiltinComputations", "BuiltinExpectations", "BuiltinFocuses",
-                    "BuiltinSupport", "DefaultCatalogs", "BuilderImpl"}
+                    "BuiltinSupport", "DefaultCatalogs", "BuilderImpl", "InMemoryClaimLedger"}
         missing_in_doc = sorted((code - doc) - internal)
         if missing_in_code:
             print(f"{module}: documented but not in code: {', '.join(missing_in_code)}")

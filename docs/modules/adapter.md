@@ -128,7 +128,7 @@
 | `OrientationMapping` | — | `Heading`/`Direction`, `Turn`/`Rotation`, `Flip`/`Mirror`; upright mirror-then-rotate transform and the non-upright capability remap, with `MappingResult.Unrepresentable` as the `SC-MC-0004` payload |
 | `AdapterCodes` | final class, package-private | the adapter's `SC-MC-*` codes, their catalog `CodeEntry`s and the severity each finding carries |
 | `CaptureReports` | final class, package-private | the report site: one `CaptureReport` entry → one `Finding` (severity, world label, trust guard) |
-| `SavedClaims` | `ClaimLedger` | per-world `SavedData`, CAS on the server thread (M3) |
+| `ClaimLedger.inMemory` | `ClaimLedger` | per-world in-memory ledger, CAS on the server thread; dies with the level's structure state (D-44) |
 | `StructureManager` | `ContextStore` | in-memory per-level registry; `begin`/`commit`/`abort` and host lifecycle events (D-40) |
 | `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
 | `JsonDocument` / `StructureSetReader` / `StructureSetWriter` | — | `kind` dispatcher; Gson tree ↔ `StructureSetDocument`; canonical set output (S2) |
@@ -284,12 +284,14 @@ opened it; the kernel never closes.
 
 ## 5. Claims
 
-`SavedClaims` is one `SavedData` per world (M3, committed at `d4b6d82`); rows are a flat list ordered
-by `(cell, owner, bay, siting origin, placement orientation, placement offset, sharing)`; `revision` is a long in the same data. It is compatible with
-Model C: a refused read never creates a row, a nested body is never a claim binding (`engine` §7.5),
-and a failed check still writes nothing. The persisted row shape is unchanged. `settle` runs on the
-server thread and is one atomic replacement of `(owner, siting)` after checking `expectedRevision`
-and the matrix; `release` removes the key and bumps the revision only when something was removed;
+`ClaimLedger.inMemory` is one ledger per world, created with that world's structure state and dropped
+with it (D-44); rows are a flat list ordered by
+`(cell, instance, bay, siting origin, placement orientation, placement offset, sharing)`, and
+`revision` is a long beside them. It is compatible with Model C: a refused read never creates a row,
+a nested body is never a claim binding (`engine` §7.5), and a failed check still writes nothing.
+`settle` runs on the server thread and is one atomic replacement of one instance's rows after
+checking `expectedRevision` and the matrix; `release(instance)` removes that instance's rows and
+bumps the revision only when something was removed;
 `read` is a copy. A crash between the in-memory mutation and `setDirty` loses the revision; the host
 re-reads the store on load. The `/cumulus settle` command drives this path on the server thread.
 
@@ -303,10 +305,9 @@ the narrow publish/read interface implemented by the manager and the attempt.
 
 `WatchEvents` dispatches the host lifecycle: a player break or explosion inside a structure's bounds
 is `Broken` and releases the claim rows; a placement is `Invalidated` and releases the rows; a piston
-that moves the whole claimed structure is `Moved`, translates the claim rows and invalidates on a
-conflict; a partial move/destroy is `Invalidated` and releases the rows; a level unload is
-`Unloaded`. If the manager rejects a piston `Moved`, the adapter dispatches `Invalidated` for the
-stale instance and releases its old claim rows without translating them. `Loaded` exists for a host
+that moves any claimed cell is `Invalidated` and releases the rows — a pushed structure is gone,
+not translated; a partial move/destroy is `Invalidated` and releases the rows; a level unload is
+`Unloaded`, dispatched by `ServerState.unload` rather than by `WatchEvents`. The adapter produces no move event. `Loaded` exists for a host
 that restores its own instances, but this adapter has no persisted instances to restore. A manager
 rejects an event that would create a duplicate `(owner, siting)`; `Broken`/`Invalidated` are
 idempotent. The kernel manager reports `findAt`/`findIn`/`instances` registry-wide (no `World`); the
@@ -779,9 +780,14 @@ All commands run on the server thread. `check` returns 1 whenever it reaches a r
   declaration order. The command prints the set id/origin, the root and satellite outcomes, `settled`,
   `rolledBack`, `rollbackFailures`, the per-structure claim row counts and `firstFailure`, then the set
   findings. `set check` writes no row.
-- `ServerAboutToStartEvent` opens `ServerState`; `ServerStoppingEvent` closes it; `LevelEvent.Unload`
-  closes that world's capture (invalidating its leases) and drops its per-level store. Persisted claims
-  rows are not released; the next access reloads them from the world's saved data.
+- `ServerAboutToStartEvent` opens `ServerState`; `ServerStoppingEvent` closes it, and
+  `ServerStoppedEvent` closes it again on the crash path, where the stopping event never fires.
+  `LevelEvent.Load` creates that world's per-level store; `LevelEvent.Unload` — handled by
+  `ServerState.unload` alone — dispatches `Unloaded`, removes the store, closes the capture
+  (invalidating its leases) and forgets the watcher. Per-level state is keyed by
+  `ServerLevel#dimension()`, and no read path creates it: a lookup answers `null` or throws rather
+  than rebuilding what an unload just removed. The level's claim ledger is created with the store
+  and dropped with it, so no row outlives the instance that owns it (D-44).
 
 A capture report is printed as its own block, `capture <id>: findings`, before the check/settle
 findings (M5e, `28d0334`): a capture failure prints its failure line and then the report, and a

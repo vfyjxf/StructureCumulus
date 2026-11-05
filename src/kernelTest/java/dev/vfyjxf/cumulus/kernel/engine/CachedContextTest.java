@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -301,7 +302,7 @@ class CachedContextTest {
         assertEquals(first.outcome().spend(), second.outcome().spend());
         assertEquals(first.findings().findings(), second.findings().findings());
 
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         ContextStore contexts = ContextStore.inMemory();
         ContextKey<Long> failingKey = mergedKey("cached/failing");
         Blueprint failing = volumeBlueprint("cached/failing", region, failingKey, value -> value == 99L);
@@ -311,7 +312,7 @@ class CachedContextTest {
         );
         assertTrue(MagicFixtures.hasCode(failed, Codes.expected));
         assertEquals(0L, ledger.revision());
-        assertTrue(ledger.all().isEmpty());
+        assertTrue(TestWorld.rows(ledger).isEmpty());
         assertEquals(0L, contexts.context(MagicFixtures.instance).revision());
         assertTrue(contexts.context(MagicFixtures.instance).values().isEmpty());
     }

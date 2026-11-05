@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.document.LinkSpec;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
@@ -140,16 +141,16 @@ class StructureSetRollbackStressTest {
         ClaimRow foreignOwner = new ClaimRow(
             LatticeKey.of(LatticePoint.of(500, 0, 500)),
             Sharing.exclusive,
-            rival,
             fixture.plan.rootSiting(),
-            id("foreign")
+            id("foreign"),
+            new InstanceId(world, 900)
         );
         ClaimRow foreignSiting = new ClaimRow(
             LatticeKey.of(LatticePoint.of(500, 0, 501)),
             Sharing.exclusive,
-            owner,
             fixture.plan.rootSiting().withOrigin(LatticePoint.of(700, 10, 700)),
-            id("foreign")
+            id("foreign"),
+            new InstanceId(world, 901)
         );
         fixture.ledger.seed(foreignOwner, foreignSiting);
         StructureSetResult result = fixture.run();

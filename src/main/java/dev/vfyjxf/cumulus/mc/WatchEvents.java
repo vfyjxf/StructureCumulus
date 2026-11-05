@@ -1,20 +1,13 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.StructureCumulus;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
-import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
 import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
-import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
-import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import dev.vfyjxf.cumulus.kernel.space.Siting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -55,7 +48,6 @@ public final class WatchEvents {
         NeoForge.EVENT_BUS.addListener(EntityJoinLevelEvent.class, WatchEvents::entityJoined);
         NeoForge.EVENT_BUS.addListener(EntityLeaveLevelEvent.class, WatchEvents::entityLeft);
         NeoForge.EVENT_BUS.addListener(LevelEvent.Load.class, WatchEvents::levelLoaded);
-        NeoForge.EVENT_BUS.addListener(LevelEvent.Unload.class, WatchEvents::levelUnloaded);
     }
 
     static long dispatchCount() {
@@ -149,20 +141,8 @@ public final class WatchEvents {
         if (event.getLevel() instanceof ServerLevel level) {
             ServerState state = ServerState.current();
             if (state != null) {
+                state.openLevel(level);
                 dispatch(state.structures(level), new StructureEvent.Loaded(state.world(level), List.of()));
-            }
-        }
-    }
-
-    static void levelUnloaded(LevelEvent.Unload event) {
-        if (active(event.getLevel())) {
-            dispatches.incrementAndGet();
-            LevelWatch.levelUnloaded(event.getLevel());
-        }
-        if (event.getLevel() instanceof ServerLevel level) {
-            ServerState state = ServerState.current();
-            if (state != null) {
-                dispatch(state.structures(level), new StructureEvent.Unloaded(state.world(level)));
             }
         }
     }
@@ -256,118 +236,27 @@ public final class WatchEvents {
                 release(level, instance);
                 continue;
             }
-            boolean hasClaim = false;
-            boolean allMoved = true;
-            Cuboid claimBounds = instance.bounds().bounds();
-            if (claimBounds == null) {
-                dispatch(manager, new StructureEvent.Invalidated(instance.id(), "the structure has no bounds"));
-                release(level, instance);
-                continue;
-            }
-            ClaimView claims = state.claims(level).read(claimBounds);
-            for (ClaimRow row : claims.rows()) {
-                if (!row.owner().equals(instance.owner()) || !row.siting().equals(instance.siting())) {
-                    continue;
-                }
-                hasClaim = true;
-                LatticePoint cell = row.cell().point();
-                BlockPos pos = new BlockPos(cell.x(), cell.y(), cell.z());
-                if (!level.getBlockState(pos).isAir() && !pushed.contains(cell)) {
-                    allMoved = false;
-                    break;
-                }
-            }
-            CuboidSet movedBounds = instance.bounds().translate(dx, dy, dz);
-            LatticePoint movedOrigin = instance.siting().origin().offset(dx, dy, dz);
-            if (!hasClaim || !allMoved || movedBounds == null || movedOrigin == null) {
-                dispatch(
-                    manager,
-                    new StructureEvent.Invalidated(instance.id(), "a piston moved only part of the structure")
-                );
-                release(level, instance);
-                continue;
-            }
-            Siting movedSiting = instance.siting().withOrigin(movedOrigin);
-            StructureEvent moved = new StructureEvent.Moved(instance.id(), instance.siting(), movedSiting, movedBounds);
-            if (!dispatchChecked(manager, moved)) {
-                dispatch(
-                    manager,
-                    new StructureEvent.Invalidated(instance.id(), "the manager rejected the moved siting")
-                );
-                release(level, instance);
-                continue;
-            }
-            if (!moveClaims(level, instance, movedSiting, dx, dy, dz)) {
-                dispatch(manager, new StructureEvent.Invalidated(instance.id(), "the moved claims conflict"));
-                release(level, instance);
-                release(level, instance.owner(), movedSiting);
-                continue;
-            }
+            dispatch(
+                manager,
+                new StructureEvent.Invalidated(instance.id(), "a piston moved the structure")
+            );
+            release(level, instance);
         }
-    }
-
-    private static boolean moveClaims(
-        ServerLevel level,
-        StructureInstance instance,
-        Siting to,
-        int dx,
-        int dy,
-        int dz
-    ) {
-        ServerState state = ServerState.current();
-        if (state == null) {
-            return false;
-        }
-        Cuboid oldBounds = instance.bounds().bounds();
-        if (oldBounds == null) {
-            return true;
-        }
-        SavedClaims ledger = state.claims(level);
-        ClaimView old = ledger.read(oldBounds);
-        List<ClaimRow> moved = new ArrayList<>();
-        for (ClaimRow row : old.rows()) {
-            if (!row.owner().equals(instance.owner()) || !row.siting().equals(instance.siting())) {
-                continue;
-            }
-            LatticePoint cell = row.cell().point();
-            LatticePoint next = cell.offset(dx, dy, dz);
-            if (next == null) {
-                return false;
-            }
-            moved.add(new ClaimRow(LatticeKey.of(next), row.sharing(), row.owner(), to, row.bay()));
-        }
-        if (moved.isEmpty()) {
-            return true;
-        }
-        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance.owner(), to, moved, ledger.revision()));
-        if (!(verdict instanceof ClaimVerdict.Settled)) {
-            return false;
-        }
-        try {
-            ledger.release(instance.owner(), instance.siting());
-        } catch (RuntimeException failure) {
-            StructureCumulus.logger.warn("claim release for moved structure {} failed", instance.id(), failure);
-        }
-        return true;
     }
 
     private static void release(ServerLevel level, StructureInstance instance) {
-        release(level, instance.owner(), instance.siting());
-    }
-
-    private static void release(ServerLevel level, OwnerId owner, Siting siting) {
         ServerState state = ServerState.current();
         if (state == null) {
             return;
         }
         try {
-            state.claims(level).release(owner, siting);
+            state.claims(level).release(instance.id());
         } catch (RuntimeException failure) {
-            StructureCumulus.logger.warn("claim release for {} at {} failed", owner, siting, failure);
+            StructureCumulus.logger.warn("claim release for {} failed", instance.id(), failure);
         }
     }
 
-    private static void dispatch(StructureManager manager, StructureEvent event) {
+    static void dispatch(StructureManager manager, StructureEvent event) {
         dispatchChecked(manager, event);
     }
 

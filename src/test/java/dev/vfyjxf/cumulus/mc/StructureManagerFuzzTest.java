@@ -107,7 +107,8 @@ class StructureManagerFuzzTest {
                 for (NamespacedId key : expected) {
                     Blueprint blueprint = blueprintOf(fixture, key);
                     Siting siting = sitingOf(fixture, key);
-                    List<ClaimRow> expectedRows = expectedRows(blueprint, siting, owner);
+                    InstanceId rowInstance = attempts.get(expected.indexOf(key)).id();
+                    List<ClaimRow> expectedRows = expectedRows(blueprint, siting, rowInstance);
                     List<ClaimRow> actual = ownRows(result, key, blueprint, siting);
                     assertEquals(expectedRows, actual, where + " claim rows of " + key);
                     assertRowLaws(actual, where + " " + key);
@@ -249,9 +250,9 @@ class StructureManagerFuzzTest {
                         new ClaimRow(
                             LatticeKey.of(world(fixture.plan.rootSiting(), LatticePoint.of(0, 0, 0))),
                             Sharing.exclusive,
-                            rival,
                             fixture.plan.rootSiting(),
-                            id("rival_bay")
+                            id("rival_bay"),
+                            new InstanceId(world, 900)
                         )
                     );
                     default -> {}
@@ -394,43 +395,6 @@ class StructureManagerFuzzTest {
                             where + " Broken removes the context"
                         );
                     }
-                    case 2, 3 -> {
-                        Siting target = spares.get(random.nextInt(spares.size()));
-                        StructureInstance occupant = manager.find(instance.owner(), target);
-                        List<StructureInstance> before = manager.instances();
-                        if (occupant != null && !occupant.id().equals(instance.id())) {
-                            assertThrows(
-                                IllegalArgumentException.class,
-                                () -> manager.onEvent(
-                                    new StructureEvent.Moved(
-                                        instance.id(),
-                                        instance.siting(),
-                                        target,
-                                        instance.bounds()
-                                    )
-                                ),
-                                where + " a moved collision is rejected"
-                            );
-                            assertEquals(before, manager.instances(), where + " a rejected move writes nothing");
-                        } else {
-                            StructureContext context = instance.context();
-                            CuboidSet bounds = CuboidSet.of(
-                                Cuboid.of(
-                                    target.origin(),
-                                    LatticePoint.of(
-                                        target.origin().x() + 2,
-                                        target.origin().y() + 1,
-                                        target.origin().z() + 2
-                                    )
-                                )
-                            );
-                            manager.onEvent(new StructureEvent.Moved(instance.id(), instance.siting(), target, bounds));
-                            StructureInstance moved = Objects.requireNonNull(manager.find(instance.id()), where);
-                            assertEquals(context, moved.context(), where + " Moved preserves the context");
-                            assertEquals(target, moved.siting(), where + " Moved updates the siting");
-                            assertEquals(bounds, moved.bounds(), where + " Moved updates the bounds");
-                        }
-                    }
                     case 4 -> {
                         manager.onEvent(new StructureEvent.Invalidated(instance.id(), "fuzz"));
                         assertNull(manager.find(instance.id()), where + " Invalidated removes the instance");
@@ -556,7 +520,7 @@ class StructureManagerFuzzTest {
         return satellite.siting();
     }
 
-    private static List<ClaimRow> expectedRows(Blueprint blueprint, Siting siting, OwnerId rowOwner) {
+    private static List<ClaimRow> expectedRows(Blueprint blueprint, Siting siting, InstanceId rowInstance) {
         List<ClaimRow> rows = new ArrayList<>();
         for (Bay bay : blueprint.bays()) {
             CuboidSet owned = switch (bay.footprint()) {
@@ -573,9 +537,9 @@ class StructureManagerFuzzTest {
                                 new ClaimRow(
                                     LatticeKey.of(LatticePoint.of(x, y, z)),
                                     bay.sharing(),
-                                    rowOwner,
                                     siting,
-                                    bay.id()
+                                    bay.id(),
+                                    rowInstance
                                 )
                             );
                         }
@@ -600,7 +564,7 @@ class StructureManagerFuzzTest {
     ) {
         List<ClaimRow> rows = new ArrayList<>();
         for (ClaimRow row : result.claimsOf(key)) {
-            if (row.owner().equals(owner) && row.siting().equals(siting) && blueprint.bay(row.bay()) != null) {
+            if (row.siting().equals(siting) && blueprint.bay(row.bay()) != null) {
                 rows.add(row);
             }
         }

@@ -2,8 +2,10 @@ package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
 import dev.vfyjxf.cumulus.StructureCumulus;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
+import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
 import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -25,9 +27,12 @@ import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import dev.vfyjxf.cumulus.mc.visual.VisualClaim;
 import dev.vfyjxf.cumulus.mc.visual.VisualInstance;
 import dev.vfyjxf.cumulus.mc.visual.VisualSnapshot;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -44,7 +49,11 @@ public final class ServerState {
 
     private static final OwnerId serverOwner = OwnerId.of(NamespacedId.of(Constants.modId, "server"));
 
-    private static @Nullable ServerState current;
+    /** The host's custom document key types; the shipped adapter registers none. */
+    private static final Map<NamespacedId, Class<?>> hostTypes = Map.of();
+
+    /** Written on the server thread, read by the datapack receive hook from the main thread. */
+    private static volatile @Nullable ServerState current;
 
     private final Catalogs catalogs;
     private final StructureKernel kernel;
@@ -52,8 +61,8 @@ public final class ServerState {
     private final DocumentSource documents;
     private final TraitLookup traitLookup;
     private NestedExtentLookup nestedExtentLookup = NestedExtentLookup.capabilities();
-    private final Map<ServerLevel, LevelStore> levels = new HashMap<>();
-    private final Map<ServerLevel, LevelCapture> captures = new HashMap<>();
+    private final Map<ResourceKey<Level>, LevelStore> levels = new HashMap<>();
+    private final Map<ResourceKey<Level>, LevelCapture> captures = new HashMap<>();
 
     private ServerState() {
         this.catalogs = Catalogs.builder().expectations(AdapterExpectations.catalog()).codes(AdapterCodes.catalog())
@@ -74,19 +83,29 @@ public final class ServerState {
                 return document != null ? document : builtin.findSet(id);
             }
         };
-        this.kernel = StructureKernel.create(catalogs, new Host(documents, null, StructureManager.create(), Map.of()));
+        this.kernel = StructureKernel.create(catalogs, new Host(documents, null, StructureManager.create(), hostTypes));
         this.traitLookup = TraitLookup.load(StructureCumulus.logger);
     }
 
     public static void open(ServerAboutToStartEvent event) {
         ServerState previous = current;
-        current = new ServerState();
+        current = null;
         if (previous != null) {
             closeState(previous);
         }
+        current = new ServerState();
     }
 
     public static void close(ServerStoppingEvent event) {
+        closeCurrent();
+    }
+
+    /** The crash path: {@code ServerStoppingEvent} never fires, {@code ServerStoppedEvent} always does. */
+    public static void stopped(ServerStoppedEvent event) {
+        closeCurrent();
+    }
+
+    private static void closeCurrent() {
         ServerState state = current;
         current = null;
         if (state != null) {
@@ -97,13 +116,19 @@ public final class ServerState {
 
     public static void unload(LevelEvent.Unload event) {
         ServerState state = current;
-        if (state != null && event.getLevel() instanceof ServerLevel level) {
-            LevelCapture capture = state.captures.remove(level);
-            if (capture != null) {
-                capture.close();
-            }
-            state.levels.remove(level);
+        if (state == null || !(event.getLevel() instanceof ServerLevel level)) {
+            return;
         }
+        ResourceKey<Level> key = level.dimension();
+        LevelStore store = state.levels.remove(key);
+        if (store != null) {
+            WatchEvents.dispatch(store.structures(), new StructureEvent.Unloaded(state.world(level)));
+        }
+        LevelCapture capture = state.captures.remove(key);
+        if (capture != null) {
+            capture.close();
+        }
+        LevelWatch.levelUnloaded(level);
     }
 
     private static void closeState(ServerState state) {
@@ -136,22 +161,22 @@ public final class ServerState {
             catalogs.focuses(),
             catalogs.expectations(),
             catalogs.computations(),
-            Map.of(),
+            hostTypes,
             documents
         );
         return StructureSetCompiler.compile(document, context);
     }
 
     StructureKernel kernel(ServerLevel level) {
-        return store(level).kernel();
+        return require(level).kernel();
     }
 
-    SavedClaims claims(ServerLevel level) {
-        return store(level).claims();
+    ClaimLedger claims(ServerLevel level) {
+        return require(level).claims();
     }
 
     StructureManager structures(ServerLevel level) {
-        return store(level).structures();
+        return require(level).structures();
     }
 
     /**
@@ -164,7 +189,17 @@ public final class ServerState {
     }
 
     LevelCapture capture(ServerLevel level) {
-        return captures.computeIfAbsent(level, attached -> new LevelCapture(attached, nestedExtentLookup, traitLookup));
+        ResourceKey<Level> key = level.dimension();
+        LevelCapture capture = captures.get(key);
+        if (capture != null && capture.level() == level) {
+            return capture;
+        }
+        if (capture != null) {
+            capture.close();
+        }
+        LevelCapture created = new LevelCapture(level, nestedExtentLookup, traitLookup);
+        captures.put(key, created);
+        return created;
     }
 
     void closeCaptures() {
@@ -180,15 +215,27 @@ public final class ServerState {
         return serverOwner;
     }
 
-    private LevelStore store(ServerLevel level) {
-        return levels.computeIfAbsent(level, attached -> {
-            World world = World.of(worldId(attached));
-            SavedClaims claims = attached.getDataStorage()
-                    .computeIfAbsent(SavedClaims.factory(world), SavedClaims.dataName);
+    /** Creates this level's state; the only creation point, driven by {@code LevelEvent.Load}. */
+    void openLevel(ServerLevel level) {
+        levels.computeIfAbsent(level.dimension(), ignored -> {
+            World world = World.of(worldId(level));
+            ClaimLedger claims = ClaimLedger.inMemory(world);
             StructureManager structures = StructureManager.create();
-            Host host = new Host(documents, claims, structures, Map.of());
+            Host host = new Host(documents, claims, structures, hostTypes);
             return new LevelStore(claims, structures, StructureKernel.create(catalogs, host));
         });
+    }
+
+    private @Nullable LevelStore existing(ServerLevel level) {
+        return levels.get(level.dimension());
+    }
+
+    private LevelStore require(ServerLevel level) {
+        LevelStore store = existing(level);
+        if (store == null) {
+            throw new IllegalStateException("no structure state for " + worldId(level));
+        }
+        return store;
     }
 
     private static NamespacedId worldId(ServerLevel level) {
@@ -196,14 +243,14 @@ public final class ServerState {
         return NamespacedId.of(location.getNamespace(), location.getPath());
     }
 
-    private record LevelStore(SavedClaims claims, StructureManager structures, StructureKernel kernel) {}
+    private record LevelStore(ClaimLedger claims, StructureManager structures, StructureKernel kernel) {}
 
     /**
      * Reads this level's formed instances and persisted claim rows without mutating either. The
      * snapshot is taken on the server thread; the client only ever sees a serialized copy.
      */
     public VisualSnapshot visualSnapshot(ServerLevel level) {
-        LevelStore store = store(level);
+        LevelStore store = require(level);
         StructureManager structures = store.structures();
         List<VisualInstance> instances = new ArrayList<>();
         for (StructureInstance instance : structures.instances()) {
@@ -225,7 +272,12 @@ public final class ServerState {
         ClaimView view = store.claims().read(fullLattice());
         List<VisualClaim> claims = new ArrayList<>(view.rows().size());
         for (var row : view.rows()) {
-            claims.add(new VisualClaim(row.cell(), row.sharing(), row.owner(), row.siting(), row.bay()));
+            StructureInstance owner = structures.find(row.instance());
+            if (owner == null) {
+                // A row whose instance is gone has no owner to show.
+                continue;
+            }
+            claims.add(new VisualClaim(row.cell(), row.sharing(), owner.owner(), row.siting(), row.bay()));
         }
         return new VisualSnapshot(world(level).id(), level.getGameTime(), view.revision(), instances, claims);
     }

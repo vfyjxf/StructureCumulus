@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.uitest;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
@@ -11,6 +12,7 @@ import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
@@ -29,9 +31,10 @@ import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.space.Tilt;
 import dev.vfyjxf.cumulus.kernel.space.Turn;
-import dev.vfyjxf.cumulus.mc.SavedClaims;
 import dev.vfyjxf.cumulus.mc.ServerState;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import org.jspecify.annotations.NullMarked;
 
 import java.lang.reflect.Method;
@@ -72,7 +75,7 @@ final class VisualFixtureSupport {
         LatticePoint.maxXz
     );
 
-    private static final Map<ServerLevel, List<StructureInstance>> unloadedFixtures = new HashMap<>();
+    private static final Map<ResourceKey<Level>, List<StructureInstance>> unloadedFixtures = new HashMap<>();
 
     private static final Method currentMethod;
     private static final Method structuresMethod;
@@ -258,59 +261,6 @@ final class VisualFixtureSupport {
     }
 
     /** Moves the first fixture owner's instance and translates its claim rows with it. */
-    static boolean moveFixture(ServerLevel level, LatticePoint origin, int dx, int dy, int dz) {
-        ServerState state = state();
-        if (state == null) {
-            return false;
-        }
-        StructureManager manager = structures(state, level);
-        StructureInstance target = null;
-        for (StructureInstance instance : manager.instances()) {
-            if (instance.owner().equals(ownerA) && instance.siting().origin().equals(origin)) {
-                target = instance;
-                break;
-            }
-        }
-        if (target == null) {
-            return false;
-        }
-        LatticePoint newOrigin = origin.offset(dx, dy, dz);
-        if (newOrigin == null) {
-            return false;
-        }
-        CuboidSet movedBounds = target.bounds().translate(dx, dy, dz);
-        if (movedBounds == null) {
-            return false;
-        }
-        Siting oldSiting = target.siting();
-        Siting newSiting = oldSiting.withOrigin(newOrigin);
-        SavedClaims ledger = claims(state, level);
-        List<ClaimRow> oldRows = new ArrayList<>();
-        for (ClaimRow row : ledger.read(lattice).rows()) {
-            if (row.owner().equals(target.owner()) && row.siting().equals(oldSiting)) {
-                oldRows.add(row);
-            }
-        }
-        ledger.release(target.owner(), oldSiting);
-        List<ClaimRow> translated = new ArrayList<>(oldRows.size());
-        for (ClaimRow row : oldRows) {
-            LatticePoint cell = row.cell().point().offset(dx, dy, dz);
-            if (cell == null) {
-                return false;
-            }
-            translated.add(new ClaimRow(LatticeKey.of(cell), row.sharing(), row.owner(), newSiting, row.bay()));
-        }
-        ClaimVerdict verdict = ledger
-                .settle(new SettleRequest(target.owner(), newSiting, translated, ledger.revision()));
-        if (!(verdict instanceof ClaimVerdict.Settled)) {
-            return false;
-        }
-        manager.onEvent(new StructureEvent.Moved(target.id(), oldSiting, newSiting, movedBounds));
-        VisualClientState.noteEvent("moved");
-        return true;
-    }
-
-    /** Unloads the level's fixture instances; claim rows stay persisted by manager contract. */
     static boolean unloadFixture(ServerLevel level) {
         ServerState state = state();
         if (state == null) {
@@ -323,7 +273,7 @@ final class VisualFixtureSupport {
                 ours.add(instance);
             }
         }
-        unloadedFixtures.put(level, List.copyOf(ours));
+        unloadedFixtures.put(level.dimension(), List.copyOf(ours));
         VisualClientState.expectLifecycle("unloaded");
         VisualClientState.noteEvent("unloaded");
         manager.onEvent(new StructureEvent.Unloaded(world(state, level)));
@@ -336,7 +286,7 @@ final class VisualFixtureSupport {
         if (state == null) {
             return false;
         }
-        List<StructureInstance> saved = unloadedFixtures.remove(level);
+        List<StructureInstance> saved = unloadedFixtures.remove(level.dimension());
         if (saved == null) {
             return false;
         }
@@ -379,15 +329,15 @@ final class VisualFixtureSupport {
         for (StructureInstance instance : manager.instances()) {
             manager.onEvent(new StructureEvent.Broken(instance.id()));
         }
-        SavedClaims ledger = claims(state, level);
-        Set<OwnerSiting> keys = new LinkedHashSet<>();
+        ClaimLedger ledger = claims(state, level);
+        Set<InstanceId> held = new LinkedHashSet<>();
         for (ClaimRow row : ledger.read(lattice).rows()) {
-            keys.add(new OwnerSiting(row.owner(), row.siting()));
+            held.add(row.instance());
         }
-        for (OwnerSiting key : keys) {
-            ledger.release(key.owner(), key.siting());
+        for (InstanceId instance : held) {
+            ledger.release(instance);
         }
-        unloadedFixtures.remove(level);
+        unloadedFixtures.remove(level.dimension());
         VisualClientState.setSetSummary(null);
         VisualGroupState.clear();
         VisualPartState.clear();
@@ -414,17 +364,11 @@ final class VisualFixtureSupport {
         for (StructureInstance instance : ours) {
             manager.onEvent(new StructureEvent.Broken(instance.id()));
         }
-        SavedClaims ledger = claims(state, level);
-        Set<OwnerSiting> keys = new LinkedHashSet<>();
-        for (ClaimRow row : ledger.read(lattice).rows()) {
-            if (fixtureOwners.contains(row.owner())) {
-                keys.add(new OwnerSiting(row.owner(), row.siting()));
-            }
+        ClaimLedger ledger = claims(state, level);
+        for (StructureInstance instance : ours) {
+            ledger.release(instance.id());
         }
-        for (OwnerSiting key : keys) {
-            ledger.release(key.owner(), key.siting());
-        }
-        unloadedFixtures.remove(level);
+        unloadedFixtures.remove(level.dimension());
         VisualClientState.setSetSummary(null);
         VisualGroupState.clear();
         VisualPartState.clear();
@@ -451,9 +395,9 @@ final class VisualFixtureSupport {
         }
     }
 
-    static SavedClaims claims(ServerState state, ServerLevel level) {
+    static ClaimLedger claims(ServerState state, ServerLevel level) {
         try {
-            return (SavedClaims) claimsMethod.invoke(state, level);
+            return (ClaimLedger) claimsMethod.invoke(state, level);
         } catch (ReflectiveOperationException failure) {
             throw new IllegalStateException("cannot read the claim ledger", failure);
         }
@@ -500,19 +444,23 @@ final class VisualFixtureSupport {
         CuboidSet cells,
         Sharing sharing
     ) {
+        StructureInstance instance = Objects.requireNonNull(
+            structures(state, level).find(world(state, level), owner, siting),
+            () -> "no fixture instance at " + owner.id().text() + "@" + siting
+        );
         List<ClaimRow> rows = new ArrayList<>();
         for (Cuboid box : cells.boxes()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {
                         LatticePoint cell = LatticePoint.of(x, y, z);
-                        rows.add(new ClaimRow(LatticeKey.of(cell), sharing, owner, siting, claimBay));
+                        rows.add(new ClaimRow(LatticeKey.of(cell), sharing, siting, claimBay, instance.id()));
                     }
                 }
             }
         }
-        SavedClaims ledger = claims(state, level);
-        ClaimVerdict verdict = ledger.settle(new SettleRequest(owner, siting, rows, ledger.revision()));
+        ClaimLedger ledger = claims(state, level);
+        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance.id(), rows, ledger.revision()));
         if (!(verdict instanceof ClaimVerdict.Settled)) {
             throw new IllegalStateException("the fixture claim was rejected: " + verdict);
         }
@@ -526,5 +474,4 @@ final class VisualFixtureSupport {
         return CuboidSet.of(boxes);
     }
 
-    private record OwnerSiting(OwnerId owner, Siting siting) {}
 }

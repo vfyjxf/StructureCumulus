@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
@@ -77,10 +78,10 @@ class ExpandedLifecycleTest {
         assertEquals(List.of(first, second, third), manager.findAt(cellA), "findAt is in instance id order");
         assertEquals(List.of(first, second, third), manager.instances());
 
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerC, atOrigin, List.of(row(ownerC, atOrigin, cellA, Sharing.shared)));
+        ClaimLedger ledger = ClaimLedger.inMemory(worldA);
+        settle(ledger, first.id(), List.of(row(first.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, third.id(), List.of(row(third.id(), atOrigin, cellA, Sharing.shared)));
         assertEquals(3, ledger.revision(), "each shared row settles its own key");
         assertEquals(3, ledger.read(readBox(cellA)).rows().size(), "three owners share one cell");
 
@@ -104,10 +105,10 @@ class ExpandedLifecycleTest {
         StructureInstance sharedFirst = form(manager, worldA, ownerA, atOrigin, cellA);
         StructureInstance sharedSecond = form(manager, worldA, ownerB, atOrigin, cellA);
         StructureInstance far = form(manager, worldA, ownerC, atOrigin, cellB);
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerC, atOrigin, List.of(row(ownerC, atOrigin, cellB, Sharing.shared)));
+        ClaimLedger ledger = ClaimLedger.inMemory(worldA);
+        settle(ledger, sharedFirst.id(), List.of(row(sharedFirst.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, sharedSecond.id(), List.of(row(sharedSecond.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, far.id(), List.of(row(far.id(), atOrigin, cellB, Sharing.shared)));
         long base = ledger.revision();
 
         applyBroken(manager, ledger, List.of(cellA));
@@ -128,11 +129,11 @@ class ExpandedLifecycleTest {
         StructureInstance second = form(manager, worldA, ownerB, atOrigin, cellA);
         StructureInstance third = form(manager, worldA, ownerC, atOrigin, cellB);
         StructureInstance far = form(manager, worldA, ownerD, atOrigin, cellC);
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerC, atOrigin, List.of(row(ownerC, atOrigin, cellB, Sharing.shared)));
-        settle(ledger, ownerD, atOrigin, List.of(row(ownerD, atOrigin, cellC, Sharing.shared)));
+        ClaimLedger ledger = ClaimLedger.inMemory(worldA);
+        settle(ledger, first.id(), List.of(row(first.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, third.id(), List.of(row(third.id(), atOrigin, cellB, Sharing.shared)));
+        settle(ledger, far.id(), List.of(row(far.id(), atOrigin, cellC, Sharing.shared)));
         long base = ledger.revision();
 
         List<LatticePoint> affected = List.of(cellA, cellA, cellB, cellB, cellA);
@@ -152,105 +153,6 @@ class ExpandedLifecycleTest {
     }
 
     @Test
-    void onePistonMoveTranslatesEveryOverlappingInstance() {
-        StructureManager manager = StructureManager.create();
-        StructureInstance first = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance second = form(manager, worldA, ownerB, atOrigin, cellA);
-        manager.publish(first.id(), Map.of(count, 7L), FindingBundle.empty(), Spend.zero);
-        manager.publish(second.id(), Map.of(count, 9L), FindingBundle.empty(), Spend.zero);
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellA, Sharing.shared)));
-        long base = ledger.revision();
-        LatticePoint moved = Objects.requireNonNull(cellA.offset(1, 0, 0), "moved cell");
-
-        assertEquals(MoveOutcome.moved, applyMove(manager, ledger, first, 1, 0, 0));
-        assertEquals(MoveOutcome.moved, applyMove(manager, ledger, second, 1, 0, 0));
-
-        StructureInstance movedFirst = manager.find(first.id());
-        StructureInstance movedSecond = manager.find(second.id());
-        assertNotNull(movedFirst);
-        assertNotNull(movedSecond);
-        assertEquals(moved, movedFirst.siting().origin());
-        assertEquals(moved, movedSecond.siting().origin());
-        assertEquals(box(moved), movedFirst.bounds());
-        assertEquals(7L, movedFirst.context().get(count), "the id and context survive the move");
-        assertEquals(9L, movedSecond.context().get(count));
-        assertEquals(2, movedFirst.context().revision(), "the move never rewrites the context");
-        assertTrue(ledger.read(readBox(cellA)).rows().isEmpty(), "both old claim rows are released");
-        List<ClaimRow> translated = ledger.read(readBox(moved)).rows();
-        assertEquals(2, translated.size(), "both overlapping instances have a translated row");
-        assertEquals(base + 4, ledger.revision(), "each moved instance settles once and releases once");
-
-        assertTrue(manager.findIn(box(cellA)).isEmpty(), "the stale piston cell finds no instance now");
-        assertEquals(base + 4, ledger.revision(), "a duplicate piston pass translates nothing more");
-    }
-
-    @Test
-    void pistonMoveRejectsOneInstanceWithoutTouchingItsClaims() {
-        StructureManager manager = StructureManager.create();
-        StructureInstance first = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance second = form(manager, worldA, ownerB, atOrigin, cellA);
-        StructureInstance occupant = form(manager, worldA, ownerA, Siting.of(cellD, Orientation.identity), cellD);
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellA, Sharing.shared)));
-        long base = ledger.revision();
-
-        assertEquals(MoveOutcome.rejected, applyMove(manager, ledger, first, 1, 0, 0));
-        assertEquals(MoveOutcome.moved, applyMove(manager, ledger, second, 1, 0, 0));
-
-        StructureInstance rejected = manager.find(first.id());
-        assertNotNull(rejected, "a rejected move leaves the instance at its old place");
-        assertEquals(atOrigin, rejected.siting());
-        assertEquals(box(cellA), rejected.bounds());
-        assertEquals(1, rejected.context().revision(), "a rejected move leaves the context alone");
-        assertEquals(1, ledger.read(readBox(cellA)).rows().size(), "the rejected instance keeps its claim row");
-        assertTrue(ledger.read(readBox(cellD)).rows().stream().noneMatch(row -> row.owner().equals(ownerA)));
-        assertEquals(1, ledger.read(readBox(cellD)).rows().size(), "the moved peer translates its row");
-        assertEquals(base + 2, ledger.revision(), "only the accepted move touches claims");
-        assertNotNull(manager.find(occupant.id()), "the blocking occupant is untouched");
-        assertEquals(List.of(rejected), manager.findAt(cellA));
-        assertEquals(3, manager.instances().size(), "no instance leaked out of the registry");
-    }
-
-    @Test
-    void pistonMoveConflictInvalidatesOnlyTheConflictingInstance() {
-        StructureManager manager = StructureManager.create();
-        StructureInstance conflicting = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance moving = form(manager, worldA, ownerB, Siting.of(cellE, Orientation.identity), cellE);
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(
-            ledger,
-            ownerB,
-            Siting.of(cellE, Orientation.identity),
-            List.of(row(ownerB, Siting.of(cellE, Orientation.identity), cellE, Sharing.shared))
-        );
-        Siting incumbentSiting = Siting.of(cellD, Orientation.identity);
-        settle(ledger, ownerC, incumbentSiting, List.of(row(ownerC, incumbentSiting, cellD, Sharing.exclusive)));
-        long base = ledger.revision();
-        assertEquals(1, ledger.read(readBox(cellD)).rows().size());
-
-        assertEquals(MoveOutcome.invalidated, applyMove(manager, ledger, conflicting, 1, 0, 0));
-        assertEquals(MoveOutcome.moved, applyMove(manager, ledger, moving, 1, 0, 0));
-
-        assertNull(manager.find(conflicting.id()), "a conflicting translation invalidates the instance");
-        assertTrue(ledger.read(readBox(cellA)).rows().isEmpty(), "the conflicting old row is released");
-        assertEquals(1, ledger.read(readBox(cellD)).rows().size(), "the incumbent row survives the invalidation");
-        assertEquals(ownerC, ledger.read(readBox(cellD)).rows().get(0).owner());
-        assertTrue(
-            ledger.read(readBox(cellD)).rows().stream().noneMatch(row -> row.owner().equals(ownerA)),
-            "no translated row from the invalidated instance remains"
-        );
-        StructureInstance moved = manager.find(moving.id());
-        assertNotNull(moved);
-        assertEquals(cellF, moved.siting().origin());
-        assertEquals(1, ledger.read(readBox(cellF)).rows().size(), "the accepted peer translates its row");
-        assertEquals(base + 3, ledger.revision(), "one invalidation release plus one move settle/release");
-    }
-
-    @Test
     void siblingSitingsInTwoWorldsStayIndependentAndFindIsAmbiguous() {
         StructureManager manager = StructureManager.create();
         StructureInstance inWorldA = form(manager, worldA, ownerA, atOrigin, cellA);
@@ -265,14 +167,14 @@ class ExpandedLifecycleTest {
         );
         assertEquals(manager.instances(), manager.findAt(cellA), "findAt lists both worlds' instances");
 
-        SavedClaims ledgerA = new SavedClaims(worldA);
-        SavedClaims ledgerB = new SavedClaims(worldB);
-        settle(ledgerA, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledgerB, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
+        ClaimLedger ledgerA = ClaimLedger.inMemory(worldA);
+        ClaimLedger ledgerB = ClaimLedger.inMemory(worldB);
+        settle(ledgerA, inWorldA.id(), List.of(row(inWorldA.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledgerB, inWorldA.id(), List.of(row(inWorldA.id(), atOrigin, cellA, Sharing.shared)));
         assertEquals(1, ledgerA.revision());
         assertEquals(1, ledgerB.revision());
 
-        ledgerA.release(ownerA, atOrigin);
+        ledgerA.release(inWorldA.id());
         assertEquals(2, ledgerA.revision());
         assertTrue(ledgerA.read(readBox(cellA)).rows().isEmpty());
         assertEquals(1, ledgerB.revision(), "the other world's ledger is untouched");
@@ -297,10 +199,10 @@ class ExpandedLifecycleTest {
         StructureInstance sibling = form(manager, worldB, ownerC, atOrigin, cellA);
         StructureAttempt draftA = manager.begin(worldA, new StructureSpec(ownerD, atOrigin, blueprint));
         StructureAttempt draftB = manager.begin(worldB, new StructureSpec(ownerE, atOrigin, blueprint));
-        SavedClaims ledgerA = new SavedClaims(worldA);
-        SavedClaims ledgerB = new SavedClaims(worldB);
-        settle(ledgerA, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledgerB, ownerC, atOrigin, List.of(row(ownerC, atOrigin, cellA, Sharing.shared)));
+        ClaimLedger ledgerA = ClaimLedger.inMemory(worldA);
+        ClaimLedger ledgerB = ClaimLedger.inMemory(worldB);
+        settle(ledgerA, first.id(), List.of(row(first.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledgerB, sibling.id(), List.of(row(sibling.id(), atOrigin, cellA, Sharing.shared)));
         long revisionA = ledgerA.revision();
         long revisionB = ledgerB.revision();
 
@@ -385,10 +287,10 @@ class ExpandedLifecycleTest {
         StructureInstance first = form(manager, worldA, ownerA, atOrigin, cellA);
         StructureInstance second = form(manager, worldA, ownerB, atOrigin, cellA);
         StructureInstance far = form(manager, worldA, ownerC, atOrigin, cellB);
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerC, atOrigin, List.of(row(ownerC, atOrigin, cellB, Sharing.shared)));
+        ClaimLedger ledger = ClaimLedger.inMemory(worldA);
+        settle(ledger, first.id(), List.of(row(first.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, far.id(), List.of(row(far.id(), atOrigin, cellB, Sharing.shared)));
         long base = ledger.revision();
 
         applyBroken(manager, ledger, List.of(cellA));
@@ -411,9 +313,9 @@ class ExpandedLifecycleTest {
         StructureManager manager = StructureManager.create();
         StructureInstance old = form(manager, worldA, ownerA, atOrigin, cellA);
         StructureInstance peer = form(manager, worldA, ownerB, atOrigin, cellA);
-        SavedClaims ledger = new SavedClaims(worldA);
-        settle(ledger, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledger, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellA, Sharing.shared)));
+        ClaimLedger ledger = ClaimLedger.inMemory(worldA);
+        settle(ledger, old.id(), List.of(row(old.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, peer.id(), List.of(row(peer.id(), atOrigin, cellA, Sharing.shared)));
         assertEquals(2, ledger.revision());
 
         StructureAttempt replacement = manager.begin(worldA, new StructureSpec(ownerA, atOrigin, otherBlueprint));
@@ -429,54 +331,11 @@ class ExpandedLifecycleTest {
         assertEquals(2, ledger.revision(), "a manager replacement never touches the ledger");
 
         releaseInstance(ledger, replacementInstance);
+        assertEquals(2, ledger.revision(), "a replacement owns no rows until the host settles them");
+        releaseInstance(ledger, old);
         assertEquals(3, ledger.revision());
-        assertEquals(1, ledger.read(readBox(cellA)).rows().size(), "only the replaced key's row is released");
-        assertEquals(ownerB, ledger.read(readBox(cellA)).rows().get(0).owner());
-    }
-
-    @Test
-    void rejectedMovesLeaveTheRegistryAndContextsIdentical() {
-        StructureManager manager = StructureManager.create();
-        StructureInstance instance = form(manager, worldA, ownerA, atOrigin, cellA);
-        manager.publish(instance.id(), Map.of(count, 5L), FindingBundle.empty(), Spend.zero);
-        Siting target = Siting.of(cellD, Orientation.identity);
-        StructureInstance occupant = form(manager, worldA, ownerA, target, cellD);
-        StructureInstance before = manager.find(instance.id());
-        assertNotNull(before);
-        assertEquals(2, before.context().revision());
-
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(instance.id(), atOrigin, target, box(cellD))),
-            "a move onto an occupied siting is rejected"
-        );
-        assertEquals(before, manager.find(instance.id()), "a rejected move never mutates the instance");
-        assertEquals(occupant, manager.find(occupant.id()));
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(instance.id(), target, atOrigin, box(cellA))),
-            "a move whose from siting does not match is rejected"
-        );
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(new InstanceId(worldA, 999), atOrigin, target, box(cellD))),
-            "a move for an unknown id is rejected"
-        );
-        manager.onEvent(new StructureEvent.Unloaded(worldC));
-        manager.onEvent(new StructureEvent.Broken(new InstanceId(worldA, 999)));
-        manager.onEvent(new StructureEvent.Invalidated(new InstanceId(worldA, 999), "unknown"));
-        assertEquals(before, manager.find(instance.id()), "unknown events are no-ops");
-        assertEquals(2, manager.instances().size());
-
-        manager.onEvent(new StructureEvent.Broken(occupant.id()));
-        manager.onEvent(new StructureEvent.Moved(instance.id(), atOrigin, target, box(cellD)));
-        StructureInstance moved = manager.find(instance.id());
-        assertNotNull(moved);
-        assertEquals(target, moved.siting());
-        assertEquals(2, moved.context().revision(), "an accepted move preserves the context");
-        assertEquals(5L, moved.context().get(count));
-        assertTrue(manager.findAt(cellA).isEmpty());
-        assertEquals(List.of(moved), manager.findAt(cellD));
+        assertEquals(1, ledger.read(readBox(cellA)).rows().size(), "only the replaced instance's row is released");
+        assertEquals(peer.id(), ledger.read(readBox(cellA)).rows().get(0).instance());
     }
 
     @Test
@@ -510,16 +369,16 @@ class ExpandedLifecycleTest {
     }
 
     @Test
-    void worldUnloadDropsInstancesAndDraftsButKeepsPersistedClaims() {
+    void worldUnloadDropsInstancesAndDraftsButLeavesTheHostLedgerAlone() {
         StructureManager manager = StructureManager.create();
         StructureInstance inWorldA = form(manager, worldA, ownerA, atOrigin, cellA);
         StructureInstance inWorldB = form(manager, worldB, ownerB, atOrigin, cellB);
         StructureAttempt draftA = manager.begin(worldA, new StructureSpec(ownerC, atOrigin, blueprint));
         StructureAttempt draftB = manager.begin(worldB, new StructureSpec(ownerD, atOrigin, blueprint));
-        SavedClaims ledgerA = new SavedClaims(worldA);
-        SavedClaims ledgerB = new SavedClaims(worldB);
-        settle(ledgerA, ownerA, atOrigin, List.of(row(ownerA, atOrigin, cellA, Sharing.shared)));
-        settle(ledgerB, ownerB, atOrigin, List.of(row(ownerB, atOrigin, cellB, Sharing.shared)));
+        ClaimLedger ledgerA = ClaimLedger.inMemory(worldA);
+        ClaimLedger ledgerB = ClaimLedger.inMemory(worldB);
+        settle(ledgerA, inWorldA.id(), List.of(row(inWorldA.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledgerB, inWorldB.id(), List.of(row(inWorldB.id(), atOrigin, cellB, Sharing.shared)));
         long revisionA = ledgerA.revision();
         long revisionB = ledgerB.revision();
 
@@ -534,20 +393,14 @@ class ExpandedLifecycleTest {
         );
         draftB.publish(draftB.id(), Map.of(count, 1L), FindingBundle.empty(), Spend.zero);
         draftB.abort();
-        assertEquals(revisionA, ledgerA.revision(), "an unload never releases persisted claims");
+        assertEquals(revisionA, ledgerA.revision(), "a manager unload never touches the host ledger");
         assertEquals(1, ledgerA.read(readBox(cellA)).rows().size());
         assertEquals(revisionB, ledgerB.revision(), "another world's ledger is untouched");
 
-        StructureInstance recreated = form(manager, worldA, ownerA, atOrigin, cellA);
-        assertNotNull(manager.find(recreated.id()));
-        releaseInstance(ledgerA, recreated);
-        assertEquals(revisionA + 1, ledgerA.revision(), "the persisted rows are still releasable after reload");
+        releaseInstance(ledgerA, inWorldA);
+        assertEquals(revisionA + 1, ledgerA.revision(), "the host releases the rows by instance");
         assertTrue(ledgerA.read(readBox(cellA)).rows().isEmpty());
         assertEquals(1, ledgerB.read(readBox(cellB)).rows().size());
-    }
-
-    private enum MoveOutcome {
-        moved, rejected, invalidated
     }
 
     private static StructureInstance form(
@@ -585,22 +438,22 @@ class ExpandedLifecycleTest {
         return OwnerId.of(NamespacedId.of("test", "expanded_" + path));
     }
 
-    private static ClaimRow row(OwnerId owner, Siting siting, LatticePoint cell, Sharing sharing) {
-        return new ClaimRow(LatticeKey.of(cell), sharing, owner, siting, claimBay);
+    private static ClaimRow row(InstanceId instance, Siting siting, LatticePoint cell, Sharing sharing) {
+        return new ClaimRow(LatticeKey.of(cell), sharing, siting, claimBay, instance);
     }
 
-    private static void settle(SavedClaims ledger, OwnerId owner, Siting siting, List<ClaimRow> rows) {
-        ClaimVerdict verdict = ledger.settle(new SettleRequest(owner, siting, rows, ledger.revision()));
+    private static void settle(ClaimLedger ledger, InstanceId instance, List<ClaimRow> rows) {
+        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance, rows, ledger.revision()));
         if (!(verdict instanceof ClaimVerdict.Settled)) {
             throw new AssertionError("the settle was rejected: " + verdict);
         }
     }
 
-    private static void releaseInstance(SavedClaims ledger, StructureInstance instance) {
-        ledger.release(instance.owner(), instance.siting());
+    private static void releaseInstance(ClaimLedger ledger, StructureInstance instance) {
+        ledger.release(instance.id());
     }
 
-    private static void applyBroken(StructureManager manager, SavedClaims ledger, List<LatticePoint> cells) {
+    private static void applyBroken(StructureManager manager, ClaimLedger ledger, List<LatticePoint> cells) {
         Set<InstanceId> seen = new HashSet<>();
         for (LatticePoint cell : cells) {
             for (StructureInstance instance : manager.findAt(cell)) {
@@ -612,7 +465,7 @@ class ExpandedLifecycleTest {
         }
     }
 
-    private static void applyInvalidated(StructureManager manager, SavedClaims ledger, List<LatticePoint> cells) {
+    private static void applyInvalidated(StructureManager manager, ClaimLedger ledger, List<LatticePoint> cells) {
         Set<InstanceId> seen = new HashSet<>();
         for (LatticePoint cell : cells) {
             for (StructureInstance instance : manager.findAt(cell)) {
@@ -622,45 +475,6 @@ class ExpandedLifecycleTest {
                 }
             }
         }
-    }
-
-    private static MoveOutcome applyMove(
-        StructureManager manager,
-        SavedClaims ledger,
-        StructureInstance instance,
-        int dx,
-        int dy,
-        int dz
-    ) {
-        CuboidSet movedBounds = Objects.requireNonNull(instance.bounds().translate(dx, dy, dz), "translated bounds");
-        LatticePoint movedOrigin = Objects.requireNonNull(instance.siting().origin().offset(dx, dy, dz));
-        Siting to = instance.siting().withOrigin(movedOrigin);
-        try {
-            manager.onEvent(new StructureEvent.Moved(instance.id(), instance.siting(), to, movedBounds));
-        } catch (IllegalArgumentException rejected) {
-            return MoveOutcome.rejected;
-        }
-        Cuboid oldBounds = Objects.requireNonNull(instance.bounds().bounds(), "old bounds");
-        List<ClaimRow> moved = new ArrayList<>();
-        for (ClaimRow row : ledger.read(oldBounds).rows()) {
-            if (!row.owner().equals(instance.owner()) || !row.siting().equals(instance.siting())) {
-                continue;
-            }
-            LatticePoint next = Objects.requireNonNull(row.cell().point().offset(dx, dy, dz));
-            moved.add(new ClaimRow(LatticeKey.of(next), row.sharing(), row.owner(), to, row.bay()));
-        }
-        if (moved.isEmpty()) {
-            return MoveOutcome.moved;
-        }
-        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance.owner(), to, moved, ledger.revision()));
-        if (!(verdict instanceof ClaimVerdict.Settled)) {
-            manager.onEvent(new StructureEvent.Invalidated(instance.id(), "the moved claims conflict"));
-            ledger.release(instance.owner(), instance.siting());
-            ledger.release(instance.owner(), to);
-            return MoveOutcome.invalidated;
-        }
-        ledger.release(instance.owner(), instance.siting());
-        return MoveOutcome.moved;
     }
 
     private static CuboidSet box(LatticePoint cell) {

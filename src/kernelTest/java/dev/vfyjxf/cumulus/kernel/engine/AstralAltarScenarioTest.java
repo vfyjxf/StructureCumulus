@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -38,19 +39,19 @@ class AstralAltarScenarioTest {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
         Blueprint tierTwo = blueprint("astral/tier_two", tierTwoBounds);
         assertEquals(54L, tierTwo.bayCells().volume(), "the tier II altar has fifty-four cells");
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(tierTwo, siting, view(tierTwoBounds, true), ledger)
         );
         assertEquals(54, formed.claims().rows().size(), "fifty-four claim rows");
-        assertEquals(54, ledger.all().size(), "the ledger holds fifty-four rows");
+        assertEquals(54, TestWorld.rows(ledger).size(), "the ledger holds fifty-four rows");
     }
 
     @Test
     void aMissingRelayFails() {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult result = MagicFixtures.settle(
             blueprint("astral/tier_two_missing_relay", tierTwoBounds),
             siting,
@@ -59,20 +60,20 @@ class AstralAltarScenarioTest {
         );
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "the relay cell is air");
         assertTrue(MagicFixtures.hasCode(failed, Codes.expected), "the missing relay is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no rows");
     }
 
     @Test
     void tierThreeGrowsTheClaimInPlace() {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         Blueprint tierTwo = blueprint("astral/tier_two_growth", tierTwoBounds);
         assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(tierTwo, siting, view(tierTwoBounds, true), ledger),
             "the tier II claim settles first"
         );
-        assertEquals(54, ledger.all().size(), "the first tier holds fifty-four rows");
+        assertEquals(54, TestWorld.rows(ledger).size(), "the first tier holds fifty-four rows");
         assertEquals(1L, ledger.revision(), "one settlement revision");
 
         Blueprint tierThree = blueprint("astral/tier_three_growth", tierThreeBounds);
@@ -91,10 +92,10 @@ class AstralAltarScenarioTest {
             "the tier III check replaces the tier II claim"
         );
         assertEquals(72, grown.claims().rows().size(), "the grown claim has seventy-two rows");
-        assertEquals(72, ledger.all().size(), "the ledger grows in place to seventy-two rows");
+        assertEquals(72, TestWorld.rows(ledger).size(), "the ledger grows in place to seventy-two rows");
         assertTrue(
-            ledger.all().stream().allMatch(row -> row.owner().equals(MagicFixtures.owner)),
-            "the grown rows belong to the same owner"
+            TestWorld.rows(ledger).stream().allMatch(row -> row.instance().equals(MagicFixtures.instance)),
+            "the grown rows belong to the same instance"
         );
         assertEquals(2L, ledger.revision(), "the in-place replacement bumps the revision once");
     }

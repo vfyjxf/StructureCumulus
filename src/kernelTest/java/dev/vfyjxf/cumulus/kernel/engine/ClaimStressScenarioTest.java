@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -35,12 +36,12 @@ class ClaimStressScenarioTest {
 
     @Test
     void sharedWallCoexistsAcrossOwners() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         Blueprint blueprint = wall("claim/shared", Sharing.shared);
         assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(blueprint, siting, airView(), ledger),
-            "owner A settles the shared wall"
+            "the first instance settles the shared wall"
         );
         MatchResult.Formed second = settleAs(
             blueprint,
@@ -50,13 +51,13 @@ class ClaimStressScenarioTest {
             MagicFixtures.rival,
             MagicFixtures.rivalInstance
         );
-        assertEquals(2, ledger.all().size(), "two shared owners coexist");
-        assertEquals(2, second.claims().rows().size(), "the shared settlement returns both rows");
+        assertEquals(2, TestWorld.rows(ledger).size(), "two shared instances coexist");
+        assertEquals(1, second.claims().rows().size(), "a settlement returns the rows it wrote");
     }
 
     @Test
     void anExclusiveWallConflicts() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         Blueprint blueprint = wall("claim/exclusive", Sharing.exclusive);
         assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(blueprint, siting, airView(), ledger));
         MatchResult result = MagicFixtures.check(
@@ -69,33 +70,33 @@ class ClaimStressScenarioTest {
         );
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result);
         assertTrue(MagicFixtures.hasCode(failed, Codes.claimConflict), "the exclusive wall conflicts");
-        assertEquals(1, ledger.all().size(), "the failed check writes nothing");
+        assertEquals(1, TestWorld.rows(ledger).size(), "the failed check writes nothing");
     }
 
     @Test
-    void releaseRemovesOnlyTheOwnerAtThatSiting() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+    void releaseRemovesOnlyTheReleasedInstance() {
+        ClaimLedger ledger = MagicFixtures.ledger();
         Blueprint blueprint = wall("claim/release", Sharing.shared);
         assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(blueprint, siting, airView(), ledger));
         settleAs(blueprint, siting, airView(), ledger, MagicFixtures.rival, MagicFixtures.rivalInstance);
-        assertEquals(2, ledger.all().size(), "both owners hold a row");
-        ledger.release(MagicFixtures.owner, siting);
-        assertEquals(1, ledger.all().size(), "only the released owner's row is removed");
-        assertTrue(ledger.all().stream().allMatch(row -> row.owner().equals(MagicFixtures.rival)));
+        assertEquals(2, TestWorld.rows(ledger).size(), "both instances hold a row");
+        ledger.release(MagicFixtures.rivalInstance);
+        assertEquals(1, TestWorld.rows(ledger).size(), "only the released instance's row is removed");
+        assertTrue(TestWorld.rows(ledger).stream().allMatch(row -> row.instance().equals(MagicFixtures.instance)));
     }
 
     @Test
-    void aSettleReplacesTheWholeOwnerSitingKey() {
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+    void aSettleReplacesTheWholeInstanceKey() {
+        ClaimLedger ledger = MagicFixtures.ledger();
         Blueprint first = oneCellBlueprint("claim/replace_first", cell, Sharing.shared);
         Blueprint second = oneCellBlueprint("claim/replace_second", LatticePoint.of(1, 0, 0), Sharing.shared);
         assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(first, siting, airView(), ledger));
-        assertEquals(1, ledger.all().size(), "the first settlement writes one row");
+        assertEquals(1, TestWorld.rows(ledger).size(), "the first settlement writes one row");
         long revision = ledger.revision();
         assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(second, siting, airView(), ledger));
-        assertEquals(1, ledger.all().size(), "the whole key is replaced, not merged");
+        assertEquals(1, TestWorld.rows(ledger).size(), "the whole instance is replaced, not merged");
         assertEquals(revision + 1, ledger.revision(), "the replacement bumps the revision once");
-        assertEquals(LatticePoint.of(1, 0, 0).key(), ledger.all().get(0).cell(), "the new cell is the only row");
+        assertEquals(LatticePoint.of(1, 0, 0).key(), TestWorld.rows(ledger).get(0).cell(), "the new cell is the only row");
     }
 
     @Test
@@ -123,13 +124,13 @@ class ClaimStressScenarioTest {
                         Expectations.anyOccupant()
                     )
                 ).build();
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(blueprint, siting, airView(), ledger)
         );
         assertEquals(2, formed.claims().rows().size(), "both shared bays contribute a row");
-        assertEquals(2, ledger.all().size(), "the ledger keeps both duplicate cell rows");
+        assertEquals(2, TestWorld.rows(ledger).size(), "the ledger keeps both duplicate cell rows");
         assertFalse(
             formed.claims().rows().get(0).bay().equals(formed.claims().rows().get(1).bay()),
             "the duplicate rows differ by bay id"
@@ -159,7 +160,7 @@ class ClaimStressScenarioTest {
         Blueprint blueprint,
         Siting siting,
         TestWorld.View view,
-        TestWorld.Ledger ledger,
+        ClaimLedger ledger,
         OwnerId owner,
         InstanceId instance
     ) {

@@ -1,7 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.claim;
 
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
@@ -21,33 +21,34 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ClaimTest {
 
     private static final Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
-    private static final OwnerId ownerA = OwnerId.of(NamespacedId.of("a"));
-    private static final OwnerId ownerB = OwnerId.of(NamespacedId.of("b"));
+    private static final World world = World.of(NamespacedId.of("w"));
+    private static final InstanceId instanceA = new InstanceId(world, 1);
+    private static final InstanceId instanceB = new InstanceId(world, 2);
 
-    private static ClaimRow row(OwnerId owner, Sharing sharing) {
-        return new ClaimRow(LatticeKey.of(LatticePoint.origin), sharing, owner, siting, NamespacedId.of("bay"));
+    private static ClaimRow row(InstanceId instance, Sharing sharing) {
+        return new ClaimRow(LatticeKey.of(LatticePoint.origin), sharing, siting, NamespacedId.of("bay"), instance);
     }
 
     @Test
     void matrixIsSymmetricAndSelfExcluded() {
-        assertFalse(ClaimMatrix.conflicts(row(ownerA, Sharing.shared), row(ownerA, Sharing.shared)));
-        assertFalse(ClaimMatrix.conflicts(row(ownerA, Sharing.shared), row(ownerB, Sharing.shared)));
-        assertTrue(ClaimMatrix.conflicts(row(ownerA, Sharing.exclusive), row(ownerB, Sharing.shared)));
-        assertTrue(ClaimMatrix.conflicts(row(ownerA, Sharing.shared), row(ownerB, Sharing.exclusive)));
-        assertTrue(ClaimMatrix.conflicts(row(ownerA, Sharing.exclusive), row(ownerB, Sharing.exclusive)));
+        assertFalse(ClaimMatrix.conflicts(row(instanceA, Sharing.shared), row(instanceA, Sharing.shared)));
+        assertFalse(ClaimMatrix.conflicts(row(instanceA, Sharing.shared), row(instanceB, Sharing.shared)));
+        assertTrue(ClaimMatrix.conflicts(row(instanceA, Sharing.exclusive), row(instanceB, Sharing.shared)));
+        assertTrue(ClaimMatrix.conflicts(row(instanceA, Sharing.shared), row(instanceB, Sharing.exclusive)));
+        assertTrue(ClaimMatrix.conflicts(row(instanceA, Sharing.exclusive), row(instanceB, Sharing.exclusive)));
     }
 
     @Test
     void claimSetOrdersAndViewHidesUnavailableRows() {
-        ClaimSet set = new ClaimSet(List.of(row(ownerB, Sharing.shared), row(ownerA, Sharing.shared)), 3);
-        assertEquals(ownerA, set.rows().get(0).owner());
+        ClaimSet set = new ClaimSet(List.of(row(instanceB, Sharing.shared), row(instanceA, Sharing.shared)), 3);
+        assertEquals(instanceA, set.rows().get(0).instance());
         assertEquals(3, set.revision());
         ClaimView unavailable = ClaimView.unavailable();
         assertFalse(unavailable.available());
         assertTrue(unavailable.rows().isEmpty());
         assertEquals(
             1,
-            new ClaimView(List.of(row(ownerA, Sharing.shared)), 1, true).rowsIn(Cuboid.of(0, 0, 0, 1, 1, 1)).size()
+            new ClaimView(List.of(row(instanceA, Sharing.shared)), 1, true).rowsIn(Cuboid.of(0, 0, 0, 1, 1, 1)).size()
         );
     }
 
@@ -56,11 +57,11 @@ class ClaimTest {
         ClaimRow foreign = new ClaimRow(
             LatticeKey.of(LatticePoint.origin),
             Sharing.shared,
-            ownerB,
             siting,
-            NamespacedId.of("bay")
+            NamespacedId.of("bay"),
+            instanceB
         );
-        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(ownerA, siting, List.of(foreign), 0));
+        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instanceA, List.of(foreign), 0));
     }
 
     @Test
@@ -76,33 +77,8 @@ class ClaimTest {
 
     @Test
     void aNoOpReleaseKeepsRevisionZero() {
-        ClaimLedger ledger = new ClaimLedger() {
-            @Override
-            public World world() {
-                return new World(NamespacedId.of("w"));
-            }
-
-            @Override
-            public long revision() {
-                return 0;
-            }
-
-            @Override
-            public ClaimVerdict settle(SettleRequest request) {
-                return new ClaimVerdict.Settled(request.expectedRevision(), List.of());
-            }
-
-            @Override
-            public ClaimVerdict release(OwnerId owner, Siting siting) {
-                return new ClaimVerdict.Settled(0, List.of());
-            }
-
-            @Override
-            public ClaimView read(Cuboid box) {
-                return new ClaimView(List.of(), 0, true);
-            }
-        };
-        ClaimVerdict released = ledger.release(ownerB, siting);
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        ClaimVerdict released = ledger.release(instanceB);
         assertTrue(released instanceof ClaimVerdict.Settled);
         assertEquals(0, ((ClaimVerdict.Settled) released).revision());
         assertEquals(0, ledger.revision());

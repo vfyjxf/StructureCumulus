@@ -1,13 +1,6 @@
-package dev.vfyjxf.cumulus.mc;
+package dev.vfyjxf.cumulus.kernel.claim;
 
-import dev.vfyjxf.cumulus.Constants;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimMatrix;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
-import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
-import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
-import dev.vfyjxf.cumulus.kernel.core.OwnerId;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
@@ -17,17 +10,9 @@ import dev.vfyjxf.cumulus.kernel.finding.Label;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
-import dev.vfyjxf.cumulus.kernel.space.Siting;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.saveddata.SavedData;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,47 +20,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/** One world's claim ledger, persisted as that level's SavedData; writes run on the server thread. */
-@NullMarked
-public final class SavedClaims extends SavedData implements ClaimLedger {
-
-    /** The saved-data name under the level's data folder. */
-    public static final String dataName = Constants.modId + "_claims";
-
-    /** The NBT schema version written by {@link #save}. */
-    public static final int dataVersion = 1;
-
-    private static final String versionKey = "version";
-    private static final String revisionKey = "revision";
-    private static final String rowsKey = "rows";
-
-    private static final Comparator<ClaimRow> rowOrder = Comparator.comparing(ClaimRow::cell)
-            .thenComparing(row -> row.owner().id()).thenComparing(ClaimRow::bay)
-            .thenComparing(row -> row.siting().origin()).thenComparing(row -> row.siting().placement().orientation())
-            .thenComparing(row -> row.siting().placement().offset()).thenComparing(ClaimRow::sharing);
+/** One world's claim ledger in memory: rows live and die with the world's structure state. */
+final class InMemoryClaimLedger implements ClaimLedger {
 
     private final World world;
     private final List<ClaimRow> rows = new ArrayList<>();
     private long revision;
 
-    public SavedClaims(World world) {
+    InMemoryClaimLedger(World world) {
         this.world = Objects.requireNonNull(world, "world");
-    }
-
-    private SavedClaims(World world, List<ClaimRow> decoded, long revision) {
-        this.world = Objects.requireNonNull(world, "world");
-        if (revision < 0) {
-            throw new IllegalArgumentException("revision >= 0");
-        }
-        this.rows.addAll(decoded);
-        this.rows.sort(rowOrder);
-        this.revision = revision;
-    }
-
-    /** Builds the SavedData factory for a world. */
-    public static SavedData.Factory<SavedClaims> factory(World world) {
-        Objects.requireNonNull(world, "world");
-        return new SavedData.Factory<>(() -> new SavedClaims(world), (tag, registries) -> load(world, tag));
     }
 
     @Override
@@ -99,32 +52,29 @@ public final class SavedClaims extends SavedData implements ClaimLedger {
             return conflict;
         }
         List<ClaimRow> replacement = new ArrayList<>(new LinkedHashSet<>(request.rows()));
-        replacement.sort(rowOrder);
+        replacement.sort(ClaimRow::compareTo);
         List<ClaimRow> next = new ArrayList<>(rows.size() + replacement.size());
         for (ClaimRow row : rows) {
-            if (!row.owner().equals(request.owner()) || !row.siting().equals(request.siting())) {
+            if (!row.instance().equals(request.instance())) {
                 next.add(row);
             }
         }
         next.addAll(replacement);
-        next.sort(rowOrder);
+        next.sort(ClaimRow::compareTo);
         rows.clear();
         rows.addAll(next);
         revision++;
-        setDirty();
         return new ClaimVerdict.Settled(revision, replacement);
     }
 
     @Override
-    public ClaimVerdict release(OwnerId owner, Siting siting) {
-        Objects.requireNonNull(owner, "owner");
-        Objects.requireNonNull(siting, "siting");
-        boolean removed = rows.removeIf(row -> row.owner().equals(owner) && row.siting().equals(siting));
+    public ClaimVerdict release(InstanceId instance) {
+        Objects.requireNonNull(instance, "instance");
+        boolean removed = rows.removeIf(row -> row.instance().equals(instance));
         if (!removed) {
             return new ClaimVerdict.Settled(revision, List.of());
         }
         revision++;
-        setDirty();
         return new ClaimVerdict.Settled(revision, List.of());
     }
 
@@ -140,36 +90,6 @@ public final class SavedClaims extends SavedData implements ClaimLedger {
         return new ClaimView(found, revision, true);
     }
 
-    @Override
-    public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
-        Objects.requireNonNull(tag, "tag");
-        tag.putInt(versionKey, dataVersion);
-        tag.putLong(revisionKey, revision);
-        ListTag encoded = new ListTag();
-        for (ClaimRow row : rows) {
-            encoded.add(ClaimCodec.encode(row));
-        }
-        tag.put(rowsKey, encoded);
-        return tag;
-    }
-
-    /** Reads one ledger from its NBT form. */
-    public static SavedClaims load(World world, CompoundTag tag) {
-        Objects.requireNonNull(world, "world");
-        Objects.requireNonNull(tag, "tag");
-        int version = tag.getInt(versionKey);
-        if (version != dataVersion) {
-            throw new IllegalArgumentException("unsupported claim data version " + version);
-        }
-        long revision = tag.getLong(revisionKey);
-        ListTag encoded = tag.getList(rowsKey, Tag.TAG_COMPOUND);
-        List<ClaimRow> rows = new ArrayList<>(encoded.size());
-        for (int index = 0; index < encoded.size(); index++) {
-            rows.add(ClaimCodec.decode(encoded.getCompound(index)));
-        }
-        return new SavedClaims(world, rows, revision);
-    }
-
     private @Nullable ClaimVerdict conflicts(SettleRequest request) {
         Map<String, Conflict> conflicts = new LinkedHashMap<>();
         for (ClaimRow requested : request.rows()) {
@@ -177,8 +97,7 @@ public final class SavedClaims extends SavedData implements ClaimLedger {
                 if (!ClaimMatrix.conflicts(requested, incumbent)) {
                     continue;
                 }
-                String key = requested.bay().text() + "|" + incumbent.owner().id().text() + "|"
-                        + incumbent.bay().text();
+                String key = requested.bay().text() + "|" + incumbent.instance() + "|" + incumbent.bay().text();
                 Conflict conflict = conflicts
                         .computeIfAbsent(key, ignored -> new Conflict(requested, incumbent, CuboidSet.empty()));
                 conflict.incumbents.add(incumbent);
@@ -199,7 +118,7 @@ public final class SavedClaims extends SavedData implements ClaimLedger {
 
     private static Finding finding(Conflict conflict) {
         Locus locus = Locus.world(conflict.cells);
-        String message = conflict.incumbent.owner().id() + ":" + conflict.incumbent.bay() + " already holds "
+        String message = conflict.incumbent.instance() + ":" + conflict.incumbent.bay() + " already holds "
                 + conflict.cells.volume() + " cell(s) of " + conflict.requested.bay();
         return Finding.builder(Codes.claimConflict).phase(Phase.settle).message(message)
                 .label(Label.primary(locus, "contested cells"))

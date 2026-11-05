@@ -93,7 +93,7 @@ class StructureSetHostTest {
 
         Blueprint root = fixture.plan.root();
         for (ClaimRow row : result.claimsOf(rootId)) {
-            assertEquals(owner, row.owner());
+            assertEquals(fixture.instance(0), row.instance());
             assertEquals(fixture.plan.rootSiting(), row.siting());
             assertNotNull(root.bay(row.bay()));
         }

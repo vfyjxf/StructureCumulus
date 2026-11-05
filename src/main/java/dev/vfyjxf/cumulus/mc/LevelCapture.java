@@ -78,6 +78,11 @@ public final class LevelCapture implements WorldCapture {
     private volatile boolean closed;
     private @Nullable WatchHandle watch;
 
+    /** The level instance this capture was built for; a reloaded dimension builds a new one. */
+    ServerLevel level() {
+        return level;
+    }
+
     public LevelCapture(ServerLevel level) {
         this(level, NestedExtentLookup.capabilities(), TraitLookup.builtin(), TraitCaptureContext.empty());
     }

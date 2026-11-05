@@ -8,10 +8,12 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.SectionPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -38,7 +40,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @NullMarked
 final class LevelWatch {
 
-    private static final Map<ServerLevel, LevelWatch> levels = new HashMap<>();
+    private static final Map<ResourceKey<Level>, LevelWatch> levels = new HashMap<>();
     private static final AtomicInteger activeHandles = new AtomicInteger();
 
     private LevelWatch() {}
@@ -76,21 +78,21 @@ final class LevelWatch {
     }
 
     static void levelUnloaded(LevelAccessor accessor) {
-        if (!(accessor instanceof ServerLevel level)) {
+        if (!(accessor instanceof Level level)) {
             return;
         }
-        LevelWatch watch = levels.remove(level);
+        LevelWatch watch = levels.remove(level.dimension());
         if (watch != null) {
             watch.epoch.incrementAndGet();
         }
     }
 
     static WatchHandle acquire(ServerLevel level, WatchRegion region) {
-        return levels.computeIfAbsent(level, ignored -> new LevelWatch()).add(region, level);
+        return levels.computeIfAbsent(level.dimension(), ignored -> new LevelWatch()).add(region, level);
     }
 
     static int refCount(ServerLevel level, long chunk) {
-        LevelWatch watch = levels.get(level);
+        LevelWatch watch = levels.get(level.dimension());
         if (watch == null) {
             return 0;
         }
@@ -99,10 +101,10 @@ final class LevelWatch {
     }
 
     private static @Nullable LevelWatch watchOf(LevelAccessor accessor) {
-        if (!active() || !(accessor instanceof ServerLevel level)) {
+        if (!active() || !(accessor instanceof Level level)) {
             return null;
         }
-        return levels.get(level);
+        return levels.get(level.dimension());
     }
 
     private final Map<Long, Set<WatchHandle>> chunks = new HashMap<>();
@@ -153,7 +155,7 @@ final class LevelWatch {
         handles.remove(handle);
         activeHandles.decrementAndGet();
         if (handles.isEmpty()) {
-            levels.remove(handle.level(), this);
+            levels.remove(handle.level().dimension(), this);
         }
     }
 

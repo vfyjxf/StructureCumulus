@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
@@ -45,7 +46,7 @@ class EnvelopeScenarioTest {
         Siting siting = TechFixtures.turn(LatticePoint.origin, Turn.half);
         TestWorld.View view = TechFixtures.view();
         fusion().fill(view, siting, Map.of('#', TechFixtures.fusionTorus));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         Blueprint blueprint = fusionBlueprint("envelope/fusion_clean");
 
         Bay derived = blueprint.bay(envelope);
@@ -59,7 +60,7 @@ class EnvelopeScenarioTest {
             "the torus and its envelope form"
         );
         assertEquals(32, formed.claims().rows().size(), "only the bound torus is claimed");
-        assertEquals(32, ledger.all().size(), "the envelope owns no row");
+        assertEquals(32, TestWorld.rows(ledger).size(), "the envelope owns no row");
     }
 
     @Test
@@ -69,11 +70,11 @@ class EnvelopeScenarioTest {
         fusion().fill(view, siting, Map.of('#', TechFixtures.fusionTorus));
         LatticePoint crystal = LatticePoint.of(2, 0, 2);
         TechFixtures.put(view, siting, crystal, TechFixtures.crystal);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(fusionBlueprint("envelope/fusion_crystal"), siting, view, ledger);
 
         assertEnvelopeFailureAt(result, TechFixtures.world(siting, crystal));
-        assertEquals(0, ledger.all().size(), "a failed check writes no row");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no row");
     }
 
     @Test
@@ -90,7 +91,7 @@ class EnvelopeScenarioTest {
         Siting siting = TechFixtures.turn(LatticePoint.origin, Turn.clockwise);
         TestWorld.View view = TechFixtures.view();
         cpu().fill(view, siting, Map.of('#', TechFixtures.cpu));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(enclosed, siting, view, ledger),
@@ -105,7 +106,7 @@ class EnvelopeScenarioTest {
         TestWorld.View view = TechFixtures.view();
         refinery().fill(view, siting, refineryLegend());
         TechFixtures.put(view, siting, LatticePoint.of(1, 3, 0), TechFixtures.hatch);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         Blueprint blueprint = portBlueprint("envelope/pnc_port");
         assertEquals(2L, Objects.requireNonNull(blueprint.bay(envelope), "envelope").cells().volume());
 
@@ -123,11 +124,11 @@ class EnvelopeScenarioTest {
         TestWorld.View view = TechFixtures.view();
         refinery().fill(view, siting, refineryLegend());
         TechFixtures.put(view, siting, LatticePoint.of(0, 3, 1), TechFixtures.hatch);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(portBlueprint("envelope/pnc_undeclared"), siting, view, ledger);
 
         assertEnvelopeFailureAt(result, TechFixtures.world(siting, LatticePoint.of(0, 3, 1)));
-        assertEquals(0, ledger.all().size(), "a failed check writes no row");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no row");
     }
 
     @Test
@@ -136,7 +137,7 @@ class EnvelopeScenarioTest {
         TestWorld.View view = TechFixtures.view();
         ebf().fill(view, siting, ebfLegend());
         TechFixtures.put(view, siting, LatticePoint.of(-1, 0, -1), TechFixtures.hatch);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         Blueprint blueprint = widenedEbfBlueprint("envelope/gt_ring");
         assertEquals(48L, Objects.requireNonNull(blueprint.bay(envelope), "envelope").cells().volume());
 
@@ -154,17 +155,17 @@ class EnvelopeScenarioTest {
         TestWorld.View view = TechFixtures.view();
         ebf().fill(view, siting, ebfLegend());
         TechFixtures.put(view, siting, LatticePoint.of(-1, 1, -1), TechFixtures.hatch);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(widenedEbfBlueprint("envelope/gt_outside_ring"), siting, view, ledger);
 
         assertEnvelopeFailureAt(result, TechFixtures.world(siting, LatticePoint.of(-1, 1, -1)));
-        assertEquals(0, ledger.all().size(), "a failed check writes no row");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no row");
     }
 
     @Test
     void envelopeOnlyBlueprintIsAdmittedWithNoRows() {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         TestWorld.View view = TechFixtures.view();
         view.put(TestWorld.block(TestWorld.stone, LatticePoint.of(2, 0, 0)));
         MatchResult.Formed formed = assertInstanceOf(
@@ -173,7 +174,7 @@ class EnvelopeScenarioTest {
             "an empty snapshot closes the envelope and a block outside the bounds is invisible"
         );
         assertTrue(formed.claims().rows().isEmpty(), "the envelope owns nothing");
-        assertEquals(0, ledger.all().size());
+        assertEquals(0, TestWorld.rows(ledger).size());
         assertEquals(0L, ledger.revision());
     }
 
@@ -182,11 +183,11 @@ class EnvelopeScenarioTest {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
         TestWorld.View view = TechFixtures.view();
         view.put(TestWorld.block(TestWorld.stone, LatticePoint.origin));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(envelopeOnly("envelope/only_blocked"), siting, view, ledger);
 
         assertEnvelopeFailureAt(result, LatticePoint.origin);
-        assertEquals(0, ledger.all().size());
+        assertEquals(0, TestWorld.rows(ledger).size());
     }
 
     @Test
@@ -194,11 +195,11 @@ class EnvelopeScenarioTest {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
         TestWorld.View view = TechFixtures.view();
         view.put(TechFixtures.entity(TechFixtures.cow, LatticePoint.origin, Cuboid.of(LatticePoint.origin)));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(envelopeOnly("envelope/only_entity"), siting, view, ledger);
 
         assertEnvelopeFailureAt(result, LatticePoint.origin);
-        assertEquals(0, ledger.all().size());
+        assertEquals(0, TestWorld.rows(ledger).size());
     }
 
     @Test

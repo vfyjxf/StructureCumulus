@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -46,7 +47,7 @@ class FusionVoidScenarioTest {
         Siting siting = TechFixtures.turn(LatticePoint.origin, Turn.half);
         TestWorld.View view = TechFixtures.view();
         fusion.fill(view, siting, legend);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(combinedBlueprint("fusion/torus_and_void"), siting, view, ledger),
@@ -59,7 +60,7 @@ class FusionVoidScenarioTest {
             new LinkedHashSet<>(TechFixtures.rowKeys(formed)),
             "the claims are the sited torus and void"
         );
-        assertEquals(50, ledger.all().size(), "the ledger holds the torus and the void");
+        assertEquals(50, TestWorld.rows(ledger).size(), "the ledger holds the torus and the void");
     }
 
     @Test
@@ -68,7 +69,7 @@ class FusionVoidScenarioTest {
         TestWorld.View view = TechFixtures.view();
         fusion.fill(view, siting, legend);
         TechFixtures.put(view, siting, voidCenter, TechFixtures.crystal);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(torusOnlyBlueprint("fusion/torus_only_hole"), siting, view, ledger),
@@ -92,11 +93,11 @@ class FusionVoidScenarioTest {
         TestWorld.View view = TechFixtures.view();
         fusion.fill(view, siting, legend);
         TechFixtures.put(view, siting, voidCenter, TechFixtures.crystal);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(combinedBlueprint("fusion/torus_void_occupied"), siting, view, ledger);
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "the void bay sees the crystal");
         assertTrue(TechFixtures.hasCode(failed, Codes.expected), "the occupied void is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no rows");
     }
 
     @Test
@@ -105,11 +106,11 @@ class FusionVoidScenarioTest {
         TestWorld.View view = TechFixtures.view();
         fusion.fill(view, siting, legend);
         view.air(TechFixtures.world(siting, LatticePoint.of(0, 0, 0)));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(torusOnlyBlueprint("fusion/torus_missing"), siting, view, ledger);
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "one torus cell is air");
         assertTrue(TechFixtures.hasCode(failed, Codes.expected), "the missing torus cell is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no rows");
     }
 
     private static Blueprint torusOnlyBlueprint(String path) {

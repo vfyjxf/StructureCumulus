@@ -130,21 +130,11 @@ class ExpandedManagerTest {
     }
 
     @Test
-    void movedBrokenAndInvalidatedAtScaleLeaveExactlyTheExpectedRegistry() {
+    void brokenAndInvalidatedAtScaleLeaveExactlyTheExpectedRegistry() {
         StructureManager manager = StructureManager.create();
         List<StructureInstance> formed = new ArrayList<>();
         for (int i = 0; i < 40; i++) {
             formed.add(form(manager, world0, owner, siting(i), box(i, 0, 0, i + 1, 1, 1)));
-        }
-        for (int i = 0; i < 10; i++) {
-            manager.onEvent(
-                new StructureEvent.Moved(
-                    formed.get(i).id(),
-                    siting(i),
-                    siting(100 + i),
-                    box(100 + i, 0, 0, 101 + i, 1, 1)
-                )
-            );
         }
         for (int i = 10; i < 20; i++) {
             manager.onEvent(new StructureEvent.Broken(formed.get(i).id()));
@@ -155,10 +145,9 @@ class ExpandedManagerTest {
 
         assertEquals(20, manager.instances().size());
         for (int i = 0; i < 10; i++) {
-            StructureInstance moved = Objects.requireNonNull(manager.find(formed.get(i).id()), "moved");
-            assertEquals(siting(100 + i), moved.siting());
-            assertEquals(1, manager.findAt(LatticePoint.of(100 + i, 0, 0)).size());
-            assertTrue(manager.findAt(LatticePoint.of(i, 0, 0)).isEmpty());
+            StructureInstance kept = Objects.requireNonNull(manager.find(formed.get(i).id()), "kept");
+            assertEquals(siting(i), kept.siting());
+            assertEquals(1, manager.findAt(LatticePoint.of(i, 0, 0)).size());
         }
         for (int i = 10; i < 30; i++) {
             assertNull(manager.find(formed.get(i).id()));
@@ -406,42 +395,6 @@ class ExpandedManagerTest {
             }
         }
         assertEquals(10, manager.instances().size());
-    }
-
-    @Test
-    void movedCollisionsStaleFromAndUnknownIdsAreRejectedAtScale() {
-        StructureManager manager = StructureManager.create();
-        List<StructureInstance> formed = new ArrayList<>();
-        for (int i = 0; i < 20; i++) {
-            formed.add(form(manager, world0, owner, siting(i), box(i, 0, 0, i + 1, 1, 1)));
-        }
-        StructureInstance moving = formed.get(0);
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager
-                    .onEvent(new StructureEvent.Moved(moving.id(), siting(0), siting(1), box(200, 0, 0, 201, 1, 1))),
-            "a move onto an occupied tuple is rejected"
-        );
-        manager.onEvent(new StructureEvent.Moved(moving.id(), siting(0), siting(100), box(300, 0, 0, 301, 1, 1)));
-        assertEquals(siting(100), Objects.requireNonNull(manager.find(moving.id()), "moved").siting());
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager
-                    .onEvent(new StructureEvent.Moved(moving.id(), siting(0), siting(101), box(302, 0, 0, 303, 1, 1))),
-            "a stale from is rejected"
-        );
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(
-                new StructureEvent.Moved(new InstanceId(world0, 999), siting(0), siting(102), box(0, 0, 0, 1, 1, 1))
-            ),
-            "an unknown id is rejected"
-        );
-        StructureInstance otherWorld = form(manager, world(5), owner, siting(100), box(400, 0, 0, 401, 1, 1));
-        manager.onEvent(
-            new StructureEvent.Moved(otherWorld.id(), siting(100), siting(1_000), box(500, 0, 0, 501, 1, 1))
-        );
-        assertEquals(siting(1_000), Objects.requireNonNull(manager.find(otherWorld.id()), "other").siting());
     }
 
     @Test

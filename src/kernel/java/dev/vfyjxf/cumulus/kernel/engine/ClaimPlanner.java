@@ -4,7 +4,7 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.core.OwnerId;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
@@ -24,10 +24,10 @@ import java.util.Objects;
 /** The only row factory: pure, with no view and no ledger. */
 public final class ClaimPlanner {
 
-    public static Derived derive(Blueprint blueprint, Siting siting, OwnerId owner, List<BayBinding> bindings) {
+    public static Derived derive(Blueprint blueprint, Siting siting, InstanceId instance, List<BayBinding> bindings) {
         Objects.requireNonNull(blueprint, "blueprint");
         Objects.requireNonNull(siting, "siting");
-        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(instance, "instance");
         Objects.requireNonNull(bindings, "bindings");
         Map<NamespacedId, List<OccupantSnapshot>> subjectsByBay = new LinkedHashMap<>();
         for (BayBinding binding : bindings) {
@@ -76,7 +76,7 @@ public final class ClaimPlanner {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
                             LatticePoint point = LatticePoint.of(x, y, z);
-                            rows.add(new ClaimRow(LatticeKey.of(point), bay.sharing(), owner, siting, bay.id()));
+                            rows.add(new ClaimRow(LatticeKey.of(point), bay.sharing(), siting, bay.id(), instance));
                         }
                     }
                 }

@@ -122,12 +122,7 @@ final class VisualFixtureCommand {
                                             .executes(context -> stage(context, VisualFixtureSupport::stagePair))
                                 )
                             )
-                            .then(
-                                Commands.literal("move").then(
-                                    Commands.argument("origin", BlockPosArgument.blockPos())
-                                            .executes(VisualFixtureCommand::move)
-                                )
-                            ).then(Commands.literal("unload").executes(context -> {
+                            .then(Commands.literal("unload").executes(context -> {
                                 return VisualFixtureSupport.unloadFixture(context.getSource().getLevel()) ? 1 : 0;
                             })).then(Commands.literal("load").executes(context -> {
                                 return VisualFixtureSupport.loadFixture(context.getSource().getLevel()) ? 1 : 0;
@@ -227,14 +222,6 @@ final class VisualFixtureCommand {
         ServerLevel level = context.getSource().getLevel();
         BlockPos pos = BlockPosArgument.getBlockPos(context, "origin");
         return stage.test(level, LatticePoint.of(pos.getX(), pos.getY(), pos.getZ())) ? 1 : 0;
-    }
-
-    private static int move(CommandContext<CommandSourceStack> context) {
-        ServerLevel level = context.getSource().getLevel();
-        BlockPos pos = BlockPosArgument.getBlockPos(context, "origin");
-        return VisualFixtureSupport.moveFixture(level, LatticePoint.of(pos.getX(), pos.getY(), pos.getZ()), 1, 0, 0)
-                ? 1
-                : 0;
     }
 
     private static int hierarchyStage(

@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -63,7 +64,7 @@ class EntityWindowScenarioTest {
         LatticePoint worldCell = TechFixtures.world(siting, LatticePoint.origin);
         TestWorld.View view = new TestWorld.View()
                 .put(TechFixtures.entity(TechFixtures.cow, worldCell, Cuboid.of(worldCell)));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(blueprint, siting, view, ledger),

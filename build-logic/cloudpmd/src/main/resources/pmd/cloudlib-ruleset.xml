@@ -1064,4 +1064,28 @@
         </properties>
     </rule>
 
+    <!-- B-09 Level identity: a level object must never key a collection.
+         Two failures follow from `Map<ServerLevel, …>`: the map keeps the level alive, so an
+         unloaded level cannot be collected; and a dimension that unloads and loads again yields a
+         new level object, so the same world owns two entries that are never reconciled.
+         Fix: `ServerLevel#dimension()` answers `ResourceKey<Level>`, which names the dimension
+         rather than one instance of it.
+         Stock: 0 — the three StructureCumulus sites (`ServerState.levels`, `ServerState.captures`,
+         `LevelWatch.levels`) and the uitest fixture were re-keyed by A06-D03/D-46. CloudLib and
+         Nimbus were not re-measured here; this ruleset ships to them too, so their first run may
+         report.
+         The rule is strict on purpose: a short-lived local map keyed by a level still
+         reads as "this level is an identity", and judging whether a particular map outlives its
+         level costs more than rewriting it. -->
+    <rule name="NoLevelAsCollectionKey"
+          language="java"
+          message="A level object must not key a collection"
+          class="dev.vfyjxf.cloudlib.pmd.rules.NoLevelAsCollectionKeyRule">
+        <description>
+            Reports a field, local variable, parameter or method return type whose outer container is
+            a Map or Set and whose first type argument is a Minecraft level type.
+        </description>
+        <priority>1</priority>
+    </rule>
+
 </ruleset>

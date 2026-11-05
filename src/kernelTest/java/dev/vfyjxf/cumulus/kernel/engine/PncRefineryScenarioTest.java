@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -60,7 +61,7 @@ class PncRefineryScenarioTest {
         Siting siting = TechFixtures.turn(LatticePoint.origin, Turn.half);
         TestWorld.View view = TechFixtures.view();
         refinery.fill(view, siting, legend);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(standardBlueprint("pnc/refinery_half"), siting, view, ledger),
@@ -69,7 +70,7 @@ class PncRefineryScenarioTest {
         assertEquals(13, formed.claims().rows().size(), "twelve body cells plus the controller");
         Set<LatticeKey> expected = TechFixtures.worldKeys(siting, allCells);
         assertEquals(expected, new LinkedHashSet<>(TechFixtures.rowKeys(formed)), "the claims are the sited refinery");
-        assertEquals(13, ledger.all().size(), "the ledger holds the refinery");
+        assertEquals(13, TestWorld.rows(ledger).size(), "the ledger holds the refinery");
     }
 
     @Test
@@ -79,35 +80,35 @@ class PncRefineryScenarioTest {
         refinery.fill(view, siting, legend);
         LatticePoint missing = LatticePoint.of(1, 2, 1);
         view.air(TechFixtures.world(siting, missing));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures
                 .settle(standardBlueprint("pnc/refinery_missing_output"), siting, view, ledger);
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "one output cell is air");
         assertTrue(TechFixtures.hasCode(failed, Codes.expected), "the missing output is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no rows");
     }
 
     @Test
     void twoOutputsAndAirPaddingUseBoxVersusBound() {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
         TestWorld.View view = paddedView(siting);
-        TestWorld.Ledger boxLedger = TechFixtures.ledger();
+        ClaimLedger boxLedger = TechFixtures.ledger();
         MatchResult.Formed boxed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(paddedBlueprint("pnc/refinery_box", Footprint.box()), siting, view, boxLedger),
             "the air padding is inside a Box footprint"
         );
         assertEquals(12, boxed.claims().rows().size(), "Box owns eight body cells and four padded outputs");
-        assertEquals(12, boxLedger.all().size(), "the Box ledger holds twelve rows");
+        assertEquals(12, TestWorld.rows(boxLedger).size(), "the Box ledger holds twelve rows");
 
-        TestWorld.Ledger boundLedger = TechFixtures.ledger();
+        ClaimLedger boundLedger = TechFixtures.ledger();
         MatchResult.Formed bounded = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(paddedBlueprint("pnc/refinery_bound", Footprint.bound()), siting, view, boundLedger),
             "a Bound footprint skips the air padding"
         );
         assertEquals(10, bounded.claims().rows().size(), "Bound owns eight body cells and two real outputs");
-        assertEquals(10, boundLedger.all().size(), "the Bound ledger holds ten rows");
+        assertEquals(10, TestWorld.rows(boundLedger).size(), "the Bound ledger holds ten rows");
     }
 
     @Test
@@ -116,7 +117,7 @@ class PncRefineryScenarioTest {
         TestWorld.View view = TechFixtures.view();
         refinery.fill(view, siting, legend);
         TechFixtures.put(view, siting, LatticePoint.of(2, 2, 0), TechFixtures.refineryOutput);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(fifthOutputBlueprint("pnc/refinery_fifth"), siting, view, ledger),
@@ -133,7 +134,7 @@ class PncRefineryScenarioTest {
     void twoControllersAreAdmittedByPerCellChecks() {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
         TestWorld.View view = ambiguousControllerView(siting);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(ambiguousControllerBlueprint("pnc/refinery_two_controllers"), siting, view, ledger),
@@ -146,7 +147,7 @@ class PncRefineryScenarioTest {
     void aHostCountRejectsTwoControllers() {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
         TestWorld.View view = ambiguousControllerView(siting);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures
                 .settle(countedControllerBlueprint("pnc/refinery_counted_controller"), siting, view, ledger);
         MatchResult.Failed failed = assertInstanceOf(
@@ -155,7 +156,7 @@ class PncRefineryScenarioTest {
             "a host-side uniqueness test sees the ambiguity"
         );
         assertTrue(TechFixtures.hasCode(failed, Codes.expected), "the ambiguity is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "an ambiguous controller writes no claim");
+        assertEquals(0, TestWorld.rows(ledger).size(), "an ambiguous controller writes no claim");
     }
 
     @Test
@@ -163,7 +164,7 @@ class PncRefineryScenarioTest {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
         TestWorld.View view = TechFixtures.view();
         refinery.fill(view, siting, legend);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(standardBlueprint("pnc/refinery_conflict"), siting, view, ledger),
@@ -180,7 +181,7 @@ class PncRefineryScenarioTest {
         );
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "the rival is rejected");
         assertTrue(TechFixtures.hasCode(failed, Codes.claimConflict), "the conflict is SC-CLM-0001");
-        assertEquals(13, ledger.all().size(), "the conflict leaves the incumbent rows untouched");
+        assertEquals(13, TestWorld.rows(ledger).size(), "the conflict leaves the incumbent rows untouched");
         assertEquals(revision, ledger.revision(), "the conflict does not move the revision");
     }
 

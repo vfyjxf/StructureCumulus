@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
@@ -39,7 +40,7 @@ class Ae2CpuScenarioTest {
         Siting siting = TechFixtures.turn(origin, Turn.clockwise);
         TestWorld.View view = TechFixtures.view();
         cpuPattern.fill(view, siting, cpu, TechFixtures.cpu);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(cpuBlueprint("ae2/cpu_clockwise"), siting, view, ledger),
@@ -48,7 +49,7 @@ class Ae2CpuScenarioTest {
         assertEquals(8, formed.claims().rows().size(), "eight CPU cells are claimed");
         Set<LatticeKey> expected = TechFixtures.worldKeys(siting, cpuCells);
         assertEquals(expected, new LinkedHashSet<>(TechFixtures.rowKeys(formed)), "the claims are the sited CPU cells");
-        assertEquals(8, ledger.all().size(), "the ledger holds eight rows");
+        assertEquals(8, TestWorld.rows(ledger).size(), "the ledger holds eight rows");
     }
 
     @Test
@@ -57,11 +58,11 @@ class Ae2CpuScenarioTest {
         TestWorld.View view = TechFixtures.view();
         cpuPattern.fill(view, siting, cpu, TechFixtures.cpu);
         view.air(TechFixtures.world(siting, LatticePoint.of(1, 1, 1)));
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult result = TechFixtures.settle(cpuBlueprint("ae2/cpu_missing_storage"), siting, view, ledger);
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "one CPU cell is air");
         assertTrue(TechFixtures.hasCode(failed, Codes.expected), "the missing storage is SC-EXP-0001");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no rows");
     }
 
     @Test
@@ -70,7 +71,7 @@ class Ae2CpuScenarioTest {
         TestWorld.View view = TechFixtures.view();
         cpuPattern.fill(view, siting, cpu, TechFixtures.cpu);
         TechFixtures.put(view, siting, LatticePoint.of(2, 0, 0), TechFixtures.storage);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(cpuBlueprint("ae2/cpu_outside_block"), siting, view, ledger),
@@ -107,13 +108,13 @@ class Ae2CpuScenarioTest {
         Siting siting = TechFixtures.identity(origin);
         TestWorld.View view = TechFixtures.view();
         cpuPattern.fill(view, siting, cpu, TechFixtures.cpu);
-        TestWorld.Ledger ledger = TechFixtures.ledger();
+        ClaimLedger ledger = TechFixtures.ledger();
         assertInstanceOf(
             MatchResult.Formed.class,
             TechFixtures.settle(cpuBlueprint("ae2/cpu_conflict"), siting, view, ledger),
             "the first owner forms"
         );
-        assertEquals(8, ledger.all().size(), "the first owner holds eight rows");
+        assertEquals(8, TestWorld.rows(ledger).size(), "the first owner holds eight rows");
         long revision = ledger.revision();
         MatchResult result = TechFixtures.settle(
             cpuBlueprint("ae2/cpu_conflict"),
@@ -125,7 +126,7 @@ class Ae2CpuScenarioTest {
         );
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result, "the rival is rejected");
         assertTrue(TechFixtures.hasCode(failed, Codes.claimConflict), "the conflict is SC-CLM-0001");
-        assertEquals(8, ledger.all().size(), "the conflict leaves the incumbent rows untouched");
+        assertEquals(8, TestWorld.rows(ledger).size(), "the conflict leaves the incumbent rows untouched");
         assertEquals(revision, ledger.revision(), "the conflict does not move the revision");
     }
 

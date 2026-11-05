@@ -85,8 +85,6 @@ public sealed interface StructureEvent {
 
     record Broken(InstanceId id) implements StructureEvent {}
 
-    record Moved(InstanceId id, Siting from, Siting to, CuboidSet bounds) implements StructureEvent {}
-
     record Loaded(World world, List<StructureInstance> instances) implements StructureEvent {}
 
     record Unloaded(World world) implements StructureEvent {}
@@ -109,7 +107,6 @@ The host owns detection; the manager owns the registry and context state.
 | success | `attempt.commit(bounds)` | moves the draft into `instances`, returns the immutable `StructureInstance` |
 | failure | `attempt.abort()` | discards the draft and its context |
 | destroyed | `onEvent(new Broken(id))` | removes the instance and its context |
-| moved | `onEvent(new Moved(id, from, to, bounds))` | updates the spec siting and world bounds; rejects a collision |
 | unloaded | `onEvent(new Unloaded(world))` | clears that world's in-memory instances and drafts; claim rows stay |
 | loaded | `onEvent(new Loaded(world, restored))` | validates, then replaces only that world's instances with the restored set |
 | corrupt | `onEvent(new Invalidated(id, reason))` | removes the instance and context |
@@ -117,13 +114,12 @@ The host owns detection; the manager owns the registry and context state.
 Laws:
 
 - one formed instance per `(world, owner, siting)`; a second draft for that tuple is rejected; a
-  `commit` replaces an already formed instance at that tuple in the same world; a `Moved` collision
-  is rejected. The same `(owner, siting)` in another world is a different instance;
+  `commit` replaces an already formed instance at that tuple in the same world. The same
+  `(owner, siting)` in another world is a different instance;
 - `commit` and `abort` are one-shot; a second call is an error;
 - `ContextStore.remove` on a draft closes it: the reservation is released, it returns the old
   context, and later `publish`/`remove`/`commit`/`abort` throw `IllegalStateException`; no instance
   is formed. `remove` on a formed instance removes the instance and returns its context;
-- `Moved` preserves the `InstanceId` and the context; only the siting and bounds change;
 - `Broken`/`Invalidated` are idempotent (an unknown id is a no-op); on a draft they close it;
 - `Unloaded` and `Loaded` are per `World`; `Loaded` is the only bulk replace and touches only the
   named world. It validates every restored id/siting and world membership before mutating, so a
@@ -153,16 +149,10 @@ The host supplies the world-frame `bounds`; the manager never interprets them. T
 - a player break or explosion inside `bounds` dispatches `Broken`;
 - a block place inside `bounds` dispatches `Invalidated` (the structure no longer matches its
   captured cells);
-- a piston that moves only part of the structure, or destroys a bound cell, dispatches `Invalidated`
-  and releases the old claim key;
-- a piston that moves every claimed non-air cell by one direction dispatches `Moved` with the
-  translated bounds and siting; the adapter translates the claim rows to the new siting, and if the
-  new claims conflict it dispatches `Invalidated` and releases the old rows;
-- if the manager rejects that `Moved` (a target collision or another host rejection), the adapter
-  dispatches `Invalidated` for the stale instance and releases its old claims; it does not translate
-  the rows. This is the rejected-`Moved` path;
-- a level unload dispatches `Unloaded(world)`, dropping that world's manager state but keeping its
-  persisted claim rows;
+- a piston that moves any claimed cell, or destroys a bound cell, dispatches `Invalidated` and
+  releases the claim rows: a pushed structure is gone, not translated;
+- a level unload dispatches `Unloaded(world)` and drops that world's manager state together with
+  its claim ledger (D-44);
 - a host that restores its own instances dispatches `Loaded(world, instances)`.
 
 No chunk listener is needed: a structure spans chunks and is not removed by a chunk unload. The
@@ -250,8 +240,8 @@ no instance id survives the session.
 
 - `SavedContexts`, `ContextCodecs`, `FindingCodec` and their tests are deleted; the adapter manager is
   in-memory.
-- The adapter wires `begin`/`commit`/`abort`, `Broken`, `Invalidated`, `Moved`, `Unloaded` and
-  `Loaded` through `WatchEvents`; `Loaded` is host-driven because the adapter has no persisted
+- The adapter wires `begin`/`commit`/`abort`, `Broken`, `Invalidated`, `Unloaded` and `Loaded`
+  through `WatchEvents`; `Loaded` is host-driven because the adapter has no persisted
   instances to restore.
 
 ## 10. Nested extent access (design 13, approved split)

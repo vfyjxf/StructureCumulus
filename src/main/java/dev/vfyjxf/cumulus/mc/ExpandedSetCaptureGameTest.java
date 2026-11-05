@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
@@ -346,7 +347,7 @@ public final class ExpandedSetCaptureGameTest {
         StructureSet plan = plan(origin, 6);
         placeBlocks(helper, plan);
         StructureManager structures = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         Cuboid bounds = SetCommand.bounds(plan);
         cleanup(structures, ledger, state, plan);
         try (SnapshotLease lease = capture(state, level, bounds)) {
@@ -447,19 +448,20 @@ public final class ExpandedSetCaptureGameTest {
         return Cuboid.of(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
-    private static void cleanup(StructureManager structures, SavedClaims ledger, ServerState state, StructureSet plan) {
+    private static void cleanup(StructureManager structures, ClaimLedger ledger, ServerState state, StructureSet plan) {
         for (StructureSet.Satellite satellite : plan.satellites()) {
             release(structures, ledger, state, satellite.siting());
         }
         release(structures, ledger, state, plan.rootSiting());
     }
 
-    private static void release(StructureManager structures, SavedClaims ledger, ServerState state, Siting siting) {
+    private static void release(StructureManager structures, ClaimLedger ledger, ServerState state, Siting siting) {
         StructureInstance instance = structures.find(state.owner(), siting);
-        if (instance != null) {
-            structures.onEvent(new StructureEvent.Broken(instance.id()));
+        if (instance == null) {
+            return;
         }
-        ledger.release(state.owner(), siting);
+        structures.onEvent(new StructureEvent.Broken(instance.id()));
+        ledger.release(instance.id());
     }
 
     private static Blueprint rootBlueprint() {

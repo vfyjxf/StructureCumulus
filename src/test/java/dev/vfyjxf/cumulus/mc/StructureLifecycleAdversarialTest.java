@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
@@ -193,8 +194,8 @@ class StructureLifecycleAdversarialTest {
         StructureManager first = StructureManager.create();
         StructureInstance instance = form(first, ownerA, origin, oneCell);
 
-        SavedClaims ledger = new SavedClaims(world);
-        settle(ledger, ownerA, origin, List.of(row(ownerA, origin, LatticePoint.origin, Sharing.exclusive)));
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        settle(ledger, instance.id(), List.of(row(instance.id(), origin, LatticePoint.origin, Sharing.exclusive)));
         long revision = ledger.revision();
         assertEquals(1, ledger.read(wideBox).rows().size());
 
@@ -212,43 +213,45 @@ class StructureLifecycleAdversarialTest {
 
     @Test
     void claimReleaseBumpsTheRevisionOnlyWhenItRemovesARow() {
-        SavedClaims ledger = new SavedClaims(world);
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
         assertEquals(0, ledger.revision());
+        InstanceId instanceA = new InstanceId(world, 1_000_000L);
+        InstanceId instanceB = new InstanceId(world, 1_000_001L);
         settle(
             ledger,
-            ownerA,
-            origin,
+            instanceA,
             List.of(
-                row(ownerA, origin, LatticePoint.of(0, 0, 0), Sharing.exclusive),
-                row(ownerA, origin, LatticePoint.of(1, 0, 0), Sharing.exclusive)
+                row(instanceA, origin, LatticePoint.of(0, 0, 0), Sharing.exclusive),
+                row(instanceA, origin, LatticePoint.of(1, 0, 0), Sharing.exclusive)
             )
         );
         assertEquals(1, ledger.revision(), "the settle bumps the revision once");
         assertEquals(2, ledger.read(wideBox).rows().size());
 
-        ClaimVerdict released = ledger.release(ownerA, origin);
-        assertTrue(released instanceof ClaimVerdict.Settled settled);
+        ClaimVerdict released = ledger.release(instanceA);
+        assertTrue(released instanceof ClaimVerdict.Settled);
         assertEquals(2, ((ClaimVerdict.Settled) released).revision());
         assertEquals(2, ledger.revision());
-        assertTrue(ledger.read(wideBox).rows().isEmpty(), "release removes every row of the key");
+        assertTrue(ledger.read(wideBox).rows().isEmpty(), "release removes every row of the instance");
 
-        ClaimVerdict again = ledger.release(ownerA, origin);
+        ClaimVerdict again = ledger.release(instanceA);
         assertEquals(2, ((ClaimVerdict.Settled) again).revision(), "a no-op release does not bump");
         assertEquals(2, ledger.revision());
-        ledger.release(ownerB, origin);
-        assertEquals(2, ledger.revision(), "releasing an absent key does not bump");
+        ledger.release(instanceB);
+        assertEquals(2, ledger.revision(), "releasing an absent instance does not bump");
     }
 
     @Test
     void claimTranslateSettlesNewRowsThenReleasesOldAndCountsThem() {
-        SavedClaims ledger = new SavedClaims(world);
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        InstanceId moving = new InstanceId(world, 1_000_000L);
+        InstanceId translatedInstance = new InstanceId(world, 1_000_001L);
         settle(
             ledger,
-            ownerA,
-            origin,
+            moving,
             List.of(
-                row(ownerA, origin, LatticePoint.of(0, 0, 0), Sharing.exclusive),
-                row(ownerA, origin, LatticePoint.of(1, 0, 0), Sharing.exclusive)
+                row(moving, origin, LatticePoint.of(0, 0, 0), Sharing.exclusive),
+                row(moving, origin, LatticePoint.of(1, 0, 0), Sharing.exclusive)
             )
         );
         assertEquals(1, ledger.revision());
@@ -259,20 +262,20 @@ class StructureLifecycleAdversarialTest {
         for (ClaimRow row : old.rows()) {
             LatticePoint next = row.cell().point().offset(10, 0, 0);
             assertNotNull(next);
-            translated.add(new ClaimRow(LatticeKey.of(next), row.sharing(), ownerA, movedOrigin, row.bay()));
+            translated.add(new ClaimRow(LatticeKey.of(next), row.sharing(), movedOrigin, row.bay(), translatedInstance));
         }
-        settle(ledger, ownerA, movedOrigin, translated);
+        settle(ledger, translatedInstance, translated);
         assertEquals(2, ledger.revision(), "the translated settle bumps once");
         assertEquals(2, ledger.read(twoCellBox).rows().size(), "the old rows remain until the release");
         assertEquals(2, ledger.read(movedBox).rows().size());
 
-        ledger.release(ownerA, origin);
-        assertEquals(3, ledger.revision(), "the release of the old siting bumps once");
+        ledger.release(moving);
+        assertEquals(3, ledger.revision(), "the release of the old instance bumps once");
         assertEquals(2, ledger.read(movedBox).rows().size(), "the translated rows survive the old release");
         assertEquals(movedOrigin, ledger.read(movedBox).rows().get(0).siting());
         assertEquals(2, ledger.read(wideBox).rows().size(), "the translation never duplicates a row");
 
-        ClaimVerdict stale = ledger.settle(new SettleRequest(ownerA, movedOrigin, List.of(), 1L));
+        ClaimVerdict stale = ledger.settle(new SettleRequest(translatedInstance, List.of(), 1L));
         assertTrue(stale instanceof ClaimVerdict.RevisionMoved moved);
         assertEquals(1L, ((ClaimVerdict.RevisionMoved) stale).expected());
         assertEquals(3L, ((ClaimVerdict.RevisionMoved) stale).actual());
@@ -282,21 +285,21 @@ class StructureLifecycleAdversarialTest {
 
     @Test
     void claimTranslateConflictLeavesBothSidesUntouchedUntilTheRelease() {
-        SavedClaims ledger = new SavedClaims(world);
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        InstanceId incumbent = new InstanceId(world, 1_000_000L);
+        InstanceId pending = new InstanceId(world, 1_000_001L);
         settle(
             ledger,
-            ownerB,
-            movedOrigin,
-            List.of(row(ownerB, movedOrigin, LatticePoint.of(10, 0, 0), Sharing.exclusive))
+            incumbent,
+            List.of(row(incumbent, movedOrigin, LatticePoint.of(10, 0, 0), Sharing.exclusive))
         );
-        settle(ledger, ownerA, origin, List.of(row(ownerA, origin, LatticePoint.origin, Sharing.exclusive)));
+        settle(ledger, pending, List.of(row(pending, origin, LatticePoint.origin, Sharing.exclusive)));
         assertEquals(2, ledger.revision());
 
         ClaimVerdict verdict = ledger.settle(
             new SettleRequest(
-                ownerA,
-                movedOrigin,
-                List.of(row(ownerA, movedOrigin, LatticePoint.of(10, 0, 0), Sharing.exclusive)),
+                pending,
+                List.of(row(pending, movedOrigin, LatticePoint.of(10, 0, 0), Sharing.exclusive)),
                 2L
             )
         );
@@ -305,17 +308,17 @@ class StructureLifecycleAdversarialTest {
         assertEquals(1, ledger.read(oneCellBox).rows().size(), "the pending row is untouched");
         ClaimView target = ledger.read(movedBox);
         assertEquals(1, target.rows().size());
-        assertEquals(ownerB, target.rows().get(0).owner());
+        assertEquals(incumbent, target.rows().get(0).instance());
         assertTrue(
-            target.rows().stream().noneMatch(row -> row.owner().equals(ownerA)),
+            target.rows().stream().noneMatch(row -> row.instance().equals(pending)),
             "the conflicting row is not inserted"
         );
 
-        ledger.release(ownerA, origin);
+        ledger.release(pending);
         assertEquals(3, ledger.revision());
         assertTrue(ledger.read(oneCellBox).rows().isEmpty());
         assertEquals(1, ledger.read(movedBox).rows().size(), "the incumbent survives the invalidation");
-        assertEquals(ownerB, ledger.read(movedBox).rows().get(0).owner());
+        assertEquals(incumbent, ledger.read(movedBox).rows().get(0).instance());
     }
 
     @Test
@@ -335,21 +338,6 @@ class StructureLifecycleAdversarialTest {
         assertNotNull(manager.find(instance.id()), "unknown ids and other worlds are no-ops");
         assertTrue(manager.findAt(LatticePoint.of(-4, 0, -4)).isEmpty());
 
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(new InstanceId(world, 999), origin, movedOrigin, oneCell)),
-            "a Moved event for an unknown instance is rejected"
-        );
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(instance.id(), movedOrigin, origin, oneCell)),
-            "a Moved event whose from siting does not match is rejected"
-        );
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> manager.onEvent(new StructureEvent.Moved(instance.id(), origin, other.siting(), oneCell)),
-            "a Moved event onto an occupied siting is rejected"
-        );
         StructureInstance unchanged = manager.find(instance.id());
         assertNotNull(unchanged, "a rejected event never removes the instance");
         assertEquals(origin, unchanged.siting(), "a rejected event leaves the siting unchanged");
@@ -392,18 +380,18 @@ class StructureLifecycleAdversarialTest {
         assertEquals(first, manager.find(ownerA, origin));
         assertEquals(second, manager.find(ownerB, origin));
 
-        SavedClaims ledger = new SavedClaims(world);
-        settle(ledger, ownerA, origin, List.of(row(ownerA, origin, LatticePoint.origin, Sharing.shared)));
-        settle(ledger, ownerB, origin, List.of(row(ownerB, origin, LatticePoint.origin, Sharing.shared)));
-        assertEquals(2, ledger.read(oneCellBox).rows().size(), "two shared owners hold one cell each");
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        settle(ledger, first.id(), List.of(row(first.id(), origin, LatticePoint.origin, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), origin, LatticePoint.origin, Sharing.shared)));
+        assertEquals(2, ledger.read(oneCellBox).rows().size(), "two shared instances hold one cell each");
         long revision = ledger.revision();
 
         manager.onEvent(new StructureEvent.Broken(first.id()));
         assertEquals(List.of(second), manager.findAt(LatticePoint.origin));
-        ledger.release(ownerA, origin);
-        assertEquals(revision + 1, ledger.revision(), "releasing one owner bumps once");
+        ledger.release(first.id());
+        assertEquals(revision + 1, ledger.revision(), "releasing one instance bumps once");
         assertEquals(1, ledger.read(oneCellBox).rows().size());
-        assertEquals(ownerB, ledger.read(oneCellBox).rows().get(0).owner());
+        assertEquals(second.id(), ledger.read(oneCellBox).rows().get(0).instance());
     }
 
     @Test
@@ -560,11 +548,12 @@ class StructureLifecycleAdversarialTest {
     }
 
     @Test
-    void duplicateRowsInOneSettleCollapseToTheKey() {
-        SavedClaims ledger = new SavedClaims(world);
-        ClaimRow duplicate = row(ownerA, origin, LatticePoint.origin, Sharing.exclusive);
+    void duplicateRowsInOneSettleCollapseToTheInstance() {
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        InstanceId instance = new InstanceId(world, 1_000_000L);
+        ClaimRow duplicate = row(instance, origin, LatticePoint.origin, Sharing.exclusive);
         ClaimVerdict verdict = ledger
-                .settle(new SettleRequest(ownerA, origin, List.of(duplicate, duplicate), ledger.revision()));
+                .settle(new SettleRequest(instance, List.of(duplicate, duplicate), ledger.revision()));
         assertTrue(verdict instanceof ClaimVerdict.Settled);
         assertEquals(1, ledger.revision());
         assertEquals(1, ledger.read(oneCellBox).rows().size(), "duplicate rows in one key collapse");
@@ -655,12 +644,12 @@ class StructureLifecycleAdversarialTest {
         return attempt.id();
     }
 
-    private static ClaimRow row(OwnerId owner, Siting siting, LatticePoint cell, Sharing sharing) {
-        return new ClaimRow(LatticeKey.of(cell), sharing, owner, siting, bay);
+    private static ClaimRow row(InstanceId instance, Siting siting, LatticePoint cell, Sharing sharing) {
+        return new ClaimRow(LatticeKey.of(cell), sharing, siting, bay, instance);
     }
 
-    private static void settle(SavedClaims ledger, OwnerId owner, Siting siting, List<ClaimRow> rows) {
-        ClaimVerdict verdict = ledger.settle(new SettleRequest(owner, siting, rows, ledger.revision()));
+    private static void settle(ClaimLedger ledger, InstanceId instance, List<ClaimRow> rows) {
+        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance, rows, ledger.revision()));
         if (!(verdict instanceof ClaimVerdict.Settled)) {
             throw new AssertionError("the settle was rejected: " + verdict);
         }

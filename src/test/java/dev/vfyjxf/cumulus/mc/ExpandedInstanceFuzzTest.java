@@ -140,50 +140,6 @@ class ExpandedInstanceFuzzTest {
     }
 
     @Test
-    void movingAnExclusiveInstanceOntoHeldCellsInvalidatesAndReleasesOldRows() {
-        for (long seed : seeds) {
-            StructureManager manager = StructureManager.create();
-            StructureSetTestSupport.TestView view = new StructureSetTestSupport.TestView();
-            StructureSetTestSupport.FakeLedger ledger = new StructureSetTestSupport.FakeLedger();
-            OwnerId owner = owners[0];
-            StructureInstance first = Objects.requireNonNull(
-                form(manager, ledger, view, exclusiveBlueprint, worlds[0], owner, sitings[0], seed)
-            );
-            StructureInstance held = Objects.requireNonNull(
-                form(manager, ledger, view, exclusiveBlueprint, worlds[0], owner, sitings[4], seed)
-            );
-            assertNull(manager.find(worlds[0], owner, sitings[5]), "seed=" + seed + " the move target tuple is free");
-            List<ClaimRow> heldRows = expectedRows(exclusiveBlueprint, Objects.requireNonNull(held.siting()), owner);
-            List<ClaimRow> translated = expectedRows(exclusiveBlueprint, sitings[5], owner);
-            long revision = ledger.revision();
-
-            ClaimVerdict released = ledger.release(owner, first.siting());
-            assertInstanceOf(ClaimVerdict.Settled.class, released, "seed=" + seed + " the old key releases");
-            ClaimVerdict translatedVerdict = ledger
-                    .settle(new SettleRequest(owner, sitings[5], translated, ledger.revision()));
-            assertInstanceOf(
-                ClaimVerdict.Conflict.class,
-                translatedVerdict,
-                "seed=" + seed + " the translated exclusive rows conflict with the held instance"
-            );
-            manager.onEvent(new StructureEvent.Invalidated(first.id(), "move conflict"));
-            assertNull(manager.find(first.id()), "seed=" + seed + " the invalidated instance is removed");
-            assertEquals(
-                0L,
-                manager.context(first.id()).revision(),
-                "seed=" + seed + " the invalidated context is removed"
-            );
-            assertEquals(heldRows, ledger.rows(), "seed=" + seed + " only the held rows remain");
-            assertTrue(ledger.revision() > revision, "seed=" + seed + " the release bumps the revision");
-            assertThrows(
-                IllegalArgumentException.class,
-                () -> manager.onEvent(new StructureEvent.Moved(first.id(), sitings[0], sitings[5], bounds.asSet())),
-                "seed=" + seed + " moving a removed instance is rejected"
-            );
-        }
-    }
-
-    @Test
     void unloadedWorldsKeepClaimsAndLoadedRestoresInstancesAndContexts() {
         for (long seed : seeds) {
             Random random = new Random(seed);
@@ -331,16 +287,15 @@ class ExpandedInstanceFuzzTest {
                 formInstance(world, owner, siting, sharedBlueprint);
             }
             for (int step = 0; step < 45; step++) {
-                int op = random.nextInt(10);
+                int op = random.nextInt(9);
                 trace.add("op" + op + ":" + manager.instances().size());
                 switch (op) {
                     case 0, 1 -> publishContext();
                     case 2 -> publishContext();
                     case 3, 4 -> brokenOrInvalidated();
-                    case 5 -> moveInstance();
-                    case 6 -> unloadWorld();
-                    case 7 -> loadWorld();
-                    case 8 -> removeInstance();
+                    case 5 -> unloadWorld();
+                    case 6 -> loadWorld();
+                    case 7 -> removeInstance();
                     default -> formRandom();
                 }
                 assertInvariants(step);
@@ -419,9 +374,9 @@ class ExpandedInstanceFuzzTest {
                 );
             }
             revision(world, 1);
-            List<ClaimRow> expected = expectedRows(blueprint, siting, owner);
-            assertEquals(expected, ownRows(formed, blueprint, siting, owner), where() + " settled rows");
-            claimModel(world).put(tuple(owner, siting), expected);
+            List<ClaimRow> expected = expectedRows(blueprint, siting, attempt.id());
+            assertEquals(expected, ownRows(formed, blueprint, siting), where() + " settled rows");
+            claimModel(world).put(tuple(attempt.id()), expected);
             List<StructureInstance> saved = Objects.requireNonNull(loaded.get(world));
             saved.removeIf(
                 candidate -> candidate.id().equals(instance.id())
@@ -472,10 +427,10 @@ class ExpandedInstanceFuzzTest {
             StructureInstance instance = Objects.requireNonNull(manager.find(id), where() + " broken target is formed");
             World world = id.world();
             StructureSetTestSupport.FakeLedger ledger = Objects.requireNonNull(ledgers.get(world));
-            ClaimVerdict released = ledger.release(instance.owner(), instance.siting());
-            assertInstanceOf(ClaimVerdict.Settled.class, released, where() + " remove releases the claim key");
+            ClaimVerdict released = ledger.release(instance.id());
+            assertInstanceOf(ClaimVerdict.Settled.class, released, where() + " remove releases the instance rows");
             revision(world, 1);
-            claimModel(world).remove(tuple(instance.owner(), instance.siting()));
+            claimModel(world).remove(tuple(instance.id()));
             manager.onEvent(new StructureEvent.Broken(id));
             manager.onEvent(new StructureEvent.Invalidated(id, "again"));
             assertNull(manager.find(id), where() + " Broken removes and is idempotent");
@@ -484,58 +439,6 @@ class ExpandedInstanceFuzzTest {
                 Objects.requireNonNull(loaded.get(world)).removeIf(candidate -> candidate.id().equals(id)),
                 where() + " the saved instance is dropped"
             );
-        }
-
-        private void moveInstance() {
-            List<StructureInstance> instances = manager.instances();
-            if (instances.isEmpty()) {
-                return;
-            }
-            StructureInstance instance = instances.get(random.nextInt(instances.size()));
-            Siting target = sitings[random.nextInt(sitings.length)];
-            if (target.equals(instance.siting())) {
-                return;
-            }
-            StructureInstance occupant = manager.find(instance.id().world(), instance.owner(), target);
-            List<StructureInstance> before = manager.instances();
-            if (occupant != null) {
-                assertThrows(
-                    IllegalArgumentException.class,
-                    () -> manager.onEvent(
-                        new StructureEvent.Moved(
-                            instance.id(),
-                            instance.siting(),
-                            target,
-                            Objects.requireNonNull(target.toWorld(bounds)).asSet()
-                        )
-                    ),
-                    where() + " a moved collision inside the world is rejected"
-                );
-                assertEquals(before, manager.instances(), where() + " a rejected move writes nothing");
-                return;
-            }
-            World world = instance.id().world();
-            StructureSetTestSupport.FakeLedger ledger = Objects.requireNonNull(ledgers.get(world));
-            StructureContext context = instance.context();
-            List<ClaimRow> translated = expectedRows(sharedBlueprint, target, instance.owner());
-            ledger.release(instance.owner(), instance.siting());
-            revision(world, 1);
-            ClaimVerdict settled = ledger
-                    .settle(new SettleRequest(instance.owner(), target, translated, ledger.revision()));
-            assertInstanceOf(ClaimVerdict.Settled.class, settled, where() + " shared translated rows settle");
-            revision(world, 1);
-            Map<String, List<ClaimRow>> worldClaims = claimModel(world);
-            worldClaims.remove(tuple(instance.owner(), instance.siting()));
-            worldClaims.put(tuple(instance.owner(), target), translated);
-            CuboidSet worldBounds = Objects.requireNonNull(target.toWorld(bounds)).asSet();
-            manager.onEvent(new StructureEvent.Moved(instance.id(), instance.siting(), target, worldBounds));
-            StructureInstance moved = Objects.requireNonNull(manager.find(instance.id()), where());
-            assertEquals(context, moved.context(), where() + " Moved preserves the id and context");
-            assertEquals(target, moved.siting(), where() + " Moved updates the siting");
-            assertEquals(worldBounds, moved.bounds(), where() + " Moved updates the bounds");
-            List<StructureInstance> saved = Objects.requireNonNull(loaded.get(world));
-            saved.removeIf(candidate -> candidate.id().equals(instance.id()));
-            saved.add(moved);
         }
 
         private void unloadWorld() {
@@ -577,10 +480,10 @@ class ExpandedInstanceFuzzTest {
             StructureInstance instance = instances.get(random.nextInt(instances.size()));
             World world = instance.id().world();
             StructureSetTestSupport.FakeLedger ledger = Objects.requireNonNull(ledgers.get(world));
-            ClaimVerdict released = ledger.release(instance.owner(), instance.siting());
-            assertInstanceOf(ClaimVerdict.Settled.class, released, where() + " removal releases the claim key");
+            ClaimVerdict released = ledger.release(instance.id());
+            assertInstanceOf(ClaimVerdict.Settled.class, released, where() + " removal releases the instance rows");
             revision(world, 1);
-            claimModel(world).remove(tuple(instance.owner(), instance.siting()));
+            claimModel(world).remove(tuple(instance.id()));
             StructureContext removed = manager.remove(instance.id());
             assertEquals(instance.context(), removed, where() + " remove returns the formed context");
             assertNull(manager.find(instance.id()), where() + " remove drops the instance");
@@ -674,7 +577,7 @@ class ExpandedInstanceFuzzTest {
                 }
                 for (StructureInstance savedInstance : saved) {
                     assertNotNull(
-                        worldClaims.get(tuple(savedInstance.owner(), savedInstance.siting())),
+                        worldClaims.get(tuple(savedInstance.id())),
                         where + " saved instance lost its claim key: " + savedInstance.id() + "@"
                                 + savedInstance.siting() + " keys=" + worldClaims.keySet() + " trace=" + trace
                     );
@@ -683,7 +586,7 @@ class ExpandedInstanceFuzzTest {
                     if (!instance.id().world().equals(world)) {
                         continue;
                     }
-                    List<ClaimRow> expected = worldClaims.get(tuple(instance.owner(), instance.siting()));
+                    List<ClaimRow> expected = worldClaims.get(tuple(instance.id()));
                     assertNotNull(
                         expected,
                         where + " a formed instance has a claim key: " + instance.id() + " "
@@ -691,7 +594,7 @@ class ExpandedInstanceFuzzTest {
                                 + worldClaims.keySet() + " trace=" + trace
                     );
                     assertEquals(
-                        expectedRows(sharedBlueprint, instance.siting(), instance.owner()),
+                        expectedRows(sharedBlueprint, instance.siting(), instance.id()),
                         expected,
                         where + " claim rows match the current siting"
                     );
@@ -799,11 +702,11 @@ class ExpandedInstanceFuzzTest {
         return NamespacedId.of("expanded_instances", path);
     }
 
-    private static String tuple(OwnerId owner, Siting siting) {
-        return owner.id().text() + "@" + siting;
+    private static String tuple(InstanceId instance) {
+        return instance.world().id().text() + "#" + instance.serial();
     }
 
-    private static List<ClaimRow> expectedRows(Blueprint blueprint, Siting siting, OwnerId owner) {
+    private static List<ClaimRow> expectedRows(Blueprint blueprint, Siting siting, InstanceId instance) {
         List<ClaimRow> rows = new ArrayList<>();
         for (Bay bay : blueprint.bays()) {
             for (Cuboid box : bay.cells().boxes()) {
@@ -811,7 +714,7 @@ class ExpandedInstanceFuzzTest {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
                             LatticePoint point = Objects.requireNonNull(siting.toWorld(LatticePoint.of(x, y, z)));
-                            rows.add(new ClaimRow(LatticeKey.of(point), bay.sharing(), owner, siting, bay.id()));
+                            rows.add(new ClaimRow(LatticeKey.of(point), bay.sharing(), siting, bay.id(), instance));
                         }
                     }
                 }
@@ -821,15 +724,10 @@ class ExpandedInstanceFuzzTest {
         return List.copyOf(rows);
     }
 
-    private static List<ClaimRow> ownRows(
-        MatchResult.Formed formed,
-        Blueprint blueprint,
-        Siting siting,
-        OwnerId owner
-    ) {
+    private static List<ClaimRow> ownRows(MatchResult.Formed formed, Blueprint blueprint, Siting siting) {
         List<ClaimRow> rows = new ArrayList<>();
         for (ClaimRow row : formed.claims().rows()) {
-            if (row.owner().equals(owner) && row.siting().equals(siting) && row.bay().equals(bayId)) {
+            if (row.instance().equals(formed.instance()) && row.siting().equals(siting) && row.bay().equals(bayId)) {
                 rows.add(row);
             }
         }

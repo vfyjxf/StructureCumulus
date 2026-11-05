@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
@@ -13,6 +14,7 @@ import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
@@ -90,15 +92,15 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         helper.setBlock(BlockPos.ZERO, Blocks.STONE);
         LatticePoint point = point(helper.absolutePos(BlockPos.ZERO));
         Siting siting = Siting.of(point, Orientation.identity);
         StructureInstance first = form(manager, state, level, ownerA, siting, point);
         StructureInstance second = form(manager, state, level, ownerB, siting, point);
         long base = ledger.revision();
-        claim(ledger, ownerA, siting, point, Sharing.shared);
-        claim(ledger, ownerB, siting, point, Sharing.shared);
+        claim(ledger, first.id(), siting, point, Sharing.shared);
+        claim(ledger, second.id(), siting, point, Sharing.shared);
         long settled = ledger.revision();
         assertEquals(helper, base + 2, settled, "two shared rows settle in two revisions");
         assertEquals(helper, 2, rows(ledger, point).size(), "two shared owners hold the cell");
@@ -135,7 +137,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos firstRel = BlockPos.ZERO;
         BlockPos secondRel = new BlockPos(4, 0, 0);
         helper.setBlock(firstRel, Blocks.STONE);
@@ -146,8 +148,8 @@ public final class StructureLifecycleAdversarialGameTest {
         Siting secondSiting = Siting.of(secondPoint, Orientation.identity);
         StructureInstance first = form(manager, state, level, ownerA, firstSiting, firstPoint);
         StructureInstance second = form(manager, state, level, ownerB, secondSiting, secondPoint);
-        claim(ledger, ownerA, firstSiting, firstPoint, Sharing.exclusive);
-        claim(ledger, ownerB, secondSiting, secondPoint, Sharing.exclusive);
+        claim(ledger, first.id(), firstSiting, firstPoint, Sharing.exclusive);
+        claim(ledger, second.id(), secondSiting, secondPoint, Sharing.exclusive);
         long settled = ledger.revision();
 
         BlockPos firstAbs = helper.absolutePos(firstRel);
@@ -177,7 +179,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos firstRel = BlockPos.ZERO;
         BlockPos secondRel = new BlockPos(4, 0, 0);
         LatticePoint firstPoint = point(helper.absolutePos(firstRel));
@@ -186,8 +188,8 @@ public final class StructureLifecycleAdversarialGameTest {
         Siting secondSiting = Siting.of(secondPoint, Orientation.identity);
         StructureInstance first = form(manager, state, level, ownerA, firstSiting, firstPoint);
         StructureInstance second = form(manager, state, level, ownerB, secondSiting, secondPoint);
-        claim(ledger, ownerA, firstSiting, firstPoint, Sharing.exclusive);
-        claim(ledger, ownerB, secondSiting, secondPoint, Sharing.exclusive);
+        claim(ledger, first.id(), firstSiting, firstPoint, Sharing.exclusive);
+        claim(ledger, second.id(), secondSiting, secondPoint, Sharing.exclusive);
         long settled = ledger.revision();
 
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
@@ -211,7 +213,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos originRel = BlockPos.ZERO;
         helper.setBlock(originRel, Blocks.STONE);
         LatticePoint origin = point(helper.absolutePos(originRel));
@@ -272,7 +274,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
         helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
@@ -281,7 +283,7 @@ public final class StructureLifecycleAdversarialGameTest {
         Siting siting = Siting.of(origin, Orientation.identity);
         StructureInstance instance = form(manager, state, level, ownerA, siting, origin);
         manager.publish(instance.id(), Map.of(count, 5L), FindingBundle.empty(), Spend.zero);
-        claim(ledger, ownerA, siting, origin, Sharing.exclusive);
+        claim(ledger, instance.id(), siting, origin, Sharing.exclusive);
         long beforeMove = ledger.revision();
 
         WatchEvents.pistonMoved(
@@ -326,7 +328,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos pushedRel = new BlockPos(1, 1, 0);
         BlockPos stillRel = new BlockPos(1, 2, 0);
@@ -344,7 +346,7 @@ public final class StructureLifecycleAdversarialGameTest {
             siting,
             CuboidSet.of(Cuboid.of(pushed), Cuboid.of(still))
         );
-        claimRows(ledger, ownerA, siting, List.of(pushed, still), Sharing.exclusive);
+        claimRows(ledger, instance.id(), siting, List.of(pushed, still), Sharing.exclusive);
         long beforeMove = ledger.revision();
         assertEquals(helper, 2, rows(ledger, pushed).size() + rows(ledger, still).size(), "two claim rows");
 
@@ -356,7 +358,7 @@ public final class StructureLifecycleAdversarialGameTest {
         assertEquals(helper, beforeMove + 1, ledger.revision(), "an invalidation releases the key once");
         assertEquals(helper, 0, rows(ledger, pushed).size(), "the old pushed claim is released");
         assertEquals(helper, 0, rows(ledger, still).size(), "the old stationary claim is released");
-        ledger.release(ownerA, siting);
+        cleanup(manager, ledger, ownerA, siting);
         helper.succeed();
     }
 
@@ -365,7 +367,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos torchRel = new BlockPos(1, 1, 0);
         helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
@@ -373,7 +375,7 @@ public final class StructureLifecycleAdversarialGameTest {
         LatticePoint torch = point(helper.absolutePos(torchRel));
         Siting siting = Siting.of(torch, Orientation.identity);
         StructureInstance instance = form(manager, state, level, ownerA, siting, torch);
-        claim(ledger, ownerA, siting, torch, Sharing.exclusive);
+        claim(ledger, instance.id(), siting, torch, Sharing.exclusive);
         long beforeMove = ledger.revision();
 
         WatchEvents.pistonMoved(
@@ -388,7 +390,7 @@ public final class StructureLifecycleAdversarialGameTest {
             "the destroyed-part Invalidated must release the claims (D-38): observed rows=" + destroyedRows
                     + ", revisionDelta=" + destroyedDelta
         );
-        ledger.release(ownerA, siting);
+        cleanup(manager, ledger, ownerA, siting);
         helper.succeed();
     }
 
@@ -397,7 +399,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
         BlockPos targetRel = new BlockPos(2, 1, 0);
@@ -409,8 +411,9 @@ public final class StructureLifecycleAdversarialGameTest {
         Siting siting = Siting.of(origin, Orientation.identity);
         Siting incumbents = Siting.of(target, Orientation.identity);
         StructureInstance instance = form(manager, state, level, ownerA, siting, origin);
-        claim(ledger, ownerA, siting, origin, Sharing.exclusive);
-        claim(ledger, ownerB, incumbents, target, Sharing.exclusive);
+        InstanceId incumbentInstance = new InstanceId(state.world(level), 1_000_000L);
+        claim(ledger, instance.id(), siting, origin, Sharing.exclusive);
+        claim(ledger, incumbentInstance, incumbents, target, Sharing.exclusive);
         long beforeMove = ledger.revision();
         assertEquals(helper, 1, rows(ledger, target).size(), "the incumbent row exists");
 
@@ -422,38 +425,38 @@ public final class StructureLifecycleAdversarialGameTest {
         assertEquals(helper, beforeMove + 1, ledger.revision(), "only the invalidation release bumps the revision");
         assertEquals(helper, 0, rows(ledger, origin).size(), "the old claim row is released");
         assertEquals(helper, 1, rows(ledger, target).size(), "the incumbent row survives");
-        assertEquals(helper, ownerB, rows(ledger, target).get(0).owner(), "the incumbent owner is untouched");
-        ledger.release(ownerA, siting);
-        ledger.release(ownerB, incumbents);
+        assertEquals(helper, incumbentInstance, rows(ledger, target).get(0).instance(), "the incumbent is untouched");
+        cleanup(manager, ledger, ownerA, siting);
+        ledger.release(incumbentInstance);
         helper.succeed();
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void levelUnloadDropsInstancesAndKeepsTheClaimRows(GameTestHelper helper) {
+    public void levelUnloadDropsInstancesAndTheirClaimRows(GameTestHelper helper) {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos rel = new BlockPos(0, 1, 0);
         helper.setBlock(rel, Blocks.STONE);
         LatticePoint point = point(helper.absolutePos(rel));
         Siting siting = Siting.of(point, Orientation.identity);
         StructureInstance instance = form(manager, state, level, ownerA, siting, point);
-        claim(ledger, ownerA, siting, point, Sharing.exclusive);
+        claim(ledger, instance.id(), siting, point, Sharing.exclusive);
         long beforeUnload = ledger.revision();
 
-        WatchEvents.levelUnloaded(new LevelEvent.Unload(level));
+        ServerState.unload(new LevelEvent.Unload(level));
 
         assertTrue(helper, manager.find(instance.id()) == null, "an unload drops the instance");
         assertTrue(helper, manager.findAt(point).isEmpty(), "an unload empties the registry");
-        int unloadRows = rows(ledger, point).size();
-        long unloadDelta = ledger.revision() - beforeUnload;
+        state.openLevel(level);
+        ClaimLedger reloaded = state.claims(level);
         helper.assertTrue(
-            unloadRows == 1 && unloadDelta == 0L,
-            "a world unload drops only the in-memory instance; claims persist: observed rows=" + unloadRows
-                    + ", revisionDelta=" + unloadDelta
+            reloaded.read(Cuboid.of(point)).rows().isEmpty() && reloaded.revision() == 0L,
+            "a world unload drops the store and its rows: observed rows="
+                    + reloaded.read(Cuboid.of(point)).rows().size() + ", revision=" + reloaded.revision()
+                    + ", before=" + beforeUnload
         );
-        ledger.release(ownerA, siting);
         helper.succeed();
     }
 
@@ -462,14 +465,14 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos structureRel = new BlockPos(0, 1, 0);
         BlockPos outsideRel = new BlockPos(6, 1, 0);
         helper.setBlock(structureRel, Blocks.STONE);
         LatticePoint point = point(helper.absolutePos(structureRel));
         Siting siting = Siting.of(point, Orientation.identity);
         StructureInstance instance = form(manager, state, level, ownerA, siting, point);
-        claim(ledger, ownerA, siting, point, Sharing.exclusive);
+        claim(ledger, instance.id(), siting, point, Sharing.exclusive);
         long base = ledger.revision();
 
         Player player = helper.makeMockPlayer(GameType.SURVIVAL);
@@ -508,7 +511,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
         helper.setBlock(pistonRel, Blocks.PISTON.defaultBlockState().setValue(PistonBaseBlock.FACING, Direction.EAST));
@@ -519,7 +522,7 @@ public final class StructureLifecycleAdversarialGameTest {
         Siting occupied = Siting.of(target, Orientation.identity);
         StructureInstance moving = form(manager, state, level, ownerA, siting, origin);
         StructureInstance occupant = form(manager, state, level, ownerA, occupied, target);
-        claim(ledger, ownerA, siting, origin, Sharing.exclusive);
+        claim(ledger, moving.id(), siting, origin, Sharing.exclusive);
         long before = ledger.revision();
 
         WatchEvents.pistonMoved(
@@ -557,7 +560,7 @@ public final class StructureLifecycleAdversarialGameTest {
         ServerState state = requireState();
         ServerLevel level = helper.getLevel();
         StructureManager manager = state.structures(level);
-        SavedClaims ledger = state.claims(level);
+        ClaimLedger ledger = state.claims(level);
         BlockPos pistonRel = new BlockPos(0, 1, 0);
         BlockPos stoneRel = new BlockPos(1, 1, 0);
         BlockPos extraRel = new BlockPos(1, 2, 0);
@@ -570,7 +573,7 @@ public final class StructureLifecycleAdversarialGameTest {
         Siting occupying = Siting.of(target, Orientation.identity);
         StructureInstance stale = form(manager, state, level, ownerA, siting, origin);
         StructureInstance occupant = form(manager, state, level, ownerA, occupying, target);
-        claimRows(ledger, ownerA, siting, List.of(origin, extraCell), Sharing.shared);
+        claimRows(ledger, stale.id(), siting, List.of(origin, extraCell), Sharing.shared);
         assertEquals(
             helper,
             2,
@@ -644,13 +647,13 @@ public final class StructureLifecycleAdversarialGameTest {
         return attempt.commit(bounds);
     }
 
-    private static void claim(SavedClaims ledger, OwnerId owner, Siting siting, LatticePoint cell, Sharing sharing) {
-        claimRows(ledger, owner, siting, List.of(cell), sharing);
+    private static void claim(ClaimLedger ledger, InstanceId instance, Siting siting, LatticePoint cell, Sharing sharing) {
+        claimRows(ledger, instance, siting, List.of(cell), sharing);
     }
 
     private static void claimRows(
-        SavedClaims ledger,
-        OwnerId owner,
+        ClaimLedger ledger,
+        InstanceId instance,
         Siting siting,
         List<LatticePoint> cells,
         Sharing sharing
@@ -658,24 +661,25 @@ public final class StructureLifecycleAdversarialGameTest {
         long expected = ledger.revision();
         List<ClaimRow> rows = new ArrayList<>(cells.size());
         for (LatticePoint cell : cells) {
-            rows.add(new ClaimRow(LatticeKey.of(cell), sharing, owner, siting, claimBay));
+            rows.add(new ClaimRow(LatticeKey.of(cell), sharing, siting, claimBay, instance));
         }
-        ClaimVerdict verdict = ledger.settle(new SettleRequest(owner, siting, rows, expected));
+        ClaimVerdict verdict = ledger.settle(new SettleRequest(instance, rows, expected));
         if (!(verdict instanceof ClaimVerdict.Settled)) {
             throw new GameTestAssertException("the setup settle was rejected: " + verdict);
         }
     }
 
-    private static List<ClaimRow> rows(SavedClaims ledger, LatticePoint cell) {
+    private static List<ClaimRow> rows(ClaimLedger ledger, LatticePoint cell) {
         return ledger.read(Cuboid.of(cell)).rows();
     }
 
-    private static void cleanup(StructureManager manager, SavedClaims ledger, OwnerId owner, Siting siting) {
+    private static void cleanup(StructureManager manager, ClaimLedger ledger, OwnerId owner, Siting siting) {
         StructureInstance instance = manager.find(owner, siting);
-        if (instance != null) {
-            manager.onEvent(new StructureEvent.Broken(instance.id()));
+        if (instance == null) {
+            return;
         }
-        ledger.release(owner, siting);
+        manager.onEvent(new StructureEvent.Broken(instance.id()));
+        ledger.release(instance.id());
     }
 
     private static LatticePoint point(BlockPos pos) {

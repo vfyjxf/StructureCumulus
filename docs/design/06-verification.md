@@ -208,7 +208,7 @@ characterization, not a new kernel promise.
 | kernel | `GateBudgetScenarioTest` | stale lease at check, mid-attempt invalidation, invalidation before settle, a tiny budget | 4 |
 | adapter | `EntityWindowPolicyTest` | the blueprint-local entity window mapped into `CommandSupport.policy` through the siting (identity, nonzero and a dropped unmappable window), and a set's root/satellite windows mapped by their own sitings | 2 |
 | kernel | `StructureManagerTest` | begin/commit/abort, draft rejection, formed replacement, moved/broken/loaded/unloaded, bounds lookup and post-commit publish | 7 |
-| adapter | `SavedClaimsLifecycleTest` | stale CAS, conflict bytes, whole-key release, duplicate-row canonical collapse | 4 |
+| kernel | `ClaimLedgerTest` | stale CAS, conflict, whole-instance replacement and release, revision bumps, duplicate-row collapse | 12 |
 
 **Characterized gaps** — documented limitations, each with its asserting test; they are not owed work
 and not a pending list:
@@ -244,14 +244,13 @@ both explicit leaves. The kernel classifies by the vanilla block type; a waterlo
 fluid occupant at this layer. `anyOccupant` is unchanged.
 
 **Release granularity and unload (D-38).** `ClaimLedger.release(owner, siting)` deletes every row of
-the `(owner, siting)` key; there is no per-bay or per-row release. One siting is one instance, and a
-shared cell's two rows are still one lifecycle object. Removal (`Broken`/`Invalidated`), a piston
-partial/destroy and a structure-set rollback releases the whole key; a piston full move translates the rows
-then releases the old key. A world unload is not a release: it drops only the world's in-memory
-manager instances and drafts, while the persisted claim rows stay until a later host action or a new
-settle replaces the key. `SavedClaimsLifecycleTest` characterizes the whole-key removal and the
-duplicate-row collapse on reload; `StructureLifecycleAdversarialGameTest.levelUnloadDropsInstancesAndKeepsTheClaimRows`
-asserts the unload split. This is intentional, not a gap.
+the instance; there is no per-bay or per-row release. A shared cell's two rows are still one
+lifecycle object. Removal (`Broken`/`Invalidated`), a piston partial/destroy and a structure-set
+rollback releases the whole instance; a piston full move translates the rows then releases the old
+rows in one compare-and-set. A world unload drops the manager instances, the drafts and the claim
+ledger together (D-44), so no row outlives its instance.
+`StructureLifecycleAdversarialGameTest` asserts that split; `ClaimLedgerTest` characterizes the
+whole-instance removal and the duplicate-row collapse.
 
 ### 3.3 Structure-set stress batch (SS4)
 
@@ -311,7 +310,7 @@ snapshot with no captured host values. It adds no kernel type and no GameTest.
 ### 3.5 Structure-set command and host GameTests (S5, extended by S6)
 
 Three adapter GameTest classes (nine methods) in `src/main/java/.../mc` drive the set layer over a real
-`LevelCapture`, the real `SavedClaims`/`StructureManager` and the server dispatcher. They add no kernel
+`LevelCapture`, the real in-memory ledger and `StructureManager`, and the server dispatcher. They add no kernel
 type, no code and no decision.
 
 | Test | What it drives |

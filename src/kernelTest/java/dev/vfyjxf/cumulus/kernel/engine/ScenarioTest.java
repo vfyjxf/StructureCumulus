@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -129,7 +130,7 @@ class ScenarioTest {
         view.air(LatticePoint.of(1, 1, 1));
         view.put(TestWorld.block(TestWorld.campfire, LatticePoint.of(1, 0, 1)));
         TestWorld.Lease lease = new TestWorld.Lease(view);
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest
                 .of(campfire, atOrigin, lease, instance, owner, Budget.unbounded(), new ClaimView(List.of(), 0, true));
 
@@ -137,7 +138,7 @@ class ScenarioTest {
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, checked);
         assertEquals(1L, admitted.outcome().value(air).fold(v -> v, () -> -1L));
         assertEquals(0, ledger.revision());
-        assertEquals(0, ledger.all().size());
+        assertEquals(0, TestWorld.rows(ledger).size());
 
         ContextStore store = ContextStore.inMemory();
         MatchResult settled = MatchEngine.settle(request, admitted, ledger, store);
@@ -193,7 +194,7 @@ class ScenarioTest {
         TestWorld.View view = new TestWorld.View().put(TestWorld.block(TestWorld.door, LatticePoint.of(3, 0, 0)))
                 .put(TestWorld.block(TestWorld.door, LatticePoint.of(3, 1, 0)));
         TestWorld.Lease lease = new TestWorld.Lease(view);
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest
                 .of(blueprint, atOrigin, lease, instance, owner, Budget.unbounded(), new ClaimView(List.of(), 0, true));
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
@@ -242,7 +243,7 @@ class ScenarioTest {
                 ).check(Check.of(id("hatch"), shared, focus, Expectations.anyOccupant())).build();
         TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.origin));
         TestWorld.Lease lease = new TestWorld.Lease(view);
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest first = MatchRequest.of(
             sharedBlueprint,
             atOrigin,
@@ -281,7 +282,7 @@ class ScenarioTest {
                 ContextStore.inMemory()
             )
         );
-        assertEquals(2, ledger.all().size());
+        assertEquals(2, TestWorld.rows(ledger).size());
 
         Bay exclusive = Bay.of(id("hatch"), cell, Coverage.anySubject, Footprint.bound(), Sharing.exclusive);
         Blueprint exclusiveBlueprint = Blueprint.builder(id("exclusive_hatch"))
@@ -380,7 +381,7 @@ class ScenarioTest {
             view.air(cell);
         }
         Blueprint blueprint = Blueprint.builder(id("pipe")).bounds(Cuboid.of(0, 0, 0, 2, 2, 2)).checks(checks).build();
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest.of(
             blueprint,
             atOrigin,
@@ -443,7 +444,7 @@ class ScenarioTest {
             List.of()
         );
         TestWorld.View view = new TestWorld.View().put(cow);
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest.of(
             blueprint,
             atOrigin,
@@ -525,7 +526,7 @@ class ScenarioTest {
         Blueprint blueprint = Blueprint.builder(id("hatch")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
                 .check(Check.of(id("hatch"), hatch, focus, Expectations.anyOccupant())).build();
         TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.origin));
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest a = MatchRequest.of(
             blueprint,
             atOrigin,
@@ -559,7 +560,8 @@ class ScenarioTest {
             MatchResult.Formed.class,
             MatchEngine.settle(a, admitted, ledger, ContextStore.inMemory())
         );
-        assertEquals(2, formed.claims().rows().size());
+        assertEquals(1, formed.claims().rows().size(), "a settlement returns the rows it wrote");
+        assertEquals(2, TestWorld.rows(ledger).size(), "both shared rows coexist in the ledger");
         assertEquals(2, ledger.revision());
     }
 
@@ -596,7 +598,7 @@ class ScenarioTest {
         for (LatticePoint cell : List.of(LatticePoint.of(3, 1, 0), LatticePoint.of(3, 2, 0))) {
             view.put(TestWorld.block(TestWorld.door, cell));
         }
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest.of(
             blueprint,
             atOrigin,
@@ -624,7 +626,7 @@ class ScenarioTest {
         LatticePoint world = LatticePoint.of(10, 64, 10);
         TestWorld.View view = new TestWorld.View().air(world);
         Siting siting = Siting.of(world, Orientation.identity);
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest.of(
             blueprint,
             siting,
@@ -654,7 +656,7 @@ class ScenarioTest {
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.anyOccupant()))
                 .build();
         TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.origin));
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest.of(
             blueprint,
             atOrigin,
@@ -717,7 +719,7 @@ class ScenarioTest {
         TestWorld.View view = new TestWorld.View().air(world)
                 .refuseSection(SectionKey.of(TestWorld.world, 0, LatticePoint.origin, 16));
         Siting siting = Siting.of(world, Orientation.identity);
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest request = MatchRequest.of(
             blueprint,
             siting,

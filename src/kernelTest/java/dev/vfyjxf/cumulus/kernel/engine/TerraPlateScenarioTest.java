@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -42,7 +43,7 @@ class TerraPlateScenarioTest {
     void tenDeclaredCellsFormAndClaimTenRows() {
         Blueprint blueprint = terraBlueprint();
         assertEquals(10L, blueprint.bayCells().volume(), "the declaration has ten cells");
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(
@@ -53,7 +54,7 @@ class TerraPlateScenarioTest {
             )
         );
         assertEquals(10, formed.claims().rows().size(), "ten claim rows");
-        assertEquals(10, ledger.all().size(), "the ledger holds ten rows");
+        assertEquals(10, TestWorld.rows(ledger).size(), "the ledger holds ten rows");
         assertEquals(1L, ledger.revision(), "one settlement revision");
         assertTrue(
             MagicFixtures.rowKeys(formed).contains(MagicFixtures.world(identity(), plateCell).key()),
@@ -67,7 +68,7 @@ class TerraPlateScenarioTest {
         Turn[] turns = {Turn.none, Turn.clockwise, Turn.half, Turn.counterclockwise};
         for (Turn turn : turns) {
             Siting siting = MagicFixtures.turn(origin, turn);
-            TestWorld.Ledger ledger = MagicFixtures.ledger();
+            ClaimLedger ledger = MagicFixtures.ledger();
             MatchResult.Formed formed = assertInstanceOf(
                 MatchResult.Formed.class,
                 MagicFixtures.settle(terraBlueprint(), siting, terraView(siting), ledger),
@@ -80,7 +81,7 @@ class TerraPlateScenarioTest {
                 Set.copyOf(MagicFixtures.rowKeys(formed)),
                 "turn " + turn + " claims the rotated cells"
             );
-            assertEquals(10, ledger.all().size(), "turn " + turn + " writes ten rows");
+            assertEquals(10, TestWorld.rows(ledger).size(), "turn " + turn + " writes ten rows");
         }
     }
 
@@ -89,7 +90,7 @@ class TerraPlateScenarioTest {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
         TestWorld.View view = terraView(siting);
         MagicFixtures.air(view, siting, center);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult result = MagicFixtures.settle(terraBlueprint(), siting, view, ledger);
         MatchResult.Failed failed = assertInstanceOf(
             MatchResult.Failed.class,
@@ -98,7 +99,7 @@ class TerraPlateScenarioTest {
         );
         assertTrue(MagicFixtures.hasCode(failed, Codes.expected), "the mismatch carries SC-EXP-0001");
         assertEquals(0L, ledger.revision(), "a failed check writes no revision");
-        assertEquals(0, ledger.all().size(), "a failed check writes no rows");
+        assertEquals(0, TestWorld.rows(ledger).size(), "a failed check writes no rows");
     }
 
     @Test
@@ -106,14 +107,14 @@ class TerraPlateScenarioTest {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
         TestWorld.View view = terraView(siting);
         MagicFixtures.put(view, siting, LatticePoint.of(1, 2, 1), extra);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(terraBlueprint(), siting, view, ledger),
             "outside the bounds the extra block is not judged"
         );
         assertEquals(10, formed.claims().rows().size(), "the extra block does not add a claim");
-        assertEquals(10, ledger.all().size(), "the ledger holds ten rows");
+        assertEquals(10, TestWorld.rows(ledger).size(), "the ledger holds ten rows");
         assertTrue(
             !MagicFixtures.rowKeys(formed).contains(MagicFixtures.world(siting, LatticePoint.of(1, 2, 1)).key()),
             "the extra block is not claimed"
@@ -124,7 +125,7 @@ class TerraPlateScenarioTest {
     void anIncumbentExclusiveOwnerMakesTheCheckFail() {
         Siting siting = MagicFixtures.identity(LatticePoint.origin);
         TestWorld.View view = terraView(siting);
-        TestWorld.Ledger ledger = MagicFixtures.ledger();
+        ClaimLedger ledger = MagicFixtures.ledger();
         assertInstanceOf(
             MatchResult.Formed.class,
             MagicFixtures.settle(terraBlueprint(), siting, view, ledger),
@@ -140,10 +141,10 @@ class TerraPlateScenarioTest {
         );
         assertTrue(MagicFixtures.hasCode(failed, Codes.claimConflict), "the conflict carries SC-CLM-0001");
         assertEquals(1L, ledger.revision(), "the failed check does not move the revision");
-        assertEquals(10, ledger.all().size(), "the failed check does not write rows");
+        assertEquals(10, TestWorld.rows(ledger).size(), "the failed check does not write rows");
         assertTrue(
-            ledger.all().stream().allMatch(row -> row.owner().equals(MagicFixtures.owner)),
-            "the incumbent owns the rows"
+            TestWorld.rows(ledger).stream().allMatch(row -> row.instance().equals(MagicFixtures.instance)),
+            "the incumbent instance holds the rows"
         );
     }
 

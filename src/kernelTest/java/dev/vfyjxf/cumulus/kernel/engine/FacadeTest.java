@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
@@ -65,7 +66,7 @@ class FacadeTest {
         Blueprint blueprint = Blueprint.builder(id("one")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air())).build();
         TestWorld.View view = new TestWorld.View().air(LatticePoint.origin);
-        TestWorld.Ledger ledger = new TestWorld.Ledger();
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         StructureManager structures = StructureManager.create();
         StructureKernel kernel = StructureKernel
                 .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));

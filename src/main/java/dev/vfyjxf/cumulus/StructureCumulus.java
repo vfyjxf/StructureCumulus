@@ -25,6 +25,8 @@ public final class StructureCumulus {
         NeoForge.EVENT_BUS.addListener(DatapackBlueprints::addReloadListener);
         NeoForge.EVENT_BUS.addListener(ServerState::open);
         NeoForge.EVENT_BUS.addListener(ServerState::close);
+        // ServerStoppingEvent is skipped when the server thread crashes; ServerStoppedEvent is not.
+        NeoForge.EVENT_BUS.addListener(ServerState::stopped);
         NeoForge.EVENT_BUS.addListener(ServerState::unload);
         NeoForge.EVENT_BUS.addListener(CumulusCommand::register);
         WatchEvents.register();
