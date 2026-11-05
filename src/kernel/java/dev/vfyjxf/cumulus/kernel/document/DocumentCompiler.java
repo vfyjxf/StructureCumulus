@@ -5,7 +5,6 @@ import dev.vfyjxf.cumulus.kernel.context.Merges;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
-import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.Merge;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
@@ -25,6 +24,7 @@ import dev.vfyjxf.cumulus.kernel.structure.AnchorSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.BlueprintBuilder;
+import dev.vfyjxf.cumulus.kernel.structure.BlueprintRejected;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Computation;
 import dev.vfyjxf.cumulus.kernel.structure.ComputationFactory;
@@ -140,11 +140,10 @@ public final class DocumentCompiler {
         try {
             Blueprint blueprint = builder.build();
             return new CompileResult(FindingBundle.of(findings), blueprint);
-        } catch (IllegalArgumentException rejected) {
-            CodeEntry entry = codeFromMessage(rejected.getMessage());
+        } catch (BlueprintRejected rejected) {
             error(
                 findings,
-                entry,
+                rejected.code(),
                 "the compiled blueprint is invalid: " + rejected.getMessage(),
                 document.root().source(),
                 documentLocus(document)
@@ -985,23 +984,6 @@ public final class DocumentCompiler {
         }
         CuboidSet cells = document.root().bounds().asSet();
         return cells.isEmpty() ? null : Locus.local(cells);
-    }
-
-    private static CodeEntry codeFromMessage(@Nullable String message) {
-        if (message != null) {
-            int space = message.indexOf(' ');
-            String text = space < 0 ? message : message.substring(0, space);
-            while (!text.isEmpty() && ":;,.".indexOf(text.charAt(text.length() - 1)) >= 0) {
-                text = text.substring(0, text.length() - 1);
-            }
-            FindingCode code = FindingCode.parse(text);
-            for (CodeEntry entry : Codes.all) {
-                if (entry.code().equals(code)) {
-                    return entry;
-                }
-            }
-        }
-        return Codes.blueprintInvalid;
     }
 
     private static @Nullable CuboidSet translate(CuboidSet cells, LatticePoint offset) {

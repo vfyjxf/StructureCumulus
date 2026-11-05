@@ -3,10 +3,13 @@ package dev.vfyjxf.cumulus.kernel.structure;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.SourceSpan;
 import dev.vfyjxf.cumulus.kernel.core.Value;
+import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import org.jspecify.annotations.Nullable;
@@ -146,7 +149,8 @@ public final class BlueprintBuilder {
     public Blueprint build() {
         Cuboid declaredBounds = bounds;
         if (declaredBounds == null) {
-            throw new IllegalArgumentException("SC-BPT-0001: a blueprint needs bounds");
+            fail("SC-BPT-0001", "a blueprint needs bounds");
+            throw new AssertionError("unreachable");
         }
         if (declaredBounds.isEmpty()) {
             fail("SC-BPT-0001", "bounds must not be empty");
@@ -305,7 +309,8 @@ public final class BlueprintBuilder {
         } else {
             OrientationPolicy policy = orientation;
             if (policy == null) {
-                throw new IllegalArgumentException("SC-BPT-0006: anchors need an orientation policy");
+                fail("SC-BPT-0006", "anchors need an orientation policy");
+                throw new AssertionError("unreachable");
             }
             if (anchor(policy.primaryRole()) == null) {
                 fail("SC-BPT-0006", "the policy's primary role has no anchor");
@@ -459,6 +464,11 @@ public final class BlueprintBuilder {
     }
 
     private static void fail(String code, String message) {
-        throw new IllegalArgumentException(code + ": " + message);
+        FindingCode findingCode = FindingCode.of(code);
+        CodeEntry entry = Codes.all.stream()
+                .filter(candidate -> candidate.code().equals(findingCode))
+                .findFirst()
+                .orElse(Codes.blueprintInvalid);
+        throw new BlueprintRejected(entry, message);
     }
 }

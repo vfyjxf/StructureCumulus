@@ -11,6 +11,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.Value;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
@@ -964,6 +965,64 @@ class DocumentCompilerTest {
         List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 1));
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
         assertTrue(found.get(0).message().contains("schema version"), () -> found.get(0).message());
+    }
+
+    @Test
+    void aRewordedRejectionKeepsItsCode() {
+        assertEquals(Codes.baysOverlap.code(), overlapFinding("a", "b").code());
+        assertEquals(Codes.baysOverlap.code(), overlapFinding("north_wall_bay", "south_wall_bay").code());
+    }
+
+    private static Finding overlapFinding(String left, String right) {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        Value air = Value.object(Map.of("kind", Value.string("air")));
+        BlueprintSpec root = new BlueprintSpec(
+            id("overlap"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(
+                new BaySpec(id(left), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null),
+                new BaySpec(id(right), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+            ),
+            List.of(),
+            List.of(
+                new CheckSpec(
+                    id(left),
+                    id(left),
+                    kind("bay"),
+                    Value.object(),
+                    kind("each_cell"),
+                    Value.object(Map.of("element", air)),
+                    null,
+                    null
+                ),
+                new CheckSpec(
+                    id(right),
+                    id(right),
+                    kind("bay"),
+                    Value.object(),
+                    kind("each_cell"),
+                    Value.object(Map.of("element", air)),
+                    null,
+                    null
+                )
+            ),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().findings();
+        assertEquals(1, found.size(), () -> found.toString());
+        return found.get(0);
     }
 
     private static Document expectationDocument(NamespacedId expectationKind) {
