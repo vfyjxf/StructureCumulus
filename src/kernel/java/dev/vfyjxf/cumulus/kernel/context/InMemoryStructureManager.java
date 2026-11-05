@@ -295,6 +295,11 @@ final class InMemoryStructureManager implements StructureManager {
         }
 
         @Override
+        public boolean isOpen() {
+            return !closed;
+        }
+
+        @Override
         public StructureContext context(InstanceId instance) {
             if (!instance.equals(id)) {
                 return StructureContext.empty(instance);

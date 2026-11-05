@@ -3,7 +3,6 @@ package dev.vfyjxf.cumulus.kernel.engine;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
@@ -139,7 +138,7 @@ class AdversarialExpectationTest {
 
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
-            MatchEngine.settle(request, admitted, null, ContextStore.inMemory())
+            MatchEngine.settle(request, admitted, null, TestAttempt.of(request))
         );
         assertTrue(formed.claims().rows().isEmpty());
         assertEquals(0, formed.claims().revision());

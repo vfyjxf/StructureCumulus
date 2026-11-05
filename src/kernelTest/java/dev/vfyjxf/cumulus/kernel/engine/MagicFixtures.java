@@ -5,7 +5,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -198,7 +197,7 @@ final class MagicFixtures {
         if (!(checked instanceof MatchResult.Admitted admitted)) {
             return checked;
         }
-        return MatchEngine.settle(request, admitted, ledger, ContextStore.inMemory());
+        return MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request));
     }
 
     static boolean hasCode(MatchResult result, CodeEntry code) {

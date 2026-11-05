@@ -12,6 +12,9 @@ public interface StructureAttempt extends ContextStore {
 
     StructureSpec spec();
 
+    /** Whether the attempt still accepts a publish and a commit. */
+    boolean isOpen();
+
     /** Commits the attempt once; the bounds are the formed structure's world-frame cells. */
     StructureInstance commit(CuboidSet bounds);
 

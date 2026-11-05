@@ -105,15 +105,15 @@ class CachedContextTest {
             "a cached value is not a match value"
         );
 
-        ContextStore contexts = ContextStore.inMemory();
+        TestAttempt attempt = TestAttempt.of(request);
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
-            MatchEngine.settle(request, admitted, null, contexts)
+            MatchEngine.settle(request, admitted, null, attempt)
         );
         assertEquals(1, formed.contextRevision());
-        assertNull(contexts.context(MagicFixtures.instance).get(blueprintKey), "settle never re-publishes the cache");
+        assertNull(attempt.store().context(MagicFixtures.instance).get(blueprintKey), "settle never re-publishes the cache");
         Catalog<Deriver<?>> derivers = Catalog.empty(id("derivers"));
-        StructureContext derived = MatchEngine.derive(formed, List.of(), derivers, contexts);
+        StructureContext derived = MatchEngine.derive(formed, List.of(), derivers, attempt.store());
         assertNull(derived.get(blueprintKey), "derive never reads the cache into the store");
 
         MatchResult.Undecided withoutCache = assertInstanceOf(

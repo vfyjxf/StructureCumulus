@@ -175,7 +175,7 @@ class EnvelopeScenarioTest {
         );
         assertTrue(formed.claims().rows().isEmpty(), "the envelope owns nothing");
         assertEquals(0, TestWorld.rows(ledger).size());
-        assertEquals(0L, ledger.revision());
+        assertEquals(1L, ledger.revision(), "the zero-row settle clears the key and bumps the revision");
     }
 
     @Test

@@ -4,7 +4,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
@@ -173,7 +172,7 @@ class ClaimStressScenarioTest {
                 request,
                 assertInstanceOf(MatchResult.Admitted.class, checked),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(request)
             )
         );
     }

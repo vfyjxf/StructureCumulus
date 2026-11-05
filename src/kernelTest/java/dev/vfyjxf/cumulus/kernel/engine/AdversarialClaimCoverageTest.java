@@ -449,7 +449,7 @@ class AdversarialClaimCoverageTest {
         );
         assertTrue(formed.claims().rows().isEmpty(), "Footprint.None claims nothing");
         assertTrue(TestWorld.rows(ledger).isEmpty(), "a None footprint writes no ledger row");
-        assertEquals(0, ledger.revision(), "a None-only settlement consumes no ledger revision");
+        assertEquals(1, ledger.revision(), "a None-only settlement clears the key and bumps the revision");
 
         Bay exclusiveNone = MagicFixtures
                 .bay(id("none_exclusive"), oneCell, Coverage.everyCell, Footprint.none(), Sharing.exclusive);

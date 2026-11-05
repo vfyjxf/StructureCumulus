@@ -59,16 +59,16 @@ class GateBudgetScenarioTest {
         TestWorld.View view = airView();
         TestWorld.Lease lease = new TestWorld.Lease(view);
         ClaimLedger ledger = MagicFixtures.ledger();
-        ContextStore contexts = ContextStore.inMemory();
         MatchRequest request = request(blueprint(), lease, Budget.unbounded());
+        TestAttempt attempt = TestAttempt.of(request);
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
         lease.invalidate();
         MatchResult.Dropped dropped = assertInstanceOf(
             MatchResult.Dropped.class,
-            MatchEngine.settle(request, admitted, ledger, contexts)
+            MatchEngine.settle(request, admitted, ledger, attempt)
         );
         assertTrue(MagicFixtures.hasCode(dropped, Codes.snapshotStale), "the settle drop is SC-ENG-0002");
-        assertNoWrites(ledger, contexts);
+        assertNoWrites(ledger, attempt.store());
     }
 
     @Test
@@ -76,12 +76,12 @@ class GateBudgetScenarioTest {
         TestWorld.View view = airView();
         TestWorld.Lease lease = new TestWorld.Lease(view);
         ClaimLedger ledger = MagicFixtures.ledger();
-        ContextStore contexts = ContextStore.inMemory();
         MatchRequest request = request(blueprint(), lease, Budget.of(0, 0));
+        TestAttempt attempt = TestAttempt.of(request);
         MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, MatchEngine.check(request));
         assertEquals(UndecidedReason.budgetExhausted, undecided.reason());
         assertTrue(MagicFixtures.hasCode(undecided, Codes.budgetExhausted), "the budget gate is SC-ENG-0001");
-        assertNoWrites(ledger, contexts);
+        assertNoWrites(ledger, attempt.store());
     }
 
     private static void assertNoWrites(ClaimLedger ledger, ContextStore contexts) {

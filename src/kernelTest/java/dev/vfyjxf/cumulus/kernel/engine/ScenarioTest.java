@@ -4,7 +4,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.context.DeriveContext;
 import dev.vfyjxf.cumulus.kernel.context.Deriver;
 import dev.vfyjxf.cumulus.kernel.context.Merges;
@@ -140,8 +139,8 @@ class ScenarioTest {
         assertEquals(0, ledger.revision());
         assertEquals(0, TestWorld.rows(ledger).size());
 
-        ContextStore store = ContextStore.inMemory();
-        MatchResult settled = MatchEngine.settle(request, admitted, ledger, store);
+        TestAttempt attempt = TestAttempt.of(request);
+        MatchResult settled = MatchEngine.settle(request, admitted, ledger, attempt);
         MatchResult.Formed formed = assertInstanceOf(MatchResult.Formed.class, settled);
         assertEquals(27, formed.claims().rows().size());
         assertEquals(new Spend(28, 4), formed.outcome().spend());
@@ -166,12 +165,12 @@ class ScenarioTest {
         };
         Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers"))
                 .put(id("capacity_deriver"), capacityDeriver).build();
-        StructureContext context = MatchEngine.derive(formed, campfire.derivations(), derivers, store);
+        StructureContext context = MatchEngine.derive(formed, campfire.derivations(), derivers, attempt.store());
         assertEquals(1L, context.get(air));
         assertEquals(10L, context.get(capacity));
         assertEquals(2, context.revision());
         assertEquals(formed.outcome().spend(), context.spend());
-        StructureContext again = MatchEngine.derive(formed, campfire.derivations(), derivers, store);
+        StructureContext again = MatchEngine.derive(formed, campfire.derivations(), derivers, attempt.store());
         assertEquals(formed.outcome().spend(), again.spend());
         assertEquals(3, again.revision());
     }
@@ -200,7 +199,7 @@ class ScenarioTest {
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
-            MatchEngine.settle(request, admitted, ledger, ContextStore.inMemory())
+            MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request))
         );
         assertEquals(2, formed.claims().rows().size());
     }
@@ -259,7 +258,7 @@ class ScenarioTest {
                 first,
                 assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(first)),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(first)
             )
         );
         assertEquals(1, firstFormed.claims().rows().size());
@@ -279,7 +278,7 @@ class ScenarioTest {
                 second,
                 assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(second)),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(second)
             )
         );
         assertEquals(2, TestWorld.rows(ledger).size());
@@ -397,7 +396,7 @@ class ScenarioTest {
                 request,
                 assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request)),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(request)
             )
         );
         assertEquals(4, formed.claims().rows().size());
@@ -460,7 +459,7 @@ class ScenarioTest {
                 request,
                 assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request)),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(request)
             )
         );
         assertEquals(2, formed.claims().rows().size());
@@ -552,13 +551,13 @@ class ScenarioTest {
                 b,
                 assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(b)),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(b)
             )
         );
         assertEquals(1, ledger.revision());
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
-            MatchEngine.settle(a, admitted, ledger, ContextStore.inMemory())
+            MatchEngine.settle(a, admitted, ledger, TestAttempt.of(a))
         );
         assertEquals(1, formed.claims().rows().size(), "a settlement returns the rows it wrote");
         assertEquals(2, TestWorld.rows(ledger).size(), "both shared rows coexist in the ledger");
@@ -612,7 +611,7 @@ class ScenarioTest {
         assertEquals(100L, admitted.outcome().value(volume).fold(v -> v, () -> -1L));
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
-            MatchEngine.settle(request, admitted, ledger, ContextStore.inMemory())
+            MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request))
         );
         assertEquals(294, formed.claims().rows().size());
     }
@@ -642,7 +641,7 @@ class ScenarioTest {
                 request,
                 assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request)),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(request)
             )
         );
         assertEquals(world.key(), formed.claims().rows().get(0).cell());
@@ -699,7 +698,7 @@ class ScenarioTest {
         );
         MatchResult.Failed failed = assertInstanceOf(
             MatchResult.Failed.class,
-            MatchEngine.settle(request, forged, ledger, ContextStore.inMemory())
+            MatchEngine.settle(request, forged, ledger, TestAttempt.of(request))
         );
         assertTrue(
             failed.findings().findings().stream()
@@ -733,7 +732,7 @@ class ScenarioTest {
         assertEquals(1L, admitted.outcome().value(air).fold(v -> v, () -> -1L));
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,
-            MatchEngine.settle(request, admitted, ledger, ContextStore.inMemory())
+            MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request))
         );
         assertEquals(world.key(), formed.claims().rows().get(0).cell());
     }

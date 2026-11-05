@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.kernel.spi;
 
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
@@ -91,13 +92,10 @@ public final class StructureKernel {
         return MatchEngine.check(request);
     }
 
-    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted) {
-        return settle(request, admitted, host.contexts());
-    }
-
-    /** Settles through a reserved draft instead of the host registry. */
-    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted, ContextStore contexts) {
-        return MatchEngine.settle(request, admitted, host.ledger(), contexts);
+    /** Settles through the attempt that reserved the instance. */
+    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted, StructureAttempt attempt) {
+        Objects.requireNonNull(attempt, "attempt");
+        return MatchEngine.settle(request, admitted, host.ledger(), attempt);
     }
 
     public StructureContext derive(MatchResult.Formed formed, List<DerivationSpec> derivations) {

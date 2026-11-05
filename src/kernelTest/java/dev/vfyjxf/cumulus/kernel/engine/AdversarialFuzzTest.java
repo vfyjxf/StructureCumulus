@@ -252,10 +252,10 @@ class AdversarialFuzzTest {
                     continue;
                 }
                 MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, checked, where);
-                ContextStore contexts = ContextStore.inMemory();
+                TestAttempt attempt = TestAttempt.of(request);
                 MatchResult.Formed formed = assertInstanceOf(
                     MatchResult.Formed.class,
-                    MatchEngine.settle(request, admitted, ledger, contexts),
+                    MatchEngine.settle(request, admitted, ledger, attempt),
                     where
                 );
                 List<ClaimRow> expected = expectedRows(blueprint, siting, MagicFixtures.instance);
@@ -265,13 +265,13 @@ class AdversarialFuzzTest {
                 assertEquals(expected, sorted(TestWorld.rows(ledger)), where + " ledger rows");
                 MatchResult.Formed again = assertInstanceOf(
                     MatchResult.Formed.class,
-                    MatchEngine.settle(request, admitted, ledger, contexts),
+                    MatchEngine.settle(request, admitted, ledger, attempt),
                     where + " a re-settle replaces the same key"
                 );
                 List<ClaimRow> ownAgain = ownRows(again, blueprint, MagicFixtures.instance);
                 assertEquals(expected, ownAgain, where + " re-settle row set");
                 assertEquals(expected, sorted(TestWorld.rows(ledger)), where + " no duplicate rows after a re-settle");
-                assertEquals(expected.isEmpty() ? 0L : 2L, ledger.revision(), where + " revision count");
+                assertEquals(2L, ledger.revision(), where + " revision count");
                 assertRowLaws(ownAgain, where);
             }
         }
@@ -292,7 +292,6 @@ class AdversarialFuzzTest {
                 Blueprint rivalBlueprint = occupantBlueprint(id("rival"), rivalBayId, bounds, rival);
                 TestWorld.View view = MagicFixtures.view().put(TestWorld.block(TestWorld.stone, worldCell));
                 ClaimLedger ledger = MagicFixtures.ledger();
-                ContextStore contexts = ContextStore.inMemory();
                 MatchRequest rivalRequest = MatchRequest.of(
                     rivalBlueprint,
                     siting,
@@ -309,7 +308,7 @@ class AdversarialFuzzTest {
                 );
                 assertInstanceOf(
                     MatchResult.Formed.class,
-                    MatchEngine.settle(rivalRequest, rivalAdmitted, ledger, contexts)
+                    MatchEngine.settle(rivalRequest, rivalAdmitted, ledger, TestAttempt.of(rivalRequest))
                 );
                 ClaimView frozen = ledger.read(Objects.requireNonNull(siting.toWorld(bounds), where + " world bounds"));
                 MatchRequest request = MatchRequest.of(
@@ -334,7 +333,7 @@ class AdversarialFuzzTest {
                     MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, checked, where);
                     MatchResult.Formed formed = assertInstanceOf(
                         MatchResult.Formed.class,
-                        MatchEngine.settle(request, admitted, ledger, contexts),
+                        MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request)),
                         where
                     );
                     assertEquals(1, ownRows(formed, blueprint, MagicFixtures.instance).size(), where);
@@ -404,7 +403,7 @@ class AdversarialFuzzTest {
                     );
                     MatchResult.Formed formed = assertInstanceOf(
                         MatchResult.Formed.class,
-                        MatchEngine.settle(request, admitted, ledger, ContextStore.inMemory()),
+                        MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request)),
                         where
                     );
                     List<ClaimRow> own = ownRows(formed, blueprint, MagicFixtures.instance);

@@ -4,7 +4,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.context.Merges;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
@@ -329,7 +328,7 @@ class ReadModelTest {
 
         MatchResult.Failed failed = assertInstanceOf(
             MatchResult.Failed.class,
-            MatchEngine.settle(request, forged, ClaimLedger.inMemory(TestWorld.world), ContextStore.inMemory())
+            MatchEngine.settle(request, forged, ClaimLedger.inMemory(TestWorld.world), TestAttempt.of(request))
         );
         assertEquals(
             Codes.bindingInvalid.code(),

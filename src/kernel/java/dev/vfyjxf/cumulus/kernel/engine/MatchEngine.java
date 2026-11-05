@@ -13,7 +13,9 @@ import dev.vfyjxf.cumulus.kernel.context.CachedContext;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.context.DeriveContext;
 import dev.vfyjxf.cumulus.kernel.context.Deriver;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.CancelToken;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
@@ -381,13 +383,23 @@ public final class MatchEngine {
         MatchRequest request,
         MatchResult.Admitted admitted,
         @Nullable ClaimLedger ledger,
-        ContextStore contexts
+        StructureAttempt attempt
     ) {
         Objects.requireNonNull(request, "request");
         Objects.requireNonNull(admitted, "admitted");
-        Objects.requireNonNull(contexts, "contexts");
+        Objects.requireNonNull(attempt, "attempt");
         Phase phase = Phase.settle;
         List<Finding> findings = new ArrayList<>(admitted.findings().findings());
+        Finding target = validateAttempt(request, attempt, phase);
+        if (target != null) {
+            findings.add(target);
+            return new MatchResult.Undecided(
+                phase,
+                UndecidedReason.designDefect,
+                FindingBundle.of(findings),
+                admitted.outcome()
+            );
+        }
         if (admitted.phase() != Phase.check
                 || !admitted.instance().equals(request.instance())
                 || !admitted.siting().equals(request.siting())
@@ -419,40 +431,11 @@ public final class MatchEngine {
             findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(findings));
         }
-        if (derived.rows().isEmpty()) {
-            StructureContext context = publish(contexts, request, admitted.outcome(), findings);
-            long revision = ledger == null ? 0 : ledger.revision();
-            return new MatchResult.Formed(
-                phase,
-                request.instance(),
-                request.siting(),
-                admitted.outcome(),
-                new ClaimSet(List.of(), revision),
-                context.revision(),
-                revision,
-                FindingBundle.of(findings)
-            );
-        }
+        long revision;
         if (ledger == null) {
-            findings.add(
-                code(Codes.ledgerUnavailable, phase, "no ledger is installed; the claims cannot be written", null)
-            );
-            return new MatchResult.Undecided(
-                phase,
-                UndecidedReason.ledgerUnavailable,
-                FindingBundle.of(findings),
-                admitted.outcome()
-            );
-        }
-        ClaimVerdict verdict = ledger.settle(
-            new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision())
-        );
-        if (verdict instanceof ClaimVerdict.RevisionMoved) {
-            Cuboid readBox = derived.footprint().bounds();
-            ClaimView fresh = readBox == null ? ClaimView.unavailable() : ledger.read(readBox);
-            if (!fresh.available()) {
+            if (!derived.rows().isEmpty()) {
                 findings.add(
-                    code(Codes.ledgerUnavailable, phase, "the ledger moved and cannot answer the re-read", null)
+                    code(Codes.ledgerUnavailable, phase, "no ledger is installed; the claims cannot be written", null)
                 );
                 return new MatchResult.Undecided(
                     phase,
@@ -461,44 +444,71 @@ public final class MatchEngine {
                     admitted.outcome()
                 );
             }
-            List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows());
-            if (!retryConflicts.isEmpty()) {
-                findings.addAll(retryConflicts);
+            revision = 0;
+        } else {
+            ClaimVerdict verdict = ledger.settle(
+                new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision())
+            );
+            if (verdict instanceof ClaimVerdict.RevisionMoved) {
+                long retryRevision;
+                if (derived.rows().isEmpty()) {
+                    retryRevision = ledger.revision();
+                } else {
+                    Cuboid readBox = derived.footprint().bounds();
+                    ClaimView fresh = readBox == null ? ClaimView.unavailable() : ledger.read(readBox);
+                    if (!fresh.available()) {
+                        findings.add(
+                            code(Codes.ledgerUnavailable, phase, "the ledger moved and cannot answer the re-read", null)
+                        );
+                        return new MatchResult.Undecided(
+                            phase,
+                            UndecidedReason.ledgerUnavailable,
+                            FindingBundle.of(findings),
+                            admitted.outcome()
+                        );
+                    }
+                    List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows());
+                    if (!retryConflicts.isEmpty()) {
+                        findings.addAll(retryConflicts);
+                        return new MatchResult.Failed(phase, FindingBundle.of(findings));
+                    }
+                    retryRevision = fresh.revision();
+                }
+                verdict = ledger
+                        .settle(new SettleRequest(request.instance(), derived.rows(), retryRevision));
+            }
+            if (verdict instanceof ClaimVerdict.RevisionMoved moved) {
+                findings.add(
+                    code(
+                        Codes.ledgerMoved,
+                        phase,
+                        "the ledger moved twice (" + moved.expected() + " -> " + moved.actual() + ")",
+                        null
+                    )
+                );
+                return new MatchResult.Undecided(
+                    phase,
+                    UndecidedReason.ledgerMoved,
+                    FindingBundle.of(findings),
+                    admitted.outcome()
+                );
+            }
+            if (verdict instanceof ClaimVerdict.Conflict conflict) {
+                findings.addAll(conflict.findings().findings());
                 return new MatchResult.Failed(phase, FindingBundle.of(findings));
             }
-            verdict = ledger
-                    .settle(new SettleRequest(request.instance(), derived.rows(), fresh.revision()));
+            ClaimVerdict.Settled settled = (ClaimVerdict.Settled) verdict;
+            revision = settled.revision();
         }
-        if (verdict instanceof ClaimVerdict.RevisionMoved moved) {
-            findings.add(
-                code(
-                    Codes.ledgerMoved,
-                    phase,
-                    "the ledger moved twice (" + moved.expected() + " -> " + moved.actual() + ")",
-                    null
-                )
-            );
-            return new MatchResult.Undecided(
-                phase,
-                UndecidedReason.ledgerMoved,
-                FindingBundle.of(findings),
-                admitted.outcome()
-            );
-        }
-        if (verdict instanceof ClaimVerdict.Conflict conflict) {
-            findings.addAll(conflict.findings().findings());
-            return new MatchResult.Failed(phase, FindingBundle.of(findings));
-        }
-        ClaimVerdict.Settled settled = (ClaimVerdict.Settled) verdict;
-        StructureContext context = publish(contexts, request, admitted.outcome(), findings);
+        StructureContext context = publish(attempt, request, admitted.outcome(), findings);
         return new MatchResult.Formed(
             phase,
             request.instance(),
             request.siting(),
             admitted.outcome(),
-            new ClaimSet(settled.rows(), settled.revision()),
+            new ClaimSet(derived.rows(), revision),
             context.revision(),
-            settled.revision(),
+            revision,
             FindingBundle.of(findings)
         );
     }
@@ -608,7 +618,7 @@ public final class MatchEngine {
     }
 
     private static StructureContext publish(
-        ContextStore contexts,
+        StructureAttempt attempt,
         MatchRequest request,
         MatchOutcome outcome,
         List<Finding> findings
@@ -619,7 +629,28 @@ public final class MatchEngine {
                 published.put(entry.getKey(), entry.getValue());
             }
         }
-        return contexts.publish(request.instance(), published, FindingBundle.of(findings), outcome.spend());
+        return attempt.publish(request.instance(), published, FindingBundle.of(findings), outcome.spend());
+    }
+
+    private static @Nullable Finding validateAttempt(MatchRequest request, StructureAttempt attempt, Phase phase) {
+        if (!attempt.isOpen()) {
+            return code(Codes.designDefect, phase, "the attempt is already closed", null);
+        }
+        if (!attempt.id().equals(request.instance())) {
+            return code(
+                Codes.designDefect,
+                phase,
+                "the attempt " + attempt.id() + " does not belong to " + request.instance(),
+                null
+            );
+        }
+        StructureSpec spec = attempt.spec();
+        if (!spec.owner().equals(request.owner())
+                || !spec.siting().equals(request.siting())
+                || !spec.structure().equals(request.blueprint().id())) {
+            return code(Codes.designDefect, phase, "the attempt spec does not match the request", null);
+        }
+        return null;
     }
 
     private static @Nullable Finding nestedSubject(List<BayBinding> bindings, Phase phase) {

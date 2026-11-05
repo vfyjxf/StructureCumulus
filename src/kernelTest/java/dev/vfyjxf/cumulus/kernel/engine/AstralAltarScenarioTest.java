@@ -4,7 +4,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -87,7 +86,7 @@ class AstralAltarScenarioTest {
                 request,
                 assertInstanceOf(MatchResult.Admitted.class, checked),
                 ledger,
-                ContextStore.inMemory()
+                TestAttempt.of(request)
             ),
             "the tier III check replaces the tier II claim"
         );

@@ -1138,6 +1138,11 @@ class StructureSetAdversarialTest {
         }
 
         @Override
+        public boolean isOpen() {
+            return delegate.isOpen();
+        }
+
+        @Override
         public StructureInstance commit(CuboidSet bounds) {
             if (throwCommit) {
                 throw new IllegalStateException("test commit refused");
