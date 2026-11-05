@@ -304,6 +304,63 @@ class AdapterExpectationsTest {
         assertEquals(replies(json, mismatching), replies(javaBlueprint, mismatching));
     }
 
+    @Test
+    void stateRejectsAnUnknownBlock() {
+        List<Finding> findings = compileExpect("{\"kind\":\"state\",\"block\":\"minecraft:stonee\"}");
+        assertTrue(anyFactoryBad(findings), () -> findings.toString());
+    }
+
+    @Test
+    void fluidRejectsAnUnknownFluid() {
+        List<Finding> findings = compileExpect("{\"kind\":\"fluid\",\"id\":\"minecraft:watr\"}");
+        assertTrue(anyFactoryBad(findings), () -> findings.toString());
+    }
+
+    @Test
+    void aBareBlockIdIsRejected() {
+        List<Finding> findings = compileExpect("{\"kind\":\"state\",\"block\":\"stone\"}");
+        assertTrue(
+            findings.stream().anyMatch(finding ->
+                finding.code().equals(Codes.factoryBad.code()) && finding.message().contains("minecraft:stone")
+            ),
+            () -> findings.toString()
+        );
+    }
+
+    @Test
+    void aBareFluidIdIsRejected() {
+        List<Finding> findings = compileExpect("{\"kind\":\"fluid\",\"id\":\"water\"}");
+        assertTrue(anyFactoryBad(findings), () -> findings.toString());
+    }
+
+    @Test
+    void aTagIdStillNeedsANamespace() {
+        List<Finding> findings = compileExpect("{\"kind\":\"tag\",\"registry\":\"block\",\"id\":\"logs\"}");
+        assertTrue(anyFactoryBad(findings), () -> findings.toString());
+    }
+
+    private static boolean anyFactoryBad(List<Finding> findings) {
+        return findings.stream().anyMatch(finding -> finding.code().equals(Codes.factoryBad.code()));
+    }
+
+    private static List<Finding> compileExpect(String expect) {
+        CompileResult result = DocumentCompiler.compile(read(documentWithExpect(expect)), context(adapterCatalogs()));
+        assertNull(result.blueprint());
+        return result.findings().findings();
+    }
+
+    private static String documentWithExpect(String expect) {
+        return """
+                {"schemaVersion":1,"id":"test:host","bounds":[0,0,0,1,1,1],
+                 "bays":[{"id":"test:host_bay","box":[0,0,0,1,1,1],"coverage":"every_cell",
+                          "footprint":"box","sharing":"shared"}],
+                 "checks":[
+                   {"id":"test:check","bay":"test:host_bay","focus":{"kind":"occupant","cell":[0,0,0]},
+                    "expect":%s}
+                 ]}
+                """.formatted(expect);
+    }
+
     private static List<String> shape(Blueprint blueprint) {
         List<String> shape = new ArrayList<>();
         for (Check<?> check : blueprint.checks()) {

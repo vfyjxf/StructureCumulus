@@ -1208,6 +1208,26 @@ is defence in depth. No other error is caught: an `OutOfMemoryError` leaves no s
 commit, so an exception between them locks that spot until the level unloads. A settle that formed
 and then threw leaves rows with no instance; releasing that key on the way out is the only cleanup.
 
+### D-58 — A registry reference names its namespace and must resolve
+
+A factory argument that names a registry entry — `block`, `fluid`, and a tag id — must carry a
+namespace, and an unknown entry is a compile finding (`SC-EXP-0005`). A bare `"stone"` is refused with
+a hint naming `minecraft:stone`; it is not silently rewritten into the mod's namespace.
+
+**Why no default namespace here.** `NamespacedId.parse` fills `structurecumulus:`, which is right for
+document-local ids (a bay, a check, a key) and wrong for registry entries: every vanilla block would be
+spelled `minecraft:x` anyway, and a bare id silently becomes a lookup in a namespace no registry
+uses.
+
+**Why an unknown id is an error.** Both registries are defaulted: `BLOCK.get` answers air and
+`FLUID.get` answers the empty fluid, so a typo compiled into "expects air". For a fluid the mistake is
+worse: the empty fluid's block form is air, so "expects water" matched air. The two `== null` guards
+were dead code.
+
+**Tags stay unresolved.** A tag may be declared by a datapack that loads later, so an unknown tag is
+not a compile error; it matches nothing at match time. This is the one place a document names a
+registry object without resolving it.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

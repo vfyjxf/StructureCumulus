@@ -253,6 +253,13 @@ cell passes both. The composed check's `ExpectationMeta` is the kernel `Junction
 reads `HostTypes.fluidState`; the entity tag reads `HostTypes.entityType`; the fluid check reads both
 block and fluid state. A missing value is `Unreadable` with `SC-MC-0010`, never a mismatch.
 
+A registry reference — the `state` factory's `block`, the `fluid` factory's `id` and a tag's `id` — must
+carry a namespace; a bare id is refused with a hint naming `minecraft:<id>` rather than read in the
+mod's namespace. An unknown block or fluid is the compile finding `SC-EXP-0005`, because both
+registries are defaulted and a lookup must not answer the default. A tag id is the one registry
+reference left unresolved: a later datapack may declare it, so an unknown tag matches nothing at match
+time.
+
 `ServerState` merges `AdapterExpectations.catalog()` into its expectation catalog, so an ordinary
 `checks` entry whose `expect.kind` is `property`, `state`, `tag` or `fluid` compiles through the same
 `DocumentCompiler` path as a kernel leaf. There is no `mc_checks` member, no separate MC JSON check
