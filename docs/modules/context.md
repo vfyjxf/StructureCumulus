@@ -120,7 +120,7 @@ public final class Merges {
 
 One `StructureContext` per `InstanceId`: a revision, a typed value map, the latest findings and the
 cumulative spend. `revision` starts at 0 and grows by one per publish. The map is immutable and
-ordered by `(key.id, key.type.getName())`; `keys()` returns that order. `get` returns `null` only
+ordered by the canonical key order (core L4); `keys()` returns that order. `get` returns `null` only
 when the key is absent; a published `null` is not a value (a key's absence is the absence of the
 entry). `require` returns `Found(value)` or `Missing`; it never throws. `has` is `get != null`.
 

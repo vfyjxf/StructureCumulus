@@ -1148,6 +1148,27 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-49 — A context key is identified by (id, type), not by its whole record
+
+`ContextKey` carries five components, but only two of them name the slot: `id` and `type`. `merge` and
+`whenAbsent` describe how the slot is filled; `retention` says when it is readable. Two keys with the
+same id and type are the same slot even when their merge functions differ, and the merge function is
+compared by reference on purpose — a lambda cannot be compared by value.
+
+**Equality stays the whole record.** `equals` compares every component so that a blueprint built twice
+stays equal only when the derived content is identical (I-13), and so that a duplicate key is a real
+duplicate rather than a silent merge.
+
+**Hashing and lookup use `(id, type)`.** The record's generated `hashCode` mixes in a `Class`, an enum
+and a lambda, so it varies across JVMs and across two equivalent lambda sites. That broke two things at
+once: a `HashMap`-backed lookup missed a key the `TreeMap`-backed one found, and `HashSet` iteration
+order leaked into results. `ContextKey#hashCode` therefore returns a hash of `(id, type.getName())`,
+which keeps the `equals`/`hashCode` contract (equal objects still hash equally) and makes every
+identity-hash dependency disappear.
+
+**One canonical order.** `ContextKeys.order()` sorts by `(id, type.getName())` and is the only order a
+`ContextKey` set may be iterated in; the comparators that re-implemented it are replaced by it.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

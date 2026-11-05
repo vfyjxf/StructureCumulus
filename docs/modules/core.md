@@ -29,7 +29,7 @@ parsing, catalogs of concrete extension families (only the generic `Catalog<T>`)
 | `Budget` | record | `(cells, sections)` ceiling |
 | `Spend` | record | `(cells, sections)` consumed |
 | `ContextKey<T>` | record | typed identity + retention + optional merge + optional absent value |
-| `ContextKeys` | final class | the only key factory |
+| `ContextKeys` | final class | the only key factory + the canonical key order |
 | `Merge<T>` | functional interface | associative fold, no identity |
 | `Retention` | enum | `match` (attempt only), `instance` (published) |
 | `Outcome<T>` | sealed interface | `Found(value)` / `Missing` |
@@ -114,6 +114,7 @@ public record ContextKey<T>(NamespacedId id, Class<T> type, Retention retention,
                             @Nullable Merge<T> merge, @Nullable T whenAbsent) {
     public ContextKey { /* non-null id, type, retention */ }
     public boolean contributed();
+    public int hashCode(); // (id, type.getName()) only; equals stays the full record
 }
 
 public final class ContextKeys {
@@ -122,6 +123,7 @@ public final class ContextKeys {
                                        @Nullable Merge<T> merge);
     public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention,
                                        @Nullable Merge<T> merge, @Nullable T whenAbsent);
+    public static java.util.Comparator<ContextKey<?>> order();
     private ContextKeys() {}
 }
 
@@ -252,9 +254,14 @@ explain a missing value builds the finding where the locus is known; `Outcome` i
 vocabulary of a lookup, not a report.
 
 **L4 — key identity.** `ContextKey` equality is the full record: id, type, retention, merge and
-`whenAbsent`. A catalog owns uniqueness by id; two keys with one id and different types are a
-catalog error (`SC-SPI-0003`). `ContextKeys.of` is the only constructor that the kernel uses; the
-canonical constructor validates and `ContextKeys` is the intended factory.
+`whenAbsent`. Lookup identity is the slot, `(id, type)`: two keys with one id and one type name the
+same value slot even when their merge functions differ, and `merge` is compared by reference — a
+lambda cannot be compared by value. `hashCode` uses `(id, type.getName())` only, so equal keys hash
+equally and no identity hash reaches a container. The canonical order is `ContextKeys.order()`,
+`(id, type.getName())`, and it is the only order a key set may be iterated in. A key id is unique
+within one blueprint: a duplicate is `SC-DOC-0004` on the document side and `SC-BPT-0007` on the
+builder side. `ContextKeys.of` is the only constructor that the kernel uses; the canonical
+constructor validates and `ContextKeys` is the intended factory.
 
 **L5 — merge is associative, with no identity.** `merge.combine` must be associative; the kernel
 never supplies an identity. A key with `merge != null` is section-contributed; a key with
