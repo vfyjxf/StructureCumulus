@@ -263,7 +263,8 @@ footprints; a subject from a nested frame (`frame != 0`) or of kind `OccupantKin
 for a claimable bay. A nested structure is checkable but never claimable: a nested focus returns no
 subject, and a check that binds a nested body through `Focuses.occupant` fails at claim prediction
 with `SC-CLM-0004` before an `Admitted` exists. Rows are one per cell per bay; a cell may carry two
-rows only when both bays are `shared` (the blueprint refuses an exclusive overlap). `rows` is sorted
+rows only when both bays are `shared` — the build refuses the overlap it can compute, and `derive`
+refuses the settled one a `Bound` pair hides until then (D-57). `rows` is sorted
 by `(cell, owner, bay, siting origin, placement orientation, placement offset, sharing)`.
 
 `check` rejects a nested or non-root binding while folding the verdict; it never returns an
@@ -273,7 +274,9 @@ footprint lies inside the bay's world cells; for `oneSubject` the union equals t
 `exclusive + Bound` at least one non-air subject exists. A failure is
 `Failed(SC-CLM-0004)`/`SC-CLM-0005` and nothing is written. `ClaimPlanner.derive` throws
 `IllegalArgumentException` carrying `SC-CLM-0004` if a nested or non-root subject reaches it; that is
-a proof failure, because check and settle already validated the bindings.
+a proof failure, because check and settle already validated the bindings. It also throws
+`SC-CLM-0001` when two bays of one instance own one cell with an exclusive side; `plannerFailure`
+maps that to the conflict code, and check and settle answer `Failed` with nothing written.
 
 A ledger is free to answer `Formed.claims()` with its whole row set rather than only the replacement
 rows. A host that runs several structures must therefore filter the set by `(owner, siting, bay)`

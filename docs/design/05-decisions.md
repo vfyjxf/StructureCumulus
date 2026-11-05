@@ -1148,6 +1148,26 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-57 — A blueprint is refused only for conflicts it cannot outgrow
+
+The build refuses two bays of one blueprint whose owned cell sets are known at build time and
+intersect with an exclusive side. `Box` owns its cells and `Declared` owns the set written in the
+document; both transform rigidly with the siting, so the overlap holds in every world, every origin
+and every orientation. `Bound` is excluded: its owned set is the union of the subjects read at
+settle and may be smaller than its bay, so a static answer would refuse blueprints that resolve
+cleanly.
+
+The remaining cases are decided where the cells exist:
+
+- a `Bound` overlap is refused by the planner, which scans its sorted rows and rejects a cell held
+  by two bays when either side is exclusive;
+- two instances never share a key, so their conflicts stay the ledger's job.
+
+Replacing the old rule changes three cases. The old rule compared bay cells, not owned cells, so it
+refused a `Declared` bay whose checked cells overlapped another bay while its owned cells did not,
+and it treated a `Bound` bay's cells as if they were owned. It also ignored `Declared` against
+`Declared`, which the owned-set rule now refuses.
+
 ### D-59 — A contributed key is complete or absent
 
 A section contribution whose value does not match the key's type marks the key absent. The engine

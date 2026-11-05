@@ -121,8 +121,10 @@ order on `Sharing`; the matrix is the only rule and the adapter has no second pr
 
 `ClaimRow` order is `(cell, instance, bay, siting origin, placement orientation, placement offset, sharing)`, implemented once in `compareTo`; `ClaimSet` and
 `ClaimVerdict` sort by it. A row is identified by the full record; two bays of one instance may hold
-the same cell only when both are `shared` (the blueprint refuses an exclusive overlap), and the two
-rows stay distinct by `bay`. A settlement replaces every row of one instance in one compare-and-set;
+the same cell only when both are `shared`. An exclusive overlap is refused twice: at build for the
+owned sets the blueprint already knows (`Box`, `Declared` — D-57), and by the planner where the rows
+are derived for the ones only the world answers (`Bound`, `SC-CLM-0001`). The two rows stay distinct
+by `bay`. A settlement replaces every row of one instance in one compare-and-set;
 it never merges per row or per bay.
 
 ### 4.4 Footprint
@@ -138,7 +140,9 @@ Claims protect what a structure occupies or declares, never what it merely reads
 empty cavity is protected; `Declared` is ground the author writes down; `None` is an observation
 that owns nothing. `Footprint` does not decide whether a `Match` is complete; that is `Coverage` in
 `structure`. A nested body or a non-root subject is never part of a `Bound` footprint; the engine
-rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
+rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5). Two `Bound` bays of one
+blueprint that own the same cell with an exclusive side are not a build fact: the planner refuses
+them when it derives the settled rows (`SC-CLM-0001`).
 
 ### 4.5 Ledger behaviour
 
