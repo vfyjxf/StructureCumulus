@@ -268,11 +268,14 @@ capture, `LevelCapture.close()`, `LevelEvent.Unload` and `ServerStoppingEvent` i
 leases. The world epoch and the watched-region mark counter below are the full specification and are
 implemented (M5a, `d1fa42f`); M3's per-level stores do not change them.
 
-The mark counter is **event-edged**: `WatchEvents` listens for `BlockEvent.NeighborNotifyEvent`
-(receive-canceled), `BlockEvent.BreakEvent`, `BlockEvent.EntityPlaceEvent`, `ExplosionEvent.Detonate`,
-`PistonEvent.Pre`, `ChunkEvent.Unload`, `EntityJoinLevelEvent`, `EntityLeaveLevelEvent` and
-`LevelEvent.Unload`; each handler is a server-side filter that only marks the chunks of an active
-capture's watched region, so an unmarked world pays nothing and a 10k-move sweep dispatches no work.
+The mark counter is **write-edged** (D-47): the adapter hooks `LevelChunk#setBlockState` and
+`BlockEntity#setChanged` instead of subscribing to intent events, so every server-side write is
+observed once and a write that changed nothing reports nothing. `LevelWatch` keeps its chunk marks,
+while `CumulusHooks` owns the instance side: a chunk-grained index finds the formed instances that
+touch the written cell, and the first hit of a tick drops the instance and releases its claims — a
+piston push is a batch of writes, so a pushed structure is gone rather than translated. The two
+remaining main-bus listeners are `EntityJoinLevelEvent` and `EntityLeaveLevelEvent`; `LevelEvent.Load`
+and `LevelEvent.Unload` still open and close the level's store, whose ledger is retired on unload.
 `LevelWatch` refcounts watched chunks per level, keeps a monotonic epoch, and stores the capture's
 lazy fingerprints: entity anchor/footprint/type/UUID (verified through `Level.getEntity`, no chunk
 load) and block-entity type/NBT (`saveWithoutMetadata`, re-read through `getChunkNow` only, never

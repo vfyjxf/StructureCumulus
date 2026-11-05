@@ -1097,6 +1097,32 @@ that also wants durable claims re-settles its restored instances and the planner
 **A move is a removal.** With the instance as the key there is no second identity to reconcile when a
 structure is pushed: the adapter invalidates it and releases its rows, and a rebuild is a fresh settle.
 
+### D-47 — A block change is observed at the write, not at the intent
+
+The adapter learns that a block changed by hooking the one method every server-side write goes
+through — `LevelChunk#setBlockState` — instead of subscribing to a list of NeoForge events. The
+callback carries the old and the new state, the position and the `isMoving` flag, and it fires only
+when the write actually changed something: a `null` return is a no-op.
+
+**Why the event list was wrong.** A pre-event describes an intent: it fires before the write, it may
+be cancelled, it names a direction rather than a result, and it exists only for the paths someone
+remembered to cover. Fire, fluids, `/fill`, `/clone`, another mod's `setBlock` and a wither had no
+event at all, and a cancelled break still deleted the instance.
+
+**A piston is not a special case.** A piston move is a batch of block writes with `isMoving` set, so
+the funnel sees it like any other change and reports the affected instances as gone. The adapter does
+not reconstruct a translation: a structure a piston pushes is no longer formed, its claim rows are
+released, and the player settles it again at its new position.
+
+**The instance side is indexed.** A per-level `Map<chunk, Set<InstanceId>>` is maintained by the
+manager wrapper, so the hook's first three checks are constant-time and a write that touches no
+formed structure costs one hash lookup. A block-entity `setChanged` feeds only the capture watch: a
+content change never invalidates the instance itself (D-41).
+
+**Costs.** Mixin becomes a load-bearing dependency of the adapter; the hook sits on a hot path and may
+only do a hash lookup before returning; the injection points must be re-verified on every Minecraft
+update. The kernel is unaffected — every hook lives in the adapter source set.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
