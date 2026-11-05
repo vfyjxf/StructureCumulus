@@ -211,6 +211,22 @@ The value is the live capability handle. The capture lease is the validity bound
 not retain a handle after the lease stops being current. No copy is made, and no mutation goes
 through a second wrapper.
 
+### 7.1.1 The contract
+
+A check reads a trait value; it never writes through one. These methods are writes and must not be
+called from a check (D-41):
+
+| Capability | Writes |
+| --- | --- |
+| `IItemHandler` | `insertItem`, `extractItem`, `setStackInSlot` (on `IItemHandlerModifiable`) |
+| `IEnergyStorage` | `receiveEnergy`, `extractEnergy` with `simulate = false` |
+| `IFluidHandler` | `fill`, `drain` with `FluidAction.EXECUTE` |
+| `Entity` (via a captured trait) | `hurt`, `setHealth`, `setItemInHand`, `remove`, `discard` |
+
+Reading is allowed and is the caller's determinism risk; writing is a contract violation. The engine
+cannot detect either, because the value is an arbitrary `Object` and the kernel must not name a host
+type.
+
 ### 7.2 One generic capability provider
 
 `BlockCapability`, `ItemCapability` and `EntityCapability` share `BaseCapability<T, C>`, and their

@@ -390,8 +390,10 @@ A four-state test uses `slot` or `find`.
 
 `TraitKey` equality is `(id, type)`; one id under two types is a capture error. A trait's identity is
 its id, so two keys with one id denote one slot. A trait is captured once and never recomputed.
-Trait values are immutable values (a string, boxed primitive, `NamespacedId`, an immutable
-record/collection); a live host object is a host bug. `OccupantFilter.ofTrait(id)` matches a
+A trait value is whatever its provider returns. The framework does not police it: a capability
+handle is live for the lease's lifetime, and a check that dereferences one accepts dependence on
+world state (D-41). The contract is one line — a check writes nothing, including through a trait
+value. `OccupantFilter.ofTrait(id)` matches a
 `Present` slot only; `Absent`, `Refused` and an unasked slot are not matches, so a filtered query is
 never a totality proof.
 

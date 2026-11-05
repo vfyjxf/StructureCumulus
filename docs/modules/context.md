@@ -147,6 +147,12 @@ is a host contract violation, not a kernel outcome. A successful `settle` publis
 values once; a `derive` publishes its own batch once at `revision + 1`. There is no base-revision CAS
 and no stale-publish finding.
 
+A published `instance` value must be a value: it is merged into the instance context and survives
+every later revision, so anything held there outlives the lease that produced it. A live host handle
+— a capability, an entity — may only be published at `Retention.match`, where it dies with the
+attempt. A `Retention.instance` handle is a contract violation (D-41); the store cannot detect it,
+because the value is an arbitrary `Object`.
+
 **Removal.** `remove(instance)` returns the stored `StructureContext`, or `null` when the instance is
 absent; it never fabricates an empty context. After removal a later `context(instance)` reads the
 empty context at revision 0. The manager removes the instance and its context together; a set

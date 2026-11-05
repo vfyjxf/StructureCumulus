@@ -774,7 +774,8 @@ holders without a fake default for the other.
 `EntityTraitProviders`; the NBT keys disappear, so a host that needs serialized block-entity or
 entity data registers a typed provider over the owning API. The trait value is live for the lease's
 lifetime; a consumer must not retain it after the lease stops being current. The record set is now
-34 decisions (D-34); the kernel types `TraitKey`/`TraitSlot`/`Trait` are unchanged. **Status
+34 decisions (D-34); the kernel types `TraitKey`/`TraitSlot`/`Trait` are unchanged. The value is
+live but not policed: the contract is purity, not immutability (D-41). **Status
 (T1–T3):** implemented; the focused trait tests and the full GameTest run are green.
 
 ### D-35 — A set's siting, budget and context lifecycle close S6
@@ -963,6 +964,38 @@ The record set is now 40 decisions (D-40). **Status:** implemented; `StructureMa
 `AdversarialManagerTest`, `StructureLifecycleGameTest` and
 `StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0).
 
+### D-41 — The snapshot carries values; a live handle is a contract, not a guard
+
+The capture freezes the values the framework owns and states one contract where it does not.
+
+**The contract.** `check` is pure: it writes nothing — no claim, no frame, no world edit — and that
+includes writing through a host value. Determinism is promised for a check that reads only captured
+values; a check that dereferences a live host value accepts that its verdict may differ between runs.
+
+**The values.** Captured cells are frozen: `BlockState`, `FluidState`, the detached block-entity copy
+and the occupant walk are copies. The three capability traits carry the live NeoForge capability
+(D-34); the framework neither copies nor wraps them, and does not police how they are used. An entity
+cell carries the captured `EntityType`, never the live `Entity`: the host read is
+`HostTypes.entityType`, and any other entity state is a captured trait.
+
+**The store.** A `Retention.instance` value is merged into the instance context and survives every
+later revision, so it must be a value. A live handle may only be published at `Retention.match`,
+where it dies with the attempt; a `Retention.instance` handle is a contract violation.
+
+**Rejected:** freezing the three capabilities into read-only copies (a second value model and a copy
+on every capture, for a value no shipped check dereferences); a kind marker on `TraitKey` (the value
+stays reachable through `Trait.value()` and `OccupantSnapshot.trait`, so the marker would label the
+gun without unloading it); an exception carved into I-02 (the snapshot would stop being an isolation
+boundary at all).
+
+**Why:** the framework cannot tell whether an arbitrary `Object` is mutable, and the only type-level
+fix costs a public concept per capability. The shipped surface dereferences no trait value, so the
+contract costs one paragraph and keeps the real API object for addons.
+
+**Consequence:** `world` §4.7, `adapter` §3.1/§7.1, `11` §7.1 and `context` §4.2 state the contract;
+`04-api` §4 keeps its `getStackInSlot` example and notes that the value is live; `10-host-data` §2-§4
+and `adapter` §8 rename the entity host read to `HostTypes.entityType`.
+
 ### D-44 — Claims are session-scoped
 
 A claim ledger lives exactly as long as the structure instances that own its rows: the adapter persists
@@ -986,7 +1019,7 @@ that also wants durable claims re-settles its restored instances and the planner
 **A move is a removal.** With the instance as the key there is no second identity to reconcile when a
 structure is pushed: the adapter invalidates it and releases its rows, and a rebuild is a fresh settle.
 
-> Numbering note: D-41…D-43 and D-46 are still proposals carried by
+> Numbering note: D-42, D-43 and D-46 are still proposals carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; they enter this file when their code lands.
 
 ## 3. Consequences a reviewer should attack

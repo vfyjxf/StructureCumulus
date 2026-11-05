@@ -88,8 +88,10 @@ deriver, a remedy provider. There is no second semantic path and no "compact pro
 ## Law 11 — Determinism is a public promise
 
 For a fixed `(blueprint, snapshotId, siting, owner, budget, claims revision, catalog snapshot)` the
-result value, the finding order and the spend are identical across runs and JVMs. All ordered
-collections are built in a defined order; ties are broken by declaration index, never by hash.
+result value, the finding order and the spend are identical across runs and JVMs, for a check that
+honours the purity contract (D-41). A check that dereferences a live host value accepts that its
+verdict may differ between runs. All ordered collections are built in a defined order; ties are
+broken by declaration index, never by hash.
 
 ## Law 12 — The design is normative
 

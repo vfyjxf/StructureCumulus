@@ -60,9 +60,9 @@ internally consistent.
 | Id | Invariant | Enforced by |
 | --- | --- | --- |
 | **I-01** | Nothing under `kernel.**` names Minecraft, NeoForge or Mojang. | `compileKernelJava` (no MC on classpath) + `kernelPurity` scan. |
-| **I-02** | A match reads only an immutable `WorldView`; `(blueprint, snapshot, siting, owner)` fully determines the verdict. | `engine` signature; `world` has no live handle. |
+| **I-02** | A match reads only the snapshot. A captured cell is a value; a host value handed through the capture is live, and `(blueprint, snapshot, siting, owner)` determines the verdict for a check that reads only captured values. | `engine` signature; the purity contract in `world` §4.7 and D-41. |
 | **I-03** | Every footprint is a `CuboidSet`; no voxel enumeration in the kernel. | `space`; `CuboidSet` has no cell stream. |
-| **I-04** | `check` writes nothing: no claim, no context frame, no world edit. | `engine.check` has no writer parameter; `StructureKernel.check` has no ledger write. |
+| **I-04** | `check` is given no write port: no claim, no context frame, no world writer. A live host value is a write port the host owns; writing through it is a contract violation, not a kernel outcome. | `engine.check` has no writer parameter; `StructureKernel.check` has no ledger write; the purity contract in `world` §4.7. |
 | **I-05** | `settle` is the only claim writer; `Formed` exists only after `Settled`. | `claim` API; `engine.settle`. |
 | **I-06** | Every claim row is derived by the pure planner from `(blueprint, siting, owner, bindings)`; a caller cannot hand in rows. | `ClaimPlanner`; `Admitted` carries bindings, not rows. |
 | **I-07** | A `MISMATCH` is refutation, `UNREADABLE` is ignorance, `ABSTAIN` is refusal; they do not collapse. | `Reply` four-state family; `MatchResult` fold. |

@@ -162,7 +162,9 @@ One interface, one catalog registration, no engine access. `ctx.phase()` is alwa
 
 The standard `structurecumulus:inventory` trait value is the live `IItemHandler` itself, so the check
 above reads `((IItemHandler) present.trait().value()).getStackInSlot(0)` when it needs slot contents;
-there is no copied slot list. The same rule holds for `energy` (`IEnergyStorage`) and `fluid`
+there is no copied slot list. The value is live: a check that reads it accepts dependence on world
+state, and a check must never write through it (D-41). A blueprint that needs capture-time contents
+registers a captured trait. The same rule holds for `energy` (`IEnergyStorage`) and `fluid`
 (`IFluidHandler`): a trait carries the owning API object, never a framework wrapper.
 
 ## 5. The document surface

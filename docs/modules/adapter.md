@@ -150,7 +150,10 @@ M1 copies blocks and block entities. M2a adds loaded entities, M2c adds trait sl
 refusal, M2d adds nested frames, and M5e adds the capture report and, with it, the orientation audit.
 The rules below are implemented.
 
-- One server-thread call. `ServerChunkCache.getChunkNow`; never `Level.getChunk`, never a chunk load.
+- One server-thread call. `ServerChunkCache.getChunkNow`; the capture never calls `Level.getChunk`.
+  This covers the capture's own reads: a capability provider is host code and is handed the live
+  `Level`, so a provider that reads a neighbour may cause a load — the vanilla double chest does,
+  through `ChestBlock.getContainer`. That read is the provider's, not the capture's.
   A nested child uses the same rule: an unloaded chunk is a cut, never a load.
 - The section walk visits every captured cell and reads its state from a per-frame copied section
   container; an all-air section is `Air(revision)`; an unloaded root chunk is
@@ -206,7 +209,9 @@ The rules below are implemented.
 `SnapshotLevel` is the one host snapshot per frame. It implements `BlockGetter` in **local** frame
 coordinates: `getBlockState`, `getFluidState`, `getBlockEntity` and the typed `get(pos, HostType)`.
 Out-of-bounds reads answer air / empty fluid / null; a missing section answers the same without a
-world read. No `Level` is retained.
+world read. The snapshot retains no `Level` of its own: block states, fluids and block entities are
+copies, and an entity cell carries the captured `EntityType`. A capability handle handed through the
+capture is host code's object and may reach one; it is live for the lease (D-41).
 
 - `LevelCapture` copies each world section's `PalettedContainer<BlockState>` once per frame
   (`PalettedContainer.copy()`), keyed by world section coordinates; the occupant walk reads its
@@ -214,8 +219,8 @@ world read. No `Level` is retained.
   copied states.
 - Block entities are copied at capture (`saveWithId` then `BlockEntity.loadStatic`) into detached
   snapshot instances keyed by the local cell; `getLevel()` is null on every one of them.
-- The captured entity candidates are kept with their local footprints; `get(cell, entity)` answers the
-  narrowest captured entity covering the cell.
+- The captured entity candidates are kept with their local footprints; `get(cell, entityType)`
+  answers the `EntityType` of the narrowest captured entity covering the cell.
 - `FrameData` carries the snapshot per frame; nested frames build and carry their own.
 - `LevelSnapshot.get(pos, type)` dispatches to the frame snapshot; `get(ref, type)` uses the ref's
   anchor. A `LevelSnapshot` built without a snapshot answers null. No typed read touches the level.
@@ -245,7 +250,7 @@ fluid-state leaf matches the fluid type and the block-state leaf matches `block.
 leaf (its block is not the water block) even though its fluid state is water; a real water or lava
 cell passes both. The composed check's `ExpectationMeta` is the kernel `Junction`'s (`all_of`,
 `SC-EXP-0001`); its mismatch findings are the leaves' `SC-MC-0009`. `property`, `state` and the block tag read `HostTypes.blockState`; the fluid tag
-reads `HostTypes.fluidState`; the entity tag reads `HostTypes.entity`; the fluid check reads both
+reads `HostTypes.fluidState`; the entity tag reads `HostTypes.entityType`; the fluid check reads both
 block and fluid state. A missing value is `Unreadable` with `SC-MC-0010`, never a mismatch.
 
 `ServerState` merges `AdapterExpectations.catalog()` into its expectation catalog, so an ordinary
@@ -331,6 +336,10 @@ The value is the provider's real value, not a copy the framework invents: a cons
 `getStackInSlot`, `getEnergyStored` or `getFluidInTank` on the capability itself. The capture lease
 is the validity boundary; a consumer must not retain a handle after the lease stops being current.
 No list, integer or NBT wrapper exists.
+
+The framework does not police this value. A check may read it, and a check that does accepts that its
+verdict depends on world state; a check must not write through it (D-41, `11` §7.1). Any other entity
+state is a captured trait, not a host read.
 
 ### 7.2 Slot rules
 

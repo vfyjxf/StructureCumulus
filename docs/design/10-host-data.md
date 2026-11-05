@@ -19,7 +19,7 @@ Reads are a **typeclass bridge** over that snapshot:
 ```java
 view.get(pos, HostTypes.blockState)
 view.get(pos, HostTypes.fluidState)
-view.get(pos, HostTypes.entity)
+view.get(pos, HostTypes.entityType)
 ```
 
 There is no `BlockSnapshot`, `FluidSnapshot`, `EntitySnapshot`, `McSnapshot`, `HostData`, `HostTable`
@@ -59,7 +59,7 @@ Adapter constants:
 ```java
 public static final HostType<BlockState> blockState = HostType.of(id("block_state"));
 public static final HostType<FluidState> fluidState = HostType.of(id("fluid_state"));
-public static final HostType<Entity> entity = HostType.of(id("entity"));
+public static final HostType<EntityType<?>> entityType = HostType.of(id("entity_type"));
 public static final HostType<BlockEntity> blockEntity = HostType.of(id("block_entity"));
 ```
 
@@ -96,7 +96,7 @@ The method is a field extension, not a wrapper object:
 ```java
 BlockState state = view.get(cell, HostTypes.blockState);
 FluidState fluid = view.get(cell, HostTypes.fluidState);
-Entity entity = view.get(cell, HostTypes.entity);
+EntityType<?> entityType = view.get(cell, HostTypes.entityType);
 BlockEntity blockEntity = view.get(cell, HostTypes.blockEntity);
 ```
 
@@ -130,8 +130,8 @@ final class SnapshotLevel implements BlockGetter {
 - one snapshot, not one per data type;
 - heightmaps are not captured: no kernel request path exists (§13).
 
-`CapturedEntity` is the adapter's internal record: entity UUID, type, local footprint and the captured
-entity reference.
+`CapturedEntity` is the adapter's internal record: entity UUID, type id, local footprint and the
+captured `EntityType`. The live `Entity` is used only while the capture runs.
 
 `LevelSnapshot` holds the frame's `SnapshotLevel` and implements `WorldView.get`:
 
@@ -152,8 +152,8 @@ The adapter's `SnapshotLevel.get` is the typeclass dispatcher:
     if (type.equals(HostTypes.fluidState)) {
         return (H) getFluidState(pos);
     }
-    if (type.equals(HostTypes.entity)) {
-        return (H) entityAt(pos);
+    if (type.equals(HostTypes.entityType)) {
+        return (H) entityTypeAt(pos);
     }
     if (type.equals(HostTypes.blockEntity)) {
         return (H) getBlockEntity(pos);
@@ -173,7 +173,7 @@ The capture is one section walk:
 2. fill that section's 16³ `FluidState` array from the copied block states;
 3. copy each block entity as a detached snapshot block entity (`saveWithId` / `loadStatic`) keyed by
    the local cell;
-4. keep the captured entity candidates with their local footprints;
+4. keep the captured entity candidates with their local footprints and their `EntityType`;
 5. wrap the frame's maps in one `SnapshotLevel`.
 
 The occupant walk reads each cell's `BlockState` from the copied container, not the live chunk
@@ -419,7 +419,7 @@ Kernel:
 Adapter:
 
 - one `SnapshotLevel` per frame;
-- `HostType` constants for block state, fluid state, entity, block entity;
+- `HostType` constants for block state, fluid state, entity type, block entity;
 - `LevelCapture`/`FrameData`/`LevelSnapshot` snapshot wiring;
 - `McAnchors`;
 - adapter expectation factories;
@@ -460,7 +460,7 @@ block state; `LevelCapture` composes the snapshot content into the section diges
 not captured because no request path exists.
 
 H3 is implemented: the adapter's `property`/`state`/`tag`/`fluid` factories lower to
-`Expectations.host` over `HostTypes.blockState`/`fluidState`/`entity`; the `state` factory resolves
+`Expectations.host` over `HostTypes.blockState`/`fluidState`/`entityType`; the `state` factory resolves
 its `BlockState` at compile time; the `fluid` factory composes the fluid-state and block-state leaves;
 `McAnchors` enforces `AnchorSpec.value` against the captured origin property; `AdapterCodes` carries
 the `SC-MC-0006`…`0010` catalog entries; and the adapter expectation catalog is merged into
