@@ -442,14 +442,17 @@ invalidation is `StructureEvent.Broken` through the bound manager: a formed stru
 removed even when its release fails. `rolledBack` names only the attempts whose release answered
 `Settled`; the host owns any further invalidation policy (`06-verification.md` §3.3).
 
-**Commit-phase limitation.** Rollback restores the old claim rows it snapshotted, but it does not
-recreate a prior `StructureInstance`/context that an earlier commit in the same run already replaced.
-Member commits run only after every settle succeeds; a *settle* failure therefore leaves the previous
-instances and rows in place. A *commit* failure can occur only after an earlier member committed and
-is only reachable through a host-contract violation (a draft committing into another manager, or a
-manager rejecting a valid commit); the new instance is removed, the old claim rows are restored, but
-the old manager instance is not reconstructed. This is a documented limitation, not an atomic
-replace guarantee.
+**The previous occupant is released, never restored (D-79).** Before the settle pass the host takes
+over each member's siting: it looks up the formed instance at the same owner and siting and releases
+its rows. A rollback releases only what this run settled and removes this run's draft contexts; the
+previous instance is not restored. Its rows, its context and its identity are stale from the moment
+the replacement was attempted — the blueprint may have changed under it, and after a reload there is
+no instance at all — and the host re-forms it the same way any structure comes back: by settling
+again. Member commits run only after every settle succeeds, so a *settle* failure leaves the previous
+instance in the manager as a stale entry with no rows. A *commit* failure can occur only after an
+earlier member committed and is only reachable through a host-contract violation (a draft committing
+into another manager, or a manager rejecting a valid commit); the committed prefix is rolled back the
+same release-only way. This is a documented limitation, not an atomic replace guarantee.
 
 ### 10.4 Result
 

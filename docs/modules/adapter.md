@@ -903,6 +903,10 @@ structure's own findings (including warnings); `rollbackFailures` stays separate
 `claims` filters `Formed.claims()` by `(owner, siting, bay)`, so a ledger-wide `ClaimSet` never leaks
 another structure's rows into a per-structure view. Rollback removes the context of every formed
 attempt, including the failed-release root; `rolledBack` still names only the successful releases.
+Before the settle pass the host takes over each member's siting — the formed instance at the same
+owner and siting is released through the ledger — and a rollback never restores it (D-79): the
+release covers only what this run settled, the previous instance's rows stay gone, and the host
+re-forms the siting by settling again.
 
 ### 13.5 The set command and its one capture (S5)
 
@@ -953,11 +957,11 @@ and `StructureSetHost` remain a library entry point a host may drive without the
 is independent and a later satellite's CAS retry sees the earlier rows through the ledger. Rollback
 releases claims and removes the kernel context of every formed attempt through
 `StructureEvent.Broken` on the bound `StructureManager`; `rolledBack` still names only the successful
-releases, and a failed release or `Broken` dispatch is a `SC-SET-0007` rollback failure (D-35). Rollback cannot recreate a previous `StructureInstance` that an
-earlier commit in the same run already replaced: member commits are deferred until every settle
-succeeds, so a settle failure keeps the previous set, while a commit-phase failure (only reachable via
-a host-contract violation) removes the committed prefix and restores old claim rows but not the old
-manager instance. A set has one shared budget: presence charges `(1, 0)` per
+releases, and a failed release or `Broken` dispatch is a `SC-SET-0007` rollback failure (D-35). Rollback never restores the previous occupant of a member's siting
+(D-79): the takeover release already dropped its rows, member commits are deferred until every settle
+succeeds, and a settle failure leaves the previous instance as a stale manager entry that the host
+replaces only by settling again, while a commit-phase failure (only reachable via
+a host-contract violation) rolls the committed prefix back the same release-only way. A set has one shared budget: presence charges `(1, 0)` per
 read and each attempt receives the remainder, so the set's total reads stay within the run budget
 (09 §7.3). Same-siting is rejected (`SC-SET-0008`) in the compiler, in `StructureSet.place` and by
 the host's defensive check. The SS4 stress suite

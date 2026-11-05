@@ -1021,7 +1021,8 @@ destructive one. A host that forms a set settles every member first, commits the
 back with that compensation.
 
 **Rejected.** Folding `commit` into `settle`: the set host needs the prepare/commit gap for its own
-rollback (`StructureSetHost` settles every member, then commits, then restores claims). A single
+rollback (`StructureSetHost` settles every member, then commits; a failure releases, it never
+restores, D-79). A single
 `form(instanceId, rows, values)` port: it moves the same ordering decision into the host without
 adding atomicity, and the two stores have different lifetimes — the ledger is per-world and
 persisted, the context is per-instance and in memory. A `Prepared` handle that forces commit-or-
@@ -1212,6 +1213,28 @@ holds for every settle that happens, but a settle whose plan owns nothing no lon
 
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
+
+### D-79 — A rollback releases what the set wrote; it never restores the previous occupant
+
+When a structure set fails partway it releases the members it already settled and invalidates their
+contexts. The previous instance at the same owner and siting — taken over before the members settled —
+is not restored. Its rows, its context and its identity are stale from the moment the replacement was
+attempted: the blueprint may have changed under it, and after a reload there is no instance at all.
+
+The host re-forms it the same way any structure comes back: by settling again.
+
+**Why not restore.** Restoring means snapshotting every row of the previous instance before the
+takeover — including rows outside the new member's bounds — and replaying them through a write path
+that exists for that one purpose. That is a second source of truth for occupancy, and it is exactly
+where the lost-rows defect came from: the snapshot was taken over the member's bounds while the release
+removed the whole instance.
+
+**Law 6 stays absolute.** With the replay gone, `engine.settle` remains the only writer and every row
+it writes comes from the planner. D-78 is withdrawn.
+
+> Numbering note: D-78 was a proposal (`37-law-6-host-may-replay.md`) whose plan was withdrawn before
+> landing; it never entered this file, so the withdrawal above closes a proposal, not a recorded
+> decision.
 
 ## 3. Consequences a reviewer should attack
 
