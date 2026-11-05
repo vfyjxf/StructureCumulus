@@ -242,7 +242,7 @@ public final class Expectations {
         public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
             OccupantSnapshot subject = ctx.subject();
             LatticePoint cell = subject.ref().anchor();
-            H host = ctx.view().get(cell, type);
+            H host = ctx.view().get(subject.ref(), type);
             if (host == null) {
                 String message = "host value " + type.id() + " was not captured";
                 Finding finding = Finding.builder(absentCode, Severity.error).phase(ctx.phase()).message(message)

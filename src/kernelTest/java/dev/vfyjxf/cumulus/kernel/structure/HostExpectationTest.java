@@ -127,16 +127,70 @@ class HostExpectationTest {
         assertNull(new View().get(cell, blockState), "an unbridged view answers null");
         HostView view = new HostView();
         view.hosts.put(cell, "lit");
-        assertEquals("lit", view.get(subject.ref(), blockState), "the ref form reads the anchor");
+        assertEquals("lit", view.get(subject.ref(), blockState), "a ref without a body reads its cell");
+    }
+
+    @Test
+    void aHostExpectationReadsTheBody() {
+        BodyView view = new BodyView();
+        OccupantSnapshot subject = bodyOccupant();
+        assertEquals("chicken", view.get(subject.ref().anchor(), blockState), "the cell answers another body");
+        assertEquals("cow", view.get(subject.ref(), blockState), "the ref form answers the body");
+        Expectation<OccupantSnapshot> expectation = Expectations.host(
+            blockState,
+            (value, pos) -> value.equals("cow"),
+            propertyMismatch,
+            hostNotCaptured,
+            "expected cow"
+        );
+        assertInstanceOf(Reply.Match.class, expectation.test(context(view, subject)));
+    }
+
+    @Test
+    void aRefFromAnotherFrameIsNotAnswered() {
+        CountingView view = new CountingView();
+        OccupantSnapshot subject = frameOneOccupant();
+        Expectation<OccupantSnapshot> expectation = Expectations
+                .host(blockState, (value, pos) -> true, propertyMismatch, hostNotCaptured, "expected lit");
+        Reply.Unreadable unreadable = assertInstanceOf(Reply.Unreadable.class, expectation.test(context(view, subject)));
+        Finding finding = Objects.requireNonNull(unreadable.findings().primary(), "finding");
+        assertEquals(hostNotCaptured, finding.code());
+        assertEquals(0, view.reads, "a foreign frame never reaches the cell");
     }
 
     private static ExpectationContext<OccupantSnapshot> context(WorldView view) {
-        OccupantSnapshot subject = occupant();
+        return context(view, occupant());
+    }
+
+    private static ExpectationContext<OccupantSnapshot> context(WorldView view, OccupantSnapshot subject) {
         return ExpectationContext.of(new FakeFocus(view, subject), subject, List.of(subject));
     }
 
     private static OccupantSnapshot occupant() {
         OccupantRef ref = new OccupantRef(snapshot, 0, furnace, OccupantKind.block, cell);
+        return new OccupantSnapshot(
+            ref,
+            new OccupantDescriptor(furnace, OccupantKind.block),
+            Cuboid.of(cell),
+            List.of()
+        );
+    }
+
+    private static OccupantSnapshot bodyOccupant() {
+        NamespacedId cow = NamespacedId.of("minecraft", "cow");
+        OccupantRef ref = new OccupantRef(
+            snapshot,
+            0,
+            cow,
+            OccupantKind.entity,
+            cell,
+            NamespacedId.of(cow.namespace(), "body-1")
+        );
+        return new OccupantSnapshot(ref, new OccupantDescriptor(cow, OccupantKind.entity), Cuboid.of(cell), List.of());
+    }
+
+    private static OccupantSnapshot frameOneOccupant() {
+        OccupantRef ref = new OccupantRef(snapshot, 1, furnace, OccupantKind.block, cell);
         return new OccupantSnapshot(
             ref,
             new OccupantDescriptor(furnace, OccupantKind.block),
@@ -235,6 +289,36 @@ class HostExpectationTest {
             }
             String value = hosts.get(pos);
             return value == null ? null : (H) value;
+        }
+    }
+
+    private static final class BodyView extends View {
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <H> @Nullable H get(OccupantRef ref, HostType<H> type) {
+            if (!type.equals(blockState) || ref.body() == null) {
+                return null;
+            }
+            return (H) "cow";
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+            return type.equals(blockState) ? (H) "chicken" : null;
+        }
+    }
+
+    private static final class CountingView extends View {
+
+        private int reads;
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+            reads++;
+            return type.equals(blockState) ? (H) "lit" : null;
         }
     }
 

@@ -56,6 +56,9 @@ public interface WorldView {
     }
 
     default <H> @Nullable H get(OccupantRef ref, HostType<H> type) {
+        if (!ref.from(snapshotId()) || ref.frame() != frame() || ref.body() != null) {
+            return null;
+        }
         return get(ref.anchor(), type);
     }
 
