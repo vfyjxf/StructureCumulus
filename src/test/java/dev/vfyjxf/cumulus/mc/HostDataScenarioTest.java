@@ -90,6 +90,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -204,7 +205,20 @@ class HostDataScenarioTest {
         assertEquals("match", replyText(AdapterExpectations.fluidTag(FluidTags.WATER), child, childWater));
         assertEquals("match", replyText(AdapterExpectations.fluid(Fluids.WATER), child, childWater));
         BlockState rootValue = root.get(childCell, HostTypes.blockState);
-        assertTrue(rootValue == null || rootValue.isAir(), "the root frame does not answer the child's local cell");
+        assertNull(rootValue, "the root frame does not answer the child's local cell");
+    }
+
+    @Test
+    void aCheckOverAnUncapturedCellIsUnreadableNotAnAirMismatch() {
+        LatticePoint inside = LatticePoint.of(0, 0, 0);
+        LatticePoint outside = LatticePoint.of(9, 0, 0);
+        LevelSnapshot view = view(Map.of(inside, furnace), Map.of(inside, furnaceState), true);
+
+        assertEquals(
+            "unreadable:" + AdapterCodes.valueNotCaptured,
+            replyText(AdapterExpectations.state(Blocks.STONE.defaultBlockState()), view, outside),
+            "an uncaptured cell answers unreadable, not a mismatch against air"
+        );
     }
 
     @Test

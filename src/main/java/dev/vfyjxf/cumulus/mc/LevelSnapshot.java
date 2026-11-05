@@ -262,6 +262,9 @@ public final class LevelSnapshot implements WorldView {
 
     @Override
     public <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+        if (!(read(pos) instanceof CellRead.Found)) {
+            return null;
+        }
         SnapshotLevel host = data.hostSnapshot();
         return host == null ? null : host.get(pos, type);
     }

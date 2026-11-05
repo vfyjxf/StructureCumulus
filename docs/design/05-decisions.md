@@ -1239,6 +1239,29 @@ siblings are captured before any grandchild under a shared budget, a policy with
 kind queries no provider, the ceiling frame queries its anchor exactly once and builds no child, and
 two captures of one world produce the same frame order and the same cut report.
 
+### D-80 — A cell that was not captured has no value
+
+`WorldView.get(cell, type)` answers null when the cell lies outside the capture, belongs to a refused
+section, or was refused individually. Air is answered only for a cell that was captured and holds air.
+`read(cell)` already distinguishes the two: `Found` versus `Unreadable`.
+
+The Minecraft-facing `BlockGetter` accessor keeps answering air, because the game interface it
+implements has no null; it serves internal helpers and never reaches a check.
+
+**Why.** The two states are different questions. A check that asks "is this stone" and receives air for
+a cell nobody looked at reports a mismatch; it should report that it cannot tell, and the engine turns
+that into `Undecided`.
+
+**Consequence:** `LevelSnapshot.get(cell, type)` serves only cells whose `read` is `Found`;
+`SnapshotLevel.get` guards its own frame bounds, and its air fallbacks stay for the `BlockGetter` face
+and the digest. An all-air section was captured and still answers air; an out-of-bounds cell, a refused
+section and a refused cell answer null, so `Expectations.host` returns `Unreadable` with the absent
+code (`SC-MC-0010`) instead of a mismatch against air. `world` §4.11, `10-host-data.md` §4 and
+`adapter` §3.1 state the rule. **Status:** implemented with the tests that pin it: an out-of-bounds
+cell, a refused section and an individually refused cell answer null for every host type, a captured
+air cell and an all-air section still answer air, the `BlockGetter` face keeps answering air, and a
+check expecting stone over an uncaptured cell is `Unreadable`, never an air mismatch.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

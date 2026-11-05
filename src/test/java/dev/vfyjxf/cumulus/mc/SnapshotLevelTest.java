@@ -137,17 +137,30 @@ class SnapshotLevelTest {
     }
 
     @Test
-    void outOfBoundsAnswersAirEmptyAndNull() {
+    void anUncapturedCellHasNoBlockState() {
         SnapshotLevel snapshot = snapshot(Blocks.STONE.defaultBlockState());
 
-        assertTrue(snapshot.getBlockState(new BlockPos(1, 0, 0)).isAir());
-        assertTrue(snapshot.getBlockState(new BlockPos(-1, 0, 0)).isAir());
-        assertTrue(snapshot.getBlockState(new BlockPos(0, 1, 0)).isAir());
+        assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.blockState), "outside the bounds has no value");
+        assertNull(snapshot.get(LatticePoint.of(-1, 0, 0), HostTypes.blockState), "a negative cell has no value");
+        assertNull(snapshot.get(LatticePoint.of(0, 1, 0), HostTypes.fluidState), "above the bounds has no value");
+    }
+
+    @Test
+    void theBlockGetterStillAnswersAir() {
+        SnapshotLevel snapshot = snapshot(Blocks.STONE.defaultBlockState());
+
+        assertTrue(snapshot.getBlockState(new BlockPos(1, 0, 0)).isAir(), "the game face answers air");
         assertEquals(Fluids.EMPTY.defaultFluidState(), snapshot.getFluidState(new BlockPos(1, 0, 0)));
         assertNull(snapshot.getBlockEntity(new BlockPos(1, 0, 0)));
         assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entityType));
-        assertTrue(Objects.requireNonNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.blockState), "air").isAir());
-        assertEquals(Fluids.EMPTY.defaultFluidState(), snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.fluidState));
+    }
+
+    @Test
+    void aCapturedAirCellStillReadsAir() {
+        SnapshotLevel snapshot = snapshot(Blocks.AIR.defaultBlockState());
+
+        assertTrue(Objects.requireNonNull(snapshot.get(LatticePoint.origin, HostTypes.blockState), "air").isAir());
+        assertEquals(Fluids.EMPTY.defaultFluidState(), snapshot.get(LatticePoint.origin, HostTypes.fluidState));
     }
 
     @Test

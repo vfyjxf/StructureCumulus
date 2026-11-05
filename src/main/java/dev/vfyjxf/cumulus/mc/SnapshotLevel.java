@@ -109,6 +109,9 @@ final class SnapshotLevel implements BlockGetter {
 
     @SuppressWarnings("unchecked")
     <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+        if (!contains(pos.x(), pos.y(), pos.z())) {
+            return null;
+        }
         if (type.equals(HostTypes.blockState)) {
             return (H) blockState(pos.x(), pos.y(), pos.z());
         }

@@ -212,9 +212,12 @@ The rules below are implemented.
 
 `SnapshotLevel` is the one host snapshot per frame. It implements `BlockGetter` in **local** frame
 coordinates: `getBlockState`, `getFluidState`, `getBlockEntity` and the typed `get(pos, HostType)`.
-Out-of-bounds reads answer air / empty fluid / null; a missing section answers the same without a
-world read. The snapshot retains no `Level` of its own: block states and fluids are copies, and an
-entity cell carries the captured `EntityType`. A capability handle handed through the
+A typed `get` answers null for a cell that was not captured — outside the capture, a refused section,
+or a cell refused individually (D-80); air is answered only for a cell that was captured holding air,
+and an all-air section was captured. The `BlockGetter` face keeps answering air / empty fluid / null,
+because the game interface has no null; it serves internal helpers and never reaches a check. The
+snapshot retains no `Level` of its own: block states and fluids are copies, and an entity cell carries
+the captured `EntityType`. A capability handle handed through the
 capture is host code's object and may reach one; it is live for the lease (D-41).
 
 - `LevelCapture` copies each world section's `PalettedContainer<BlockState>` once per frame
@@ -227,8 +230,10 @@ capture is host code's object and may reach one; it is live for the lease (D-41)
 - The captured entity candidates are kept with their local footprints; `get(cell, entityType)`
   answers the `EntityType` of the narrowest captured entity covering the cell.
 - `FrameData` carries the snapshot per frame; nested frames build and carry their own.
-- `LevelSnapshot.get(pos, type)` dispatches to the frame snapshot; `get(ref, type)` uses the ref's
-  anchor. A `LevelSnapshot` built without a snapshot answers null. No typed read touches the level.
+- `LevelSnapshot.get(pos, type)` serves only cells whose `read` is `Found` and then dispatches to the
+  frame snapshot; `get(ref, type)` answers a bodyless ref through that cell read and a body ref
+  through the captured body index (D-52). A `LevelSnapshot` built without a snapshot answers null. No
+  typed read touches the level.
 - The section digest composes the occupant digest with `SnapshotLevel.contentDigest(region)`, which
   hashes the captured block states, fluid states and entities of the section. A same-type occupant
   with a different `BlockState` therefore changes `contentDigest`.

@@ -474,9 +474,11 @@ many typed reads. The default answers `null`; `get(ref, type)` answers for the o
 A ref without a body names a cell: the default reads `ref.anchor()`. A ref with a body names one body:
 the default answers `null`, and a host that stores values per body overrides `get(ref, type)` to
 answer by body. A ref from another snapshot or frame answers `null`, exactly like `occupant(ref)`.
-A missing value means "not in this snapshot", never an exception and never a substitute. The kernel
-never reads a live world: an implementation answers from the captured snapshot. Host reads add
-nothing to `ReadScope`, because one snapshot carries every host payload.
+A missing value means the cell was not captured — outside the capture, in a refused section, or
+refused individually — never an exception and never a substitute; air is a value only for a cell that
+was captured holding air, and `read(cell)` draws the same line as `Found` versus `Unreadable` (D-80).
+The kernel never reads a live world: an implementation answers from the captured snapshot. Host reads
+add nothing to `ReadScope`, because one snapshot carries every host payload.
 
 `Expectations.host(type, test, mismatchCode, absentCode, description)` is the one kernel bridge
 (`structure` §4.6): it reads the subject's ref once, answers `Unreadable` with the caller's

@@ -319,12 +319,50 @@ class CaptureAdversarialTest {
         );
         assertNull(view.get(cell, HostTypes.entityType), "no entity was captured");
         assertNull(view.get(cell, HostType.of(NamespacedId.of("test", "custom"))), "an unknown host type answers null");
-        BlockState outside = view.get(LatticePoint.of(9, 0, 0), HostTypes.blockState);
-        assertTrue(outside != null && outside.isAir(), "an out-of-bounds host read is air, not null");
-        assertTrue(
-            Objects.requireNonNull(view.get(LatticePoint.of(9, 0, 0), HostTypes.fluidState)).isEmpty(),
-            "an out-of-bounds fluid read is empty"
+        assertNull(view.get(LatticePoint.of(9, 0, 0), HostTypes.blockState), "an out-of-bounds host read has no value");
+        assertNull(
+            view.get(LatticePoint.of(9, 0, 0), HostTypes.fluidState),
+            "an out-of-bounds fluid read has no value"
         );
+    }
+
+    @Test
+    void aRefusedSectionHasNoBlockState() {
+        LatticePoint cell = LatticePoint.of(0, 0, 0);
+        SectionKey key = SectionKey.of(world, 0, cell, 16);
+        Map<SectionKey, SectionSlot> sections = Map
+                .of(key, new SectionSlot.Refused(ReadStatus.notCaptured, AdapterCodes.notCaptured));
+        SnapshotLevel host = host(LatticePoint.origin, cellBounds, Map.of(cell, Blocks.STONE.defaultBlockState()));
+        LevelSnapshot view = view(cellBounds, sections, host);
+
+        assertNull(view.get(cell, HostTypes.blockState), "a refused section has no value");
+        assertNull(view.get(cell, HostTypes.fluidState), "a refused section has no fluid either");
+        assertNull(view.get(cell, HostTypes.entityType), "a refused section has no entity either");
+    }
+
+    @Test
+    void aRefusedCellHasNoBlockState() {
+        LatticePoint cell = LatticePoint.of(0, 0, 0);
+        SectionKey key = SectionKey.of(world, 0, cell, 16);
+        ReadRefusal refusal = new ReadRefusal(ReadStatus.notCaptured, AdapterCodes.notCaptured);
+        Map<SectionKey, SectionSlot> sections = Map
+                .of(key, new SectionSlot.Partial(SectionSnapshot.of(key, Map.of(), 0L), Map.of(cell, refusal)));
+        SnapshotLevel host = host(LatticePoint.origin, cellBounds, Map.of(cell, Blocks.STONE.defaultBlockState()));
+        LevelSnapshot view = view(cellBounds, sections, host);
+
+        assertNull(view.get(cell, HostTypes.blockState), "an individually refused cell has no value");
+        assertNull(view.get(cell, HostTypes.fluidState), "an individually refused cell has no fluid either");
+    }
+
+    @Test
+    void anAllAirSectionStillReadsAir() {
+        LatticePoint cell = LatticePoint.of(0, 0, 0);
+        SectionKey key = SectionKey.of(world, 0, cell, 16);
+        SnapshotLevel host = host(LatticePoint.origin, cellBounds, Map.of());
+        LevelSnapshot view = view(cellBounds, Map.of(key, new SectionSlot.Air(0)), host);
+
+        assertTrue(Objects.requireNonNull(view.get(cell, HostTypes.blockState), "air").isAir());
+        assertEquals(Fluids.EMPTY.defaultFluidState(), view.get(cell, HostTypes.fluidState));
     }
 
     @Test
@@ -352,8 +390,7 @@ class CaptureAdversarialTest {
             view.get(negative, HostTypes.fluidState),
             "the negative cell resolves its own fluid"
         );
-        BlockState outside = view.get(LatticePoint.of(-40, 0, 0), HostTypes.blockState);
-        assertTrue(outside != null && outside.isAir(), "outside the snapshot is air");
+        assertNull(view.get(LatticePoint.of(-40, 0, 0), HostTypes.blockState), "outside the snapshot has no value");
     }
 
     @Test

@@ -129,7 +129,8 @@ final class SnapshotLevel implements BlockGetter {
 - fluids are one 16³ `FluidState` array per copied section, read from the copied block states;
 - no block entity is copied: `getBlockEntity` answers null and there is no `block_entity` host token
   (D-61); entities keep their captured footprint;
-- out-of-bounds reads return air / empty fluid;
+- a typed `get` answers null outside the frame bounds; the air fallbacks below stay for the
+  `BlockGetter` face and the digest, which never reach a check (D-80);
 - no live `Level` retained for reads;
 - one snapshot, not one per data type;
 - heightmaps are not captured: no kernel request path exists (§13).
@@ -139,24 +140,33 @@ captured `EntityType`. The live `Entity` is used only while the capture runs. Th
 indexes the captured entities once by body (`OccupantDescriptors.body(type, uuid)`), and the ref form
 of `SnapshotLevel.get` answers `HostTypes.entityType` from that index without touching a cell.
 
-`LevelSnapshot` holds the frame's `SnapshotLevel` and implements `WorldView.get`:
+`LevelSnapshot` holds the frame's `SnapshotLevel` and implements `WorldView.get`; a cell serves its
+value only when `read` answers `Found`, so an out-of-bounds cell, a refused section and an
+individually refused cell answer null instead of air (D-80):
 
 ```java
 @Override
 public <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+    if (!(read(pos) instanceof CellRead.Found)) {
+        return null;
+    }
     return snapshot.get(pos, type);
 }
 ```
 
-The adapter's `SnapshotLevel.get` is the typeclass dispatcher:
+The adapter's `SnapshotLevel.get` is the typeclass dispatcher behind that gate, guarding its own
+frame bounds:
 
 ```java
 <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
+    if (!contains(pos)) {
+        return null;
+    }
     if (type.equals(HostTypes.blockState)) {
-        return (H) getBlockState(pos);
+        return (H) blockState(pos.x(), pos.y(), pos.z());
     }
     if (type.equals(HostTypes.fluidState)) {
-        return (H) getFluidState(pos);
+        return (H) fluidState(pos.x(), pos.y(), pos.z());
     }
     if (type.equals(HostTypes.entityType)) {
         return (H) entityTypeAt(pos);
@@ -205,7 +215,8 @@ public static <H> Expectation<OccupantSnapshot> host(
 Semantics:
 
 - `H host = ctx.view().get(subject.ref().anchor(), type)`;
-- `null` -> `Unreadable` with `absentCode`, the caller's code;
+- `null` -> `Unreadable` with `absentCode`, the caller's code; an uncaptured cell therefore never
+  mismatches against air (D-80);
 - `test.test(host, cell)` true -> `Match`;
 - false -> `Mismatch` with `mismatchCode` and `description`;
 - the read is one snapshot value: the kernel does not decode, transform or re-frame it.

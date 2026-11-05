@@ -193,8 +193,8 @@ public final class CaptureGameTest {
             }
             BlockState outside = view
                     .get(LatticePoint.of(origin.getX() + 2, origin.getY(), origin.getZ()), HostTypes.blockState);
-            if (outside == null || !outside.isAir()) {
-                helper.fail("an out-of-bounds cell is not air");
+            if (outside != null) {
+                helper.fail("an out-of-bounds cell answers no value, not " + outside);
             }
         }
         helper.succeed();
