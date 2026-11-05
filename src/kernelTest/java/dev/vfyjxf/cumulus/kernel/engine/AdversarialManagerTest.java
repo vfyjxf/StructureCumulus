@@ -149,7 +149,7 @@ class AdversarialManagerTest {
     }
 
     @Test
-    void publishMergesRevisionSpendAndFindingsAndPublishAfterCommitUpdatesTheInstance() {
+    void publishReplacesTheTableAndPublishAfterCommitUpdatesTheInstance() {
         StructureManager manager = StructureManager.create();
         StructureAttempt attempt = begin(manager, worldA, siting(0, 0, 0));
         StructureContext first = attempt.publish(attempt.id(), Map.of(count, 1L), findings("first"), new Spend(2, 1));
@@ -158,8 +158,8 @@ class AdversarialManagerTest {
 
         StructureContext second = attempt.publish(attempt.id(), Map.of(other, 2L), findings("second"), new Spend(3, 4));
         assertEquals(2, second.revision(), "one publish is one revision");
-        assertEquals(1L, second.get(count), "unmentioned values are kept");
-        assertEquals(2L, second.get(other), "mentioned values are replaced in");
+        assertNull(second.get(count), "an unmentioned value is dropped");
+        assertEquals(2L, second.get(other));
         assertEquals(new Spend(5, 5), second.spend(), "spend is cumulative");
         assertEquals("second", Objects.requireNonNull(second.findings().primary(), "primary").message());
 
@@ -167,7 +167,7 @@ class AdversarialManagerTest {
         StructureContext third = manager.publish(formed.id(), Map.of(count, 5L), findings("third"), new Spend(1, 1));
         assertEquals(3, third.revision());
         assertEquals(5L, third.get(count));
-        assertEquals(2L, third.get(other));
+        assertNull(third.get(other), "the formed publish replaces the whole table");
         assertEquals(new Spend(6, 6), third.spend());
         assertEquals("third", Objects.requireNonNull(third.findings().primary(), "primary").message());
 
@@ -180,14 +180,15 @@ class AdversarialManagerTest {
     }
 
     @Test
-    void emptyPublishStillBumpsTheRevisionAndKeepsValues() {
+    void anEmptyPublishReplacesTheWholeTable() {
         StructureManager manager = StructureManager.create();
         StructureAttempt attempt = begin(manager, worldA, siting(0, 0, 0));
         attempt.publish(attempt.id(), Map.of(count, 7L), findingOf("kept"), new Spend(1, 2));
         StructureContext empty = attempt.publish(attempt.id(), Map.of(), findings("latest"), Spend.zero);
 
         assertEquals(2, empty.revision());
-        assertEquals(7L, empty.get(count));
+        assertNull(empty.get(count), "an empty publish stores an empty table");
+        assertTrue(empty.keys().isEmpty());
         assertEquals(new Spend(1, 2), empty.spend());
         assertEquals("latest", Objects.requireNonNull(empty.findings().primary(), "primary").message());
     }

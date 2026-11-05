@@ -161,7 +161,7 @@ class AdversarialFuzzTest {
                     Map<ContextKey<?>, Object> values = randomValues(random);
                     Spend spend = new Spend(random.nextInt(4), random.nextInt(3));
                     FindingBundle findings = randomFindings(random, where);
-                    StructureContext expected = merge(
+                    StructureContext expected = replace(
                         Objects.requireNonNull(model.get(target)),
                         values,
                         findings,
@@ -1176,15 +1176,13 @@ class AdversarialFuzzTest {
         return FindingBundle.of(List.of(finding));
     }
 
-    private static StructureContext merge(
+    private static StructureContext replace(
         StructureContext base,
         Map<ContextKey<?>, Object> values,
         FindingBundle findings,
         Spend spend
     ) {
-        Map<ContextKey<?>, Object> merged = new LinkedHashMap<>(base.values());
-        merged.putAll(values);
-        return new StructureContext(base.instance(), base.revision() + 1, merged, findings, base.spend().plus(spend));
+        return new StructureContext(base.instance(), base.revision() + 1, values, findings, base.spend().plus(spend));
     }
 
     private static void assertPublished(
@@ -1195,14 +1193,7 @@ class AdversarialFuzzTest {
     ) {
         assertEquals(before.revision() + 1, after.revision(), "one publication is one revision");
         assertEquals(before.spend().plus(spend), after.spend(), "spend accumulates");
-        for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
-            assertEquals(entry.getValue(), after.values().get(entry.getKey()), "a published value is stored");
-        }
-        for (Map.Entry<ContextKey<?>, Object> entry : before.values().entrySet()) {
-            if (!values.containsKey(entry.getKey())) {
-                assertEquals(entry.getValue(), after.values().get(entry.getKey()), "an unmentioned value is kept");
-            }
-        }
+        assertEquals(values, after.values(), "a publish stores exactly the published table");
     }
 
     private static void assertSameResult(MatchResult first, MatchResult second, String where) {

@@ -28,7 +28,7 @@
 | `StructureEvent` | sealed interface | `Broken`, `Loaded`, `Unloaded`, `Invalidated` |
 | `CachedContext` | interface | host-owned read port: `<T> @Nullable T get(NamespacedId id, Class<T> type)` |
 | `Deriver<T>` | interface | context-only producer of one key |
-| `DeriveContext` | interface | what a deriver sees: base context, budget, findings |
+| `DeriveContext` | interface | what a deriver sees: the pass table, budget, findings |
 | `Merges` | final class | `sum`, `union`, `min`, `max`, `and`, `or` |
 
 ## 3. Signatures
@@ -96,7 +96,6 @@ public interface Deriver<T> {
 }
 
 public interface DeriveContext extends ContextView {
-    StructureContext base();
     Budget remaining();
     CancelToken cancel();
     void report(Finding finding);
@@ -135,11 +134,12 @@ format (I-12 is about documents, not runtime values).
 1. Read the current context; the new revision is `current.revision() + 1`.
 2. Reject a key with `Retention.match` in `values` (`IllegalArgumentException`): only `instance`
    values are published.
-3. Merge: every entry in `values` replaces the current entry; keys not mentioned keep their old
-   value. A published `null` is not representable; absence is the absence of an entry.
+3. Replace: `values` is the new table, whole; a key it does not mention is gone. A published `null`
+   is not representable; absence is the absence of an entry.
 4. Store `findings` as the latest bundle and `spend` as the cumulative spend
    (`current.spend.plus(spend)`).
-5. Return the new context.
+5. Return the new context, built from scratch: the previously published object is never touched, so
+   a host that still holds it keeps the old table.
 
 `publish` is total and single-writer: the engine publishes at most once per settle and once per
 derive, both on the server thread, and the host serialises them per instance. A concurrent publish
@@ -147,8 +147,8 @@ is a host contract violation, not a kernel outcome. A successful `settle` publis
 values once; a `derive` publishes its own batch once at `revision + 1`. There is no base-revision CAS
 and no stale-publish finding.
 
-A published `instance` value must be a value: it is merged into the instance context and survives
-every later revision, so anything held there outlives the lease that produced it. A live host handle
+A published `instance` value must be a value: it is stored in the instance context and outlives the
+lease that produced it. A live host handle
 — a capability, an entity — may only be published at `Retention.match`, where it dies with the
 attempt. A `Retention.instance` handle is a contract violation (D-41); the store cannot detect it,
 because the value is an arbitrary `Object`.
@@ -195,15 +195,20 @@ these events from `WatchEvents`; the manager never listens to Minecraft events a
 
 `derive` is a separate call over a `Formed`. The engine resolves each `DerivationSpec.deriver`
 through `Catalogs.derivers()`; a missing id makes the output absent and reports `SC-CTX-0004`. The
-derivers run in `(order, id)` order; each sees the context published by the settle plus the values
-produced earlier in the same derive pass. A `Deriver.requires` key must be present or the deriver is
-skipped with `SC-CTX-0007`; a `Missing` return makes the output absent and adds the deriver's own
-findings, or `SC-CTX-0005` if it reported none. All `Found` values of one derive pass are published
-in one `ContextStore.publish`; a `match` key produced by a deriver is rejected with `SC-CTX-0005`
-(only `instance` values are published). A derive pass publishes one revision, never a partial batch.
+derivers run in `(order, id)` order; each sees the settle values minus every declared derivation
+output, plus the values produced earlier in the same derive pass. A `Deriver.requires` key must be
+present or the deriver is skipped with `SC-CTX-0007`; a `Missing` return makes the output absent and
+adds the deriver's own findings, or `SC-CTX-0005` if it reported none. All `Found` values of one
+derive pass are published in one `ContextStore.publish`; a `match` key produced by a deriver is
+rejected with `SC-CTX-0005` (only `instance` values are published). A derive pass publishes one
+revision, never a partial batch.
 
-A deriver has no world view and no lease: it reads `DeriveContext` (the base context) only. A
-deriver that needs the world must be a computation, not a deriver. `DerivationSpec.arguments` is
+The pass publishes the whole table, so absence is expressed by replacement: a declared output the
+pass did not produce is simply missing, and no `whenAbsent` fallback is needed to say so.
+
+A deriver has no world view and no lease: it reads only the `DeriveContext` view of the table this
+pass is building. A deriver that needs the world must be a computation, not a deriver.
+`DerivationSpec.arguments` is
 passed to the `derive(ctx, arguments)` overload; the single-argument overload is the common path.
 
 ### 4.4 Merges
@@ -268,8 +273,8 @@ section computation returned `Missing` for a `Partial` slice. Producer: `engine.
 ## 7. Tests
 
 - `StructureContext`: sorted keys, typed get/require, empty, immutability.
-- Publish: merge semantics, revision growth, `match` rejection, cumulative spend, latest findings,
-  one writer per instance.
+- Publish: replacement semantics, revision growth, `match` rejection, cumulative spend, latest
+  findings, one writer per instance.
 - Remove: the old context is returned, a second remove answers `null` (or throws on a closed
   attempt), the instance reads empty at revision 0 afterwards; `Broken` removes the instance and
   context together; draft removal closes the attempt and releases its reservation.

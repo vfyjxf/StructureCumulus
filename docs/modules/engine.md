@@ -198,18 +198,21 @@ true, is a host contract violation.
 derive(formed, specs, derivers, contexts):
   base = contexts.context(formed.instance())
   values = new LinkedHashMap<>(base.values())
+  remove every key whose id a spec declares as its output
   findings = formed.findings()
   for spec in specs sorted by (order, deriver id):
       deriver = derivers.get(spec.deriver())
       if missing -> findings += SC-CTX-0004; continue
       if any requires absent -> findings += SC-CTX-0007; continue
-      result = deriver.derive(context over values + base)
+      result = deriver.derive(context over values)
       Found -> values.put(spec.output(), value)
       Missing -> findings += reported or SC-CTX-0005
   return contexts.publish(formed.instance(), values, findings, formed.outcome().spend())
 ```
 
-A derive pass publishes one revision. A `match` key produced by a deriver is rejected with
+A derive pass publishes one revision. The publish replaces the whole table (D-56): the declared
+outputs are dropped before the first deriver runs, so a `Missing` output is absent, never the stale
+value an earlier pass left behind. A `match` key produced by a deriver is rejected with
 `SC-CTX-0005` (only `instance` values are persisted). A missing deriver id is a finding, not a throw.
 
 ## 7. Laws
@@ -236,7 +239,9 @@ review defect, never a silent widening. `spend` is the sum of every charge.
 
 `Admitted` is not a structure: no claims, no `ClaimSet`, no `Formed`. `Formed` exists only after a
 `Settled` (or an empty-row registration that needed no ledger) and carries the claims, the context
-revision and the ledger revision. `Failed` has at least one `error` finding. `Undecided` carries a
+revision and the ledger revision. Every publish — settle or derive — stores a whole replacement
+table in a new `StructureContext`, so the context revision names an immutable snapshot, not a
+mutation of the previous one. `Failed` has at least one `error` finding. `Undecided` carries a
 reason and, when available, a partial outcome. `Dropped` means the snapshot was no longer current;
 the attempt read nothing that can be trusted. A `Partial` section does not make an attempt
 `Undecided` by itself: the computation's `Missing` propagates through the normal fold, and the

@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -27,7 +28,7 @@ class ContextTest {
     private static final InstanceId instance = new InstanceId(World.of(id("w")), 1);
 
     @Test
-    void publishMergesAndBumpsTheRevision() {
+    void aPublishReplacesTheTable() {
         ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.instance);
         ContextKey<Long> b = ContextKeys.of(id("b"), Long.class, Retention.instance);
         ContextStore store = ContextStore.inMemory();
@@ -38,10 +39,24 @@ class ContextTest {
 
         StructureContext second = store.publish(instance, Map.of(b, 2L), FindingBundle.empty(), new Spend(3, 2));
         assertEquals(2, second.revision());
-        assertEquals(1L, second.get(a));
+        assertNull(second.get(a), "an unmentioned key is gone");
         assertEquals(2L, second.get(b));
         assertEquals(new Spend(5, 3), second.spend());
         assertEquals(second, store.context(instance));
+    }
+
+    @Test
+    void aPublishReturnsANewObject() {
+        ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.instance);
+        ContextKey<Long> b = ContextKeys.of(id("b"), Long.class, Retention.instance);
+        ContextStore store = ContextStore.inMemory();
+        StructureContext first = store.publish(instance, Map.of(a, 1L), FindingBundle.empty(), Spend.zero);
+        StructureContext second = store.publish(instance, Map.of(b, 2L), FindingBundle.empty(), Spend.zero);
+
+        assertNotSame(first, second, "every publish builds a new snapshot");
+        assertNotSame(first, store.context(instance));
+        assertEquals(Map.of(a, 1L), first.values(), "the held snapshot keeps its table");
+        assertEquals(Map.of(b, 2L), second.values());
     }
 
     @Test
