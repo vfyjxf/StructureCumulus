@@ -21,4 +21,10 @@ public interface ClaimLedger {
     ClaimVerdict release(InstanceId instance);
 
     ClaimView read(Cuboid box);
+
+    /**
+     * Ends this ledger's life: its rows are dropped and its revision restarts at zero. A reader that
+     * still holds the handle observes the empty ledger, not the state the world had before.
+     */
+    void retire();
 }

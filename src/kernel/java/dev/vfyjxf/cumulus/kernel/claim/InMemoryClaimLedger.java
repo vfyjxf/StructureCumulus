@@ -90,6 +90,12 @@ final class InMemoryClaimLedger implements ClaimLedger {
         return new ClaimView(found, revision, true);
     }
 
+    @Override
+    public void retire() {
+        rows.clear();
+        revision = 0;
+    }
+
     private @Nullable ClaimVerdict conflicts(SettleRequest request) {
         Map<String, Conflict> conflicts = new LinkedHashMap<>();
         for (ClaimRow requested : request.rows()) {

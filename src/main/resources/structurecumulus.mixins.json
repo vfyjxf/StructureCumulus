@@ -1,0 +1,13 @@
+{
+    "required": true,
+    "package": "dev.vfyjxf.cumulus.mc.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "minVersion": "0.8",
+    "mixins": [
+        "BlockEntityChangedMixin",
+        "ChunkSetBlockStateMixin"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}

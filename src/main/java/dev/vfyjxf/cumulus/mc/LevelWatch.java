@@ -63,13 +63,6 @@ final class LevelWatch {
         }
     }
 
-    static void chunkUnloaded(LevelAccessor accessor, ChunkPos pos) {
-        LevelWatch watch = watchOf(accessor);
-        if (watch != null) {
-            watch.markChunk(pos.toLong());
-        }
-    }
-
     static void entityChanged(LevelAccessor accessor, Entity entity, boolean joined) {
         LevelWatch watch = watchOf(accessor);
         if (watch != null) {

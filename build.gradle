@@ -179,6 +179,19 @@ dependencies {
     // NullAway 0.12.15 is built and tested against Error Prone 2.42.0
     errorprone 'com.uber.nullaway:nullaway:0.12.15'
     errorprone 'com.google.errorprone:error_prone_core:2.42.0'
+
+    // the jar of the mixin build NeoForge runs doubles as the annotation processor
+    annotationProcessor 'net.fabricmc:sponge-mixin:0.15.2+mixin.0.8.7'
+}
+
+// mojmap has no obfuscation data, so a missing obf lookup is noise while an unresolvable
+// injection target is an error
+tasks.named('compileJava') {
+    options.compilerArgs += [
+        '-AMSG_NO_OBFDATA_FOR_TARGET=note',
+        '-AMSG_MISSING_INJECTOR_DESC_SINGLETARGET=error',
+        '-AMSG_MISSING_INJECTOR_DESC_MULTITARGET=error'
+    ]
 }
 
 test {

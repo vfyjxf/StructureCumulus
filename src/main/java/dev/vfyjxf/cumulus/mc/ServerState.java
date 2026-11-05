@@ -120,9 +120,11 @@ public final class ServerState {
             return;
         }
         ResourceKey<Level> key = level.dimension();
-        LevelStore store = state.levels.remove(key);
+        LevelStore store = state.levels.get(key);
         if (store != null) {
+            store.open = false;
             WatchEvents.dispatch(store.structures(), new StructureEvent.Unloaded(state.world(level)));
+            store.claims().retire();
         }
         LevelCapture capture = state.captures.remove(key);
         if (capture != null) {
@@ -135,6 +137,9 @@ public final class ServerState {
         state.blueprints.close();
         state.closeCaptures();
         LevelWatch.clear();
+        for (LevelStore store : state.levels.values()) {
+            store.claims().retire();
+        }
         state.levels.clear();
     }
 
@@ -217,13 +222,22 @@ public final class ServerState {
 
     /** Creates this level's state; the only creation point, driven by {@code LevelEvent.Load}. */
     void openLevel(ServerLevel level) {
-        levels.computeIfAbsent(level.dimension(), ignored -> {
+        LevelStore store = levels.computeIfAbsent(level.dimension(), ignored -> {
             World world = World.of(worldId(level));
             ClaimLedger claims = ClaimLedger.inMemory(world);
-            StructureManager structures = StructureManager.create();
+            InstanceIndex index = new InstanceIndex();
+            StructureManager structures = new IndexedStructureManager(StructureManager.create(), index);
             Host host = new Host(documents, claims, structures, hostTypes);
-            return new LevelStore(claims, structures, StructureKernel.create(catalogs, host));
+            return new LevelStore(claims, structures, StructureKernel.create(catalogs, host), index);
         });
+        store.open = true;
+    }
+
+    /** The funnel's fast-path lookup; null when the level has no open store. */
+    @Nullable
+    InstanceIndex index(ServerLevel level) {
+        LevelStore store = existing(level);
+        return store == null || !store.open ? null : store.index();
     }
 
     private @Nullable LevelStore existing(ServerLevel level) {
@@ -232,7 +246,7 @@ public final class ServerState {
 
     private LevelStore require(ServerLevel level) {
         LevelStore store = existing(level);
-        if (store == null) {
+        if (store == null || !store.open) {
             throw new IllegalStateException("no structure state for " + worldId(level));
         }
         return store;
@@ -243,7 +257,43 @@ public final class ServerState {
         return NamespacedId.of(location.getNamespace(), location.getPath());
     }
 
-    private record LevelStore(ClaimLedger claims, StructureManager structures, StructureKernel kernel) {}
+    private static final class LevelStore {
+
+        private final ClaimLedger claims;
+        private final StructureManager structures;
+        private final StructureKernel kernel;
+        private final InstanceIndex index;
+        private boolean open;
+
+        private LevelStore(
+            ClaimLedger claims,
+            StructureManager structures,
+            StructureKernel kernel,
+            InstanceIndex index
+        ) {
+            this.claims = claims;
+            this.structures = structures;
+            this.kernel = kernel;
+            this.index = index;
+            this.open = true;
+        }
+
+        private ClaimLedger claims() {
+            return claims;
+        }
+
+        private StructureManager structures() {
+            return structures;
+        }
+
+        private StructureKernel kernel() {
+            return kernel;
+        }
+
+        private InstanceIndex index() {
+            return index;
+        }
+    }
 
     /**
      * Reads this level's formed instances and persisted claim rows without mutating either. The

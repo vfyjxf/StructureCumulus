@@ -686,6 +686,12 @@ final class StructureSetTestSupport {
             return new ClaimView(found, revision, true);
         }
 
+        @Override
+        public void retire() {
+            rows.clear();
+            revision = 0;
+        }
+
         List<ClaimRow> rows() {
             return List.copyOf(rows);
         }
