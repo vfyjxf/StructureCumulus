@@ -26,6 +26,23 @@ import java.util.List;
 public final class CommandBoundaryGameTest {
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aSubcommandFailureIsReportedAndExitsZero(GameTestHelper helper) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        RecordingSource recording = new RecordingSource();
+        CommandSourceStack source = stack(helper, origin, 4, recording);
+        helper.assertValueEqual(
+            0,
+            execute(helper, source, "cumulus compile " + Constants.modId + ":a//b"),
+            "a guarded failure exits zero"
+        );
+        helper.assertTrue(
+            recording.text().startsWith("cumulus compile failed: IllegalArgumentException"),
+            "the guard reports the failure"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void onlyAGamemasterSourceCanUseCumulus(GameTestHelper helper) {
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
         CommandSourceStack player = stack(helper, origin, 0, new RecordingSource());
@@ -44,6 +61,15 @@ public final class CommandBoundaryGameTest {
 
     private static CommandDispatcher<CommandSourceStack> dispatcher(GameTestHelper helper) {
         return helper.getLevel().getServer().getCommands().getDispatcher();
+    }
+
+    private static int execute(GameTestHelper helper, CommandSourceStack source, String command) {
+        try {
+            return dispatcher(helper).execute(command, source);
+        } catch (CommandSyntaxException failure) {
+            helper.fail("the command did not parse: " + failure.getMessage());
+            return 0;
+        }
     }
 
     private static CommandSourceStack stack(
@@ -87,6 +113,10 @@ public final class CommandBoundaryGameTest {
         @Override
         public boolean shouldInformAdmins() {
             return false;
+        }
+
+        private String text() {
+            return String.join("\n", messages);
         }
     }
 }

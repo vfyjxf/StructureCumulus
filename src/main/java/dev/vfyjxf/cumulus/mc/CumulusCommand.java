@@ -41,7 +41,7 @@ public final class CumulusCommand {
                                 Commands.literal("check").then(
                                     Commands.argument("id", ResourceLocationArgument.id()).then(
                                         Commands.argument("origin", BlockPosArgument.blockPos())
-                                                .executes(CumulusCommand::check)
+                                                .executes(context -> CommandSupport.guarded(context, "check", CumulusCommand::check))
                                     )
                                 )
                             )
@@ -50,18 +50,20 @@ public final class CumulusCommand {
                                         .then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(
                                                 Commands.argument("origin", BlockPosArgument.blockPos())
-                                                        .executes(SettleCommand::run)
+                                                        .executes(context -> CommandSupport.guarded(context, "settle", SettleCommand::run))
                                             )
                                         )
                             )
                             .then(
                                 Commands.literal("compile").then(
-                                    Commands.argument("id", ResourceLocationArgument.id()).executes(CompileCommand::run)
+                                    Commands.argument("id", ResourceLocationArgument.id())
+                                            .executes(context -> CommandSupport.guarded(context, "compile", CompileCommand::run))
                                 )
                             )
                             .then(
                                 Commands.literal("explain").then(
-                                    Commands.argument("code", StringArgumentType.word()).executes(ExplainCommand::run)
+                                    Commands.argument("code", StringArgumentType.word())
+                                            .executes(context -> CommandSupport.guarded(context, "explain", ExplainCommand::run))
                                 )
                             )
                             .then(
@@ -69,7 +71,7 @@ public final class CumulusCommand {
                                         .then(
                                             Commands.argument("from", BlockPosArgument.blockPos()).then(
                                                 Commands.argument("to", BlockPosArgument.blockPos())
-                                                        .executes(ClaimsCommand::run)
+                                                        .executes(context -> CommandSupport.guarded(context, "claims", ClaimsCommand::run))
                                             )
                                         )
                             )
@@ -79,7 +81,7 @@ public final class CumulusCommand {
                                             Commands.literal("check").then(
                                                 Commands.argument("id", ResourceLocationArgument.id()).then(
                                                     Commands.argument("origin", BlockPosArgument.blockPos())
-                                                            .executes(SetCommand::check)
+                                                            .executes(context -> CommandSupport.guarded(context, "set check", SetCommand::check))
                                                 )
                                             )
                                         )
@@ -87,7 +89,7 @@ public final class CumulusCommand {
                                             Commands.literal("settle").then(
                                                 Commands.argument("id", ResourceLocationArgument.id()).then(
                                                     Commands.argument("origin", BlockPosArgument.blockPos())
-                                                            .executes(SetCommand::settle)
+                                                            .executes(context -> CommandSupport.guarded(context, "set settle", SetCommand::settle))
                                                 )
                                             )
                                         )
