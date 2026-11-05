@@ -7,9 +7,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -120,6 +122,45 @@ class CoreTest {
         assertFalse(budget.admits(new Spend(11, 2)));
         assertEquals(new Spend(3, 1), new Spend(1, 1).plus(new Spend(2, 0)));
         assertThrows(IllegalArgumentException.class, () -> new Spend(-1, 0));
+    }
+
+    @Test
+    void twoKeysWithTheSameSlotHashAlike() {
+        ContextKey<Long> a = ContextKeys
+                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right, 0L);
+        ContextKey<Long> b = ContextKeys
+                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right, 1L);
+        assertNotEquals(a, b);
+        assertEquals(a.hashCode(), b.hashCode());
+    }
+
+    @Test
+    void theOrderIsIdThenTypeName() {
+        ContextKey<Long> bx = ContextKeys.of(NamespacedId.of("b", "x"), Long.class, Retention.instance);
+        ContextKey<String> az = ContextKeys.of(NamespacedId.of("a", "z"), String.class, Retention.match);
+        ContextKey<Long> ay = ContextKeys.of(NamespacedId.of("a", "y"), Long.class, Retention.instance);
+        ContextKey<Integer> ayInt = ContextKeys.of(NamespacedId.of("a", "y"), Integer.class, Retention.match);
+        List<ContextKey<?>> shuffled = List.of(bx, ay, ayInt, az);
+        List<ContextKey<?>> expected = List.of(ayInt, ay, az, bx);
+        assertEquals(expected, shuffled.stream().sorted(ContextKeys.order()).toList());
+        TreeSet<ContextKey<?>> tree = new TreeSet<>(ContextKeys.order());
+        tree.addAll(shuffled);
+        assertEquals(expected, List.copyOf(tree));
+    }
+
+    @Test
+    void hashDoesNotDependOnIdentityHash() {
+        List<ContextKey<?>> first = List.of(
+            ContextKeys.of(NamespacedId.of("a"), Long.class, Retention.instance, (left, right) -> left + right, 0L),
+            ContextKeys.of(NamespacedId.of("b"), String.class, Retention.match)
+        );
+        List<ContextKey<?>> second = List.of(
+            ContextKeys.of(NamespacedId.of("a"), Long.class, Retention.instance, (left, right) -> left + right, 0L),
+            ContextKeys.of(NamespacedId.of("b"), String.class, Retention.match)
+        );
+        for (int index = 0; index < first.size(); index++) {
+            assertEquals(first.get(index).hashCode(), second.get(index).hashCode());
+        }
     }
 
     @Test
