@@ -15,13 +15,22 @@ import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
+import dev.vfyjxf.cumulus.kernel.structure.Expectation;
+import dev.vfyjxf.cumulus.kernel.structure.ExpectationMeta;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
+import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
+import dev.vfyjxf.cumulus.kernel.structure.Reply;
+import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandSupportTest {
 
@@ -90,6 +99,22 @@ class CommandSupportTest {
             Cuboid.of(10, 0, 10, 12, 1, 11),
             CommandSupport.sitedBounds(boundsBlueprint(), Siting.of(LatticePoint.of(10, 0, 10), Orientation.identity))
         );
+    }
+
+    @Test
+    void thePolicyCarriesTheDeclaredTrait() {
+        NamespacedId inventory = NamespacedId.of("structurecumulus", "inventory");
+        Expectation<OccupantSnapshot> declared = Expectations.custom(
+            OccupantSnapshot.class,
+            ExpectationMeta.anonymous(),
+            ReadScope.none().withTraits(Set.of(inventory)),
+            ctx -> Reply.match()
+        );
+        SnapshotPolicy policy = CommandSupport.policy(
+            declared.reads(),
+            Siting.of(LatticePoint.origin, Orientation.identity)
+        );
+        assertTrue(policy.traits().contains(inventory), "a declared trait reaches the capture policy");
     }
 
     private static Blueprint boundsBlueprint() {

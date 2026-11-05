@@ -1228,6 +1228,28 @@ were dead code.
 not a compile error; it matches nothing at match time. This is the one place a document names a
 registry object without resolving it.
 
+### D-62 — An expectation declares its read scope when it is built
+
+`Expectations.custom` gains a four-argument form carrying the expectation's `ReadScope`; the
+three-argument form keeps working for expectations that read nothing. An expectation written as a
+class overrides `Expectation.reads()`.
+
+The kernel cannot infer the scope: the body is an opaque function, and the `H` of a host read is
+never inspected. The declaration is the only signal, and it has to exist before capture, because the
+host builds its `SnapshotPolicy` from `blueprint.reads()`.
+
+**Why not `ExpectationMeta`.** Meta answers "what is this unit": its id orders the plan and its
+`requires` gates context reads. A read scope is a different question, and folding it in would change
+the identity and ordering of every meta.
+
+**Rejected: recording what an expectation actually reads.** Capture happens before any expectation
+runs. A runtime record answers a question that no longer matters, and it would need a hook on every
+read call.
+
+**Rejected: dropping the three-argument form.** A read-free custom check would have to pass
+`ReadScope.none()` for no gain; the two-argument distinction is the useful one, and the overload
+makes "I read nothing" the default rather than an omission.
+
 ### D-68 — An anchor's value is a heading in the definition frame
 
 `AnchorSpec.value` names the anchor's heading in the blueprint's own coordinates. At check time the

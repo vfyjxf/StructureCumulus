@@ -127,9 +127,18 @@ public final class Expectations {
     public static <T> Expectation<T> custom(
         Class<T> subject,
         ExpectationMeta meta,
+        ReadScope reads,
         Function<ExpectationContext<T>, Reply> body
     ) {
-        return new Custom<>(subject, meta, body);
+        return new Custom<>(subject, meta, reads, body);
+    }
+
+    public static <T> Expectation<T> custom(
+        Class<T> subject,
+        ExpectationMeta meta,
+        Function<ExpectationContext<T>, Reply> body
+    ) {
+        return custom(subject, meta, ReadScope.none(), body);
     }
 
     private static NamespacedId id(String path) {
@@ -799,13 +808,18 @@ public final class Expectations {
         }
     }
 
-    private record Custom<T>(Class<T> subject, ExpectationMeta meta, Function<ExpectationContext<T>, Reply> body)
-            implements
+    private record Custom<T>(
+        Class<T> subject,
+        ExpectationMeta meta,
+        ReadScope reads,
+        Function<ExpectationContext<T>, Reply> body
+    ) implements
                 Expectation<T> {
 
         private Custom {
             Objects.requireNonNull(subject, "subject");
             Objects.requireNonNull(meta, "meta");
+            Objects.requireNonNull(reads, "reads");
             Objects.requireNonNull(body, "body");
         }
 
@@ -822,6 +836,11 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             return meta;
+        }
+
+        @Override
+        public ReadScope reads() {
+            return reads;
         }
     }
 

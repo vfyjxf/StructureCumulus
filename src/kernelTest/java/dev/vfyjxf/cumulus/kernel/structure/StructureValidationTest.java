@@ -14,6 +14,7 @@ import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.world.EntityWindow;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
+import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 import org.junit.jupiter.api.Test;
@@ -125,6 +126,40 @@ class StructureValidationTest {
         assertTrue(reads.keys().isEmpty());
         assertTrue(reads.kinds().isEmpty());
         assertEquals(0, reads.depth());
+    }
+
+    @Test
+    void aCustomExpectationDeclaresItsTraitScope() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        TraitKey<Long> inventory = new TraitKey<>(id("inventory"), Long.class);
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Expectation<OccupantSnapshot> declared = Expectations.custom(
+            OccupantSnapshot.class,
+            ExpectationMeta.anonymous(),
+            ReadScope.none().withTraits(Set.of(inventory.id())),
+            ctx -> Reply.match()
+        );
+        Check<?> check = Check.of(id("custom"), bay, Focuses.occupant(LatticePoint.origin), declared);
+        Blueprint blueprint = Blueprint.builder(id("custom_reads")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(check).build();
+
+        assertEquals(Set.of(inventory.id()), blueprint.reads().traits());
+    }
+
+    @Test
+    void aThreeArgumentCustomReadsNothing() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Expectation<OccupantSnapshot> silent = Expectations.custom(
+            OccupantSnapshot.class,
+            ExpectationMeta.anonymous(),
+            ctx -> Reply.match()
+        );
+        Check<?> check = Check.of(id("custom"), bay, Focuses.occupant(LatticePoint.origin), silent);
+        Blueprint blueprint = Blueprint.builder(id("silent_reads")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(check).build();
+
+        assertTrue(blueprint.reads().traits().isEmpty());
     }
 
     @Test

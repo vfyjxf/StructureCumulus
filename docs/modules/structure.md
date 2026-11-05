@@ -219,6 +219,8 @@ public final class Expectations {
     public static <T> Expectation<T> atMost(int count, Expectation<T>... children);
     public static <T> Expectation<T> exactly(int count, Expectation<T>... children);
     public static Expectation<BayView> eachCell(Expectation<OccupantSnapshot> element);
+    public static <T> Expectation<T> custom(Class<T> subject, ExpectationMeta meta, ReadScope reads,
+                                            java.util.function.Function<ExpectationContext<T>, Reply> body);
     public static <T> Expectation<T> custom(Class<T> subject, ExpectationMeta meta,
                                             java.util.function.Function<ExpectationContext<T>, Reply> body);
     private Expectations() {}
@@ -449,7 +451,9 @@ Combinators evaluate every child (diagnostics matter more than a short-circuit) 
   else unreadable if `u > 0`, else abstains. A failing threshold adds `SC-EXP-0003`.
 - `eachCell(element)` is `all_of` over every cell of the bay, each element seeing a conjoined context
   with that cell's occupant via `withSubject`.
-- `custom` is a typed wrapper; it carries the supplied meta and reads.
+- `custom` is a typed wrapper in two signatures: `custom(subject, meta, body)` carries the supplied
+  meta and reads nothing, `custom(subject, meta, reads, body)` also carries the supplied `ReadScope`.
+  A trait read without a declaration never enters the host's capture policy, so it is never captured.
 - Every combinator requires at least one child; an empty `all_of`/`any_of`/`sequence`/threshold is an
   `IllegalArgumentException` at construction (the document twin is `SC-DOC-0002`).
 

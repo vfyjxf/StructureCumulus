@@ -143,6 +143,7 @@ final class HatchExpectation implements Expectation<OccupantSnapshot> {
     @Override public ExpectationMeta meta() {
         return ExpectationMeta.of(id, 80, Codes.expected.code());
     }
+    @Override public ReadScope reads() { return ReadScope.none().withTraits(Set.of(inventory.id())); }
     @Override public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
         OccupantSnapshot occupant = ctx.subject();
         return switch (occupant.slot(inventory.id())) {
@@ -168,7 +169,9 @@ final class HatchExpectation implements Expectation<OccupantSnapshot> {
 }
 ```
 
-One interface, one catalog registration, no engine access. `ctx.phase()` is always `check`.
+One interface, one catalog registration, no engine access. `ctx.phase()` is always `check`. Without
+the `reads()` override the `inventory` trait never enters `blueprint.reads()`, so the host's capture
+policy never asks for it and this expectation can never read the trait.
 
 The standard `structurecumulus:inventory` trait value is the live `IItemHandler` itself, so the check
 above reads `((IItemHandler) present.trait().value()).getStackInSlot(0)` when it needs slot contents;
