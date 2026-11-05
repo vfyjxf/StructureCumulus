@@ -10,9 +10,10 @@ properties, tags, fluids, entity data, or any other host payload.
 
 The capture is **one world snapshot** in the original MC shape, following
 [CachedLevel.java](https://github.com/khjxiaogu/Beecrasy/blob/master/src/main/java/com/khjxiaogu/beecrasy/utils/CachedLevel.java):
-copied `PalettedContainer<BlockState>` sections, fluids, block entities and entities. MBD2's
+copied `PalettedContainer<BlockState>` sections, fluids and entities. MBD2's
 structure debugger works from a captured structure region in the same direction
 ([debugging docs](https://low-drag-mc.github.io/LowDragMC-Doc/en/multiblocked2/editor/debugging.html)).
+A block entity is not part of the snapshot: its data reaches a check through a trait (D-61).
 
 Reads are a **typeclass bridge** over that snapshot:
 
@@ -60,7 +61,6 @@ Adapter constants:
 public static final HostType<BlockState> blockState = HostType.of(id("block_state"));
 public static final HostType<FluidState> fluidState = HostType.of(id("fluid_state"));
 public static final HostType<EntityType<?>> entityType = HostType.of(id("entity_type"));
-public static final HostType<BlockEntity> blockEntity = HostType.of(id("block_entity"));
 ```
 
 The constants live in the adapter's `HostTypes`; the lowerCamel names follow the project's
@@ -102,7 +102,6 @@ The method is a field extension, not a wrapper object:
 BlockState state = view.get(cell, HostTypes.blockState);
 FluidState fluid = view.get(cell, HostTypes.fluidState);
 EntityType<?> entityType = view.get(cell, HostTypes.entityType);
-BlockEntity blockEntity = view.get(cell, HostTypes.blockEntity);
 ```
 
 ## 4. The world snapshot
@@ -116,7 +115,6 @@ final class SnapshotLevel implements BlockGetter {
     private final Cuboid bounds;
     private final Map<Long, PalettedContainer<BlockState>> sections;
     private final Map<Long, FluidState[]> fluids;
-    private final Map<BlockPos, BlockEntity> blockEntities;
     private final List<CapturedEntity> entities;
 
     BlockState getBlockState(BlockPos pos);
@@ -129,7 +127,8 @@ final class SnapshotLevel implements BlockGetter {
 - local coordinates, with `origin` translating a section to world space;
 - copied sections, not per-cell maps; section keys are world section coordinates;
 - fluids are one 16³ `FluidState` array per copied section, read from the copied block states;
-- block entities are detached copies; entities keep their captured footprint;
+- no block entity is copied: `getBlockEntity` answers null and there is no `block_entity` host token
+  (D-61); entities keep their captured footprint;
 - out-of-bounds reads return air / empty fluid;
 - no live `Level` retained for reads;
 - one snapshot, not one per data type;
@@ -162,9 +161,6 @@ The adapter's `SnapshotLevel.get` is the typeclass dispatcher:
     if (type.equals(HostTypes.entityType)) {
         return (H) entityTypeAt(pos);
     }
-    if (type.equals(HostTypes.blockEntity)) {
-        return (H) getBlockEntity(pos);
-    }
     return null;
 }
 ```
@@ -178,10 +174,11 @@ The capture is one section walk:
 1. for each non-air world section the frame walk touches, copy its `PalettedContainer<BlockState>`
    once (`copy()`), keyed by the world section coordinates;
 2. fill that section's 16³ `FluidState` array from the copied block states;
-3. copy each block entity as a detached snapshot block entity (`saveWithId` / `loadStatic`) keyed by
-   the local cell;
-4. keep the captured entity candidates with their local footprints and their `EntityType`;
-5. wrap the frame's maps in one `SnapshotLevel`.
+3. keep the captured entity candidates with their local footprints and their `EntityType`;
+4. wrap the frame's maps in one `SnapshotLevel`.
+
+No block entity is copied and none is fingerprinted: block entity contents are outside the lease's
+expiry criteria, and the trait's live handle answers them (D-61).
 
 The occupant walk reads each cell's `BlockState` from the copied container, not the live chunk
 section, so a cell is read from the world once. The existing `OccupantSnapshot` capture stays as the
@@ -426,7 +423,7 @@ Kernel:
 Adapter:
 
 - one `SnapshotLevel` per frame;
-- `HostType` constants for block state, fluid state, entity type, block entity;
+- `HostType` constants for block state, fluid state and entity type;
 - `LevelCapture`/`FrameData`/`LevelSnapshot` snapshot wiring;
 - `McAnchors`;
 - adapter expectation factories;
@@ -461,10 +458,10 @@ the removed `Expectations.property`/`Anchors`/`StructureKernel.siting` and the r
 properties/tags.
 
 H2 is implemented: one `SnapshotLevel` per frame, built by the existing section walk from copied
-section states, per-section fluids, detached block entities and captured entities; `LevelSnapshot.get`
+section states, per-section fluids and captured entities; `LevelSnapshot.get`
 dispatches typed reads to its frame snapshot; `McAnchors` resolves the anchor from the captured
 block state; `LevelCapture` composes the snapshot content into the section digest. Heightmaps are
-not captured because no request path exists.
+not captured because no request path exists. Block entities left the snapshot with D-61.
 
 H3 is implemented: the adapter's `property`/`state`/`tag`/`fluid` factories lower to
 `Expectations.host` over `HostTypes.blockState`/`fluidState`/`entityType`; the `state` factory resolves

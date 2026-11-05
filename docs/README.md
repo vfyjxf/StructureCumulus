@@ -72,7 +72,8 @@ Then the module files, in dependency order:
   implemented; capture-revision lease invalidation landed at `0f0bf25`, and the determinism gate
   (`DeterminismTest`: canonical bytes, parse/write fixed point, equal compile runs, stable finding
   order) is green. M5a adds the event-edged watched-region mark counter (`LevelWatch`/`WatchEvents`,
-  lazy entity and block-entity fingerprints) at `d1fa42f`; P1 fixes the rotated-siting capture bounds
+  lazy entity and block-entity fingerprints) at `d1fa42f`; D-61 later removes the block-entity half
+  and its `setChanged` feed; P1 fixes the rotated-siting capture bounds
   with the two-phase anchored capture at `56c632c`; M5d remaps the 40 non-upright orientations at
   `ac11d0c`; M5e adds the capture report (D-28: `world.CaptureReport` on every `CaptureResult` arm,
   `SC-MC-0003` cut / `SC-MC-0004` orientation / `SC-MC-0005` over-cap, the host code catalog and the

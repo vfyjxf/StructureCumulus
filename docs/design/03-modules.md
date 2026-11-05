@@ -71,7 +71,8 @@ Notes:
   `FrameData`); M3 adds `SavedClaims` with CAS/release/reload at `d4b6d82`; D-40 removes the context `SavedData` and is
   compatible with Model C; M4 adds the JSON reader/writer, the datapack source, the merged document
   source and the five top-level `/cumulus` subcommands; M5a adds the event-edged watched-region mark counter
-  (`LevelWatch`/`WatchEvents`, lazy entity and block-entity fingerprints) at `d1fa42f`; P1 fixes the
+  (`LevelWatch`/`WatchEvents`, lazy entity and block-entity fingerprints) at `d1fa42f`, whose
+  block-entity half D-61 removes; P1 fixes the
   rotated-siting capture bounds with the two-phase anchored capture at `56c632c`; M5d adds the
   non-upright orientation remap (`ac11d0c`); M5e adds the capture report the adapter answers with
   (`world.CaptureReport`, `SC-MC-0003`/`0004`/`0005`) at `28d0334`; S6 added the sited-root descriptor

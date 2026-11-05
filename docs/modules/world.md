@@ -364,7 +364,9 @@ the trait reports an unreadable trait, never a mismatch. The same rule holds for
 `OccupantDescriptor` is version-independent identity only: `(type, kind)`, no state id, ordinal,
 class name, property map or tag list. Block states, properties, tags, fluids and entity data are not
 descriptor components; the host exposes them through a `HostType` and `WorldView.get` (§4.11). A
-trait remains the separate typed extension for a value a provider chose to copy (§4.6).
+trait remains the separate typed extension for a value a provider chose to copy (§4.6). Block entity
+data has no snapshot value at all: the host keeps no copy of one and no fingerprint of its contents,
+so a trait whose value is the live handle is the only way block entity data reaches a check (D-61).
 
 `OccupantSnapshot.traits` is one `TraitSlot` per trait id, sorted by id. The four states are
 exhaustive:

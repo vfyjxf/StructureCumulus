@@ -686,7 +686,8 @@ and stress evidence. D-29's definition-frame descriptor projection therefore has
 The replacement contract:
 
 - one world snapshot per frame: copied `PalettedContainer<BlockState>` sections, per-section
-  `FluidState` arrays, detached block entities and captured entities; no live `Level` is retained;
+  `FluidState` arrays and captured entities; no live `Level` is retained and no block entity is
+  copied (D-61);
 - `HostType<H>` is an id token, never a `Class<?>`; the adapter owns the constants (`HostTypes`);
 - `WorldView.get(pos, type)` is the only host read: default `null`, total, no exception;
   `get(ref, type)` reads the ref's anchor; a capture overrides it and answers from its snapshot;
@@ -973,8 +974,9 @@ The capture freezes the values the framework owns and states one contract where 
 includes writing through a host value. Determinism is promised for a check that reads only captured
 values; a check that dereferences a live host value accepts that its verdict may differ between runs.
 
-**The values.** Captured cells are frozen: `BlockState`, `FluidState`, the detached block-entity copy
-and the occupant walk are copies. The three capability traits carry the live NeoForge capability
+**The values.** Captured cells are frozen: `BlockState`, `FluidState` and the occupant walk are
+copies. A block entity has no copy at all — its data reaches a check through a trait whose value is
+the live handle (D-61). The three capability traits carry the live NeoForge capability
 (D-34); the framework neither copies nor wraps them, and does not police how they are used. An entity
 cell carries the captured `EntityType`, never the live `Entity`: the host read is
 `HostTypes.entityType`, and any other entity state is a captured trait.
@@ -1116,8 +1118,9 @@ released, and the player settles it again at its new position.
 
 **The instance side is indexed.** A per-level `Map<chunk, Set<InstanceId>>` is maintained by the
 manager wrapper, so the hook's first three checks are constant-time and a write that touches no
-formed structure costs one hash lookup. A block-entity `setChanged` feeds only the capture watch: a
-content change never invalidates the instance itself (D-41).
+formed structure costs one hash lookup. A block-entity `setChanged` fed only the capture watch, never
+the instance side (D-41); D-61 removes that feed together with the block-entity fingerprint it
+guarded.
 
 **Costs.** Mixin becomes a load-bearing dependency of the adapter; the hook sits on a hot path and may
 only do a hash lookup before returning; the injection points must be re-verified on every Minecraft
@@ -1173,6 +1176,32 @@ occupant chosen for a cell is a heuristic, not the identity the ref carries.
 **Consequence:** the kernel default guards snapshot, frame and body; `Expectations.host` reads the
 subject's ref; `SnapshotLevel` indexes entity types by body and answers the ref form, `LevelSnapshot`
 routes a no-body ref to its cell; `world` §4.4/§4.11 and `10-host-data` §3/§4 state the rule.
+
+### D-61 — Block entities are read live through traits; the snapshot keeps neither a copy nor a fingerprint
+
+A capture copies no `BlockEntity` and records no fingerprint of one. The block entity host read goes
+with the copy: nothing in production read it, and a snapshot that hands out a detached world object
+is what D-41 forbids. Block entity data reaches a check the way every other capability does — a trait
+resolved at capture, whose value is the live handle (D-34).
+
+Watching contents would contradict that contract. A live handle answers "as of the moment you read";
+an NBT fingerprint answers "did this change since capture". Keeping both means an attempt can be
+dropped for a change the live read already saw, and the fingerprint costs a full NBT serialization
+per block entity on every capture and every freshness check.
+
+What the freshness check still covers: the watched chunks (block changes and unloads), the entity
+fingerprints and the level epoch. A block entity that changes or disappears without a block change no
+longer invalidates the snapshot; the captured handle keeps answering its own state.
+
+**Consequence:** `HostTypes.blockEntity`, `copyBlockEntity` and the `BlockEntityFingerprint` watch
+are gone; `isCurrent()` marks, epoch and entity fingerprints only. D-47's `BlockEntity#setChanged`
+hook is cancelled by this decision — the feed existed only to invalidate on contents, so the mixin,
+`CumulusHooks.blockEntityChanged` and the eager-mark test go with it, while D-47's
+`LevelChunk#setBlockState` funnel stands. `world` §4.7 and `adapter` §3/§4 state the rule;
+`10-host-data` drops the copy step, the host token and the fingerprint from its contract.
+**Status:** implemented with the tests that pin it: no `BlockEntity` or `CompoundTag` field on
+`SnapshotLevel`, a content change or removal without a block change keeps the lease current, and the
+`inventory` trait still reads the changed contents.
 
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
