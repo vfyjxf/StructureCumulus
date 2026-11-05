@@ -404,7 +404,12 @@ dispatcher, progress tracker or dispatch queue; registration is sequential and d
 `PluginLoader` validates duplicate ids (fatal), missing `required` dependencies (fatal, plugin
 excluded), missing `optional` dependencies (warning, plugin loaded), missing `optionalRequired`
 dependencies (warning, plugin skipped) and cycles (fatal), and orders the remainder with Kahn's
-algorithm using `NamespacedId` order.
+algorithm using `NamespacedId` order. A candidate class that cannot be loaded — a broken static
+initializer, an unresolved reference — never reaches the loader: both lookups log the class name and
+the cause at error level and skip it (D-81); the `ServiceLoader` path catches `ServiceConfigurationError`
+too, which is how the JDK wraps an instantiation failure. Nothing enters the loading result, so a plugin
+that declared a dependency on the skipped class reports a missing dependency — that message is accurate
+about what happened to it and misleading about the cause.
 
 `TraitPlugin` extends `ModPlugin` with the `builtin` id and the `afterBuiltin` dependency; the built-in
 plugin overrides its dependencies to empty. `TraitLookup.builtin()` registers the built-in providers

@@ -1242,6 +1242,21 @@ wraps the same function; an instance supplier would force every caller through o
 **What the second constructor buys.** Passing the manager explicitly turns a silent mismatch — a
 draft committed into another manager — into a verification step. It stays.
 
+### D-81 — A plugin class that cannot be loaded is logged and skipped
+
+Discovery catches `LinkageError` around each candidate class, logs the class name and the cause at
+error level, and continues. Nothing is added to the loading result: a class that never loaded has no
+plugin id and no dependency edges, so the failure record — which names a plugin — cannot represent it.
+
+A plugin that declared a dependency on the skipped plugin still reports a missing dependency. That
+message is accurate about what happened to it and misleading about the cause; the module docs say so.
+
+**Why not abort (C).** One broken third-party plugin would take the whole game down; the host already
+degrades by skipping, and a skipped plugin surfaces as unknown kinds at document compile time.
+
+**Why not extend the failure record (A).** A record that can hold "an instance or a class name" changes
+a public shape for one message that the log already carries.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
