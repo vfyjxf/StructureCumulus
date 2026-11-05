@@ -36,6 +36,7 @@ public final class CumulusCommand {
         event.getDispatcher()
                 .register(
                     Commands.literal("cumulus")
+                            .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                             .then(
                                 Commands.literal("check").then(
                                     Commands.argument("id", ResourceLocationArgument.id()).then(
