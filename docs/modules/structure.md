@@ -116,6 +116,7 @@ public interface FocusContext {
     Budget remaining();
     CancelToken cancel();
     CellRead read(LatticePoint cell);
+    default @Nullable OccupantSnapshot cellOccupant(LatticePoint cell);   // maps local to world
     default @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
     default @Nullable ReadRefusal refusalAt(LatticePoint cell);
     java.util.List<ClaimRow> claimsAt(LatticePoint cell);
@@ -536,9 +537,11 @@ under it.
 
 `FocusContext` is what a focus sees. `ExpectationContext` adds the subject and `withSubject`, which
 re-types the subject for `each_cell`. Both expose the same bay/view/siting/phase/locus/context/budget
-and the same `read`/`occupantAt`/`refusalAt`/`claimsAt`; there is no second session object. `read` maps
-the local cell through the siting before asking the view; an unmapped local cell is
-`Unreadable(outOfBounds, SC-OCC-0004)`, never air and never a silent skip. `BayView.read` is the same
+and the same `read`/`cellOccupant`/`occupantAt`/`refusalAt`/`claimsAt`; there is no second session
+object. `read` maps the local cell through the siting before asking the view; an unmapped local cell is
+`Unreadable(outOfBounds, SC-OCC-0004)`, never air and never a silent skip. `cellOccupant` maps the
+same way and adds no second verdict: it is the view's stored-cell answer (`world` §4.3). `BayView.read`
+is the same
 local-to-world total read; it does not clip to the bay, and a siting miss is the same refusal.
 
 The trait four states are normative (`world` §4.7): `Present` and `Present(null)` are positive facts,
