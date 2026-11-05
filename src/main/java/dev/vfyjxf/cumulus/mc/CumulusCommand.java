@@ -135,19 +135,22 @@ public final class CumulusCommand {
             ClaimView claims = state.claims(level).read(prepared.bounds());
             StructureAttempt draft = state.structures(level)
                     .begin(state.world(level), new StructureSpec(state.owner(), prepared.siting(), blueprint.id()));
-            MatchRequest request = MatchRequest.of(
-                blueprint,
-                prepared.siting(),
-                prepared.lease(),
-                draft.id(),
-                state.owner(),
-                Budget.unbounded(),
-                claims
-            );
-            MatchResult checked = state.kernel().check(request);
-            draft.abort();
-            print(source, summary(blueprint.id(), origin, checked), checked.findings());
-            return checked;
+            try {
+                MatchRequest request = MatchRequest.of(
+                    blueprint,
+                    prepared.siting(),
+                    prepared.lease(),
+                    draft.id(),
+                    state.owner(),
+                    Budget.unbounded(),
+                    claims
+                );
+                MatchResult checked = state.kernel().check(request);
+                print(source, summary(blueprint.id(), origin, checked), checked.findings());
+                return checked;
+            } finally {
+                CommandSupport.abortQuietly(draft);
+            }
         }
     }
 

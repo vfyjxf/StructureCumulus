@@ -4,17 +4,25 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.CommandNode;
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.space.Orientation;
+import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +32,36 @@ import java.util.List;
 @GameTestHolder(Constants.modId)
 @PrefixGameTestTemplate(false)
 public final class CommandBoundaryGameTest {
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aThrowingOutputStillAbortsTheDraft(GameTestHelper helper) {
+        ServerState state = ServerState.current();
+        if (state == null) {
+            helper.fail("server state is not open");
+            return;
+        }
+        ServerLevel level = helper.getLevel();
+        BlockPos pos = helper.absolutePos(BlockPos.ZERO);
+        LatticePoint origin = LatticePoint.of(pos.getX(), pos.getY(), pos.getZ());
+        CommandSourceStack source = stack(helper, pos, 4, new RecordingSource("check "));
+        Blueprint blueprint = CommandSupport.blueprint(state.kernel(), source, BuiltinDocuments.airCellId());
+        if (blueprint == null) {
+            helper.fail("the air cell document did not compile");
+            return;
+        }
+        try {
+            CumulusCommand.check(source, state, level, blueprint, origin);
+            helper.fail("the throwing output must fail the check");
+        } catch (IllegalStateException expected) {
+            helper.assertTrue(true, "the throwing output fails the check");
+        }
+        Siting siting = Siting.of(origin, Orientation.identity);
+        StructureAttempt again = state.structures(level)
+                .begin(state.world(level), new StructureSpec(state.owner(), siting, blueprint.id()));
+        helper.assertTrue(again.isOpen(), "the aborted draft frees the siting for a new attempt");
+        again.abort();
+        helper.succeed();
+    }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void aSubcommandFailureIsReportedAndExitsZero(GameTestHelper helper) {
@@ -94,10 +132,23 @@ public final class CommandBoundaryGameTest {
     private static final class RecordingSource implements CommandSource {
 
         private final List<String> messages = new ArrayList<>();
+        private final @Nullable String throwingPrefix;
+
+        private RecordingSource() {
+            this(null);
+        }
+
+        private RecordingSource(@Nullable String throwingPrefix) {
+            this.throwingPrefix = throwingPrefix;
+        }
 
         @Override
         public void sendSystemMessage(Component message) {
-            messages.add(message.getString());
+            String text = message.getString();
+            if (throwingPrefix != null && text.startsWith(throwingPrefix)) {
+                throw new IllegalStateException("the output threw on " + text);
+            }
+            messages.add(text);
         }
 
         @Override

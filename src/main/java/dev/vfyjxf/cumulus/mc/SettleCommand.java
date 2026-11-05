@@ -69,31 +69,40 @@ final class SettleCommand {
             ClaimView claims = remainingClaims(state.claims(level), prepared.bounds(), prepared.siting());
             StructureAttempt draft = state.structures(level)
                     .begin(state.world(level), new StructureSpec(state.owner(), prepared.siting(), blueprint.id()));
-            MatchRequest request = MatchRequest.of(
-                blueprint,
-                prepared.siting(),
-                prepared.lease(),
-                draft.id(),
-                state.owner(),
-                Budget.unbounded(),
-                claims
-            );
-            MatchResult checked = kernel.check(request);
-            if (!(checked instanceof MatchResult.Admitted admitted)) {
-                draft.abort();
+            boolean closed = false;
+            MatchResult settled = null;
+            try {
+                MatchRequest request = MatchRequest.of(
+                    blueprint,
+                    prepared.siting(),
+                    prepared.lease(),
+                    draft.id(),
+                    state.owner(),
+                    Budget.unbounded(),
+                    claims
+                );
+                MatchResult checked = kernel.check(request);
+                if (!(checked instanceof MatchResult.Admitted admitted)) {
+                    CommandSupport
+                            .printFindings(source, summary("check", blueprint.id(), origin, checked), checked.findings());
+                    return checked;
+                }
+                settled = kernel.settle(request, admitted, draft);
+                if (settled instanceof MatchResult.Formed) {
+                    draft.commit(prepared.bounds().asSet());
+                    closed = true;
+                }
                 CommandSupport
-                        .printFindings(source, summary("check", blueprint.id(), origin, checked), checked.findings());
-                return checked;
+                        .printFindings(source, summary("settle", blueprint.id(), origin, settled), settled.findings());
+                return settled;
+            } finally {
+                if (!closed) {
+                    CommandSupport.abortQuietly(draft);
+                    if (settled instanceof MatchResult.Formed) {
+                        CommandSupport.releaseQuietly(state.claims(level), draft.id());
+                    }
+                }
             }
-            MatchResult settled = kernel.settle(request, admitted, draft);
-            if (settled instanceof MatchResult.Formed) {
-                draft.commit(prepared.bounds().asSet());
-            } else {
-                draft.abort();
-            }
-            CommandSupport
-                    .printFindings(source, summary("settle", blueprint.id(), origin, settled), settled.findings());
-            return settled;
         }
     }
 
