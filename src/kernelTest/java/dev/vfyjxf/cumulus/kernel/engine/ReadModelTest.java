@@ -119,6 +119,20 @@ class ReadModelTest {
     }
 
     @Test
+    void cellOccupantAnswersTheBlockUnderAnEntity() {
+        LatticePoint cell = LatticePoint.origin;
+        OccupantSnapshot stone = TestWorld.block(TestWorld.stone, cell);
+        OccupantSnapshot cow = TechFixtures.entity(TechFixtures.cow, cell, Cuboid.of(cell));
+        TestWorld.View view = new TestWorld.View().bounds(Cuboid.of(0, 0, 0, 2, 1, 1)).put(stone).putBody(cow);
+
+        assertEquals(cow, view.occupant(cell), "the body read answers the cow");
+        assertEquals(cow, assertInstanceOf(CellRead.Found.class, view.read(cell)).occupant());
+        assertEquals(stone, view.cellOccupant(cell), "the stored-cell read answers the stone under it");
+        assertTrue(Objects.requireNonNull(view.cellOccupant(LatticePoint.of(1, 0, 0)), "air").isAir());
+        assertNull(view.cellOccupant(LatticePoint.of(2, 0, 0)), "outside the bounds is not a cell answer");
+    }
+
+    @Test
     void occupantRefMustMatchSnapshotFrameAndBody() {
         OccupantSnapshot block = TestWorld.block(mc("stone_bricks"), LatticePoint.origin);
         TestWorld.View view = new TestWorld.View().put(block);
