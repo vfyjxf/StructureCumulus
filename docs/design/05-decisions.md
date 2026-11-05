@@ -1123,6 +1123,31 @@ content change never invalidates the instance itself (D-41).
 only do a hash lookup before returning; the injection points must be re-verified on every Minecraft
 update. The kernel is unaffected — every hook lives in the adapter source set.
 
+### D-48 — A siting holds one instance, so a re-settle replaces it
+
+One siting names one structure position, so the ledger never treats the incumbent rows of the same
+siting as a conflict: `settle` drops every row of the settling instance, and every row of another
+instance whose siting equals one of the incoming rows, before it runs the matrix. The replacement,
+the conflict check and the write stay inside the one compare-and-set settle already performs, so a
+failed settle leaves the previous rows in place.
+
+**Why the ledger and not the host.** The host can filter its check view (`StructureSetHost` already
+does), but `settle` re-reads the ledger, so a replacement decision made in the host is invisible to
+the matrix. Encoding it in the ledger makes the rule hold for every host, including a bare
+`/cumulus settle` that passes no view at all.
+
+**Why the siting and not the owner.** D-45 removed the owner from the claim model: `(owner, siting)`
+was a proxy for "one instance", and the owner dimension only turned a re-settle by another owner into
+a conflict instead of a takeover. The siting is the position; the owner is a host reservation fact.
+
+**Rejected.** Teaching `SettleRequest` a `replaces` list: a public record change for a rule the
+ledger can derive from the rows it already holds. Releasing the old rows in the host before settling:
+two writes with no transaction, and a failed settle would have dropped them. Adding a conflict
+exception flag to `ClaimMatrix`: the matrix compares instances and must stay a pure predicate.
+
+**Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
+`claim` §4.5 states the rule; the three same-siting GameTests pass again.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

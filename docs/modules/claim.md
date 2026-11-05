@@ -144,10 +144,16 @@ rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
 - `read(box)` is total: an unavailable store answers `ClaimView.unavailable()` (no rows, revision 0,
   `available == false`), never an empty available view. An empty result is a fact.
 - `settle(request)` is one compare-and-set over all rows of the request's instance. If
-  `request.expectedRevision() != revision()`, it answers `RevisionMoved` and writes nothing. If a
-  request row conflicts with an incumbent row (matrix, excluding the request's own key), it answers
-  `Conflict` with the incumbents and writes nothing. Otherwise it replaces the key and answers
-  `Settled(newRevision, rows)`, bumping the revision by one.
+  `request.expectedRevision() != revision()`, it answers `RevisionMoved` and writes nothing. It then
+  drops the rows this settle replaces (next bullet) and, if a request row still conflicts with a
+  remaining incumbent, answers `Conflict` with those incumbents and writes nothing. Otherwise it
+  writes the replacement and answers `Settled(newRevision, rows)`, bumping the revision by one.
+- A siting holds one instance (D-48): the rows `settle` replaces are the request instance's own rows
+  and every row of another instance whose siting equals one of the request's sitings. They are
+  dropped before `ClaimMatrix.conflicts` runs and are never reported as conflicts. Exclusion,
+  conflict check and write stay inside the one compare-and-set, so a failed settle leaves those
+  incumbents in place. The ledger derives the replacement from the request's rows; no host passes a
+  replacement list.
 - `release(instance)` deletes every row of that instance and bumps the revision by one. An absent
   instance is a no-op and does **not** bump. It is safe to call on every instance removal and move; it
   is idempotent after the first. A world unload drops the ledger with the world's structure state, so
