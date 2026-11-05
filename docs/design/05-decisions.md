@@ -1148,6 +1148,32 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-52 — A ref read answers the occupant, not its cell
+
+`WorldView.get(ref, type)` answers for the occupant `ref` names. A ref without a body names a cell:
+the default reads `ref.anchor()`. A ref with a body names one body: the default answers `null`, and a
+host that stores values per body overrides `get(ref, type)` to answer by body. A ref from another
+snapshot or frame answers `null`, exactly like `occupant(ref)`.
+
+**Why.** `OccupantRef` has carried `body` since the entity-collapse fix, and `occupant(ref)` already
+rejects a foreign frame and a foreign body. `get` was the one read entry that ignored both: two
+entities over one cell made `get(cow.ref(), entity)` answer the chicken. Widening the key is enough;
+no new port is needed.
+
+**Fail closed.** A default that falls back to the anchor cell would answer a different body's value
+silently — the defect it removes. `null` is the honest "not captured", and `world.md` §4.11 already
+says a missing value means "not in this snapshot", never a substitute.
+
+**Rejected: `HostType` gains a scope (cell or body).** One dispatch flag on every host token would
+select between two code paths, while the ref already carries the discriminator (`body`).
+
+**Rejected: hosts answer bodies through `get(LatticePoint, type)`.** A cell does not name a body; the
+occupant chosen for a cell is a heuristic, not the identity the ref carries.
+
+**Consequence:** the kernel default guards snapshot, frame and body; `Expectations.host` reads the
+subject's ref; `SnapshotLevel` indexes entity types by body and answers the ref form, `LevelSnapshot`
+routes a no-body ref to its cell; `world` §4.4/§4.11 and `10-host-data` §3/§4 state the rule.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

@@ -78,6 +78,9 @@ public interface WorldView {
     }
 
     default <H> @Nullable H get(OccupantRef ref, HostType<H> type) {
+        if (!ref.from(snapshotId()) || ref.frame() != frame() || ref.body() != null) {
+            return null;
+        }
         return get(ref.anchor(), type);
     }
 }
@@ -85,6 +88,8 @@ public interface WorldView {
 
 - one snapshot, typed reads;
 - default `null`;
+- a ref without a body reads its cell; a ref with a body, or from another snapshot or frame, answers
+  `null` unless the host overrides the ref form to answer by body;
 - `LevelSnapshot` overrides it and reads its world snapshot;
 - never reads the live world;
 - total: missing means "not in this snapshot", not an exception;
@@ -131,7 +136,9 @@ final class SnapshotLevel implements BlockGetter {
 - heightmaps are not captured: no kernel request path exists (§13).
 
 `CapturedEntity` is the adapter's internal record: entity UUID, type id, local footprint and the
-captured `EntityType`. The live `Entity` is used only while the capture runs.
+captured `EntityType`. The live `Entity` is used only while the capture runs. The constructor also
+indexes the captured entities once by body (`OccupantDescriptors.body(type, uuid)`), and the ref form
+of `SnapshotLevel.get` answers `HostTypes.entityType` from that index without touching a cell.
 
 `LevelSnapshot` holds the frame's `SnapshotLevel` and implements `WorldView.get`:
 

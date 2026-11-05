@@ -162,7 +162,7 @@ public interface WorldView {
     default ReadStatus statusOf(LatticePoint cell);
     @Nullable OccupantSnapshot occupant(OccupantRef ref);
     default <H> @Nullable H get(LatticePoint pos, HostType<H> type);         // null
-    default <H> @Nullable H get(OccupantRef ref, HostType<H> type);          // the anchor
+    default <H> @Nullable H get(OccupantRef ref, HostType<H> type);          // the occupant
     java.util.List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
     @Nullable WorldView nested(LatticePoint cell);
     long contentDigest(SectionKey key);
@@ -307,8 +307,8 @@ component orders `null` first. The five-argument constructor is the compatibilit
 occupants, not one.
 
 `from(snapshot)` compares only the snapshot. A ref from another snapshot or frame is not answerable:
-`occupant(ref)` returns `null` unless `ref.snapshot().equals(snapshotId())`, `ref.frame() == frame()`
-and the ref matches the indexed body exactly.
+`occupant(ref)` and `get(ref, type)` return `null` unless `ref.snapshot().equals(snapshotId())`,
+`ref.frame() == frame()` and the ref matches the indexed body exactly.
 
 There is one `SnapshotId` per capture, shared by every frame. A nested view has
 `depth = parent.depth + 1`, a unique `frame`, the same `snapshotId`, the exposing parent and its own
@@ -460,13 +460,16 @@ parameter the kernel never names and never inspects. The adapter owns the consta
 behind them.
 
 `WorldView.get(pos, type)` is a field extension of the snapshot, not a wrapper object: one snapshot,
-many typed reads. The default answers `null`; `get(ref, type)` reads `ref.anchor()`. A missing value
-means "not in this snapshot", never an exception and never a substitute. The kernel never reads a
-live world: an implementation answers from the captured snapshot. Host reads add nothing to
-`ReadScope`, because one snapshot carries every host payload.
+many typed reads. The default answers `null`; `get(ref, type)` answers for the occupant the ref names.
+A ref without a body names a cell: the default reads `ref.anchor()`. A ref with a body names one body:
+the default answers `null`, and a host that stores values per body overrides `get(ref, type)` to
+answer by body. A ref from another snapshot or frame answers `null`, exactly like `occupant(ref)`.
+A missing value means "not in this snapshot", never an exception and never a substitute. The kernel
+never reads a live world: an implementation answers from the captured snapshot. Host reads add
+nothing to `ReadScope`, because one snapshot carries every host payload.
 
 `Expectations.host(type, test, mismatchCode, absentCode, description)` is the one kernel bridge
-(`structure` §4.6): it reads the subject's anchor once, answers `Unreadable` with the caller's
+(`structure` §4.6): it reads the subject's ref once, answers `Unreadable` with the caller's
 `absentCode` when the value is absent, `Match` when `test` passes, and
 `Mismatch(mismatchCode, description)` when it does not. The kernel mints no MC code: `absentCode` is
 a parameter, the kernel never declares `SC-MC-0010`, and the adapter passes its `SC-MC-0010` for a
@@ -517,8 +520,8 @@ The kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value cod
   anchor-only.
 - `SectionSnapshot`: canonical occupant order, `contentDigest`, box query.
 - Descriptor: exactly `(type, kind)`; equality; trait find/has/absent.
-- Host reads: the default `get` is `null`, `get(ref, type)` reads the anchor, and a bridge answers
-  only its declared `HostType`s.
+- Host reads: the default `get` is `null`, a ref without a body reads its cell, a ref with a body or
+  from another snapshot or frame answers `null`, and a bridge answers only its declared `HostType`s.
 - Host expectation: a captured value matches; a predicate failure is `Mismatch` with the supplied
   code and description; an absent value is `Unreadable` with the supplied absent code, never a
   mismatch; no `ReadScope` entry; the meta carries the supplied mismatch code.

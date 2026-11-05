@@ -566,7 +566,7 @@ instance dependency — in a check's `ExpectationMeta.requires()` or a computati
 cache itself is the host `CachedContext` port, looked up by `(id, type)`.
 
 `Expectations.host(type, test, mismatchCode, absentCode, description)` is the one bridge for host
-payload. It reads `ctx.view().get(subject.ref().anchor(), type)` once: an absent value is
+payload. It reads `ctx.view().get(subject.ref(), type)` once: an absent value is
 `Unreadable` with the caller's `absentCode` (never a mismatch), a passing `test(host, cell)` is
 `Match`, and a failing test is `Mismatch(mismatchCode, description)`. The kernel never constructs or
 interprets the host value, never declares a host type in `ReadScope`, never mints `SC-MC-0010`, and
