@@ -219,6 +219,7 @@ class WorldTest {
         assertEquals(2, policy.traits().size());
         assertEquals(2, policy.maxDepth());
         assertTrue(SnapshotPolicy.minimal().traits().isEmpty());
+        assertEquals(SnapshotPolicy.defaultMaxDepth, SnapshotPolicy.minimal().maxDepth());
     }
 
     @Test
