@@ -318,7 +318,6 @@ class CaptureAdversarialTest {
             "the fluid state is the captured one"
         );
         assertNull(view.get(cell, HostTypes.entityType), "no entity was captured");
-        assertNull(view.get(cell, HostTypes.blockEntity), "no block entity was captured");
         assertNull(view.get(cell, HostType.of(NamespacedId.of("test", "custom"))), "an unknown host type answers null");
         BlockState outside = view.get(LatticePoint.of(9, 0, 0), HostTypes.blockState);
         assertTrue(outside != null && outside.isAir(), "an out-of-bounds host read is air, not null");
@@ -940,7 +939,7 @@ class CaptureAdversarialTest {
             });
             fluid[SnapshotLevel.fluidIndex(cell.x(), cell.y(), cell.z())] = state.getFluidState();
         }
-        return new SnapshotLevel(origin, bounds, -64, 384, sections, fluids, Map.of(), List.of());
+        return new SnapshotLevel(origin, bounds, -64, 384, sections, fluids, List.of());
     }
 
     private static <T> Holder.Reference<T> holder(Registry<T> registry, T value) {

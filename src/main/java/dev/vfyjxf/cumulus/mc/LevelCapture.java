@@ -213,7 +213,6 @@ public final class LevelCapture implements WorldCapture {
         private final Map<SectionKey, Cuboid> digestRegions = new TreeMap<>();
         private final Map<Long, PalettedContainer<BlockState>> snapshotStates = new HashMap<>();
         private final Map<Long, FluidState[]> snapshotFluids = new HashMap<>();
-        private final Map<BlockPos, BlockEntity> snapshotBlockEntities = new HashMap<>();
         private final Set<Long> copiedSections = new HashSet<>();
         private final Map<LatticePoint, NestedExtent> blockExtents = new TreeMap<>();
         private final LevelWatch.WatchRegion watch = new LevelWatch.WatchRegion();
@@ -300,7 +299,6 @@ public final class LevelCapture implements WorldCapture {
                 level.getHeight(),
                 snapshotStates,
                 snapshotFluids,
-                snapshotBlockEntities,
                 capturedEntities
             );
         }
@@ -530,10 +528,6 @@ public final class LevelCapture implements WorldCapture {
                                 : OccupantDescriptors.blockEntity(context.snapshot(), frame, cell, blockEntity, traits);
                         occupants.put(cell, occupant);
                         if (blockEntity != null) {
-                            BlockEntity copied = copyBlockEntity(blockEntity, new BlockPos(x, y, z), state);
-                            if (copied != null) {
-                                snapshotBlockEntities.put(new BlockPos(x, y, z), copied);
-                            }
                             watch.blockEntity(worldPos, blockEntity, level.registryAccess());
                         }
                         if (nestedEnabled && (!state.hasBlockEntity() || blockEntity != null)) {
@@ -663,16 +657,6 @@ public final class LevelCapture implements WorldCapture {
             return nestedLookup.get(NestedExtentHolders.entity, candidate.entity(), traitCapture.capabilityContext());
         } catch (RuntimeException failure) {
             StructureCumulus.logger.warn("nested entity provider failed for {}", candidate.id(), failure);
-            return null;
-        }
-    }
-
-    private @Nullable BlockEntity copyBlockEntity(BlockEntity source, BlockPos localPos, BlockState state) {
-        try {
-            return BlockEntity
-                    .loadStatic(localPos, state, source.saveWithId(level.registryAccess()), level.registryAccess());
-        } catch (RuntimeException failure) {
-            StructureCumulus.logger.warn("block entity copy failed at {}", localPos, failure);
             return null;
         }
     }

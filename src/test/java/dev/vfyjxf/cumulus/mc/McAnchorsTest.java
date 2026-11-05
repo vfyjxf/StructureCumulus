@@ -163,7 +163,6 @@ class McAnchorsTest {
             384,
             Map.of(SnapshotLevel.worldSectionKey(0, 0, 0), states),
             Map.of(SnapshotLevel.worldSectionKey(0, 0, 0), fluids),
-            Map.of(),
             List.of()
         );
     }

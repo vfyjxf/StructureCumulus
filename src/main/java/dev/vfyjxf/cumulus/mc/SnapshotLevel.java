@@ -44,7 +44,6 @@ final class SnapshotLevel implements BlockGetter {
     private final int height;
     private final Map<Long, PalettedContainer<BlockState>> sections;
     private final Map<Long, FluidState[]> fluids;
-    private final Map<BlockPos, BlockEntity> blockEntities;
     private final List<CapturedEntity> entities;
     private final Map<NamespacedId, EntityType<?>> entityTypesByBody;
 
@@ -55,7 +54,6 @@ final class SnapshotLevel implements BlockGetter {
         int height,
         Map<Long, PalettedContainer<BlockState>> sections,
         Map<Long, FluidState[]> fluids,
-        Map<BlockPos, BlockEntity> blockEntities,
         List<CapturedEntity> entities
     ) {
         this.origin = Objects.requireNonNull(origin, "origin");
@@ -64,7 +62,6 @@ final class SnapshotLevel implements BlockGetter {
         this.height = height;
         this.sections = Map.copyOf(Objects.requireNonNull(sections, "sections"));
         this.fluids = Map.copyOf(Objects.requireNonNull(fluids, "fluids"));
-        this.blockEntities = Map.copyOf(Objects.requireNonNull(blockEntities, "blockEntities"));
         ArrayList<CapturedEntity> sortedEntities = new ArrayList<>(entities.size());
         HashMap<NamespacedId, EntityType<?>> typesByBody = new HashMap<>(entities.size());
         for (CapturedEntity entity : entities) {
@@ -97,10 +94,7 @@ final class SnapshotLevel implements BlockGetter {
 
     @Override
     public @Nullable BlockEntity getBlockEntity(BlockPos pos) {
-        if (!contains(pos.getX(), pos.getY(), pos.getZ())) {
-            return null;
-        }
-        return blockEntities.get(pos);
+        return null;
     }
 
     @Override
@@ -123,9 +117,6 @@ final class SnapshotLevel implements BlockGetter {
         }
         if (type.equals(HostTypes.entityType)) {
             return (H) entityTypeAt(pos);
-        }
-        if (type.equals(HostTypes.blockEntity)) {
-            return (H) blockEntityAt(pos);
         }
         return null;
     }
@@ -188,13 +179,6 @@ final class SnapshotLevel implements BlockGetter {
             return Fluids.EMPTY.defaultFluidState();
         }
         return section[fluidIndex(x + origin.x(), y + origin.y(), z + origin.z())];
-    }
-
-    private @Nullable BlockEntity blockEntityAt(LatticePoint pos) {
-        if (!contains(pos.x(), pos.y(), pos.z())) {
-            return null;
-        }
-        return blockEntities.get(new BlockPos(pos.x(), pos.y(), pos.z()));
     }
 
     private @Nullable EntityType<?> entityTypeAt(LatticePoint pos) {

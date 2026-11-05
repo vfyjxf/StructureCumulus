@@ -513,7 +513,6 @@ class AdapterExpectationsTest {
             384,
             Map.of(SnapshotLevel.worldSectionKey(0, 0, 0), section),
             Map.of(SnapshotLevel.worldSectionKey(0, 0, 0), fluids),
-            Map.of(),
             entities
         );
         FrameData data = new FrameData(

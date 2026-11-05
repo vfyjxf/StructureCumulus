@@ -32,8 +32,6 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
@@ -182,13 +180,9 @@ public final class CaptureGameTest {
                 return;
             }
             LatticePoint chest = LatticePoint.of(origin.getX() + 1, origin.getY(), origin.getZ());
-            BlockEntity blockEntity = view.get(chest, HostTypes.blockEntity);
-            if (!(blockEntity instanceof ChestBlockEntity)) {
-                helper.fail("the chest block entity was not captured");
-                return;
-            }
-            if (blockEntity.getLevel() != null) {
-                helper.fail("the block entity copy keeps a live level");
+            BlockState chestState = view.get(chest, HostTypes.blockState);
+            if (chestState == null || !chestState.is(Blocks.CHEST)) {
+                helper.fail("the chest block state was not captured");
                 return;
             }
             EntityType<?> entityType = view

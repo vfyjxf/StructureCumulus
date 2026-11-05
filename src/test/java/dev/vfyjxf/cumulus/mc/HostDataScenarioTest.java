@@ -426,7 +426,7 @@ class HostDataScenarioTest {
             });
             fluid[SnapshotLevel.fluidIndex(cell.x(), cell.y(), cell.z())] = state.getFluidState();
         }
-        return new SnapshotLevel(origin, bounds, -64, 384, sections, fluids, Map.of(), List.of());
+        return new SnapshotLevel(origin, bounds, -64, 384, sections, fluids, List.of());
     }
 
     private static OccupantSnapshot block(LatticePoint cell, NamespacedId type) {

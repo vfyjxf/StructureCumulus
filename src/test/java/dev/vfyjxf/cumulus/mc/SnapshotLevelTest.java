@@ -11,6 +11,7 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
@@ -18,7 +19,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.material.FluidState;
@@ -47,7 +47,7 @@ class SnapshotLevelTest {
     private static final SnapshotId snapshotId = new SnapshotId(World.of(NamespacedId.of("test", "world")), 1);
 
     @Test
-    void readsBlockFluidEntityAndBlockEntityByLocalCoordinates() {
+    void readsBlockFluidAndEntityByLocalCoordinates() {
         LatticePoint origin = LatticePoint.of(100, 200, 300);
         Cuboid bounds = Cuboid.of(0, 0, 0, 2, 2, 2);
         BlockState water = Blocks.WATER.defaultBlockState();
@@ -58,7 +58,6 @@ class SnapshotLevelTest {
         FluidState[] fluids = fluids();
         fluids[SnapshotLevel.fluidIndex(100, 200, 300)] = water.getFluidState();
         fluids[SnapshotLevel.fluidIndex(101, 200, 300)] = log.getFluidState();
-        BlockEntity chest = BlockEntityType.CHEST.create(new BlockPos(0, 0, 0), Blocks.CHEST.defaultBlockState());
         SnapshotLevel.CapturedEntity captured = new SnapshotLevel.CapturedEntity(
             UUID.nameUUIDFromBytes(new byte[]{1}),
             NamespacedId.of("minecraft", "chicken"),
@@ -73,7 +72,6 @@ class SnapshotLevelTest {
             384,
             Map.of(key, states),
             Map.of(key, fluids),
-            Map.of(new BlockPos(0, 0, 0), chest),
             List.of(captured)
         );
 
@@ -82,10 +80,8 @@ class SnapshotLevelTest {
         assertSame(water, snapshot.get(LatticePoint.origin, HostTypes.blockState));
         assertEquals(water.getFluidState(), snapshot.getFluidState(new BlockPos(0, 0, 0)));
         assertEquals(water.getFluidState(), snapshot.get(LatticePoint.origin, HostTypes.fluidState));
-        assertSame(chest, snapshot.getBlockEntity(new BlockPos(0, 0, 0)));
-        assertSame(chest, snapshot.get(LatticePoint.origin, HostTypes.blockEntity));
+        assertNull(snapshot.getBlockEntity(new BlockPos(0, 0, 0)), "a block entity is not a captured value");
         assertSame(EntityType.CHICKEN, snapshot.get(LatticePoint.origin, HostTypes.entityType));
-        assertNull(snapshot.getBlockEntity(new BlockPos(1, 0, 0)));
         assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entityType));
         assertNull(snapshot.get(LatticePoint.origin, HostType.of(NamespacedId.of("test", "unknown"))));
     }
@@ -207,6 +203,14 @@ class SnapshotLevelTest {
         }
     }
 
+    @Test
+    void aCaptureKeepsNoBlockEntityObject() {
+        for (Field field : SnapshotLevel.class.getDeclaredFields()) {
+            assertFalse(BlockEntity.class.isAssignableFrom(field.getType()), field.getName());
+            assertFalse(CompoundTag.class.isAssignableFrom(field.getType()), field.getName());
+        }
+    }
+
     private static SnapshotLevel snapshot(BlockState state) {
         return snapshot(state, null);
     }
@@ -228,7 +232,6 @@ class SnapshotLevelTest {
             384,
             Map.of(key, states),
             Map.of(key, fluids),
-            Map.of(),
             entities
         );
     }
