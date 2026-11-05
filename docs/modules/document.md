@@ -241,8 +241,11 @@ catalog entry that lowers to `Expectations.host`, not a kernel kind
 `mc_checks` member and no separate MC JSON check type; the adapter's expectation catalog registers
 them, and the kernel's built-in catalog alone rejects them as `SC-DOC-0003`. The `state` kind resolves
 its `block` + `properties` to a `BlockState` at compile time; a malformed declaration is a compile
-finding, not a runtime error. A computation names its output key by id and either a
-bay (region = that bay's cells) or a `region` box array.
+finding, not a runtime error. A computation's identity is its output key: `id` is optional and
+defaults to `output`, and when both are written they must be equal. A factory that returns a
+different output key, a different id or a different `inputs` set is `SC-DOC-0014`; the compiler
+adds no wrapper. A computation names either a bay (region = that bay's cells) or a `region` box
+array.
 
 A `trait`/`trait_absent` declaration names a trait by `NamespacedId` and adds that id to the
 expectation's `ReadScope.traits`; the factory builds a `TraitKey<Object>` so the capture's typed
@@ -379,6 +382,7 @@ canonical blueprint form.
 | `SC-DOC-0011` | ERROR | placement names a missing definition | `DocumentCompiler` |
 | `SC-DOC-0012` | INFO | reader supplied no spans | `DocumentReader` |
 | `SC-DOC-0013` | ERROR | reader/writer parse/format failure | `DocumentReader`/`Writer` |
+| `SC-DOC-0014` | ERROR | a declaration disagrees with the factory that produces it | `DocumentCompiler` |
 
 `StructureSetCompiler` reuses `SC-DOC-0002` for a malformed or nested set reference,
 `SC-DOC-0004` for a duplicate satellite id (raised by the reader) and `SC-DOC-0011` for a root or
@@ -436,8 +440,11 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   schema version does not move for it.
 - Kind ids are lowercase snake_case. Built-in structural forms are grammar, not catalog entries;
   an unqualified kind resolves in `structurecumulus`.
-- The declared output key is authoritative. A factory that returns a different output key is
-  `SC-DOC-0003`; the compiler never silently retargets.
+- A declaration is confirmed, never repaired. A computation whose `id` differs from its `output`,
+  or whose factory returns a different output key or a different `inputs` set, is `SC-DOC-0014`;
+  the compiler never silently retargets and adds no wrapper.
+- A kind is resolved by exact id. The default namespace is applied by the reader; a catalog lookup
+  never falls back, and a built-in grammar form applies only in `structurecumulus`.
 - Document content never throws. Every malformed field, cycle, unknown factory or invalid blueprint
   becomes a located finding; `CompileResult.blueprint()` is null whenever an error exists.
 - A blueprint document is kindless or `blueprint`; a set document is `structure_set`. A set names

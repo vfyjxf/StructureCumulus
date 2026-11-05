@@ -1039,6 +1039,41 @@ shows `begin` / `settle` / `commit`; `engine` §5, `spi` §4.3, `12` §6, `02-mo
 **Host contracts:** a `ClaimLedger.settle` that throws is a host contract violation and its row state
 is undefined; so is a `StructureAttempt` whose `publish` or `commit` throws while `isOpen()` is true.
 
+### D-43 — The document declares; the compiler confirms
+
+A document describes a blueprint; it never asks the compiler to repair one. Every place where a
+declaration can disagree with the code that produces it is a compile finding, and no declaration is
+ever retargeted.
+
+**Kind resolution is exact.** A catalog lookup never falls back: `mymod:air` is either registered
+under that exact id or it is a finding. The default namespace is applied once, by the reader, when
+the document omits one; a qualified id is never re-read in `structurecumulus`.
+
+**Grammar belongs to the default namespace.** A structural form — `all_of`, `not`, `each_cell`,
+`at_least`, `sum` — is grammar only when its namespace is `structurecumulus`; a qualified id is a
+catalog id. `mymod:each_cell` therefore reaches the expectation catalog or fails, never the built-in
+grammar.
+
+**A computation is its output key.** `Computation.id()` is derived from `output()`, the document's
+`id` defaults to `output` and must equal it when written. A computation's `inputs` must equal the ones
+its factory declares. Any disagreement is `SC-DOC-0014`, and the compiler adds no wrapper: the object
+a factory returns is the object in the blueprint.
+
+**Rejected.** Keeping the fallback with a warning: Law 9 says never a fallback, and the verdict would
+still be the wrong one. Keeping the wrapper and teaching the Java builder to reproduce it: a second
+semantic path, and the wrapper carries the document's `inputs` over the factory's (K10-D04). Deleting
+the `id` member outright: a schema version bump for a cosmetic gain, when a derived field gives the
+same guarantee.
+
+**Why:** I-13 promises that the two frontends produce one blueprint; a compiler that repairs
+declarations makes the promise false in exactly the cases an author is most likely to hit. The
+built-in computation factory already defines its identity as `output.id()`, so the document's second
+name was never a second meaning.
+
+**Consequence:** `Computation.id()` becomes a default method over `output()`; `Computations.Builtin`
+drops its override; the JSON reader defaults `id` to `output` and the writer stops emitting it;
+`document` §4.1/§6/§8, `structure` §4.10 and `04-api` §5 state the rule.
+
 ### D-44 — Claims are session-scoped
 
 A claim ledger lives exactly as long as the structure instances that own its rows: the adapter persists
@@ -1062,8 +1097,8 @@ that also wants durable claims re-settles its restored instances and the planner
 **A move is a removal.** With the instance as the key there is no second identity to reconcile when a
 structure is pushed: the adapter invalidates it and releases its rows, and a rebuild is a fresh settle.
 
-> Numbering note: D-43 and D-46 are still proposals carried by
-> `Data/StructureCumulus/plan-2026-11-01/`; they enter this file when their code lands.
+> Numbering note: D-46 is still a proposal carried by
+> `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
 ## 3. Consequences a reviewer should attack
 

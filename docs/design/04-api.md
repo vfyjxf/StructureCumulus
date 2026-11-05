@@ -180,7 +180,8 @@ registers a captured trait. The same rule holds for `energy` (`IEnergyStorage`) 
 ## 5. The document surface
 
 The same campfire as data. A document is the authoring form; the compiler lowers it to the same
-`Blueprint`.
+`Blueprint`. A computation's `id` is optional: a computation is identified by the key it produces,
+so the two frontends cannot disagree on it.
 
 ```json
 {
@@ -204,8 +205,7 @@ The same campfire as data. A document is the authoring form; the compiler lowers
      "expect": {"kind": "block", "id": "minecraft:campfire"}}
   ],
   "computations": [
-    {"id": "air_cells", "kind": "air", "region": [[1,1,1,2,2,2]],
-     "output": "mymod:air_cells"}
+    {"kind": "air", "region": [[1,1,1,2,2,2]], "output": "mymod:air_cells"}
   ],
   "keys": [
     {"id": "mymod:air_cells", "type": "long", "retention": "instance", "merge": "sum"}

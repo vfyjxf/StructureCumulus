@@ -642,6 +642,11 @@ search (`adapter` §3, §11).
 `SectionContext`, which has no `read(ContextKey)`; an `AggregateComputation` receives an
 `AggregateContext`, which has no `contribute`. This is a compile-time guarantee, not a convention.
 
+A computation's identity is its output key: `id()` returns `output().id()`. `Blueprint.equals`
+compares members by value, so a computation, focus or expectation that is not a value type (a
+record, or an equal-by-value class) breaks I-13 for both frontends; the kernel requires value types
+and does not check them.
+
 A section computation runs once per section of `region ∩ captured sections` and returns one partial
 value; it reads only `SectionContext` (the snapshot slice) and has no `inputs()`. An aggregate
 computation runs once after the fold and returns one value; it reads the folded values through
@@ -665,6 +670,9 @@ stays total. A custom computation that sums over its slice and ignores `unreadab
 defect, not a different verdict. An occupant spanning a section boundary belongs to the section of
 its anchor, so a fold never counts it twice. All three are section computations; folding is the
 key's `Merge`.
+
+I-13 covers what a document can express: a computation carrying a lambda (the three-argument
+`count(predicate)`) has identity equality and therefore no document counterpart.
 
 `AggregateContext` has the same total read for the computation's whole local region, not one
 section: `cells()` is `computation.region()`, `read(cell)` maps the local cell through the siting and

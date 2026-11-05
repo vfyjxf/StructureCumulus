@@ -202,6 +202,7 @@ public final class Codes {
     public static final CodeEntry definitionMissing = ...;         // SC-DOC-0011
     public static final CodeEntry noPositions = ...;               // SC-DOC-0012
     public static final CodeEntry readerFailed = ...;              // SC-DOC-0013
+    public static final CodeEntry documentDeclared = ...;          // SC-DOC-0014
     public static final CodeEntry computationFailed = ...;         // SC-CTX-0001
     public static final CodeEntry deriverMissing = ...;            // SC-CTX-0004
     public static final CodeEntry deriverFailed = ...;             // SC-CTX-0005
@@ -358,6 +359,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-DOC-0011` | ERROR | ✓ | a placement names a missing definition | `DocumentCompiler` |
 | `SC-DOC-0012` | INFO | – | the reader produced no spans | `DocumentReader` implementation |
 | `SC-DOC-0013` | ERROR | – | the reader/writer failed to parse/format | `DocumentReader`/`DocumentWriter` |
+| `SC-DOC-0014` | ERROR | ✓ | a declaration disagrees with the factory that produces it | `DocumentCompiler` |
 | `SC-CTX-0001` | ERROR | ✓ | a computation produced no value | `engine.check` |
 | `SC-CTX-0004` | ERROR | ✓ | a derivation names a missing deriver | `engine.derive` |
 | `SC-CTX-0005` | ERROR | ✓ | a deriver failed | `engine.derive` |
@@ -387,7 +389,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-MC-0010` | ERROR | ✓ | a host snapshot value was not captured | adapter host expectations (absent) and `McAnchors` (missing anchor state), always unreadable, never a mismatch |
 | `SC-MC-*` | — | — | adapter-only family; never minted by the kernel, never in `Codes.all`; the capture paths (`0001`–`0005`) relay through a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10), and the expectation paths (`0006`–`0010`) pass `SC-MC-0010` as the absent code of `Expectations.host` (`world` §4.11) | adapter |
 
-`Codes.all` has 65 entries in this revision, matching the registry; the capture-report and host
+`Codes.all` has 66 entries in this revision, matching the registry; the capture-report and host
 expectation channels add none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot
 express the siting orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by
 the adapter in a `CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries,
@@ -401,7 +403,7 @@ neither channel suppresses the other.
 
 ## 7. Tests
 
-- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 65 entries, one per code,
+- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 66 entries, one per code,
   every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-*` are
   absent from `all`.
 - Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`
