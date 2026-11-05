@@ -229,13 +229,13 @@ An `instance` value outlives an attempt only because the host persists it. For a
 host may offer those values through `CachedContext`, a get-only port keyed by value identity
 `(id, type)`; `MatchRequest.cachedContext` carries it. It is a port, not a `ContextView`: a host
 that decodes a stored `StructureContext` answers by id and type and never has to reconstruct
-`merge`/`whenAbsent`, and the kernel never enumerates the cache.
+`merge`, and the kernel never enumerates the cache.
 
 `check` composes the cache read-only with the attempt's own values (`engine` §7.7): only
 `Retention.instance` keys are eligible, and only keys the plan declares as instance dependencies — a
 check's `ExpectationMeta.requires()` or a section/aggregate `Computation.inputs()` — participate. A
 current attempt value shadows the cache, including when the producer's key object differs in
-`merge`/`whenAbsent`; a cached lookup answers by `(id, type)`; a wrong-typed value or a host
+`merge`; a cached lookup answers by `(id, type)`; a wrong-typed value or a host
 exception is treated as absent. A required key still absent after composition is `SC-CTX-0007`.
 
 The host owns cache validation, read, write, invalidation and persistence. The kernel defines no

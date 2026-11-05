@@ -92,14 +92,6 @@ class StructureValidationTest {
     }
 
     @Test
-    void whenAbsentMustMatchTheKeyType() {
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> new ContextKey(id("bad"), Long.class, Retention.instance, null, "x")
-        );
-    }
-
-    @Test
     void aConflictExplainsItself() {
         assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of(), FindingBundle.empty()));
     }

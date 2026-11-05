@@ -371,11 +371,7 @@ public final class DocumentCompiler {
             if (spec.merge() != null && merge == null) {
                 continue;
             }
-            Object absent = spec.whenAbsent() == null ? null : decode(spec.whenAbsent(), type, spec, findings);
-            if (spec.whenAbsent() != null && absent == null) {
-                continue;
-            }
-            ContextKey<?> key = rawKey(spec, type, merge, absent);
+            ContextKey<?> key = rawKey(spec, type, merge);
             ContextKey<?> previous = keys.putIfAbsent(key.id(), key);
             if (previous != null && !previous.equals(key)) {
                 error(
@@ -394,10 +390,9 @@ public final class DocumentCompiler {
     private static ContextKey<?> rawKey(
         KeySpec spec,
         Class<?> type,
-        @Nullable Merge<?> merge,
-        @Nullable Object absent
+        @Nullable Merge<?> merge
     ) {
-        return ContextKeys.of(spec.id(), (Class) type, spec.retention(), (Merge) merge, absent);
+        return ContextKeys.of(spec.id(), (Class) type, spec.retention(), (Merge) merge);
     }
 
     private static @Nullable Class<?> type(String name, CompilerContext context, KeySpec spec, List<Finding> findings) {
@@ -456,37 +451,6 @@ public final class DocumentCompiler {
             return null;
         }
         return (Merge<?>) candidate;
-    }
-
-    private static @Nullable Object decode(Value value, Class<?> type, KeySpec spec, List<Finding> findings) {
-        if (type.equals(Long.class)) {
-            long number = value.asNumber(Long.MIN_VALUE);
-            if (number != Long.MIN_VALUE) {
-                return number;
-            }
-        } else if (type.equals(Integer.class)) {
-            long number = value.asNumber(Long.MIN_VALUE);
-            if (number >= Integer.MIN_VALUE && number <= Integer.MAX_VALUE) {
-                return (int) number;
-            }
-        } else if (type.equals(Boolean.class)) {
-            if (value.isBoolean()) {
-                return value.asBoolean(false);
-            }
-        } else if (type.equals(String.class)) {
-            if (value instanceof Value.StringValue stringValue) {
-                return stringValue.value();
-            }
-        } else if (type.equals(NamespacedId.class)) {
-            NamespacedId id = value instanceof Value.StringValue stringValue
-                    ? NamespacedId.parse(stringValue.value())
-                    : null;
-            if (id != null) {
-                return id;
-            }
-        }
-        error(findings, Codes.keyType, "whenAbsent does not fit key " + spec.id(), spec.source(), null);
-        return null;
     }
 
     private static Map<NamespacedId, Bay> buildBays(List<BaySpec> specs, Cuboid bounds, List<Finding> findings) {

@@ -1002,9 +1002,6 @@ public final class MatchEngine {
             }
             TreeMap<SectionKey, Object> parts = contributions.get(key);
             if (parts == null || parts.isEmpty()) {
-                if (key.whenAbsent() != null) {
-                    values.put(key, key.whenAbsent());
-                }
                 return;
             }
             Merge<Object> merge = (Merge<Object>) key.merge();

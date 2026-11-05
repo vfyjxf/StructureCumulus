@@ -96,7 +96,7 @@ public final class JsonReader implements DocumentReader {
 
     private static final Set<String> computationMembers = Set.of("id", "kind", "output", "bay", "region", "inputs");
 
-    private static final Set<String> keyMembers = Set.of("id", "type", "retention", "merge", "whenAbsent");
+    private static final Set<String> keyMembers = Set.of("id", "type", "retention", "merge");
 
     private static final Set<String> placementMembers = Set.of("definition", "as", "at");
 
@@ -666,16 +666,10 @@ public final class JsonReader implements DocumentReader {
                 }
             }
             NamespacedId merge = optionalId(object, "merge", path);
-            Value whenAbsent = null;
-            @Nullable
-            JsonElement absentElement = object.get("whenAbsent");
-            if (absentElement != null) {
-                whenAbsent = value(absentElement, field(path, "whenAbsent"), 0);
-            }
             if (id == null || type == null || retention == null) {
                 return null;
             }
-            return new KeySpec(id, type, retention, merge, whenAbsent, span(path));
+            return new KeySpec(id, type, retention, merge, span(path));
         }
 
         private List<PlacementSpec> placements(JsonObject object, String path) {

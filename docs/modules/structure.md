@@ -757,7 +757,7 @@ in `Codes.all`.
 - Build: an `instance` requirement needs no producer; a `match` requirement without a producer is
   `SC-CHK-0002`; a derivation output is a legal `instance` requirement. Cached composition: instance
   keys only; eligible via check requires or computation inputs; `(id, type)` lookup answers a
-  host-decoded key with lost `merge`/`whenAbsent`; current values shadow; a `match` key is never read;
+  host-decoded key with lost `merge`; current values shadow; a `match` key is never read;
   a wrong type or host exception is absent; an aggregate sees the composite.
 
 ## 8. Dependencies

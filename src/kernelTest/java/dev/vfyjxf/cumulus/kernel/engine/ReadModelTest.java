@@ -203,7 +203,7 @@ class ReadModelTest {
     void refusedComputationReportsAndIsMissingInsteadOfShortSum() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
         CuboidSet bayCells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
         Bay bay = bay(bayCells, Coverage.everyCell, Footprint.box());
         Blueprint blueprint = Blueprint.builder(id("partial")).bounds(Cuboid.of(0, 0, 0, 3, 1, 1))
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))
@@ -230,7 +230,7 @@ class ReadModelTest {
     void relayedKernelCodeBecomesRequiredReadUnavailable() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
         CuboidSet bayCells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
         Bay bay = bay(bayCells, Coverage.everyCell, Footprint.box());
         Blueprint blueprint = Blueprint.builder(id("kernel_code")).bounds(Cuboid.of(0, 0, 0, 3, 1, 1))
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))

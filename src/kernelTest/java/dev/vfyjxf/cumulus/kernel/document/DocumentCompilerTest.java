@@ -71,7 +71,7 @@ class DocumentCompilerTest {
                 .subtract(Cuboid.of(1, 0, 1, 2, 1, 2));
         CuboidSet hollowCells = CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2));
         CuboidSet fireCells = CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2));
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
 
         Value block = Value.object(Map.of("kind", Value.string("block"), "id", Value.string("minecraft:stone_bricks")));
         Value airElement = Value.object(Map.of("kind", Value.string("air")));
@@ -144,7 +144,7 @@ class DocumentCompilerTest {
                     null
                 )
             ),
-            List.of(new KeySpec(id("air_cells"), "long", Retention.instance, NamespacedId.of("sum"), null, null)),
+            List.of(new KeySpec(id("air_cells"), "long", Retention.instance, NamespacedId.of("sum"), null)),
             List.of(),
             List.of(),
             null,
@@ -557,7 +557,7 @@ class DocumentCompilerTest {
             List.of(),
             List.of(),
             List.of(
-                new KeySpec(id("total"), "long", Retention.instance, NamespacedId.of("mymod", "sum"), null, null)
+                new KeySpec(id("total"), "long", Retention.instance, NamespacedId.of("mymod", "sum"), null)
             ),
             List.of(),
             List.of(),
@@ -595,7 +595,7 @@ class DocumentCompilerTest {
                     null
                 )
             ),
-            List.of(new KeySpec(id("b"), "long", Retention.instance, NamespacedId.of("sum"), null, null)),
+            List.of(new KeySpec(id("b"), "long", Retention.instance, NamespacedId.of("sum"), null)),
             List.of(),
             List.of(),
             null,
@@ -646,7 +646,7 @@ class DocumentCompilerTest {
                     null
                 )
             ),
-            List.of(new KeySpec(id("out"), "long", Retention.instance, null, null, null)),
+            List.of(new KeySpec(id("out"), "long", Retention.instance, null, null)),
             List.of(),
             List.of(),
             null,

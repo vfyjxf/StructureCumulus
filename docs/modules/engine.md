@@ -298,7 +298,7 @@ persistence, and may pass `null`.
 1. the current attempt value with the exact `ContextKey` wins (folded section values, aggregate
    values and match values);
 2. otherwise a current attempt value with the same `(id, type, Retention.instance)` wins, so the
-   current attempt shadows the cache when its producer key object differs in `merge`/`whenAbsent`;
+   current attempt shadows the cache when its producer key object differs in `merge`;
 3. otherwise, when the key is `Retention.instance` and its `(id, type)` is eligible, the value is
    `cachedContext.get(key.id(), key.type())`;
 4. otherwise the key is absent.
@@ -345,7 +345,7 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
   aggregate and no claim or context write happens.
 - Context expectation: match/mismatch (`SC-EXP-0001`)/missing (`SC-CTX-0007`); the declared requires
   gate the key. Cached composition: instance-only; eligible via check requires or computation
-  inputs; `(id, type)` lookup answers a host-decoded key with lost `merge`/`whenAbsent`; the current
+  inputs; `(id, type)` lookup answers a host-decoded key with lost `merge`; the current
   value shadows the cached one; a `match` key is never read; a wrong type or host exception is
   absent; an aggregate sees the same composite; a cached value is never published; the same request
   and cache are deterministic.

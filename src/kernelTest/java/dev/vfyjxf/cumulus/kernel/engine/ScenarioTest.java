@@ -102,7 +102,7 @@ class ScenarioTest {
             Sharing.exclusive
         );
 
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
         ContextKey<Long> capacity = ContextKeys.of(id("capacity"), Long.class, Retention.instance);
         DerivationSpec capacitySpec = new DerivationSpec(id("capacity_deriver"), Value.object(), capacity.id(), 0);
 
@@ -471,7 +471,7 @@ class ScenarioTest {
     void refusedCellMakesTheAttemptUndecided() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
         Blueprint blueprint = Blueprint.builder(id("refused")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))
                 .computation(Computations.air(air, cells)).build();
@@ -576,7 +576,7 @@ class ScenarioTest {
         Bay cavity = Bay.of(id("cavity"), cavityCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Bay mouth = Bay.of(id("mouth"), mouthCells, Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
         ContextKey<Long> volume = ContextKeys
-                .of(id("cavity_volume"), Long.class, Retention.instance, Merges.sum(), null);
+                .of(id("cavity_volume"), Long.class, Retention.instance, Merges.sum());
         Blueprint blueprint = Blueprint.builder(id("furnace")).bounds(Cuboid.of(0, 0, 0, 7, 6, 7)).check(
             Check.of(id("wall_bricks"), wall, Focuses.bay(), Expectations.eachCell(Expectations.block(TestWorld.stone)))
         ).check(Check.of(id("cavity_air"), cavity, Focuses.bay(), Expectations.eachCell(Expectations.air())))
@@ -712,7 +712,7 @@ class ScenarioTest {
     void sectionComputationMapsThroughSiting() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
         Blueprint blueprint = Blueprint.builder(id("section_offset")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))
                 .computation(Computations.air(air, cells)).build();
@@ -742,7 +742,7 @@ class ScenarioTest {
     @Test
     void aMissingSectionContributionIsAComputationFailure() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> key = ContextKeys.of(id("missing"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> key = ContextKeys.of(id("missing"), Long.class, Retention.instance, Merges.sum());
         SectionComputation<Long> missing = new SectionComputation<>() {
             @Override
             public Outcome<Long> compute(SectionContext ctx) {

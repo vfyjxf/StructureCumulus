@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.engine;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.Merges;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
@@ -20,6 +21,7 @@ import dev.vfyjxf.cumulus.kernel.structure.AggregateContext;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
+import dev.vfyjxf.cumulus.kernel.structure.Computations;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Expectation;
@@ -27,6 +29,8 @@ import dev.vfyjxf.cumulus.kernel.structure.ExpectationMeta;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import dev.vfyjxf.cumulus.kernel.structure.Reply;
+import dev.vfyjxf.cumulus.kernel.structure.SectionComputation;
+import dev.vfyjxf.cumulus.kernel.structure.SectionContext;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Context aggregates: custom aggregate values, missing results, dead whenAbsent and derivation keys. */
+/** Context aggregates: custom aggregate values, missing results, absent keys and derivation keys. */
 class ContextAggregateScenarioTest {
 
     private static final Siting siting = MagicFixtures.identity(LatticePoint.origin);
@@ -70,7 +74,7 @@ class ContextAggregateScenarioTest {
     @DisplayName("an INSTANCE requirement without a producer builds and is SC-CTX-0007 at check")
     void anInstanceRequirementWithoutAComputationIsMissingAtRuntime() {
         ContextKey<Long> key = ContextKeys
-                .of(MagicFixtures.id("context/when_absent"), Long.class, Retention.instance, null, 7L);
+                .of(MagicFixtures.id("context/unproduced_key"), Long.class, Retention.instance);
         Blueprint blueprint = requiringBlueprint("context/absent", key);
         TestWorld.View view = MagicFixtures.view().air(LatticePoint.origin);
         MatchResult result = MagicFixtures.check(blueprint, siting, view, new ClaimView(List.of(), 0, true));
@@ -79,8 +83,84 @@ class ContextAggregateScenarioTest {
         assertTrue(MagicFixtures.hasCode(undecided, Codes.keyAbsent), "the absent instance key is SC-CTX-0007");
         assertTrue(
             undecided.partial() != null && undecided.partial().value(key).fold(value -> false, () -> true),
-            "the whenAbsent value is never produced"
+            "an unproduced key has no value"
         );
+    }
+
+    @Test
+    void anEmptyRegionLeavesTheKeyAbsent() {
+        ContextKey<Long> key = ContextKeys
+                .of(MagicFixtures.id("context/uncontributed_key"), Long.class, Retention.instance, Merges.sum());
+        SectionComputation<Long> silent = new SectionComputation<>() {
+            @Override
+            public Outcome<Long> compute(SectionContext ctx) {
+                return Outcome.missing();
+            }
+
+            @Override
+            public NamespacedId id() {
+                return MagicFixtures.id("context/silent");
+            }
+
+            @Override
+            public ContextKey<Long> output() {
+                return key;
+            }
+
+            @Override
+            public Set<ContextKey<?>> inputs() {
+                return Set.of();
+            }
+
+            @Override
+            public CuboidSet region() {
+                return region;
+            }
+        };
+        Bay bay = MagicFixtures.bay(
+            MagicFixtures.id("context/uncontributed_bay"),
+            region,
+            Coverage.anySubject,
+            Footprint.none(),
+            Sharing.shared
+        );
+        Blueprint blueprint = Blueprint.builder(MagicFixtures.id("context/uncontributed")).bounds(bounds)
+                .computation(silent)
+                .check(
+                    Check.of(
+                        MagicFixtures.id("context/uncontributed_check"),
+                        bay,
+                        Focuses.context(key),
+                        expectation(key)
+                    )
+                )
+                .build();
+        TestWorld.View view = MagicFixtures.view().air(LatticePoint.origin);
+        MatchResult result = MagicFixtures.check(blueprint, siting, view, new ClaimView(List.of(), 0, true));
+        MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, result);
+        assertEquals(UndecidedReason.unreadable, undecided.reason());
+        assertTrue(MagicFixtures.hasCode(undecided, Codes.keyAbsent), "nothing contributed leaves the key absent");
+    }
+
+    @Test
+    void aComputationThatContributesZeroIsNotAbsent() {
+        ContextKey<Long> key = ContextKeys
+                .of(MagicFixtures.id("context/zero_key"), Long.class, Retention.instance, Merges.sum());
+        Bay bay = MagicFixtures.bay(
+            MagicFixtures.id("context/zero_bay"),
+            region,
+            Coverage.anySubject,
+            Footprint.none(),
+            Sharing.shared
+        );
+        Blueprint blueprint = Blueprint.builder(MagicFixtures.id("context/zero")).bounds(bounds)
+                .computation(Computations.count(key, region))
+                .check(Check.of(MagicFixtures.id("context/zero_check"), bay, Focuses.context(key), expectation(key)))
+                .build();
+        TestWorld.View view = MagicFixtures.view().air(LatticePoint.origin);
+        MatchResult result = MagicFixtures.check(blueprint, siting, view, new ClaimView(List.of(), 0, true));
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, result);
+        assertEquals(0L, admitted.outcome().value(key).fold(value -> value, () -> -1L));
     }
 
     @Test

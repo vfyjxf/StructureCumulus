@@ -129,8 +129,7 @@ class CoreTest {
         assertEquals(a, b);
         assertFalse(a.contributed());
         ContextKey<Long> c = ContextKeys
-                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right, 0L);
+                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right);
         assertTrue(c.contributed());
-        assertEquals(0L, c.whenAbsent());
     }
 }

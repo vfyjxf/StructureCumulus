@@ -92,9 +92,9 @@ class CachedContextTest {
     @Test
     void aHostDecodedKeyAnswersByTypeAndIdentity() {
         ContextKey<Long> blueprintKey = ContextKeys
-                .of(id("cached/identity"), Long.class, Retention.instance, Merges.sum(), 11L);
+                .of(id("cached/identity"), Long.class, Retention.instance, Merges.sum());
         ContextKey<Long> decodedKey = plainKey("cached/identity");
-        assertNotEquals(blueprintKey, decodedKey, "a decoded key loses merge and whenAbsent");
+        assertNotEquals(blueprintKey, decodedKey, "a decoded key loses merge");
 
         Blueprint blueprint = requiringBlueprint("cached/identity", blueprintKey);
         CachedContext cached = hostDecoded(decodedContext(Map.of(decodedKey, 5L)));
@@ -162,7 +162,7 @@ class CachedContextTest {
     void theCurrentAttemptValueShadowsTheCachedValue() {
         ContextKey<Long> declaredKey = instanceKey("cached/shadow");
         ContextKey<Long> producedKey = ContextKeys
-                .of(id("cached/shadow"), Long.class, Retention.instance, Merges.sum(), 11L);
+                .of(id("cached/shadow"), Long.class, Retention.instance, Merges.sum());
         ContextKey<Long> aggregateKey = instanceKey("cached/shadow_aggregate");
         CuboidSet region = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
         List<Computation<?>> computations = List

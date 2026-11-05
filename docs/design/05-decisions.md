@@ -607,7 +607,7 @@ definition is `SC-DOC-0002`; an empty `E` changes nothing. **Status:** implement
 values an earlier settle/derive produced. The current attempt is authoritative. A value computed or
 published in this attempt wins; a cached value is visible only for an instance key the plan declares
 (`ExpectationMeta.requires()` for a check, `Computation.inputs()` for an aggregate); a missing or
-wrong-typed cached value stays absent. Producer-only key fields (`merge`, `whenAbsent`, `retention`)
+wrong-typed cached value stays absent. Producer-only key fields (`merge`, `retention`)
 are not part of the lookup key. The kernel never writes, serialises, stamps, evicts or invalidates the
 cache; the host owns every freshness rule.
 
@@ -1169,6 +1169,22 @@ envelope or at a neighbouring bay. Warnings do not survive that path.
 **Why not implement the dropped meanings.** A bay no check names has no obligation to state — its
 coverage is decided by checks; a definition's `arguments` and `extensions` would need placement-time
 semantics no document uses; an unreachable definition has no site.
+
+### D-64 — A key has no default value
+
+`ContextKey` loses `whenAbsent`, the document schema loses the field, and `fold` loses the branch that
+wrote a default when no section contributed. A key that nothing contributed is absent; an author who
+wants 0 on an empty region contributes 0.
+
+**Why delete instead of completing the decoder.** The document decoder resolves long, int, boolean,
+string and id — not `cuboid`, not `cuboid_set`, and not a custom type, which would need a value
+catalog of its own. Completing the built-ins would leave the field permanently half-supported, and the
+long case uses `Long.MIN_VALUE` as "absent", so `Long.MIN_VALUE` itself is rejected.
+
+**Why the field is nearly dead already.** The shipped computations always answer `Found`: `count`
+counts to zero rather than reporting missing. A default is only needed by a custom section computation
+that deliberately answers `Missing` for readable sections — and that case is better written as
+"answer zero".
 
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.

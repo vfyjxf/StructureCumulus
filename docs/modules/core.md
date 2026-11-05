@@ -111,7 +111,7 @@ public interface Merge<T> {
 }
 
 public record ContextKey<T>(NamespacedId id, Class<T> type, Retention retention,
-                            @Nullable Merge<T> merge, @Nullable T whenAbsent) {
+                            @Nullable Merge<T> merge) {
     public ContextKey { /* non-null id, type, retention */ }
     public boolean contributed();
 }
@@ -120,8 +120,6 @@ public final class ContextKeys {
     public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention);
     public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention,
                                        @Nullable Merge<T> merge);
-    public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention,
-                                       @Nullable Merge<T> merge, @Nullable T whenAbsent);
     private ContextKeys() {}
 }
 
@@ -251,15 +249,15 @@ and no global counter in the kernel; the host supplies the numbers.
 explain a missing value builds the finding where the locus is known; `Outcome` is the common
 vocabulary of a lookup, not a report.
 
-**L4 — key identity.** `ContextKey` equality is the full record: id, type, retention, merge and
-`whenAbsent`. A catalog owns uniqueness by id; two keys with one id and different types are a
+**L4 — key identity.** `ContextKey` equality is the full record: id, type, retention and `merge`.
+A catalog owns uniqueness by id; two keys with one id and different types are a
 catalog error (`SC-SPI-0003`). `ContextKeys.of` is the only constructor that the kernel uses; the
 canonical constructor validates and `ContextKeys` is the intended factory.
 
 **L5 — merge is associative, with no identity.** `merge.combine` must be associative; the kernel
 never supplies an identity. A key with `merge != null` is section-contributed; a key with
-`merge == null` is single-writer. `whenAbsent` is used only when every section of the region was
-readable and no contribution was produced. It may be `null`, which means "absent".
+`merge == null` is single-writer. A key that nothing contributed is absent; a key has no default
+value.
 
 **L6 — retention is lifetime.** `match` values live in `MatchOutcome` and are readable by later
 units of the same attempt; they are never published. `instance` values are published once by a

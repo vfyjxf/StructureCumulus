@@ -92,8 +92,8 @@ not a scheduling unit and not declared by a blueprint.
    computation that sums over the slice must return `Missing` for a refused cell. Charge cells and
    sections.
 3. **Barrier.** For each contributed key, sort contributions by `SectionKey` and fold with
-   `Merge.combine`. If any section was missing or refused, the key is absent. If all sections were
-   readable and nothing was contributed, use `ContextKey.whenAbsent` (possibly null).
+   `Merge.combine`. If any section was missing or refused, the key is absent. A key that nothing
+   contributed is absent.
 4. **Aggregate pass.** In a topological order of `inputs()`, call `compute(AggregateContext)`. A
    `Found(value)` writes the key; a `Missing` makes it absent and reports `SC-CTX-0001` unless the
    computation reported its own finding. A cycle is a compile error, so this cannot fail here.

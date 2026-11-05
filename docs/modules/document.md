@@ -91,8 +91,7 @@ public record ComputationSpec(NamespacedId id, NamespacedId kind, Value args,
                               @Nullable SourceSpan source) { }
 
 public record KeySpec(NamespacedId id, String type, Retention retention,
-                      @Nullable NamespacedId merge, @Nullable Value whenAbsent,
-                      @Nullable SourceSpan source) { }
+                      @Nullable NamespacedId merge, @Nullable SourceSpan source) { }
 
 public record PlacementSpec(NamespacedId definition, LatticePoint offset, NamespacedId alias,
                             @Nullable SourceSpan source) { }
@@ -260,7 +259,7 @@ check time, never a default.
 A key declaration maps a JSON type name to a `Class`: `long`, `int`, `boolean`, `string`, `id`,
 `cuboid`, `cuboid_set`. A custom type needs a `CompilerContext.types` entry; a document key is always
 a built-in type in v1. `merge` names `sum`, `union`, `min`, `max`, `and`, `or`; absent means
-single-writer. `whenAbsent` is decoded to the key type; a wrong kind is `SC-DOC-0008`.
+single-writer, and a merge that does not fit the type is `SC-DOC-0008`.
 
 ### 4.2 Definitions in v1
 
@@ -384,7 +383,7 @@ canonical blueprint form.
 | `SC-DOC-0005` | ERROR | placement/box outside root bounds | `DocumentCompiler` |
 | `SC-DOC-0006` | ERROR | a check names no merged bay | `DocumentCompiler` |
 | `SC-DOC-0007` | ERROR | a spec names an undeclared key | `DocumentCompiler` |
-| `SC-DOC-0008` | ERROR | key type/`whenAbsent` mismatch | `DocumentCompiler` |
+| `SC-DOC-0008` | ERROR | key type/merge mismatch | `DocumentCompiler` |
 | `SC-DOC-0009` | ERROR | definition cycle | `DocumentCompiler` |
 | `SC-DOC-0010` | ERROR | derivation output/order duplicate | `DocumentCompiler` |
 | `SC-DOC-0011` | ERROR | placement names a missing definition | `DocumentCompiler` |
@@ -405,7 +404,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 - Schema: missing/unknown/wrong-kind field; version 2; duplicate id; missing bay; missing key;
   type mismatch; cycle; missing definition; placement outside bounds.
 - Placement: alias qualification, offset, two placements of one definition, duplicate ids.
-- Keys: `long`/`int`/`boolean`/`string`/`id`/`cuboid`/`cuboid_set`; merge names; `whenAbsent`.
+- Keys: `long`/`int`/`boolean`/`string`/`id`/`cuboid`/`cuboid_set`; merge names; a removed key member
+  is an unknown member.
 - Reads: a `trait`/`trait_absent` declaration contributes its trait id, a `nested` focus its kind and
   depth; the document path and the Java builder produce equal `Blueprint.reads()`.
 - Host kinds: `property`, `state`, `tag` and `fluid` read as ordinary `checks` and compile only

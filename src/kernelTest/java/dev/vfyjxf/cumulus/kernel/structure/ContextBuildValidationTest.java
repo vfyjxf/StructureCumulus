@@ -31,12 +31,6 @@ class ContextBuildValidationTest {
     }
 
     @Test
-    void aWhenAbsentInstanceRequirementWithoutAComputationBuilds() {
-        ContextKey<Long> key = ContextKeys.of(id("when_absent_key"), Long.class, Retention.instance, null, 7L);
-        assertDoesNotThrow(() -> requiringBlueprint("when_absent", key).build());
-    }
-
-    @Test
     void aDerivationOutputInstanceRequirementBuilds() {
         ContextKey<Long> key = ContextKeys.of(id("derived_key"), Long.class, Retention.instance);
         BlueprintBuilder builder = requiringBlueprint("derived", key)

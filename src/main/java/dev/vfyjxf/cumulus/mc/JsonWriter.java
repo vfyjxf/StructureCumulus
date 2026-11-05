@@ -240,9 +240,6 @@ public final class JsonWriter implements DocumentWriter {
             if (key.merge() != null) {
                 json.addProperty("merge", JsonVocabulary.idText(key.merge()));
             }
-            if (key.whenAbsent() != null) {
-                json.add("whenAbsent", JsonValues.value(key.whenAbsent()));
-            }
             array.add(json);
         }
         return array;

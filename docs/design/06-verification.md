@@ -110,7 +110,7 @@ They are the acceptance suite; a module test that does not feed one of them is o
 6. **Entity pen** — `anySubject + Bound`, entity focus, window read; a footprint leaving the bay is
    `Failed`; two entities is ambiguous; a body wider than `maxEntitySpan` is a build error.
 7. **Absence** — a refused middle section makes a contributed key absent; a check reading it is
-   `Unreadable`, never a short sum; `whenAbsent` is used only when all sections are readable.
+   `Unreadable`, never a short sum.
 8. **Budget** — a budget too small for the section pass is `Undecided(budgetExhausted)`, no claims.
 9. **Gate** — a lease that is no longer current at the start or after the units is `Dropped`, no
    claims, no context publish.
@@ -196,7 +196,7 @@ being silently covered (`DoorCoverageScenarioTest`, `110e797`).
 ### 3.2 Stress batch `kernel-stress-batch-2`
 
 The second characterization batch, tagged `kernel-stress-batch-2` and committed at `3e60ed4`: 4 kernel
-scenario classes (17 tests) in `kernelTest/.../engine` and 3 adapter unit classes (11 tests) in
+scenario classes (19 tests) in `kernelTest/.../engine` and 3 adapter unit classes (11 tests) in
 `src/test/.../mc`. The one code change is the `NestedFocus` fix below; the suite stays
 characterization, not a new kernel promise.
 
@@ -204,7 +204,7 @@ characterization, not a new kernel promise.
 | --- | --- | --- | --- |
 | kernel | `NestedCoverageScenarioTest` | a nested focus binds no subject; `oneSubject + Bound` at build; `anySubject + Bound` with a non-claimable custom focus at build; a cut child; a child-frame occupant | 4 |
 | kernel | `ClaimStressScenarioTest` | shared/exclusive walls, per-owner release, whole-key settle replacement, duplicate rows | 5 |
-| kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, `whenAbsent` on a check-only key, a derivation output | 4 |
+| kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, an instance requirement without a producer, a derivation output, an uncontributed key staying absent, a contributed zero | 6 |
 | kernel | `GateBudgetScenarioTest` | stale lease at check, mid-attempt invalidation, invalidation before settle, a tiny budget | 4 |
 | adapter | `EntityWindowPolicyTest` | the blueprint-local entity window mapped into `CommandSupport.policy` through the siting (identity, nonzero and a dropped unmappable window), and a set's root/satellite windows mapped by their own sitings | 2 |
 | kernel | `StructureManagerTest` | begin/commit/abort, draft rejection, formed replacement, moved/broken/loaded/unloaded, bounds lookup and post-commit publish | 7 |
@@ -216,7 +216,6 @@ and not a pending list:
 | Gap | Asserted by |
 | --- | --- |
 | Two `shared` bays over one cell write duplicate claim rows | `ClaimStressScenarioTest.duplicateRowsAreCharacterized` |
-| `whenAbsent` is a dead path for a check-only key: it needs a section computation, so a check cannot reach it | `ContextAggregateScenarioTest.whenAbsentIsADeadPathForACheckOnlyKey` |
 
 **D4 fixed.** The host maps every blueprint-local entity window through its siting before it builds
 `SnapshotPolicy`: `CommandSupport.policy(blueprint, siting)` maps one blueprint's windows,
