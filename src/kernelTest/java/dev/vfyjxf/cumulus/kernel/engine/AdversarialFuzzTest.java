@@ -311,9 +311,13 @@ class AdversarialFuzzTest {
                     MatchEngine.settle(rivalRequest, rivalAdmitted, ledger, TestAttempt.of(rivalRequest))
                 );
                 ClaimView frozen = ledger.read(Objects.requireNonNull(siting.toWorld(bounds), where + " world bounds"));
+                Siting oursSiting = Siting.of(
+                    worldCell,
+                    Orientation.of(Turn.clockwise, Tilt.level, Flip.none)
+                );
                 MatchRequest request = MatchRequest.of(
                     blueprint,
-                    siting,
+                    oursSiting,
                     new TestWorld.Lease(view),
                     MagicFixtures.instance,
                     MagicFixtures.owner,

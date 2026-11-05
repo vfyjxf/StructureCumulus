@@ -18,10 +18,13 @@ import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
+import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
@@ -81,11 +84,12 @@ public final class StructureLifecycleAdversarialGameTest {
         helper.setBlock(BlockPos.ZERO, Blocks.STONE);
         LatticePoint point = point(helper.absolutePos(BlockPos.ZERO));
         Siting siting = Siting.of(point, Orientation.identity);
+        Siting secondSiting = aside(siting);
         StructureInstance first = form(manager, state, level, ownerA, siting, point);
-        StructureInstance second = form(manager, state, level, ownerB, siting, point);
+        StructureInstance second = form(manager, state, level, ownerB, secondSiting, point);
         long base = ledger.revision();
         claim(ledger, first.id(), siting, point, Sharing.shared);
-        claim(ledger, second.id(), siting, point, Sharing.shared);
+        claim(ledger, second.id(), secondSiting, point, Sharing.shared);
         long settled = ledger.revision();
         assertEquals(helper, base + 2, settled, "two shared rows settle in two revisions");
         assertEquals(helper, 2, rows(ledger, point).size(), "two shared owners hold the cell");
@@ -534,6 +538,10 @@ public final class StructureLifecycleAdversarialGameTest {
             throw new GameTestAssertException("the server state is not open");
         }
         return state;
+    }
+
+    private static Siting aside(Siting siting) {
+        return Siting.of(siting.origin(), Orientation.of(Turn.clockwise, Tilt.level, Flip.none));
     }
 
     private static StructureInstance form(

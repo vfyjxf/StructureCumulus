@@ -170,7 +170,13 @@ class AdversarialClaimCoverageTest {
     void theLedgerSettleIsACompareAndSetOverTheWholeInstanceKey() {
         ClaimLedger ledger = MagicFixtures.ledger();
         ClaimRow shared = row(origin, Sharing.shared, instance, identity, "shared");
-        ClaimRow exclusive = row(origin, Sharing.exclusive, rivalInstance, identity, "rival");
+        ClaimRow exclusive = row(
+            origin,
+            Sharing.exclusive,
+            rivalInstance,
+            MagicFixtures.turn(origin, Turn.clockwise),
+            "rival"
+        );
 
         ClaimVerdict.Settled first = assertInstanceOf(
             ClaimVerdict.Settled.class,

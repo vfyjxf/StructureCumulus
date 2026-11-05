@@ -23,10 +23,13 @@ import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
+import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
@@ -86,12 +89,14 @@ public final class ExpandedLifecycleGameTest {
         helper.setBlock(BlockPos.ZERO, Blocks.STONE);
         LatticePoint cell = point(helper.absolutePos(BlockPos.ZERO));
         Siting siting = Siting.of(cell, Orientation.identity);
+        Siting secondSiting = aside(siting, Turn.clockwise);
+        Siting thirdSiting = aside(siting, Turn.half);
         StructureInstance first = form(manager, state, level, ownerA, siting, cell);
-        StructureInstance second = form(manager, state, level, ownerB, siting, cell);
-        StructureInstance third = form(manager, state, level, ownerC, siting, cell);
+        StructureInstance second = form(manager, state, level, ownerB, secondSiting, cell);
+        StructureInstance third = form(manager, state, level, ownerC, thirdSiting, cell);
         claim(ledger, first.id(), siting, cell, Sharing.shared);
-        claim(ledger, second.id(), siting, cell, Sharing.shared);
-        claim(ledger, third.id(), siting, cell, Sharing.shared);
+        claim(ledger, second.id(), secondSiting, cell, Sharing.shared);
+        claim(ledger, third.id(), thirdSiting, cell, Sharing.shared);
         long base = ledger.revision();
         assertEquals(helper, 3, rows(ledger, cell).size(), "three overlapping owners hold one cell");
 
@@ -136,12 +141,13 @@ public final class ExpandedLifecycleGameTest {
         LatticePoint firstCell = point(helper.absolutePos(firstRel));
         LatticePoint farCell = point(helper.absolutePos(farRel));
         Siting firstSiting = Siting.of(firstCell, Orientation.identity);
+        Siting secondSiting = aside(firstSiting, Turn.clockwise);
         Siting farSiting = Siting.of(farCell, Orientation.identity);
         StructureInstance first = form(manager, state, level, ownerA, firstSiting, firstCell);
-        StructureInstance second = form(manager, state, level, ownerB, firstSiting, firstCell);
+        StructureInstance second = form(manager, state, level, ownerB, secondSiting, firstCell);
         StructureInstance far = form(manager, state, level, ownerC, farSiting, farCell);
         claim(ledger, first.id(), firstSiting, firstCell, Sharing.shared);
-        claim(ledger, second.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, second.id(), secondSiting, firstCell, Sharing.shared);
         claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
 
@@ -197,12 +203,13 @@ public final class ExpandedLifecycleGameTest {
         Siting firstSiting = Siting.of(firstCell, Orientation.identity);
         Siting secondSiting = Siting.of(secondCell, Orientation.identity);
         Siting farSiting = Siting.of(farCell, Orientation.identity);
+        Siting overlappingSiting = aside(firstSiting, Turn.clockwise);
         StructureInstance first = form(manager, state, level, ownerA, firstSiting, firstCell);
-        StructureInstance second = form(manager, state, level, ownerB, firstSiting, firstCell);
+        StructureInstance second = form(manager, state, level, ownerB, overlappingSiting, firstCell);
         StructureInstance third = form(manager, state, level, ownerC, secondSiting, secondCell);
         StructureInstance far = form(manager, state, level, ownerD, farSiting, farCell);
         claim(ledger, first.id(), firstSiting, firstCell, Sharing.shared);
-        claim(ledger, second.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, second.id(), overlappingSiting, firstCell, Sharing.shared);
         claim(ledger, third.id(), secondSiting, secondCell, Sharing.shared);
         claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
@@ -247,12 +254,13 @@ public final class ExpandedLifecycleGameTest {
         helper.setBlock(stoneRel, Blocks.STONE);
         LatticePoint origin = point(helper.absolutePos(stoneRel));
         Siting siting = Siting.of(origin, Orientation.identity);
+        Siting secondSiting = aside(siting, Turn.clockwise);
         StructureInstance first = form(manager, state, level, ownerA, siting, origin);
-        StructureInstance second = form(manager, state, level, ownerB, siting, origin);
+        StructureInstance second = form(manager, state, level, ownerB, secondSiting, origin);
         manager.publish(first.id(), Map.of(count, 3L), FindingBundle.empty(), Spend.zero);
         manager.publish(second.id(), Map.of(count, 5L), FindingBundle.empty(), Spend.zero);
         claim(ledger, first.id(), siting, origin, Sharing.shared);
-        claim(ledger, second.id(), siting, origin, Sharing.shared);
+        claim(ledger, second.id(), secondSiting, origin, Sharing.shared);
         long base = ledger.revision();
 
         CumulusHooks.blockChanged(
@@ -310,19 +318,20 @@ public final class ExpandedLifecycleGameTest {
         Siting secondSiting = Siting.of(secondCell, Orientation.identity);
         StructureInstance moving = form(manager, state, level, ownerA, firstSiting, firstCell);
         StructureInstance following = form(manager, state, level, ownerB, secondSiting, secondCell);
+        Siting partialSiting = aside(firstSiting, Turn.clockwise);
         StructureInstance partial = formBounds(
             manager,
             state,
             level,
             ownerC,
-            firstSiting,
+            partialSiting,
             CuboidSet.of(Cuboid.of(firstCell), Cuboid.of(aboveCell))
         );
         manager.publish(moving.id(), Map.of(count, 1L), FindingBundle.empty(), Spend.zero);
         manager.publish(following.id(), Map.of(count, 2L), FindingBundle.empty(), Spend.zero);
         claim(ledger, moving.id(), firstSiting, firstCell, Sharing.shared);
         claim(ledger, following.id(), secondSiting, secondCell, Sharing.shared);
-        claimRows(ledger, partial.id(), firstSiting, List.of(firstCell, aboveCell), Sharing.shared);
+        claimRows(ledger, partial.id(), partialSiting, List.of(firstCell, aboveCell), Sharing.shared);
         long base = ledger.revision();
 
         CumulusHooks.blockChanged(
@@ -363,12 +372,13 @@ public final class ExpandedLifecycleGameTest {
         LatticePoint origin = point(helper.absolutePos(stoneRel));
         LatticePoint occupied = point(helper.absolutePos(occupiedRel));
         Siting siting = Siting.of(origin, Orientation.identity);
+        Siting secondSiting = aside(siting, Turn.clockwise);
         Siting occupying = Siting.of(occupied, Orientation.identity);
         StructureInstance first = form(manager, state, level, ownerA, siting, origin);
-        StructureInstance second = form(manager, state, level, ownerB, siting, origin);
+        StructureInstance second = form(manager, state, level, ownerB, secondSiting, origin);
         StructureInstance occupant = form(manager, state, level, ownerA, occupying, occupied);
         claim(ledger, first.id(), siting, origin, Sharing.shared);
-        claim(ledger, second.id(), siting, origin, Sharing.shared);
+        claim(ledger, second.id(), secondSiting, origin, Sharing.shared);
         claim(ledger, occupant.id(), occupying, occupied, Sharing.exclusive);
         long base = ledger.revision();
 
@@ -581,11 +591,12 @@ public final class ExpandedLifecycleGameTest {
         LatticePoint farCell = point(helper.absolutePos(farRel));
         Siting firstSiting = Siting.of(firstCell, Orientation.identity);
         Siting farSiting = Siting.of(farCell, Orientation.identity);
+        Siting secondSiting = aside(firstSiting, Turn.clockwise);
         StructureInstance first = form(manager, state, level, ownerA, firstSiting, firstCell);
-        StructureInstance second = form(manager, state, level, ownerB, firstSiting, firstCell);
+        StructureInstance second = form(manager, state, level, ownerB, secondSiting, firstCell);
         StructureInstance far = form(manager, state, level, ownerC, farSiting, farCell);
         claim(ledger, first.id(), firstSiting, firstCell, Sharing.shared);
-        claim(ledger, second.id(), firstSiting, firstCell, Sharing.shared);
+        claim(ledger, second.id(), secondSiting, firstCell, Sharing.shared);
         claim(ledger, far.id(), farSiting, farCell, Sharing.shared);
         long base = ledger.revision();
 
@@ -644,6 +655,10 @@ public final class ExpandedLifecycleGameTest {
             throw new GameTestAssertException("the server state is not open");
         }
         return state;
+    }
+
+    private static Siting aside(Siting siting, Turn turn) {
+        return Siting.of(siting.origin(), Orientation.of(turn, Tilt.level, Flip.none));
     }
 
     private static StructureInstance form(

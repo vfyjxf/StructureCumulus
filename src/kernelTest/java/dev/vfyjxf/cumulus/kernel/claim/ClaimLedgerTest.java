@@ -22,12 +22,17 @@ class ClaimLedgerTest {
 
     private static final World world = World.of(NamespacedId.of("test", "ledger"));
     private static final Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+    private static final Siting peerSiting = Siting.of(LatticePoint.of(40, 0, 0), Orientation.identity);
     private static final Cuboid everything = Cuboid.of(-8, -8, -8, 64, 8, 8);
     private static final InstanceId first = new InstanceId(world, 1);
     private static final InstanceId second = new InstanceId(world, 2);
 
     private static ClaimRow row(InstanceId instance, Sharing sharing, int x, String bay) {
-        return new ClaimRow(LatticeKey.of(LatticePoint.of(x, 0, 0)), sharing, siting, NamespacedId.of("test", bay), instance);
+        return row(instance, sharing, siting, x, bay);
+    }
+
+    private static ClaimRow row(InstanceId instance, Sharing sharing, Siting at, int x, String bay) {
+        return new ClaimRow(LatticeKey.of(LatticePoint.of(x, 0, 0)), sharing, at, NamespacedId.of("test", bay), instance);
     }
 
     private static ClaimVerdict settle(ClaimLedger ledger, InstanceId instance, long expected, ClaimRow... rows) {
@@ -90,11 +95,11 @@ class ClaimLedgerTest {
         settle(ledger, first, 0, incumbent);
         assertEquals(1, ledger.revision());
 
-        ClaimVerdict moved = settle(ledger, second, 0, row(second, Sharing.exclusive, 19, "bay"));
+        ClaimVerdict moved = settle(ledger, second, 0, row(second, Sharing.exclusive, peerSiting, 19, "bay"));
         assertEquals(new ClaimVerdict.RevisionMoved(0, 1), moved);
         assertEquals(1, ledger.revision());
 
-        ClaimVerdict conflict = settle(ledger, second, 1, row(second, Sharing.exclusive, 18, "bay"));
+        ClaimVerdict conflict = settle(ledger, second, 1, row(second, Sharing.exclusive, peerSiting, 18, "bay"));
         assertInstanceOf(ClaimVerdict.Conflict.class, conflict);
         assertEquals(1, ledger.revision());
         assertEquals(List.of(incumbent), ledger.read(everything).rows());
@@ -106,7 +111,7 @@ class ClaimLedgerTest {
         ClaimRow incumbent = row(first, Sharing.exclusive, 0, "bay");
         settle(ledger, first, 0, incumbent);
 
-        ClaimVerdict verdict = settle(ledger, second, 1, row(second, Sharing.exclusive, 0, "bay"));
+        ClaimVerdict verdict = settle(ledger, second, 1, row(second, Sharing.exclusive, peerSiting, 0, "bay"));
 
         ClaimVerdict.Conflict conflict = assertInstanceOf(ClaimVerdict.Conflict.class, verdict);
         assertEquals(List.of(incumbent), conflict.incumbents());
@@ -119,11 +124,14 @@ class ClaimLedgerTest {
     void sharedClaimsCoexistButAnExclusiveOneConflicts() {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
         settle(ledger, first, 0, row(first, Sharing.shared, 3, "a"));
-        assertInstanceOf(ClaimVerdict.Settled.class, settle(ledger, second, 1, row(second, Sharing.shared, 3, "b")));
+        assertInstanceOf(
+            ClaimVerdict.Settled.class,
+            settle(ledger, second, 1, row(second, Sharing.shared, peerSiting, 3, "b"))
+        );
         assertEquals(2, ledger.revision());
         assertEquals(2, ledger.read(everything).rows().size());
 
-        ClaimVerdict verdict = settle(ledger, second, 2, row(second, Sharing.exclusive, 3, "b"));
+        ClaimVerdict verdict = settle(ledger, second, 2, row(second, Sharing.exclusive, peerSiting, 3, "b"));
         assertInstanceOf(ClaimVerdict.Conflict.class, verdict);
         assertEquals(2, ledger.revision());
     }
@@ -134,7 +142,7 @@ class ClaimLedgerTest {
         ClaimRow incumbent = row(first, Sharing.exclusive, 3, "a");
         settle(ledger, first, 0, incumbent);
 
-        ClaimVerdict verdict = settle(ledger, second, 1, row(second, Sharing.shared, 3, "b"));
+        ClaimVerdict verdict = settle(ledger, second, 1, row(second, Sharing.shared, peerSiting, 3, "b"));
 
         assertEquals(List.of(incumbent), assertInstanceOf(ClaimVerdict.Conflict.class, verdict).incumbents());
         assertEquals(1, ledger.revision());
@@ -146,7 +154,10 @@ class ClaimLedgerTest {
         settle(ledger, first, 0, row(first, Sharing.exclusive, 4, "bay"));
 
         assertInstanceOf(ClaimVerdict.Settled.class, settle(ledger, first, 1, row(first, Sharing.exclusive, 4, "other")));
-        assertInstanceOf(ClaimVerdict.Settled.class, settle(ledger, second, 2, row(second, Sharing.exclusive, 5, "bay")));
+        assertInstanceOf(
+            ClaimVerdict.Settled.class,
+            settle(ledger, second, 2, row(second, Sharing.exclusive, peerSiting, 5, "bay"))
+        );
         assertEquals(3, ledger.revision());
     }
 
@@ -165,12 +176,15 @@ class ClaimLedgerTest {
         ClaimRow incumbent = row(first, Sharing.exclusive, 6, "bay");
         settle(ledger, first, 0, incumbent);
 
-        ClaimVerdict moved = settle(ledger, second, 0, row(second, Sharing.exclusive, 6, "bay"));
+        ClaimVerdict moved = settle(ledger, second, 0, row(second, Sharing.exclusive, peerSiting, 6, "bay"));
         assertEquals(new ClaimVerdict.RevisionMoved(0, 1), moved);
         assertEquals(1, ledger.revision());
         assertEquals(List.of(incumbent), ledger.read(everything).rows());
 
-        assertInstanceOf(ClaimVerdict.Settled.class, settle(ledger, second, 1, row(second, Sharing.exclusive, 7, "bay")));
+        assertInstanceOf(
+            ClaimVerdict.Settled.class,
+            settle(ledger, second, 1, row(second, Sharing.exclusive, peerSiting, 7, "bay"))
+        );
         assertEquals(2, ledger.revision());
     }
 
@@ -203,10 +217,76 @@ class ClaimLedgerTest {
     }
 
     @Test
+    void aSameSitingSettleReplacesTheIncumbentRows() {
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        settle(
+            ledger,
+            first,
+            0,
+            row(first, Sharing.exclusive, 30, "left"),
+            row(first, Sharing.exclusive, 31, "right")
+        );
+
+        ClaimRow replacement = row(second, Sharing.exclusive, 30, "left");
+        ClaimVerdict verdict = settle(ledger, second, 1, replacement);
+
+        assertInstanceOf(ClaimVerdict.Settled.class, verdict);
+        assertEquals(2, ledger.revision());
+        assertEquals(List.of(replacement), ledger.read(everything).rows());
+    }
+
+    @Test
+    void aSameSitingSettleKeepsADistantInstance() {
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        settle(
+            ledger,
+            first,
+            0,
+            row(first, Sharing.exclusive, 32, "left"),
+            row(first, Sharing.exclusive, 33, "right")
+        );
+        InstanceId peer = new InstanceId(world, 3);
+        ClaimRow peerRow = row(peer, Sharing.exclusive, peerSiting, 60, "peer");
+        settle(ledger, peer, 1, peerRow);
+
+        ClaimRow replacement = row(second, Sharing.exclusive, 32, "left");
+        ClaimVerdict verdict = settle(ledger, second, 2, replacement);
+
+        assertInstanceOf(ClaimVerdict.Settled.class, verdict);
+        assertEquals(3, ledger.revision());
+        assertEquals(List.of(replacement, peerRow), ledger.read(everything).rows());
+    }
+
+    @Test
+    void aFailedSameSitingSettleKeepsTheIncumbent() {
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        ClaimRow incumbentLeft = row(first, Sharing.exclusive, 34, "left");
+        ClaimRow incumbentRight = row(first, Sharing.exclusive, 35, "right");
+        settle(ledger, first, 0, incumbentLeft, incumbentRight);
+        InstanceId peer = new InstanceId(world, 3);
+        ClaimRow peerRow = row(peer, Sharing.exclusive, peerSiting, 36, "peer");
+        settle(ledger, peer, 1, peerRow);
+        long before = ledger.revision();
+
+        ClaimVerdict verdict = settle(
+            ledger,
+            second,
+            2,
+            row(second, Sharing.exclusive, 34, "left"),
+            row(second, Sharing.exclusive, 36, "peer")
+        );
+
+        ClaimVerdict.Conflict conflict = assertInstanceOf(ClaimVerdict.Conflict.class, verdict);
+        assertEquals(List.of(peerRow), conflict.incumbents());
+        assertEquals(before, ledger.revision());
+        assertEquals(List.of(incumbentLeft, incumbentRight, peerRow), ledger.read(everything).rows());
+    }
+
+    @Test
     void releaseTakesTheWholeInstanceAndBumpsOnlyWhenItRemovesRows() {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
         settle(ledger, first, 0, row(first, Sharing.exclusive, 8, "a"), row(first, Sharing.shared, 9, "b"));
-        ClaimRow other = row(second, Sharing.shared, 10, "b");
+        ClaimRow other = row(second, Sharing.shared, peerSiting, 10, "b");
         settle(ledger, second, 1, other);
 
         ClaimVerdict absent = ledger.release(new InstanceId(world, 99));
@@ -226,7 +306,7 @@ class ClaimLedgerTest {
     void readReturnsACopyAndCanonicalOrder() {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
         ClaimRow a = row(first, Sharing.shared, 11, "b");
-        ClaimRow b = row(second, Sharing.shared, 11, "a");
+        ClaimRow b = row(second, Sharing.shared, peerSiting, 11, "a");
         settle(ledger, first, 0, a);
         settle(ledger, second, 1, b);
 

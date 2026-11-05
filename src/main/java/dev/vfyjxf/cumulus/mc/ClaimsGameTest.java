@@ -40,6 +40,7 @@ public final class ClaimsGameTest {
         ClaimLedger claims = state.claims(level);
         LatticePoint cell = LatticePoint.of(1_000_000, 0, 1_000_000);
         Siting siting = Siting.of(cell, Orientation.identity);
+        Siting otherSiting = Siting.of(LatticePoint.of(1_000_001, 0, 1_000_000), Orientation.identity);
         InstanceId firstInstance = new InstanceId(claims.world(), 2_000_000L);
         InstanceId secondInstance = new InstanceId(claims.world(), 2_000_001L);
         ClaimRow rowA = new ClaimRow(
@@ -52,7 +53,7 @@ public final class ClaimsGameTest {
         ClaimRow rowB = new ClaimRow(
             LatticeKey.of(cell),
             Sharing.exclusive,
-            siting,
+            otherSiting,
             NamespacedId.of(Constants.modId, "bay_b"),
             secondInstance
         );

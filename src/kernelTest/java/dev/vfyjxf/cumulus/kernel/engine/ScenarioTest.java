@@ -32,6 +32,7 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
@@ -69,6 +70,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ScenarioTest {
 
     private static final Siting atOrigin = Siting.of(LatticePoint.origin, Orientation.identity);
+    private static final Siting turned = MagicFixtures.turn(LatticePoint.origin, Turn.clockwise);
     private static final OwnerId owner = OwnerId.of(id("owner"));
     private static final InstanceId instance = new InstanceId(TestWorld.world, 1);
 
@@ -265,7 +267,7 @@ class ScenarioTest {
 
         MatchRequest second = MatchRequest.of(
             sharedBlueprint,
-            atOrigin,
+            turned,
             lease,
             new InstanceId(TestWorld.world, 2),
             OwnerId.of(id("b")),
@@ -291,7 +293,7 @@ class ScenarioTest {
                 ).check(Check.of(id("hatch"), exclusive, focus, Expectations.anyOccupant())).build();
         MatchRequest third = MatchRequest.of(
             exclusiveBlueprint,
-            atOrigin,
+            turned,
             lease,
             new InstanceId(TestWorld.world, 3),
             OwnerId.of(id("c")),
@@ -528,7 +530,7 @@ class ScenarioTest {
         ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         MatchRequest a = MatchRequest.of(
             blueprint,
-            atOrigin,
+            turned,
             new TestWorld.Lease(view),
             instance,
             OwnerId.of(id("a")),

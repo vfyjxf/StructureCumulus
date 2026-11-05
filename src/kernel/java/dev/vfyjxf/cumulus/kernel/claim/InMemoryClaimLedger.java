@@ -10,9 +10,11 @@ import dev.vfyjxf.cumulus.kernel.finding.Label;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
+import dev.vfyjxf.cumulus.kernel.space.Siting;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,24 +49,37 @@ final class InMemoryClaimLedger implements ClaimLedger {
         if (request.expectedRevision() != revision) {
             return new ClaimVerdict.RevisionMoved(request.expectedRevision(), revision);
         }
-        ClaimVerdict conflict = conflicts(request);
+        List<ClaimRow> incumbents = incumbents(request);
+        ClaimVerdict conflict = conflicts(request, incumbents);
         if (conflict != null) {
             return conflict;
         }
         List<ClaimRow> replacement = new ArrayList<>(new LinkedHashSet<>(request.rows()));
         replacement.sort(ClaimRow::compareTo);
-        List<ClaimRow> next = new ArrayList<>(rows.size() + replacement.size());
-        for (ClaimRow row : rows) {
-            if (!row.instance().equals(request.instance())) {
-                next.add(row);
-            }
-        }
+        List<ClaimRow> next = new ArrayList<>(incumbents.size() + replacement.size());
+        next.addAll(incumbents);
         next.addAll(replacement);
         next.sort(ClaimRow::compareTo);
         rows.clear();
         rows.addAll(next);
         revision++;
         return new ClaimVerdict.Settled(revision, replacement);
+    }
+
+    /** The rows this settle leaves in place: not its own, not at a siting it takes over. */
+    private List<ClaimRow> incumbents(SettleRequest request) {
+        Set<Siting> replaced = new HashSet<>();
+        for (ClaimRow row : request.rows()) {
+            replaced.add(row.siting());
+        }
+        List<ClaimRow> incumbents = new ArrayList<>();
+        for (ClaimRow row : rows) {
+            if (row.instance().equals(request.instance()) || replaced.contains(row.siting())) {
+                continue;
+            }
+            incumbents.add(row);
+        }
+        return incumbents;
     }
 
     @Override
@@ -96,10 +111,10 @@ final class InMemoryClaimLedger implements ClaimLedger {
         revision = 0;
     }
 
-    private @Nullable ClaimVerdict conflicts(SettleRequest request) {
+    private @Nullable ClaimVerdict conflicts(SettleRequest request, List<ClaimRow> incumbents) {
         Map<String, Conflict> conflicts = new LinkedHashMap<>();
         for (ClaimRow requested : request.rows()) {
-            for (ClaimRow incumbent : rows) {
+            for (ClaimRow incumbent : incumbents) {
                 if (!ClaimMatrix.conflicts(requested, incumbent)) {
                     continue;
                 }

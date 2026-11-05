@@ -66,6 +66,7 @@ class StructureLifecycleAdversarialTest {
     private static final NamespacedId otherBlueprint = NamespacedId.of("test", "adversarial_other_blueprint");
     private static final NamespacedId bay = NamespacedId.of("test", "adversarial_bay");
     private static final Siting origin = Siting.of(LatticePoint.origin, Orientation.identity);
+    private static final Siting secondSiting = Siting.of(LatticePoint.of(1, 0, 0), Orientation.identity);
     private static final Siting movedOrigin = Siting.of(LatticePoint.of(10, 0, 0), Orientation.identity);
     private static final CuboidSet oneCell = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
     private static final Cuboid oneCellBox = Cuboid.of(0, 0, 0, 1, 1, 1);
@@ -288,10 +289,11 @@ class StructureLifecycleAdversarialTest {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
         InstanceId incumbent = new InstanceId(world, 1_000_000L);
         InstanceId pending = new InstanceId(world, 1_000_001L);
+        Siting incumbentSiting = Siting.of(LatticePoint.of(12, 0, 0), Orientation.identity);
         settle(
             ledger,
             incumbent,
-            List.of(row(incumbent, movedOrigin, LatticePoint.of(10, 0, 0), Sharing.exclusive))
+            List.of(row(incumbent, incumbentSiting, LatticePoint.of(10, 0, 0), Sharing.exclusive))
         );
         settle(ledger, pending, List.of(row(pending, origin, LatticePoint.origin, Sharing.exclusive)));
         assertEquals(2, ledger.revision());
@@ -375,14 +377,14 @@ class StructureLifecycleAdversarialTest {
     void overlappingInstancesAreFoundTogetherAndRemovedIndependently() {
         StructureManager manager = StructureManager.create();
         StructureInstance first = form(manager, ownerA, origin, oneCell);
-        StructureInstance second = form(manager, ownerB, origin, oneCell);
+        StructureInstance second = form(manager, ownerB, secondSiting, oneCell);
         assertEquals(List.of(first, second), manager.findAt(LatticePoint.origin), "overlaps are found in id order");
         assertEquals(first, manager.find(ownerA, origin));
-        assertEquals(second, manager.find(ownerB, origin));
+        assertEquals(second, manager.find(ownerB, secondSiting));
 
         ClaimLedger ledger = ClaimLedger.inMemory(world);
         settle(ledger, first.id(), List.of(row(first.id(), origin, LatticePoint.origin, Sharing.shared)));
-        settle(ledger, second.id(), List.of(row(second.id(), origin, LatticePoint.origin, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), secondSiting, LatticePoint.origin, Sharing.shared)));
         assertEquals(2, ledger.read(oneCellBox).rows().size(), "two shared instances hold one cell each");
         long revision = ledger.revision();
 

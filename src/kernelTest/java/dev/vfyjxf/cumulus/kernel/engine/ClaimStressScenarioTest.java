@@ -11,6 +11,7 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
@@ -32,6 +33,7 @@ class ClaimStressScenarioTest {
     private static final Cuboid bounds = Cuboid.of(0, 0, 0, 2, 1, 1);
     private static final CuboidSet oneCell = CuboidSet.of(Cuboid.of(cell));
     private static final Siting siting = MagicFixtures.identity(LatticePoint.origin);
+    private static final Siting rivalSiting = MagicFixtures.turn(LatticePoint.origin, Turn.clockwise);
 
     @Test
     void sharedWallCoexistsAcrossOwners() {
@@ -44,7 +46,7 @@ class ClaimStressScenarioTest {
         );
         MatchResult.Formed second = settleAs(
             blueprint,
-            siting,
+            rivalSiting,
             airView(),
             ledger,
             MagicFixtures.rival,
@@ -77,7 +79,7 @@ class ClaimStressScenarioTest {
         ClaimLedger ledger = MagicFixtures.ledger();
         Blueprint blueprint = wall("claim/release", Sharing.shared);
         assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(blueprint, siting, airView(), ledger));
-        settleAs(blueprint, siting, airView(), ledger, MagicFixtures.rival, MagicFixtures.rivalInstance);
+        settleAs(blueprint, rivalSiting, airView(), ledger, MagicFixtures.rival, MagicFixtures.rivalInstance);
         assertEquals(2, TestWorld.rows(ledger).size(), "both instances hold a row");
         ledger.release(MagicFixtures.rivalInstance);
         assertEquals(1, TestWorld.rows(ledger).size(), "only the released instance's row is removed");

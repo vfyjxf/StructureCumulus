@@ -73,15 +73,15 @@ class ExpandedLifecycleTest {
     void overlappingInstancesAreListedInIdOrderAndBrokenIndependently() {
         StructureManager manager = StructureManager.create();
         StructureInstance first = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance second = form(manager, worldA, ownerB, atOrigin, cellA);
-        StructureInstance third = form(manager, worldA, ownerC, atOrigin, cellA);
+        StructureInstance second = form(manager, worldA, ownerB, siting(1), cellA);
+        StructureInstance third = form(manager, worldA, ownerC, siting(2), cellA);
         assertEquals(List.of(first, second, third), manager.findAt(cellA), "findAt is in instance id order");
         assertEquals(List.of(first, second, third), manager.instances());
 
         ClaimLedger ledger = ClaimLedger.inMemory(worldA);
         settle(ledger, first.id(), List.of(row(first.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, second.id(), List.of(row(second.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, third.id(), List.of(row(third.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), siting(1), cellA, Sharing.shared)));
+        settle(ledger, third.id(), List.of(row(third.id(), siting(2), cellA, Sharing.shared)));
         assertEquals(3, ledger.revision(), "each shared row settles its own key");
         assertEquals(3, ledger.read(readBox(cellA)).rows().size(), "three owners share one cell");
 
@@ -103,12 +103,12 @@ class ExpandedLifecycleTest {
     void oneBrokenCellReleasesOnlyTheInstancesWhoseBoundsContainIt() {
         StructureManager manager = StructureManager.create();
         StructureInstance sharedFirst = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance sharedSecond = form(manager, worldA, ownerB, atOrigin, cellA);
-        StructureInstance far = form(manager, worldA, ownerC, atOrigin, cellB);
+        StructureInstance sharedSecond = form(manager, worldA, ownerB, siting(1), cellA);
+        StructureInstance far = form(manager, worldA, ownerC, siting(2), cellB);
         ClaimLedger ledger = ClaimLedger.inMemory(worldA);
         settle(ledger, sharedFirst.id(), List.of(row(sharedFirst.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, sharedSecond.id(), List.of(row(sharedSecond.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, far.id(), List.of(row(far.id(), atOrigin, cellB, Sharing.shared)));
+        settle(ledger, sharedSecond.id(), List.of(row(sharedSecond.id(), siting(1), cellA, Sharing.shared)));
+        settle(ledger, far.id(), List.of(row(far.id(), siting(2), cellB, Sharing.shared)));
         long base = ledger.revision();
 
         applyBroken(manager, ledger, List.of(cellA));
@@ -126,14 +126,14 @@ class ExpandedLifecycleTest {
     void oneExplosionDeduplicatesRepeatedAffectedPositions() {
         StructureManager manager = StructureManager.create();
         StructureInstance first = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance second = form(manager, worldA, ownerB, atOrigin, cellA);
-        StructureInstance third = form(manager, worldA, ownerC, atOrigin, cellB);
-        StructureInstance far = form(manager, worldA, ownerD, atOrigin, cellC);
+        StructureInstance second = form(manager, worldA, ownerB, siting(1), cellA);
+        StructureInstance third = form(manager, worldA, ownerC, siting(2), cellB);
+        StructureInstance far = form(manager, worldA, ownerD, siting(3), cellC);
         ClaimLedger ledger = ClaimLedger.inMemory(worldA);
         settle(ledger, first.id(), List.of(row(first.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, second.id(), List.of(row(second.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, third.id(), List.of(row(third.id(), atOrigin, cellB, Sharing.shared)));
-        settle(ledger, far.id(), List.of(row(far.id(), atOrigin, cellC, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), siting(1), cellA, Sharing.shared)));
+        settle(ledger, third.id(), List.of(row(third.id(), siting(2), cellB, Sharing.shared)));
+        settle(ledger, far.id(), List.of(row(far.id(), siting(3), cellC, Sharing.shared)));
         long base = ledger.revision();
 
         List<LatticePoint> affected = List.of(cellA, cellA, cellB, cellB, cellA);
@@ -285,12 +285,12 @@ class ExpandedLifecycleTest {
     void duplicateBreakAndPlacementEventsNeverDoubleRelease() {
         StructureManager manager = StructureManager.create();
         StructureInstance first = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance second = form(manager, worldA, ownerB, atOrigin, cellA);
-        StructureInstance far = form(manager, worldA, ownerC, atOrigin, cellB);
+        StructureInstance second = form(manager, worldA, ownerB, siting(1), cellA);
+        StructureInstance far = form(manager, worldA, ownerC, siting(2), cellB);
         ClaimLedger ledger = ClaimLedger.inMemory(worldA);
         settle(ledger, first.id(), List.of(row(first.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, second.id(), List.of(row(second.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, far.id(), List.of(row(far.id(), atOrigin, cellB, Sharing.shared)));
+        settle(ledger, second.id(), List.of(row(second.id(), siting(1), cellA, Sharing.shared)));
+        settle(ledger, far.id(), List.of(row(far.id(), siting(2), cellB, Sharing.shared)));
         long base = ledger.revision();
 
         applyBroken(manager, ledger, List.of(cellA));
@@ -312,10 +312,10 @@ class ExpandedLifecycleTest {
     void sameSitingReplacementKeepsOverlappingPeersAndClaimKeys() {
         StructureManager manager = StructureManager.create();
         StructureInstance old = form(manager, worldA, ownerA, atOrigin, cellA);
-        StructureInstance peer = form(manager, worldA, ownerB, atOrigin, cellA);
+        StructureInstance peer = form(manager, worldA, ownerB, siting(1), cellA);
         ClaimLedger ledger = ClaimLedger.inMemory(worldA);
         settle(ledger, old.id(), List.of(row(old.id(), atOrigin, cellA, Sharing.shared)));
-        settle(ledger, peer.id(), List.of(row(peer.id(), atOrigin, cellA, Sharing.shared)));
+        settle(ledger, peer.id(), List.of(row(peer.id(), siting(1), cellA, Sharing.shared)));
         assertEquals(2, ledger.revision());
 
         StructureAttempt replacement = manager.begin(worldA, new StructureSpec(ownerA, atOrigin, otherBlueprint));
@@ -436,6 +436,10 @@ class ExpandedLifecycleTest {
 
     private static OwnerId owner(String path) {
         return OwnerId.of(NamespacedId.of("test", "expanded_" + path));
+    }
+
+    private static Siting siting(int x) {
+        return Siting.of(LatticePoint.of(x, 0, 0), Orientation.identity);
     }
 
     private static ClaimRow row(InstanceId instance, Siting siting, LatticePoint cell, Sharing sharing) {
