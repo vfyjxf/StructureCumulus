@@ -76,10 +76,15 @@ public final class OccupantDescriptors {
         Cuboid footprint,
         List<TraitSlot> traits
     ) {
-        NamespacedId body = NamespacedId.of(type.namespace(), uuid.toString());
+        NamespacedId body = body(type, uuid);
         OccupantDescriptor descriptor = new OccupantDescriptor(type, OccupantKind.entity);
         OccupantRef ref = new OccupantRef(snapshot, frame, type, OccupantKind.entity, anchor, body);
         return new OccupantSnapshot(ref, descriptor, footprint, traits);
+    }
+
+    /** The one body formula: capture and the body-read index must derive the same id. */
+    static NamespacedId body(NamespacedId type, UUID uuid) {
+        return NamespacedId.of(type.namespace(), uuid.toString());
     }
 
     public static OccupantSnapshot nested(

@@ -267,6 +267,18 @@ public final class LevelSnapshot implements WorldView {
     }
 
     @Override
+    public <H> @Nullable H get(OccupantRef ref, HostType<H> type) {
+        if (!ref.from(snapshot) || ref.frame() != frame()) {
+            return null;
+        }
+        if (ref.body() == null) {
+            return get(ref.anchor(), type);
+        }
+        SnapshotLevel host = data.hostSnapshot();
+        return host == null ? null : host.get(ref, type);
+    }
+
+    @Override
     public long contentDigest(SectionKey key) {
         SectionSlot slot = slot(key);
         if (slot instanceof SectionSlot.Present present) {

@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.world.HostType;
+import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.SectionPos;
@@ -45,6 +46,7 @@ final class SnapshotLevel implements BlockGetter {
     private final Map<Long, FluidState[]> fluids;
     private final Map<BlockPos, BlockEntity> blockEntities;
     private final List<CapturedEntity> entities;
+    private final Map<NamespacedId, EntityType<?>> entityTypesByBody;
 
     SnapshotLevel(
         LatticePoint origin,
@@ -64,11 +66,15 @@ final class SnapshotLevel implements BlockGetter {
         this.fluids = Map.copyOf(Objects.requireNonNull(fluids, "fluids"));
         this.blockEntities = Map.copyOf(Objects.requireNonNull(blockEntities, "blockEntities"));
         ArrayList<CapturedEntity> sortedEntities = new ArrayList<>(entities.size());
+        HashMap<NamespacedId, EntityType<?>> typesByBody = new HashMap<>(entities.size());
         for (CapturedEntity entity : entities) {
-            sortedEntities.add(Objects.requireNonNull(entity, "entity"));
+            Objects.requireNonNull(entity, "entity");
+            sortedEntities.add(entity);
+            typesByBody.putIfAbsent(OccupantDescriptors.body(entity.type(), entity.id()), entity.entityType());
         }
         sortedEntities.sort(entityOrder);
         this.entities = List.copyOf(sortedEntities);
+        this.entityTypesByBody = Map.copyOf(typesByBody);
     }
 
     LatticePoint origin() {
@@ -122,6 +128,15 @@ final class SnapshotLevel implements BlockGetter {
             return (H) blockEntityAt(pos);
         }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    <H> @Nullable H get(OccupantRef ref, HostType<H> type) {
+        if (!type.equals(HostTypes.entityType)) {
+            return null;
+        }
+        NamespacedId body = ref.body();
+        return body == null ? null : (H) entityTypesByBody.get(body);
     }
 
     long contentDigest(Cuboid cells) {

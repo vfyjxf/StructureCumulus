@@ -1,9 +1,14 @@
 package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
+import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.world.HostType;
+import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
+import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
+import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
@@ -39,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SnapshotLevelTest {
 
     private static final Cuboid cell = Cuboid.of(0, 0, 0, 1, 1, 1);
+    private static final SnapshotId snapshotId = new SnapshotId(World.of(NamespacedId.of("test", "world")), 1);
 
     @Test
     void readsBlockFluidEntityAndBlockEntityByLocalCoordinates() {
@@ -82,6 +88,56 @@ class SnapshotLevelTest {
         assertNull(snapshot.getBlockEntity(new BlockPos(1, 0, 0)));
         assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entityType));
         assertNull(snapshot.get(LatticePoint.origin, HostType.of(NamespacedId.of("test", "unknown"))));
+    }
+
+    @Test
+    void aBodyReadAnswersThatEntity() {
+        SnapshotLevel.CapturedEntity cow = new SnapshotLevel.CapturedEntity(
+            UUID.nameUUIDFromBytes(new byte[]{1}),
+            NamespacedId.of("minecraft", "cow"),
+            cell,
+            EntityType.COW
+        );
+        SnapshotLevel.CapturedEntity zombie = new SnapshotLevel.CapturedEntity(
+            UUID.nameUUIDFromBytes(new byte[]{2}),
+            NamespacedId.of("minecraft", "zombie"),
+            cell,
+            EntityType.ZOMBIE
+        );
+        SnapshotLevel snapshot = level(Blocks.STONE.defaultBlockState(), List.of(cow, zombie));
+
+        assertSame(EntityType.COW, snapshot.get(ref(cow), HostTypes.entityType));
+        assertSame(EntityType.ZOMBIE, snapshot.get(ref(zombie), HostTypes.entityType));
+    }
+
+    @Test
+    void aRefWithAForeignBodyNeverFallsBackToTheCell() {
+        SnapshotLevel snapshot = level(Blocks.STONE.defaultBlockState(), List.of(chicken(EntityType.CHICKEN)));
+        SnapshotLevel.CapturedEntity stranger = new SnapshotLevel.CapturedEntity(
+            UUID.nameUUIDFromBytes(new byte[]{9}),
+            NamespacedId.of("minecraft", "chicken"),
+            cell,
+            EntityType.CHICKEN
+        );
+
+        assertNull(snapshot.get(ref(stranger), HostTypes.entityType), "a foreign body is not captured");
+        assertSame(EntityType.CHICKEN, snapshot.get(LatticePoint.origin, HostTypes.entityType));
+    }
+
+    @Test
+    void aBlockRefStillReadsItsCell() {
+        BlockState stone = Blocks.STONE.defaultBlockState();
+        LevelSnapshot view = view(level(stone, List.of()));
+        OccupantRef ref = new OccupantRef(
+            snapshotId,
+            0,
+            NamespacedId.of("minecraft", "stone"),
+            OccupantKind.block,
+            LatticePoint.origin
+        );
+
+        assertSame(stone, view.get(ref, HostTypes.blockState));
+        assertSame(stone, view.get(LatticePoint.origin, HostTypes.blockState));
     }
 
     @Test
@@ -156,21 +212,15 @@ class SnapshotLevelTest {
     }
 
     private static SnapshotLevel snapshot(BlockState state, @Nullable EntityType<?> entityType) {
+        return entityType == null ? level(state, List.of()) : level(state, List.of(chicken(entityType)));
+    }
+
+    private static SnapshotLevel level(BlockState state, List<SnapshotLevel.CapturedEntity> entities) {
         PalettedContainer<BlockState> states = states();
         states.set(0, 0, 0, state);
         FluidState[] fluids = fluids();
         fluids[SnapshotLevel.fluidIndex(0, 0, 0)] = state.getFluidState();
         long key = SnapshotLevel.worldSectionKey(0, 0, 0);
-        List<SnapshotLevel.CapturedEntity> entities = entityType == null
-                ? List.of()
-                : List.of(
-                    new SnapshotLevel.CapturedEntity(
-                        UUID.nameUUIDFromBytes(new byte[]{1}),
-                        NamespacedId.of("minecraft", "chicken"),
-                        cell,
-                        entityType
-                    )
-                );
         return new SnapshotLevel(
             LatticePoint.origin,
             cell,
@@ -181,6 +231,35 @@ class SnapshotLevelTest {
             Map.of(),
             entities
         );
+    }
+
+    private static SnapshotLevel.CapturedEntity chicken(EntityType<?> entityType) {
+        return new SnapshotLevel.CapturedEntity(
+            UUID.nameUUIDFromBytes(new byte[]{1}),
+            NamespacedId.of("minecraft", "chicken"),
+            cell,
+            entityType
+        );
+    }
+
+    private static OccupantRef ref(SnapshotLevel.CapturedEntity entity) {
+        return OccupantDescriptors.entity(snapshotId, 0, LatticePoint.origin, entity.type(), entity.id(), cell).ref();
+    }
+
+    private static LevelSnapshot view(SnapshotLevel host) {
+        FrameData data = new FrameData(
+            snapshotId,
+            0,
+            0,
+            LatticePoint.origin,
+            cell,
+            Map.of(),
+            List.of(),
+            List.of(),
+            Map.of(),
+            host
+        );
+        return new LevelSnapshot(snapshotId, SnapshotPolicy.minimal(), data);
     }
 
     private static PalettedContainer<BlockState> states() {

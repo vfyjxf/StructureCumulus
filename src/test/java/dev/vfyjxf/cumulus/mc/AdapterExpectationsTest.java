@@ -191,10 +191,13 @@ class AdapterExpectationsTest {
 
     @Test
     void entityTagMatchesTheRegistryTag() {
-        assertEquals("match", reply(AdapterExpectations.entityTag(EntityTypeTags.UNDEAD), matching(), entityCell));
+        assertEquals(
+            "match",
+            reply(AdapterExpectations.entityTag(EntityTypeTags.UNDEAD), matching(), entitySubject(zombie()))
+        );
         assertEquals(
             "mismatch:" + AdapterCodes.tagMismatch,
-            reply(AdapterExpectations.entityTag(EntityTypeTags.UNDEAD), mismatching(), entityCell)
+            reply(AdapterExpectations.entityTag(EntityTypeTags.UNDEAD), mismatching(), entitySubject(marker()))
         );
     }
 
@@ -326,7 +329,11 @@ class AdapterExpectationsTest {
     }
 
     private static String reply(Expectation<?> expectation, WorldView view, LatticePoint cell) {
-        Reply reply = test(expectation, view, cell);
+        return reply(expectation, view, occupant(cell));
+    }
+
+    private static String reply(Expectation<?> expectation, WorldView view, OccupantSnapshot subject) {
+        Reply reply = test(expectation, view, subject);
         return switch (reply) {
             case Reply.Match ignored -> "match";
             case Reply.Mismatch mismatch -> "mismatch:" + Objects.requireNonNull(mismatch.findings().primary()).code();
@@ -338,8 +345,12 @@ class AdapterExpectationsTest {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Reply test(Expectation<?> expectation, WorldView view, LatticePoint cell) {
-        OccupantSnapshot subject = occupant(cell);
-        ExpectationContext context = ExpectationContext.of(new TestFocus(view, cell), subject, List.of(subject));
+        return test(expectation, view, occupant(cell));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Reply test(Expectation<?> expectation, WorldView view, OccupantSnapshot subject) {
+        ExpectationContext context = ExpectationContext.of(new TestFocus(view, subject.ref().anchor()), subject, List.of(subject));
         return ((Expectation) expectation).test(context);
     }
 
@@ -526,6 +537,18 @@ class AdapterExpectationsTest {
         return new SnapshotLevel.CapturedEntity(UUID.nameUUIDFromBytes(new byte[]{1}), type, Cuboid.of(cell), entityType);
     }
 
+    private static SnapshotLevel.CapturedEntity zombie() {
+        return entity(entityCell, EntityType.ZOMBIE);
+    }
+
+    private static SnapshotLevel.CapturedEntity marker() {
+        return entity(entityCell, EntityType.MARKER);
+    }
+
+    private static OccupantSnapshot entitySubject(SnapshotLevel.CapturedEntity captured) {
+        return OccupantDescriptors.entity(snapshot, 0, entityCell, captured.type(), captured.id(), Cuboid.of(entityCell));
+    }
+
     private static OccupantSnapshot occupant(LatticePoint cell) {
         NamespacedId type = NamespacedId.of("minecraft", "furnace");
         OccupantRef ref = new OccupantRef(snapshot, 0, type, OccupantKind.block, cell);
@@ -646,6 +669,12 @@ class AdapterExpectationsTest {
         public <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
             reads.merge(type, 1, Integer::sum);
             return delegate.get(pos, type);
+        }
+
+        @Override
+        public <H> @Nullable H get(OccupantRef ref, HostType<H> type) {
+            reads.merge(type, 1, Integer::sum);
+            return delegate.get(ref, type);
         }
 
         @Override
