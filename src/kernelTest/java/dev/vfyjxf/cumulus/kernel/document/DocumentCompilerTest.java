@@ -710,6 +710,45 @@ class DocumentCompilerTest {
     }
 
     @Test
+    void envelopeEntitiesWithoutEnvelopeIsRejected() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        BaySpec bay = new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null);
+        CheckSpec check = new CheckSpec(
+            id("wall_check"),
+            id("wall"),
+            kind("bay"),
+            Value.object(),
+            kind("any_occupant"),
+            Value.object(),
+            null,
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("entity_switch_without_envelope"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            true,
+            Value.object(),
+            List.of(bay),
+            List.of(),
+            List.of(check),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("without envelope"), () -> found.get(0).message());
+    }
+
+    @Test
     void aDefinitionThatLeaksOutsideItsBoundsIsRejected() {
         BlueprintSpec definition = new BlueprintSpec(
             id("leaky"),

@@ -57,6 +57,9 @@ public final class JsonWriter implements DocumentWriter {
         if (!root.extensions().isEmpty()) {
             throw new IllegalStateException("root spec extensions are not in the v1 envelope; use Document.extensions");
         }
+        if (root.envelopeEntities() && !root.envelope()) {
+            throw new IllegalStateException("envelopeEntities is written only on a root that declares an envelope");
+        }
         JsonObject out = new JsonObject();
         out.addProperty("schemaVersion", document.schemaVersion());
         out.addProperty("id", JsonVocabulary.idText(root.id()));

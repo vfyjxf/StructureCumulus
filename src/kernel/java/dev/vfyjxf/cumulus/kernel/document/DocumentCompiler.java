@@ -90,6 +90,15 @@ public final class DocumentCompiler {
         if (hasErrors(findings)) {
             return new CompileResult(FindingBundle.of(findings), null);
         }
+        if (document.root().envelopeEntities() && !document.root().envelope()) {
+            error(
+                findings,
+                Codes.documentField,
+                "envelopeEntities is declared without envelope",
+                document.root().source(),
+                documentLocus(document)
+            );
+        }
         rejectUnusedBays(flat, findings);
         rejectUnplacedDefinitions(document, findings);
         if (hasErrors(findings)) {

@@ -201,7 +201,7 @@ public interface DocumentWriter {
 | `id` | id | yes | the root blueprint id |
 | `bounds` | box | yes | the root local frame; every compiled cell is inside |
 | `envelope` | boolean | no | `true` derives the closed-world air pair over cells no bay or declared footprint covers; absent or `false` is off; root-only |
-| `envelopeEntities` | boolean | no | `true` makes that envelope count entities as foreign and adds the `entity` kind to its read scope (`structure` §4.11, D-55); absent or `false` leaves entities transparent; root-only |
+| `envelopeEntities` | boolean | no | `true` makes that envelope count entities as foreign and adds the `entity` kind to its read scope (`structure` §4.11, D-55); absent or `false` leaves entities transparent; root-only, and `SC-DOC-0002` unless the root also declares `envelope: true` |
 | `definitions` | object id → spec | no | reusable specs, compiled on placement |
 | `placements` | placement[] | no | definitions placed into the root |
 | `bays` | bay[] | yes* | the root's own bays |
@@ -422,8 +422,9 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   absent and `false` stay off; a definition-level member and a non-boolean value are `SC-DOC-0002`;
   an envelope root compiles to the same `Blueprint`, `Plan` and `ReadScope` as the Java `.envelope()`;
   an envelope-only root (`"bays": []`, `"checks": []`) yields one synthetic bay/check.
-  `"envelopeEntities": true` round-trips the same way, a document without it reads `false`, and a
-  definition-level member is `SC-DOC-0002` like `envelope`.
+  `"envelopeEntities": true` round-trips the same way, a document without it reads `false`, a
+  definition-level member is `SC-DOC-0002` like `envelope`, and a root that declares it without
+  `envelope` is `SC-DOC-0002` (D-63: a declaration the compiler would ignore).
 - Structure set: a valid set (root + two preheaters) reads, compiles and writes back equal content;
   `kind` selects the reader and is omitted on a canonically written blueprint; unknown members,
   wrong kind, bad `at`/`orientation`/`arguments`/link/presence members and a duplicate satellite id
@@ -452,7 +453,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   derivation is written once in the root.
 - `envelope` is a root boolean. A definition cannot declare it, and an absent member is off; the
   schema version does not move for it. `envelopeEntities` follows the same rule and only modifies
-  what an `envelope` root would judge.
+  what an `envelope` root would judge: a root declaring it without `envelope` is `SC-DOC-0002`, and
+  the writer refuses the combination instead of emitting it.
 - Kind ids are lowercase snake_case. Built-in structural forms are grammar, not catalog entries;
   an unqualified kind resolves in `structurecumulus`.
 - A declaration is confirmed, never repaired. A computation whose `id` differs from its `output`,
