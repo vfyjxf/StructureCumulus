@@ -1265,6 +1265,30 @@ bumps. A host that still bumps on a no-op stays correct — it only invalidates 
 holds for every settle that happens, but a settle whose plan owns nothing no longer happens; it is a
 `release`.
 
+### D-66 — A rejection carries its code
+
+The builder and the planner refuse with a kernel-internal `IllegalArgumentException` subtype that
+holds the `CodeEntry`; only its owning package constructs it. Callers read `code()` and never parse
+the message. The message stays the English diagnostic the finding carries today, prefixed with the
+code for compatibility with existing assertions.
+
+**Why.** The code used to be the first token of the message. Rewording a message — a translation, a
+shorter sentence, a reordered clause — silently changed which code the author saw.
+
+**Why a subtype and not the message.** The rejecting site and the reporting site sit in different
+packages, so the type is visible kernel-wide while its constructors stay package-private; the
+documented API keeps throwing `IllegalArgumentException`.
+
+**Localization.** `CodeEntry` already carries the localizable surface: `summary` and `body` in
+`Explanation`. Per-instance details stay English, like every other finding message in the kernel; a
+full localization layer would need templates and arguments and applies to all findings, not just these
+two rejection paths.
+
+**Consequence:** the compiler catches `BlueprintRejected`, the engine catches `PlanRejected`, and an
+`IllegalArgumentException` that is neither stays a programmer error. `DocumentCompiler.codeFromMessage`
+and `MatchEngine.plannerFailure`'s message dispatch are gone; the planner's refusal sites carry their
+`CodeEntry` directly (`SC-SPC-0001`, `SC-CLM-0001`, `SC-CLM-0004`, `SC-CLM-0005`).
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

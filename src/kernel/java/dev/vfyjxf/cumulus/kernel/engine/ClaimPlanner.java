@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
@@ -33,7 +34,7 @@ public final class ClaimPlanner {
         for (BayBinding binding : bindings) {
             for (OccupantSnapshot subject : binding.subjects()) {
                 if (subject.ref().frame() != 0 || subject.ref().kind().equals(OccupantKind.nested)) {
-                    throw new IllegalArgumentException("SC-CLM-0004: a nested or non-root subject cannot back a claim");
+                    throw new PlanRejected(Codes.bindingInvalid, "a nested or non-root subject cannot back a claim");
                 }
             }
             subjectsByBay.put(binding.bay().id(), binding.subjects());
@@ -46,14 +47,14 @@ public final class ClaimPlanner {
                 case Footprint.Box ignored -> {
                     CuboidSet world = siting.toWorld(bay.cells());
                     if (world == null) {
-                        throw new IllegalArgumentException("SC-SPC-0001: bay leaves the lattice");
+                        throw new PlanRejected(Codes.locusUnmapped, "bay leaves the lattice");
                     }
                     yield world;
                 }
                 case Footprint.Declared declared -> {
                     CuboidSet world = siting.toWorld(declared.cells());
                     if (world == null) {
-                        throw new IllegalArgumentException("SC-SPC-0001: footprint leaves the lattice");
+                        throw new PlanRejected(Codes.locusUnmapped, "footprint leaves the lattice");
                     }
                     yield world;
                 }
@@ -69,7 +70,7 @@ public final class ClaimPlanner {
                 case Footprint.None ignored -> CuboidSet.empty();
             };
             if (owned.isEmpty() && bay.sharing() == Sharing.exclusive) {
-                throw new IllegalArgumentException("SC-CLM-0005: exclusive bay " + bay.id() + " owns no cell");
+                throw new PlanRejected(Codes.boundEmpty, "exclusive bay " + bay.id() + " owns no cell");
             }
             for (Cuboid box : owned.boxes()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
@@ -91,8 +92,9 @@ public final class ClaimPlanner {
                 continue;
             }
             if (left.sharing() == Sharing.exclusive || right.sharing() == Sharing.exclusive) {
-                throw new IllegalArgumentException(
-                    "SC-CLM-0001: bays " + left.bay() + " and " + right.bay() + " both own " + left.cell()
+                throw new PlanRejected(
+                    Codes.claimConflict,
+                    "bays " + left.bay() + " and " + right.bay() + " both own " + left.cell()
                 );
             }
         }

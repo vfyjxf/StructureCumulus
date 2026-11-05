@@ -737,6 +737,10 @@ The producer table in `finding.md` is authoritative. A focus relay of a host `Re
 not a kernel producer row: the kernel only guarantees the `SC-OCC-0004` substitute for a code already
 in `Codes.all`.
 
+The builder refuses by throwing `BlueprintRejected`, an `IllegalArgumentException` subtype only this
+package constructs; the compiler reads the `CodeEntry` from the exception and never parses the
+message (D-66). The message keeps its `SC-…` prefix so existing message assertions hold.
+
 ## 7. Tests
 
 - Bay: `CuboidSet` shell, door pair, pipe box; empty cells rejected; `None + exclusive` rejected.

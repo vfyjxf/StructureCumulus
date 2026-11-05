@@ -399,7 +399,9 @@ are mismatches and `0010` is the unreadable absent value (a missing anchor state
 the adapter catalog gives each its ERROR
 severity and explanation, and none enters `Codes.all`. A cut child is still reported by the check as
 `SC-OCC-0003` (`adapter` §8); the capture entry explains the cut, the check finding judges it, and
-neither channel suppresses the other.
+neither channel suppresses the other. The producer rows stay as they are; where a producer refuses
+by exception (`structure` build, `engine` planning), the code rides on the rejection type —
+`BlueprintRejected`/`PlanRejected` carry the `CodeEntry` — and no caller parses a message (D-66).
 
 ## 7. Tests
 
