@@ -66,25 +66,46 @@ class ClaimLedgerTest {
     }
 
     @Test
-    void anEmptySettlementStillClearsTheInstanceAndBumps() {
-        ClaimLedger ledger = ClaimLedger.inMemory(world);
-        settle(ledger, first, 0, row(first, Sharing.exclusive, 0, "bay"));
-
-        ClaimVerdict removed = settle(ledger, first, 1);
-
-        assertInstanceOf(ClaimVerdict.Settled.class, removed);
-        assertEquals(2, ledger.revision());
-        assertTrue(ledger.read(everything).rows().isEmpty());
-    }
-
-    @Test
-    void anIdenticalReplacementStillBumpsTheRevision() {
+    void aNoOpSettleKeepsTheRevision() {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
         ClaimRow row = row(first, Sharing.exclusive, 17, "bay");
         settle(ledger, first, 0, row);
 
-        assertInstanceOf(ClaimVerdict.Settled.class, settle(ledger, first, 1, row));
+        ClaimVerdict.Settled again = assertInstanceOf(ClaimVerdict.Settled.class, settle(ledger, first, 1, row));
+
+        assertEquals(1, again.revision(), "a settle that changes nothing answers with the revision unchanged");
+        assertEquals(List.of(row), again.rows());
+        assertEquals(1, ledger.revision());
+        assertEquals(List.of(row), ledger.read(everything).rows());
+    }
+
+    @Test
+    void aSettleThatChangesRowsBumpsOnce() {
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        ClaimRow row = row(first, Sharing.exclusive, 17, "bay");
+        settle(ledger, first, 0, row);
+
+        ClaimRow added = row(first, Sharing.shared, 18, "bay");
+        ClaimVerdict.Settled changed = assertInstanceOf(
+            ClaimVerdict.Settled.class,
+            settle(ledger, first, 1, row, added)
+        );
+
+        assertEquals(2, changed.revision(), "only a content change bumps");
         assertEquals(2, ledger.revision());
+        assertEquals(List.of(row, added), ledger.read(everything).rows());
+    }
+
+    @Test
+    void aStaleSettleIsRefusedEvenWhenTheContentMatches() {
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        ClaimRow row = row(first, Sharing.exclusive, 17, "bay");
+        settle(ledger, first, 0, row);
+
+        ClaimVerdict stale = settle(ledger, first, 0, row);
+
+        assertEquals(new ClaimVerdict.RevisionMoved(0, 1), stale, "the compare-and-set runs before the content match");
+        assertEquals(1, ledger.revision());
         assertEquals(List.of(row), ledger.read(everything).rows());
     }
 

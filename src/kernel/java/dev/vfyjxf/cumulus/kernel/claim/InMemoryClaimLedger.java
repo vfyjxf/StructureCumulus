@@ -60,6 +60,9 @@ final class InMemoryClaimLedger implements ClaimLedger {
         next.addAll(incumbents);
         next.addAll(replacement);
         next.sort(ClaimRow::compareTo);
+        if (next.equals(rows)) {
+            return new ClaimVerdict.Settled(revision, replacement);
+        }
         rows.clear();
         rows.addAll(next);
         revision++;

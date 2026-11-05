@@ -271,7 +271,9 @@ class AdversarialFuzzTest {
                 List<ClaimRow> ownAgain = ownRows(again, blueprint, MagicFixtures.instance);
                 assertEquals(expected, ownAgain, where + " re-settle row set");
                 assertEquals(expected, sorted(TestWorld.rows(ledger)), where + " no duplicate rows after a re-settle");
-                assertEquals(2L, ledger.revision(), where + " revision count");
+                long contentRevision = expected.isEmpty() ? 0L : 1L;
+                assertEquals(contentRevision, ledger.revision(), where + " the revision counts content changes, not writes");
+                assertEquals(contentRevision, again.ledgerRevision(), where + " Formed carries the content revision");
                 assertRowLaws(ownAgain, where);
             }
         }

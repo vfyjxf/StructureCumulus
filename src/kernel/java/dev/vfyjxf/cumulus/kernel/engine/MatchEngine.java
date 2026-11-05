@@ -432,50 +432,58 @@ public final class MatchEngine {
             return new MatchResult.Failed(phase, FindingBundle.of(findings));
         }
         long revision;
-        if (ledger == null) {
-            if (!derived.rows().isEmpty()) {
-                findings.add(
-                    code(Codes.ledgerUnavailable, phase, "no ledger is installed; the claims cannot be written", null)
-                );
-                return new MatchResult.Undecided(
-                    phase,
-                    UndecidedReason.ledgerUnavailable,
-                    FindingBundle.of(findings),
-                    admitted.outcome()
-                );
+        if (derived.rows().isEmpty()) {
+            // an empty plan owns nothing: dropping the key is a release, never a settle (D-60)
+            if (ledger == null) {
+                revision = 0;
+            } else {
+                ClaimVerdict verdict = ledger.release(request.instance());
+                if (!(verdict instanceof ClaimVerdict.Settled released)) {
+                    findings.add(code(Codes.ledgerUnavailable, phase, "release answered " + verdict, null));
+                    return new MatchResult.Undecided(
+                        phase,
+                        UndecidedReason.ledgerUnavailable,
+                        FindingBundle.of(findings),
+                        admitted.outcome()
+                    );
+                }
+                revision = released.revision();
             }
-            revision = 0;
+        } else if (ledger == null) {
+            findings.add(
+                code(Codes.ledgerUnavailable, phase, "no ledger is installed; the claims cannot be written", null)
+            );
+            return new MatchResult.Undecided(
+                phase,
+                UndecidedReason.ledgerUnavailable,
+                FindingBundle.of(findings),
+                admitted.outcome()
+            );
         } else {
             ClaimVerdict verdict = ledger.settle(
                 new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision())
             );
             if (verdict instanceof ClaimVerdict.RevisionMoved) {
-                long retryRevision;
-                if (derived.rows().isEmpty()) {
-                    retryRevision = ledger.revision();
-                } else {
-                    Cuboid readBox = derived.footprint().bounds();
-                    ClaimView fresh = readBox == null ? ClaimView.unavailable() : ledger.read(readBox);
-                    if (!fresh.available()) {
-                        findings.add(
-                            code(Codes.ledgerUnavailable, phase, "the ledger moved and cannot answer the re-read", null)
-                        );
-                        return new MatchResult.Undecided(
-                            phase,
-                            UndecidedReason.ledgerUnavailable,
-                            FindingBundle.of(findings),
-                            admitted.outcome()
-                        );
-                    }
-                    List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows());
-                    if (!retryConflicts.isEmpty()) {
-                        findings.addAll(retryConflicts);
-                        return new MatchResult.Failed(phase, FindingBundle.of(findings));
-                    }
-                    retryRevision = fresh.revision();
+                Cuboid readBox = derived.footprint().bounds();
+                ClaimView fresh = readBox == null ? ClaimView.unavailable() : ledger.read(readBox);
+                if (!fresh.available()) {
+                    findings.add(
+                        code(Codes.ledgerUnavailable, phase, "the ledger moved and cannot answer the re-read", null)
+                    );
+                    return new MatchResult.Undecided(
+                        phase,
+                        UndecidedReason.ledgerUnavailable,
+                        FindingBundle.of(findings),
+                        admitted.outcome()
+                    );
+                }
+                List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows());
+                if (!retryConflicts.isEmpty()) {
+                    findings.addAll(retryConflicts);
+                    return new MatchResult.Failed(phase, FindingBundle.of(findings));
                 }
                 verdict = ledger
-                        .settle(new SettleRequest(request.instance(), derived.rows(), retryRevision));
+                        .settle(new SettleRequest(request.instance(), derived.rows(), fresh.revision()));
             }
             if (verdict instanceof ClaimVerdict.RevisionMoved moved) {
                 findings.add(

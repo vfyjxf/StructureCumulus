@@ -83,7 +83,7 @@ class SettleAtomicityTest {
     }
 
     @Test
-    void aZeroRowSettleClearsTheKey() {
+    void anEmptyPlanReleasesTheInstance() {
         Blueprint box = boxBlueprint("atomicity/box");
         Blueprint none = noneBlueprint("atomicity/none");
         TestWorld.View view = filledView();
@@ -112,9 +112,9 @@ class SettleAtomicityTest {
             )
         );
         assertTrue(formed.claims().rows().isEmpty());
-        assertTrue(TestWorld.rows(ledger).isEmpty(), "the zero-row settle clears the key");
-        assertEquals(2L, ledger.revision(), "the zero-row settle bumps the revision");
-        assertEquals(2L, formed.ledgerRevision(), "Formed carries the bumped revision");
+        assertTrue(TestWorld.rows(ledger).isEmpty(), "the empty plan releases the instance's key");
+        assertEquals(2L, ledger.revision(), "the release of a held key bumps the revision");
+        assertEquals(2L, formed.ledgerRevision(), "Formed carries the release revision");
     }
 
     @Test

@@ -143,7 +143,8 @@ class AdversarialClaimCoverageTest {
             IllegalArgumentException.class,
             () -> new SettleRequest(instance, List.of(row(origin, Sharing.shared, rivalInstance, identity, "x")), 0)
         );
-        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instance, List.of(), -1));
+        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instance, List.of(), 0));
+        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instance, List.of(earlierCell), -1));
     }
 
     @Test
@@ -455,7 +456,8 @@ class AdversarialClaimCoverageTest {
         );
         assertTrue(formed.claims().rows().isEmpty(), "Footprint.None claims nothing");
         assertTrue(TestWorld.rows(ledger).isEmpty(), "a None footprint writes no ledger row");
-        assertEquals(1, ledger.revision(), "a None-only settlement clears the key and bumps the revision");
+        assertEquals(0, ledger.revision(), "an empty plan releases the key; an absent key does not bump");
+        assertEquals(0, formed.ledgerRevision(), "Formed carries the unchanged revision");
 
         Bay exclusiveNone = MagicFixtures
                 .bay(id("none_exclusive"), oneCell, Coverage.everyCell, Footprint.none(), Sharing.exclusive);
