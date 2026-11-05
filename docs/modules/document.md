@@ -60,7 +60,8 @@ public record Document(int schemaVersion, BlueprintSpec root,
     public Document { /* version >= 1; maps immutable and ordered */ }
 }
 
-public record BlueprintSpec(NamespacedId id, Cuboid bounds, boolean envelope, Value arguments,
+public record BlueprintSpec(NamespacedId id, Cuboid bounds, boolean envelope, boolean envelopeEntities,
+                            Value arguments,
                             java.util.List<BaySpec> bays,
                             java.util.List<SeamSpec> seams,
                             java.util.List<CheckSpec> checks,
@@ -200,6 +201,7 @@ public interface DocumentWriter {
 | `id` | id | yes | the root blueprint id |
 | `bounds` | box | yes | the root local frame; every compiled cell is inside |
 | `envelope` | boolean | no | `true` derives the closed-world air pair over cells no bay or declared footprint covers; absent or `false` is off; root-only |
+| `envelopeEntities` | boolean | no | `true` makes that envelope count entities as foreign and adds the `entity` kind to its read scope (`structure` §4.11, D-55); absent or `false` leaves entities transparent; root-only |
 | `definitions` | object id → spec | no | reusable specs, compiled on placement |
 | `placements` | placement[] | no | definitions placed into the root |
 | `bays` | bay[] | yes* | the root's own bays |
@@ -264,7 +266,8 @@ single-writer, and a merge that does not fit the type is `SC-DOC-0008`.
 ### 4.2 Definitions in v1
 
 A `definitions` entry contributes **bays, seams and placements** only. Checks, computations, keys,
-derivations, anchors, the orientation policy and `envelope` are root-only; a definition that
+derivations, anchors, the orientation policy, `envelope` and `envelopeEntities` are root-only; a
+definition that
 declares one is `SC-DOC-0002`. `arguments` and `extensions` are not members of a definition at all:
 the reader rejects them as unknown members (`SC-DOC-0002`). A definition's `bounds` is required and
 must contain the definition's own bays and seams; a cell outside them is `SC-DOC-0002`. This keeps a
@@ -289,7 +292,8 @@ definition no placement reaches, directly or through another placement, is `SC-D
 5. Build checks: resolve the focus factory and the expectation factory, check
    `focus.subject() == expectation.subject()`, then `Check.of`.
 6. Call `Blueprint.builder(...)`; when the root carries `envelope`, call `.envelope()` before
-   `build()`. A build exception is caught and reported as its own code (for example `SC-BPT-0004`
+   `build()`, and when it carries `envelopeEntities`, call `.envelopeEntities()`. A build exception
+   is caught and reported as its own code (for example `SC-BPT-0004`
    for a reserved envelope id); a clean compile never reaches that path.
 7. Return `CompileResult(bundle, blueprint)`; `findings` may contain warnings even when the
    blueprint is non-null.
@@ -418,6 +422,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   absent and `false` stay off; a definition-level member and a non-boolean value are `SC-DOC-0002`;
   an envelope root compiles to the same `Blueprint`, `Plan` and `ReadScope` as the Java `.envelope()`;
   an envelope-only root (`"bays": []`, `"checks": []`) yields one synthetic bay/check.
+  `"envelopeEntities": true` round-trips the same way, a document without it reads `false`, and a
+  definition-level member is `SC-DOC-0002` like `envelope`.
 - Structure set: a valid set (root + two preheaters) reads, compiles and writes back equal content;
   `kind` selects the reader and is omitted on a canonically written blueprint; unknown members,
   wrong kind, bad `at`/`orientation`/`arguments`/link/presence members and a duplicate satellite id
@@ -445,7 +451,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 - A definition is geometry: bays, seams and placements only. Every check, computation, key and
   derivation is written once in the root.
 - `envelope` is a root boolean. A definition cannot declare it, and an absent member is off; the
-  schema version does not move for it.
+  schema version does not move for it. `envelopeEntities` follows the same rule and only modifies
+  what an `envelope` root would judge.
 - Kind ids are lowercase snake_case. Built-in structural forms are grammar, not catalog entries;
   an unqualified kind resolves in `structurecumulus`.
 - A declaration is confirmed, never repaired. A computation whose `id` differs from its `output`,

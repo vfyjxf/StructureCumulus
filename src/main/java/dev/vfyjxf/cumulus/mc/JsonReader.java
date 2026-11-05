@@ -61,6 +61,7 @@ public final class JsonReader implements DocumentReader {
         "id",
         "bounds",
         "envelope",
+        "envelopeEntities",
         "definitions",
         "placements",
         "bays",
@@ -243,6 +244,7 @@ public final class JsonReader implements DocumentReader {
             NamespacedId id = id(object, "id", "$");
             Cuboid bounds = box(required(object, "bounds", "$"), field("$", "bounds"));
             Boolean envelope = optionalBoolean(object, "envelope", "$");
+            Boolean envelopeEntities = optionalBoolean(object, "envelopeEntities", "$");
             Map<NamespacedId, BlueprintSpec> definitions = definitions(object);
             List<PlacementSpec> placements = placements(object, "$");
             List<BaySpec> bays = bays(object, "$", true);
@@ -261,6 +263,7 @@ public final class JsonReader implements DocumentReader {
                 id,
                 bounds,
                 Boolean.TRUE.equals(envelope),
+                Boolean.TRUE.equals(envelopeEntities),
                 arguments,
                 bays,
                 List.of(),
@@ -320,6 +323,7 @@ public final class JsonReader implements DocumentReader {
             return new BlueprintSpec(
                 id,
                 bounds,
+                false,
                 false,
                 arguments(object, path),
                 bays(object, path, false),

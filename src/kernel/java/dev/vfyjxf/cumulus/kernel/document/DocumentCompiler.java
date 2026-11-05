@@ -119,6 +119,9 @@ public final class DocumentCompiler {
         if (document.root().envelope()) {
             builder.envelope();
         }
+        if (document.root().envelopeEntities()) {
+            builder.envelopeEntities();
+        }
         if (flat.orientation != null) {
             builder.orientation(flat.orientation);
         }
@@ -228,7 +231,8 @@ public final class DocumentCompiler {
                     || !spec.derivations().isEmpty()
                     || !spec.anchors().isEmpty()
                     || spec.orientation() != null
-                    || spec.envelope()) {
+                    || spec.envelope()
+                    || spec.envelopeEntities()) {
                 error(
                     findings,
                     Codes.documentField,

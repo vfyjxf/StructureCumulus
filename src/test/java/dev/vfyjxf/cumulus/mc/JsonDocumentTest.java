@@ -44,6 +44,7 @@ import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.structure.SeamId;
 import dev.vfyjxf.cumulus.kernel.structure.SeamKind;
+import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -611,6 +612,7 @@ class JsonDocumentTest {
                 root.id(),
                 root.bounds(),
                 root.envelope(),
+                root.envelopeEntities(),
                 root.arguments(),
                 root.bays(),
                 List.of(
@@ -688,6 +690,38 @@ class JsonDocumentTest {
         assertFalse(offDocument.root().envelope());
         assertEquals(withoutSpans(absentDocument), withoutSpans(offDocument));
         assertFalse(new JsonWriter().write(offDocument).contains("\"envelope\""));
+    }
+
+    @Test
+    void envelopeEntitiesRoundTripsAndOldDocumentsReadFalse() {
+        String text = """
+                {"schemaVersion":1,"id":"test:envelope_entities","bounds":[0,0,0,2,1,1],
+                 "envelope":true,"envelopeEntities":true,"bays":[],"checks":[]}
+                """;
+        Document document = read(text);
+        assertTrue(document.root().envelopeEntities(), "the reader carries the root flag");
+        String written = new JsonWriter().write(document);
+        assertTrue(written.contains("\"envelopeEntities\": true"));
+        int envelope = written.indexOf("\"envelope\":");
+        int entities = written.indexOf("\"envelopeEntities\":");
+        assertTrue(envelope >= 0 && envelope < entities, "envelopeEntities follows envelope");
+        Document back = read(written);
+        assertEquals(withoutSpans(document), withoutSpans(back));
+        assertEquals(written, new JsonWriter().write(back), "the written form is a fixed point");
+
+        String oldText = """
+                {"schemaVersion":1,"id":"test:envelope_old","bounds":[0,0,0,2,1,1],
+                 "envelope":true,"bays":[],"checks":[]}
+                """;
+        Document old = read(oldText);
+        assertFalse(old.root().envelopeEntities(), "a document without the field reads false");
+        assertFalse(new JsonWriter().write(old).contains("\"envelopeEntities\""));
+
+        CompileResult result = DocumentCompiler.compile(back, context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        Blueprint blueprint = result.blueprint();
+        assertNotNull(blueprint);
+        assertTrue(blueprint.reads().kinds().contains(OccupantKind.entity), "the switch adds the entity kind");
     }
 
     @Test
@@ -842,6 +876,7 @@ class JsonDocumentTest {
         BlueprintSpec root = new BlueprintSpec(
             NamespacedId.of("test", "orientations"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -1108,6 +1143,7 @@ class JsonDocumentTest {
             spec.id(),
             spec.bounds(),
             spec.envelope(),
+            spec.envelopeEntities(),
             spec.arguments(),
             bays,
             seams,

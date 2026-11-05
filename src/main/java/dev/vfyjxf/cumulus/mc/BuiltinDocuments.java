@@ -107,6 +107,7 @@ final class BuiltinDocuments {
                 id,
                 bounds,
                 false,
+                false,
                 Value.object(),
                 List.of(
                     new BaySpec(

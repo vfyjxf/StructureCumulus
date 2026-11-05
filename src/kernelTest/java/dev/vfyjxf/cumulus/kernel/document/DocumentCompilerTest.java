@@ -86,6 +86,7 @@ class DocumentCompilerTest {
             id("campfire"),
             Cuboid.of(0, 0, 0, 3, 3, 3),
             false,
+            false,
             Value.object(),
             List.of(
                 new BaySpec(
@@ -184,6 +185,7 @@ class DocumentCompilerTest {
             id("envelope_root"),
             bounds,
             true,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -215,6 +217,7 @@ class DocumentCompilerTest {
             id("unit"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             true,
+            false,
             Value.object(),
             List.of(new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
             List.of(),
@@ -231,6 +234,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("root"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -265,6 +269,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("envelope_off"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(new BaySpec(id("bay"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
@@ -314,6 +319,7 @@ class DocumentCompilerTest {
             id("unit"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
             List.of(),
@@ -331,6 +337,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("root"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -374,6 +381,7 @@ class DocumentCompilerTest {
             id("bad"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -408,6 +416,7 @@ class DocumentCompilerTest {
             id("bad"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -437,6 +446,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("overlap"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(
@@ -492,6 +502,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("trait_absent"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(new BaySpec(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
@@ -551,6 +562,7 @@ class DocumentCompilerTest {
             id("bad_merge"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -578,6 +590,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("mismatched"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -630,6 +643,7 @@ class DocumentCompilerTest {
             id("undeclared_inputs"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -671,6 +685,7 @@ class DocumentCompilerTest {
                 id("unused_bay"),
                 Cuboid.of(0, 0, 0, 2, 1, 1),
                 envelope,
+                false,
                 Value.object(),
                 List.of(
                     new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
@@ -700,6 +715,7 @@ class DocumentCompilerTest {
             id("leaky"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(
                 new BaySpec(
@@ -727,6 +743,7 @@ class DocumentCompilerTest {
             id("root"),
             Cuboid.of(0, 0, 0, 3, 1, 1),
             true,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -754,6 +771,7 @@ class DocumentCompilerTest {
             id("ghost"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -771,6 +789,7 @@ class DocumentCompilerTest {
             id("root"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             true,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -798,6 +817,7 @@ class DocumentCompilerTest {
             id("leaf"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -814,6 +834,7 @@ class DocumentCompilerTest {
         BlueprintSpec middle = new BlueprintSpec(
             id("middle"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -832,6 +853,7 @@ class DocumentCompilerTest {
             id("root"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
             true,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -856,6 +878,7 @@ class DocumentCompilerTest {
         BlueprintSpec externalRoot = new BlueprintSpec(
             id("external"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -883,6 +906,7 @@ class DocumentCompilerTest {
             id("root"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             true,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -908,6 +932,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("qualified_kind"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(new BaySpec(id("cell"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
