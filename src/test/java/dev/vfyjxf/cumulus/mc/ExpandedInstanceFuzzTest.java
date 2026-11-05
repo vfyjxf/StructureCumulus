@@ -709,7 +709,7 @@ class ExpandedInstanceFuzzTest {
     private static List<ClaimRow> expectedRows(Blueprint blueprint, Siting siting, InstanceId instance) {
         List<ClaimRow> rows = new ArrayList<>();
         for (Bay bay : blueprint.bays()) {
-            for (Cuboid box : bay.cells().boxes()) {
+            for (Cuboid box : bay.cells().decomposition()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {

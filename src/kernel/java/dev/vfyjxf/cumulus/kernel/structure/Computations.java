@@ -117,7 +117,7 @@ public final class Computations {
                 return refuse(ctx);
             }
             long air = 0;
-            for (Cuboid box : ctx.cells().boxes()) {
+            for (Cuboid box : ctx.cells().decomposition()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {

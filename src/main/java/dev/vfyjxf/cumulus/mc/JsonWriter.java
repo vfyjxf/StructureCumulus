@@ -289,7 +289,7 @@ public final class JsonWriter implements DocumentWriter {
 
     private static void addCells(JsonObject json, CuboidSet cells) {
         if (cells.boxCount() == 1) {
-            json.add("box", JsonValues.box(cells.boxes().get(0)));
+            json.add("box", JsonValues.box(cells.decomposition().get(0)));
         } else {
             json.add("boxes", JsonValues.boxSet(cells));
         }

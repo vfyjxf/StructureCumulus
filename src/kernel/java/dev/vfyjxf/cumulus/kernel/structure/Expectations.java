@@ -730,7 +730,7 @@ public final class Expectations {
             boolean mismatched = false;
             boolean unreadable = false;
             boolean abstained = false;
-            for (Cuboid box : ctx.cells().boxes()) {
+            for (Cuboid box : ctx.cells().decomposition()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {

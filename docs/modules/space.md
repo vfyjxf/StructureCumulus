@@ -1,7 +1,8 @@
 # Module `kernel.space`
 
-> Rank 1. Integer lattice, canonical box sets, the 48-element orientation group, placements,
-> sitings, and the frames a finding points into. Pure arithmetic; no world, no occupant, no report.
+> Rank 1. Integer lattice, cell sets as box decompositions, the 48-element orientation group,
+> placements, sitings, and the frames a finding points into. Pure arithmetic; no world, no occupant,
+> no report.
 
 ## 1. Scope
 
@@ -22,7 +23,7 @@ structure owns (`claim`), the text a source span points into (`core`).
 | `LatticeKey` | record | one `long`, x:26 / z:26 / y:12; `Comparable` by point order |
 | `Axis` | enum | `x`, `y`, `z` |
 | `Cuboid` | record | half-open `[min,max)`; empty is legal; no union/difference |
-| `CuboidSet` | final class | normalized, disjoint, sorted, empty-free boxes; equality by cells |
+| `CuboidSet` | final class | a cell set held as a disjoint, sorted box decomposition; equality and order by cells |
 | `SectionKey` | record | `(world, frame, x, y, z)`; the view's section index |
 | `Heading` | enum | `north,south,west,east,up,down`; anchor text is matched case-insensitively |
 | `Turn` | enum | yaw quarter turn, cyclic order 4 |
@@ -80,11 +81,11 @@ public record Cuboid(LatticePoint min, LatticePoint max) implements Comparable<C
     @Override public int compareTo(Cuboid other);
 }
 
-public final class CuboidSet {
+public final class CuboidSet implements Comparable<CuboidSet> {
     public static CuboidSet empty();
     public static CuboidSet of(Cuboid... boxes);
     public static CuboidSet of(java.util.Collection<Cuboid> boxes);
-    public java.util.List<Cuboid> boxes();
+    public java.util.List<Cuboid> decomposition();             // one decomposition, not a canonical form
     public int boxCount();
     public boolean isEmpty();
     public long volume();
@@ -100,6 +101,7 @@ public final class CuboidSet {
     public CuboidSet subtract(Cuboid box);
     public @Nullable CuboidSet translate(int dx, int dy, int dz);
     public boolean contentEquals(CuboidSet other);
+    @Override public int compareTo(CuboidSet other);           // bounds, volume, first differing cell; empty last
     private CuboidSet() {}
 }
 
@@ -223,21 +225,21 @@ wrong and the javadoc says so.
 
 ### 4.3 CuboidSet
 
-`of` canonicalises:
+`of` returns one decomposition of the cell set:
 
 1. drop empty boxes;
 2. cut at every distinct `x` and `z` boundary, producing slab-columns;
 3. merge overlapping or touching `y` intervals inside a column;
 4. sort by `(min.y, min.z, min.x, max.y, max.z, max.x)`.
 
-The result has no empty box, no overlap, no mergeable pair **inside one slab-column** (touching
-`y` intervals are merged), and is idempotent. Boxes in neighbouring columns may be adjacent (a
-union that happens to be a box is not re-cut into one); irredundance is not minimality. `equals`
-and `contentEquals` are both semantic (`containsAll` both ways); the box decomposition is not part
-of value equality. Every algebra member returns `of(...)`, so the box list is normalised again.
-`volume` saturates. No member enumerates cells; `ClaimPlanner` may
-iterate `boxes()` and nested coordinates to emit rows, which is the one bounded enumeration in the
-kernel.
+Which decomposition a set holds is an implementation detail: identity is the cells (`equals`,
+`hashCode` and `contentEquals` are semantic, `containsAll` both ways), and order is content-based —
+`compareTo` compares bounds, then volume, then the first cell where two sets differ, so a
+decomposition that happens to differ cannot reorder a finding, and the empty region sorts last.
+Every algebra member returns `of(...)` over its cells, so each carries some decomposition, never a
+canonical one. `volume` saturates. No member materialises the cell list; the `compareTo` tie-break
+merges the boxes lazily, and `ClaimPlanner` may iterate `decomposition()` and nested coordinates to
+emit rows, which is the one bounded enumeration in the kernel.
 
 ### 4.4 Orientations
 
@@ -319,7 +321,8 @@ lattice. `SC-SPC-0002` (ERROR): a `CuboidSet` operation would leave the lattice.
   order, not packed order.
 - Cuboid edge cases: empty, across the origin, mirrored image, `ofSize` vs `of`.
 - `CuboidSet`: idempotence; disjointness; subtraction; union; semantic `equals` and content hash;
-  no merge of touching boxes; box order total.
+  no merge of touching boxes; box order total; content order independent of the decomposition
+  (`firstCell` is the smallest cell; the empty region sorts last).
 - Orientation: `all().size() == 48`; distinct; inverse; composition; volume invariant; the
   `1 -` mirror case; `of` normalises the 72 triples.
 - Placement: compose/inverse when non-null; off-lattice returns null; affine equivariance.

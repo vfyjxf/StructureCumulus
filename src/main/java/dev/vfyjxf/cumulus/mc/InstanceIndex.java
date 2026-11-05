@@ -70,7 +70,7 @@ final class InstanceIndex {
 
     private static Set<Long> chunkKeys(CuboidSet bounds) {
         Set<Long> keys = new HashSet<>();
-        for (Cuboid box : bounds.boxes()) {
+        for (Cuboid box : bounds.decomposition()) {
             int minX = Math.floorDiv(box.min().x(), 16);
             int maxX = Math.floorDiv(box.max().x() - 1, 16);
             int minZ = Math.floorDiv(box.min().z(), 16);

@@ -220,7 +220,7 @@ public final class VisualProbe {
 
     private static String boundsText(CuboidSet bounds) {
         List<String> boxes = new ArrayList<>();
-        for (Cuboid box : bounds.boxes()) {
+        for (Cuboid box : bounds.decomposition()) {
             boxes.add(
                 "[" + box.min().x() + "," + box.min().y() + "," + box.min().z() + ".." + box.max().x() + ","
                         + box.max().y() + "," + box.max().z() + "]"

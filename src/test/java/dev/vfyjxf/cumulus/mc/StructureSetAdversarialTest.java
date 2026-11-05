@@ -148,7 +148,7 @@ class StructureSetAdversarialTest {
         Fixture fixture = busyFixture(specs);
         StructureSet.Satellite optional = fixture.plan.satellite(optionalId);
         assertNotNull(optional);
-        fixture.view.refuse(optional.presenceCells().boxes().get(0).min());
+        fixture.view.refuse(optional.presenceCells().decomposition().get(0).min());
         StructureSetResult result = fixture.run();
 
         assertFalse(result.formed());

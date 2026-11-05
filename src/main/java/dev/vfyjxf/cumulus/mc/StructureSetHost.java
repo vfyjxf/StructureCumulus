@@ -579,7 +579,7 @@ public final class StructureSetHost {
     }
 
     private static Presence probe(StructureSet.Satellite satellite, WorldView view, SetBudget budget) {
-        for (Cuboid box : satellite.presenceCells().boxes()) {
+        for (Cuboid box : satellite.presenceCells().decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {

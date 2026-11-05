@@ -10,15 +10,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.TreeSet;
 
-/** A canonical, disjoint, sorted set of boxes. */
-public final class CuboidSet {
+/** A set of lattice cells held as a disjoint, sorted box decomposition. */
+public final class CuboidSet implements Comparable<CuboidSet> {
 
     private static final CuboidSet empty = new CuboidSet(List.of());
 
-    private final List<Cuboid> boxes;
+    private final List<Cuboid> decomposition;
 
-    private CuboidSet(List<Cuboid> boxes) {
-        this.boxes = boxes;
+    private CuboidSet(List<Cuboid> decomposition) {
+        this.decomposition = decomposition;
     }
 
     public static CuboidSet empty() {
@@ -88,21 +88,22 @@ public final class CuboidSet {
         return new CuboidSet(List.copyOf(result));
     }
 
-    public List<Cuboid> boxes() {
-        return boxes;
+    /** One decomposition of the cell set, disjoint and sorted; not a canonical form. */
+    public List<Cuboid> decomposition() {
+        return decomposition;
     }
 
     public int boxCount() {
-        return boxes.size();
+        return decomposition.size();
     }
 
     public boolean isEmpty() {
-        return boxes.isEmpty();
+        return decomposition.isEmpty();
     }
 
     public long volume() {
         long total = 0;
-        for (Cuboid box : boxes) {
+        for (Cuboid box : decomposition) {
             long volume = box.volume();
             if (total > Long.MAX_VALUE - volume) {
                 return Long.MAX_VALUE;
@@ -113,7 +114,7 @@ public final class CuboidSet {
     }
 
     public @Nullable Cuboid bounds() {
-        if (boxes.isEmpty()) {
+        if (decomposition.isEmpty()) {
             return null;
         }
         int minX = Integer.MAX_VALUE;
@@ -122,7 +123,7 @@ public final class CuboidSet {
         int maxX = Integer.MIN_VALUE;
         int maxY = Integer.MIN_VALUE;
         int maxZ = Integer.MIN_VALUE;
-        for (Cuboid box : boxes) {
+        for (Cuboid box : decomposition) {
             minX = Math.min(minX, box.min().x());
             minY = Math.min(minY, box.min().y());
             minZ = Math.min(minZ, box.min().z());
@@ -134,7 +135,7 @@ public final class CuboidSet {
     }
 
     public boolean contains(LatticePoint cell) {
-        for (Cuboid box : boxes) {
+        for (Cuboid box : decomposition) {
             if (box.contains(cell)) {
                 return true;
             }
@@ -149,8 +150,8 @@ public final class CuboidSet {
 
     public boolean intersects(CuboidSet other) {
         Objects.requireNonNull(other, "other");
-        for (Cuboid a : boxes) {
-            for (Cuboid b : other.boxes) {
+        for (Cuboid a : decomposition) {
+            for (Cuboid b : other.decomposition) {
                 if (a.intersects(b)) {
                     return true;
                 }
@@ -161,9 +162,9 @@ public final class CuboidSet {
 
     public CuboidSet union(CuboidSet other) {
         Objects.requireNonNull(other, "other");
-        List<Cuboid> all = new ArrayList<>(boxes.size() + other.boxes.size());
-        all.addAll(boxes);
-        all.addAll(other.boxes);
+        List<Cuboid> all = new ArrayList<>(decomposition.size() + other.decomposition.size());
+        all.addAll(decomposition);
+        all.addAll(other.decomposition);
         return of(all);
     }
 
@@ -174,8 +175,8 @@ public final class CuboidSet {
     public CuboidSet intersect(CuboidSet other) {
         Objects.requireNonNull(other, "other");
         List<Cuboid> result = new ArrayList<>();
-        for (Cuboid a : boxes) {
-            for (Cuboid b : other.boxes) {
+        for (Cuboid a : decomposition) {
+            for (Cuboid b : other.decomposition) {
                 Cuboid intersection = a.intersect(b);
                 if (intersection != null) {
                     result.add(intersection);
@@ -191,8 +192,8 @@ public final class CuboidSet {
 
     public CuboidSet subtract(CuboidSet other) {
         Objects.requireNonNull(other, "other");
-        List<Cuboid> current = new ArrayList<>(boxes);
-        for (Cuboid cut : other.boxes) {
+        List<Cuboid> current = new ArrayList<>(decomposition);
+        for (Cuboid cut : other.decomposition) {
             List<Cuboid> next = new ArrayList<>();
             for (Cuboid box : current) {
                 next.addAll(subtractOne(box, cut));
@@ -237,8 +238,8 @@ public final class CuboidSet {
     }
 
     public @Nullable CuboidSet translate(int dx, int dy, int dz) {
-        List<Cuboid> translated = new ArrayList<>(boxes.size());
-        for (Cuboid box : boxes) {
+        List<Cuboid> translated = new ArrayList<>(decomposition.size());
+        for (Cuboid box : decomposition) {
             Cuboid moved = box.translate(dx, dy, dz);
             if (moved == null) {
                 return null;
@@ -252,6 +253,29 @@ public final class CuboidSet {
         return containsAll(other) && other.containsAll(this);
     }
 
+    /** Content order: bounds, then cell count, then the first differing cell. */
+    @Override
+    public int compareTo(CuboidSet other) {
+        Cuboid mine = bounds();
+        Cuboid theirs = other.bounds();
+        if (mine == null || theirs == null) {
+            return Boolean.compare(mine == null, theirs == null);
+        }
+        int byMin = mine.min().compareTo(theirs.min());
+        if (byMin != 0) {
+            return byMin;
+        }
+        int byMax = mine.max().compareTo(theirs.max());
+        if (byMax != 0) {
+            return byMax;
+        }
+        int byVolume = Long.compare(volume(), other.volume());
+        if (byVolume != 0) {
+            return byVolume;
+        }
+        return CellIterator.compare(this, other);
+    }
+
     @Override
     public boolean equals(Object other) {
         return other instanceof CuboidSet set && contentEquals(set);
@@ -263,7 +287,7 @@ public final class CuboidSet {
         long sumY = 0;
         long sumZ = 0;
         long volume = 0;
-        for (Cuboid box : boxes) {
+        for (Cuboid box : decomposition) {
             long nx = (long) box.max().x() - box.min().x();
             long ny = (long) box.max().y() - box.min().y();
             long nz = (long) box.max().z() - box.min().z();
@@ -278,6 +302,6 @@ public final class CuboidSet {
 
     @Override
     public String toString() {
-        return boxes.toString();
+        return decomposition.toString();
     }
 }

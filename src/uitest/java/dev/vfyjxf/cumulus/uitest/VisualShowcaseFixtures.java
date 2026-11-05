@@ -335,7 +335,7 @@ final class VisualShowcaseFixtures {
             Blocks.BRICKS
         );
         for (VisualPart part : parts) {
-            Cuboid first = part.bounds().boxes().get(0);
+            Cuboid first = part.bounds().decomposition().get(0);
             level.getChunk(Math.floorDiv(first.min().x(), 16), Math.floorDiv(first.min().z(), 16));
             Block block;
             if (part.role() == VisualPartRole.member) {
@@ -362,7 +362,7 @@ final class VisualShowcaseFixtures {
                     case maintenance -> Blocks.IRON_TRAPDOOR;
                 };
             }
-            for (Cuboid box : part.bounds().boxes()) {
+            for (Cuboid box : part.bounds().decomposition()) {
                 fill(
                     level,
                     box.min().x(),
@@ -470,7 +470,7 @@ final class VisualShowcaseFixtures {
         int maxY = Integer.MIN_VALUE;
         int maxZ = Integer.MIN_VALUE;
         for (CuboidSet set : bounds) {
-            for (Cuboid box : set.boxes()) {
+            for (Cuboid box : set.decomposition()) {
                 minX = Math.min(minX, box.min().x());
                 minY = Math.min(minY, box.min().y());
                 minZ = Math.min(minZ, box.min().z());

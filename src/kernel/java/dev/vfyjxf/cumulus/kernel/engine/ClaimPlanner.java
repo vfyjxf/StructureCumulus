@@ -71,7 +71,7 @@ public final class ClaimPlanner {
             if (owned.isEmpty() && bay.sharing() == Sharing.exclusive) {
                 throw new IllegalArgumentException("SC-CLM-0005: exclusive bay " + bay.id() + " owns no cell");
             }
-            for (Cuboid box : owned.boxes()) {
+            for (Cuboid box : owned.decomposition()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {

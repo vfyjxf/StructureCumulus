@@ -155,7 +155,7 @@ final class VisualHierarchyScenarioSupport {
         int memberIndex = 0;
         for (VisualHierarchyFixtures.Member member : fixture.members()) {
             Block block = paletteFor(member.groupId(), memberIndex++);
-            for (Cuboid box : member.bounds().boxes()) {
+            for (Cuboid box : member.bounds().decomposition()) {
                 build = build.fill(
                     box.min().x(),
                     box.min().y(),
@@ -230,7 +230,7 @@ final class VisualHierarchyScenarioSupport {
             if (!member.groupId().equals(groupId)) {
                 continue;
             }
-            for (Cuboid box : member.bounds().boxes()) {
+            for (Cuboid box : member.bounds().decomposition()) {
                 minX = Math.min(minX, box.min().x());
                 minY = Math.min(minY, box.min().y());
                 minZ = Math.min(minZ, box.min().z());
@@ -250,7 +250,7 @@ final class VisualHierarchyScenarioSupport {
         int maxY = Integer.MIN_VALUE;
         int maxZ = Integer.MIN_VALUE;
         for (VisualHierarchyFixtures.Member member : fixture.members()) {
-            for (Cuboid box : member.bounds().boxes()) {
+            for (Cuboid box : member.bounds().decomposition()) {
                 minX = Math.min(minX, box.min().x());
                 minY = Math.min(minY, box.min().y());
                 minZ = Math.min(minZ, box.min().z());

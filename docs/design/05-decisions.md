@@ -1167,6 +1167,26 @@ Nothing observable changes while every siting is built by `Siting.of(origin, ori
 placement offset is zero; the defect is fixed in the kernel because a host can construct the other
 form.
 
+### D-50 — A region is its cells; the box list is a decomposition
+
+`CuboidSet` holds a decomposition of a cell set. Which decomposition it holds is an implementation
+detail: equality and hashing already compare cells, and no consumer may use the box list as an
+identity or an ordering key.
+
+**Ordering is content-based.** Two regions compare by bounds, then cell count, then the first cell
+where they differ; the common case never enumerates cells. A decomposition that happens to differ
+therefore cannot reorder a finding.
+
+**The box list is renamed `decomposition()`** and documented as a decomposition, not a canonical
+form. `firstCell` already answers the region's smallest cell and needs no change.
+
+**Text is not specified.** Rendered finding text is debug output; the working error surface is the
+visual layer, so the text keeps whatever the current renderer produces.
+
+**Rejected: canonicalising the decomposition.** It forces a choice between a unique form that is not
+minimal (staircase families blow up to one box per cell) and a minimal one that must enumerate cells,
+and it makes every construction pay for a property only the ordering actually needs.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

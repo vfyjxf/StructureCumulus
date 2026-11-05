@@ -91,7 +91,7 @@ final class VisualComplexScenarioSupport {
         int memberIndex = 0;
         for (VisualComplexFixtures.Member member : fixture.members()) {
             Block block = palette[memberIndex++ % palette.length];
-            for (Cuboid box : member.bounds().boxes()) {
+            for (Cuboid box : member.bounds().decomposition()) {
                 build = build.fill(
                     box.min().x(),
                     box.min().y(),
@@ -173,7 +173,7 @@ final class VisualComplexScenarioSupport {
         int maxY = Integer.MIN_VALUE;
         int maxZ = Integer.MIN_VALUE;
         for (VisualComplexFixtures.Member member : fixture.members()) {
-            for (Cuboid box : member.bounds().boxes()) {
+            for (Cuboid box : member.bounds().decomposition()) {
                 minX = Math.min(minX, box.min().x());
                 minY = Math.min(minY, box.min().y());
                 minZ = Math.min(minZ, box.min().z());

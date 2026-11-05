@@ -373,7 +373,7 @@ public final class Focuses {
 
     private static FindingBundle footprintGap(FocusContext ctx, OccupantSnapshot occupant) {
         Map<ReadRefusal, CuboidSet> groups = new LinkedHashMap<>();
-        for (Cuboid box : occupant.footprint().asSet().boxes()) {
+        for (Cuboid box : occupant.footprint().asSet().decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {
@@ -402,7 +402,7 @@ public final class Focuses {
 
     static List<LatticePoint> cellsOf(CuboidSet cells) {
         List<LatticePoint> points = new ArrayList<>();
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {

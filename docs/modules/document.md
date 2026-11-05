@@ -220,8 +220,8 @@ check before the "at least one check" rule (`structure` §4.11). An envelope-onl
 `"bays": []` and `"checks": []` is therefore legal.
 
 A box is `[x, y, z, sizeX, sizeY, sizeZ]` (origin + size). A bay has `box` or `boxes` plus optional
-`minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a normalized set; the compiler
-canonicalises again.
+`minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a cell set with a box decomposition;
+the compiler builds it through `of`.
 
 A definition is the same `BlueprintSpec` shape without `schemaVersion`; its `id` is the map key. A
 placement is `{"definition": "mymod:shell", "as": "mymod:south", "at": [0,0,0]}`. The compiler

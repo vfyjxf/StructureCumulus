@@ -529,7 +529,7 @@ class StructureManagerFuzzTest {
                 case Footprint.Bound ignored -> CuboidSet.empty();
                 case Footprint.None ignored -> CuboidSet.empty();
             };
-            for (Cuboid box : owned.boxes()) {
+            for (Cuboid box : owned.decomposition()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
@@ -620,7 +620,7 @@ class StructureManagerFuzzTest {
             assertEquals(instance.id(), instance.context().instance(), where + " context identity");
             assertEquals(instance, manager.find(instance.id()), where + " find(id)");
             assertEquals(instance, manager.find(instance.owner(), instance.siting()), where + " find(owner, siting)");
-            for (Cuboid box : instance.bounds().boxes()) {
+            for (Cuboid box : instance.bounds().decomposition()) {
                 assertTrue(manager.findAt(box.min()).contains(instance), where + " findAt covers the bounds");
             }
             if (previous != null) {
