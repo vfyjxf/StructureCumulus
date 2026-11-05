@@ -1,17 +1,14 @@
 package dev.vfyjxf.cumulus.kernel.context;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
-import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** The per-instance value store. One writer per instance. */
@@ -68,13 +65,10 @@ public interface ContextStore {
                 }
                 return contexts.compute(instance, (ignored, current) -> {
                     StructureContext base = current == null ? StructureContext.empty(instance) : current;
-                    TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(ContextKeys.order());
-                    merged.putAll(base.values());
-                    merged.putAll(values);
                     return new StructureContext(
                         instance,
                         base.revision() + 1,
-                        Collections.unmodifiableMap(merged),
+                        values,
                         findings,
                         base.spend().plus(spend)
                     );

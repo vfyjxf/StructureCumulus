@@ -5,10 +5,8 @@ import dev.vfyjxf.cumulus.kernel.core.CancelToken;
 import dev.vfyjxf.cumulus.kernel.core.ContextView;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 
-/** What a derivation sees. */
+/** What a derivation sees: the table this pass is building. */
 public interface DeriveContext extends ContextView {
-
-    StructureContext base();
 
     Budget remaining();
 
