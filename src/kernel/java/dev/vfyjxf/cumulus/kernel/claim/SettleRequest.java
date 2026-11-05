@@ -12,6 +12,9 @@ public record SettleRequest(InstanceId instance, List<ClaimRow> rows, long expec
     public SettleRequest {
         Objects.requireNonNull(instance, "instance");
         Objects.requireNonNull(rows, "rows");
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("a settle carries at least one row; use release to drop a key");
+        }
         if (expectedRevision < 0) {
             throw new IllegalArgumentException("expectedRevision >= 0");
         }

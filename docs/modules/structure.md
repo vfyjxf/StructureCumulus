@@ -410,10 +410,12 @@ what the instance owns, `Sharing` says how claims meet. They are three independe
 | `oneSubject` | at least one check binds subjects; static cells stay inside the bay | union of bound subject footprints equals `bay.cells()` |
 | `anySubject` | every check's static cells is empty; a claiming footprint also requires every subject-binding focus to be claimable | — |
 
-`exclusive` requires a footprint other than `None` (R1). `oneSubject + Box` is legal (the bay owns
-its air); `anySubject + Bound` is legal (a pen owns the animal's cells) only when every focus that
-binds a subject answers `bindsClaimableSubject() == true`. Only `None + exclusive` is a
-contradiction; a claiming bay with an unknown custom focus fails the build (`SC-BPT-0005`).
+`exclusive` must own cells at build when the owned set is already known (R1): `None` and a
+`Declared` with no cells are contradictions (`SC-BPT-0005`). A `Bound` bay is not judged here —
+its owned set exists only at settle. `oneSubject + Box` is legal (the bay owns its air);
+`anySubject + Bound` is legal (a pen owns the animal's cells) only when every focus that binds a
+subject answers `bindsClaimableSubject() == true`. A claiming bay with an unknown custom focus
+fails the build (`SC-BPT-0005`).
 
 ### 4.2 Check
 
@@ -603,10 +605,10 @@ consequence of the blueprint, not a second declaration.
 | Rule | Code |
 | --- | --- |
 | id/bounds non-null, bounds non-empty, at least one check | `SC-BPT-0001` |
-| two bays intersect and at least one is `exclusive` | `SC-BPT-0002` |
+| two bays' owned sets (`Box` cells, `Declared` cells) intersect and at least one is `exclusive`; a `Bound` owned set is unknown at build and is not judged here | `SC-BPT-0002` |
 | a bay is empty or leaves `bounds` | `SC-BPT-0003` |
 | duplicate bay/check/seam id, or two different bays with one id | `SC-BPT-0004` |
-| coverage/footprint R1–R4, `None + exclusive`, `Declared` outside bounds | `SC-BPT-0005` |
+| coverage/footprint R1–R4, an `exclusive` bay owning no known cell (`None`, an empty `Declared`), `Declared` outside bounds | `SC-BPT-0005` |
 | anchor roles duplicated, primary role absent, allowed empty/duplicate/not upright, anchors without a policy | `SC-BPT-0006` |
 | computation DAG cycle/missing input/duplicate output/empty region/section input | `SC-BPT-0007` |
 | derivation order negative/duplicate, output duplicate/also a computation output | `SC-BPT-0008` |

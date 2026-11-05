@@ -1203,6 +1203,67 @@ scan the author did not ask for.
 **Why a second read.** `read(cell)` answers the body covering the cell, which would hide a foreign
 block under it. `cellOccupant(cell)` answers what the cell stores; a host that captures bodies must
 answer both, and one that cannot answers "undecided" rather than guessing.
+### D-57 — A blueprint is refused only for conflicts it cannot outgrow
+
+The build refuses two bays of one blueprint whose owned cell sets are known at build time and
+intersect with an exclusive side. `Box` owns its cells and `Declared` owns the set written in the
+document; both transform rigidly with the siting, so the overlap holds in every world, every origin
+and every orientation. `Bound` is excluded: its owned set is the union of the subjects read at
+settle and may be smaller than its bay, so a static answer would refuse blueprints that resolve
+cleanly.
+
+The remaining cases are decided where the cells exist:
+
+- a `Bound` overlap is refused by the planner, which scans its sorted rows and rejects a cell held
+  by two bays when either side is exclusive;
+- two instances never share a key, so their conflicts stay the ledger's job.
+
+Replacing the old rule changes three cases. The old rule compared bay cells, not owned cells, so it
+refused a `Declared` bay whose checked cells overlapped another bay while its owned cells did not,
+and it treated a `Bound` bay's cells as if they were owned. It also ignored `Declared` against
+`Declared`, which the owned-set rule now refuses.
+
+### D-59 — A contributed key is complete or absent
+
+A section contribution whose value does not match the key's type marks the key absent. The engine
+still reports the defect and never folds the remaining sections. A `merge.combine` that throws, or a
+merged value of the wrong type, marks the key absent the same way. No partial sum is published.
+
+Whether the attempt forms is a separate question: a check that requires an absent key answers
+`Unreadable`, so the attempt is `Undecided`; an attempt that never reads the key may still form and
+carries the error finding. That matches the engine's existing error semantics — `budgetExhausted` and
+`foldRefused` are errors too, and they produce `Undecided`, not `Failed`.
+
+**Why keep the finding.** The defect is in extension code, and the finding is the only channel that
+tells the author. Bare absence would read as "the computation chose not to produce a value".
+
+**Why not `Failed`.** A broken computation that no check reads does not make the structure wrong;
+failing every attempt would turn one extension bug into a global outage.
+
+### D-60 — Dropping a key is a release; a settle that changes nothing is not a write
+
+When the planner derives no rows, the engine releases the instance's key instead of settling an empty
+request. `SettleRequest` therefore rejects an empty row list in its constructor: "own nothing" is a
+release, not a degenerate settle, and no host has to implement that edge case.
+
+`settle` compares the resulting ledger content with the current content and writes only when they
+differ. A settle that changes nothing answers `Settled(revision, rows)` with the revision unchanged.
+`release` already behaved this way.
+
+Revision therefore means "the content version", not "the number of writes": it changes exactly when
+the rows a reader can see change. CAS stays first — a stale `expectedRevision` is refused even when
+the content happens to match, because the caller's view is stale and it must re-read.
+
+**Why release and not an empty settle.** An empty request makes correctness depend on every host
+implementing "empty means clear" the same way; a host that reads it as "nothing to do" keeps stale
+rows forever. `release` already means "drop this instance's rows" and is implemented once.
+
+**Why idempotence is safe.** No production path branches on "the revision changed"; only tests count
+bumps. A host that still bumps on a no-op stays correct — it only invalidates readers it need not.
+
+**Supersedes:** the zero-row half of D-42's write rule — exactly one compare-and-set per settle still
+holds for every settle that happens, but a settle whose plan owns nothing no longer happens; it is a
+`release`.
 
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
