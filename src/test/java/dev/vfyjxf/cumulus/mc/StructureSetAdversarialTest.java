@@ -52,6 +52,7 @@ import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.fillRoot;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.half;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.id;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.owner;
+import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.place;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.preheaterBlueprint;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.rootBlueprint;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.rootOrigin;
@@ -59,6 +60,7 @@ import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.rootSiting;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.setId;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.shell;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.singleBlueprint;
+import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.wideBlueprint;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.world;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -658,34 +660,99 @@ class StructureSetAdversarialTest {
     }
 
     @Test
-    void aFailedReSettleKeepsTheWholePreviousSet() {
+    void aFailedSetLeavesNoRowsOfThePreviousInstance() {
+        Fixture fixture = new Fixture(set(wideBlueprint()));
+        for (int x = 0; x < 3; x++) {
+            fixture.view.put(world(fixture.plan.rootSiting(), LatticePoint.of(x, 0, 0)), shell);
+        }
+        StructureSetResult first = fixture.run();
+        assertTrue(first.formed(), () -> first.setFindings().toString());
+        InstanceId previousRoot = fixture.instance(0);
+        assertEquals(3, fixture.ledger.rows().size());
+
+        StructureSet narrower = place(
+            busyCompiled(List.of(satSpec(id("fail_sat"), LatticePoint.of(10, 0, 0), false)))
+        );
+        StructureSet.Satellite failing = narrower.satellite(id("fail_sat"));
+        assertNotNull(failing);
+        fixture.view.put(world(rootSiting(), LatticePoint.origin), rootBlock);
+        fixture.view.put(world(failing.siting(), LatticePoint.origin), remoteBlock);
+        fixture.ledger.movingSiting = failing.siting();
+        StructureSetResult second = new StructureSetHost(fixture.kernel).run(
+            narrower,
+            new TestLease(fixture.view),
+            owner,
+            Budget.unbounded(),
+            spec -> fixture.structures.begin(world, spec)
+        );
+
+        assertFalse(second.formed());
+        assertEquals(
+            0,
+            fixture.ledger.rows().size(),
+            "every row of the previous instance is released, including the cells outside the new bounds"
+        );
+        assertNotNull(
+            fixture.structures.find(previousRoot),
+            "the previous identity stays as a stale entry until the host settles again (D-79)"
+        );
+    }
+
+    @Test
+    void theHostCanSettleAgainAfterAFailedSet() {
         CompiledStructureSet compiled = busyCompiled(
             List.of(
-                satSpec(id("replace_fail_a"), LatticePoint.of(2, 0, 0), false),
-                satSpec(id("replace_fail_b"), LatticePoint.of(4, 0, 0), false)
+                satSpec(id("retry_a"), LatticePoint.of(2, 0, 0), false),
+                satSpec(id("retry_b"), LatticePoint.of(4, 0, 0), false)
             )
         );
         Fixture fixture = new Fixture(compiled);
         fillBusy(fixture);
-        StructureSetResult first = fixture.run();
-        assertTrue(first.formed(), () -> first.setFindings().toString());
-        List<InstanceId> oldInstances = List.copyOf(fixture.instances);
-        int oldRows = fixture.ledger.rows().size();
-        StructureSet.Satellite secondSatellite = fixture.plan.satellite(id("replace_fail_a"));
-        assertNotNull(secondSatellite);
-        fixture.ledger.movingSiting = secondSatellite.siting();
+        assertTrue(fixture.run().formed(), () -> "the first set forms the previous instances");
+        List<InstanceId> stale = List.copyOf(fixture.instances);
+        StructureSet.Satellite failing = fixture.plan.satellite(id("retry_a"));
+        assertNotNull(failing);
+        fixture.ledger.movingSiting = failing.siting();
+        StructureSetResult failed = fixture.run();
+        assertFalse(failed.formed());
+        assertEquals(0, fixture.ledger.rows().size(), "the failed set leaves no previous row behind");
+
+        fixture.ledger.movingSiting = null;
+        StructureSetResult again = fixture.run();
+
+        assertTrue(again.formed(), () -> again.setFindings().toString());
+        assertEquals(3, fixture.ledger.rows().size(), "the retry settles every member again");
+        assertEquals(3, fixture.structures.instances().size());
+        for (InstanceId old : stale) {
+            assertNull(fixture.structures.find(old), "the retry replaces the stale instance " + old);
+        }
+        for (StructureSet.Satellite satellite : fixture.plan.satellites()) {
+            assertNotNull(fixture.structures.find(owner, satellite.siting()));
+        }
+    }
+
+    @Test
+    void aFailedSetReportsNoRestoreAttempt() {
+        CompiledStructureSet compiled = busyCompiled(
+            List.of(
+                satSpec(id("no_restore_a"), LatticePoint.of(2, 0, 0), false),
+                satSpec(id("no_restore_b"), LatticePoint.of(4, 0, 0), false)
+            )
+        );
+        Fixture fixture = new Fixture(compiled);
+        fillBusy(fixture);
+        assertTrue(fixture.run().formed(), () -> "the first set forms the previous instances");
+        StructureSet.Satellite failing = fixture.plan.satellite(id("no_restore_a"));
+        assertNotNull(failing);
+        fixture.ledger.movingSiting = failing.siting();
         StructureSetResult second = fixture.run();
 
         assertFalse(second.formed());
-        assertEquals(
-            oldRows,
-            fixture.ledger.rows().size(),
-            "the previous claim rows must survive a failed replacement"
-        );
-        for (InstanceId old : oldInstances) {
-            assertNotNull(fixture.structures.find(old), "the previous instance " + old + " must survive");
+        assertEquals(List.of(id("root")), second.rolledBack());
+        assertTrue(second.rollbackFailures().isEmpty(), () -> second.rollbackFailures().toString());
+        for (Finding finding : second.setFindings()) {
+            assertFalse(finding.message().contains("restor"), () -> "no restore attempt is reported: " + finding);
         }
-        assertEquals(oldInstances.size(), fixture.structures.instances().size());
     }
 
     @Test

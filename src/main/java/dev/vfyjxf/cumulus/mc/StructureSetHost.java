@@ -4,7 +4,6 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
-import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureEvent;
 import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
@@ -53,10 +52,11 @@ import java.util.function.Function;
  * Host orchestration for one placed structure set: presence, links, check-all, settle-all and rollback.
  *
  * <p>The kernel still checks and settles one blueprint at a time; this class sequences those independent
- * attempts under one set-scoped budget. Member commits are deferred until every settle succeeds, so a
- * failed settlement leaves the previous claim rows and instances in place. Rollback releases claims in
- * reverse order, invalidates every settled draft or instance through the bound manager, and reports a
- * cleanup failure as {@code SC-SET-0007}.
+ * attempts under one set-scoped budget. Before the settle pass the host releases the formed instance at
+ * each member's owner and siting; that previous occupant is never restored (D-79). Member commits are
+ * deferred until every settle succeeds, so a failed settlement rolls back only what this run settled,
+ * releases claims in reverse order, invalidates every settled draft or instance through the bound
+ * manager, and reports a cleanup failure as {@code SC-SET-0007}.
  */
 public final class StructureSetHost {
 
@@ -250,19 +250,15 @@ public final class StructureSetHost {
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         ClaimLedger ledger = kernel.ledger();
-        @Nullable
-        ClaimSnapshot oldClaims;
         try {
-            oldClaims = snapshotClaims(ledger, attempts, structures, owner);
+            takeOver(ledger, structures, owner, attempts, rollbackFailures);
         } catch (RuntimeException failure) {
             List<Finding> cleanup = new ArrayList<>();
             abortFrom(attempts, 0, cleanup);
             attachCleanup(failure, cleanup);
             throw failure;
         }
-        takeOver(ledger, oldClaims, rollbackFailures);
         if (!rollbackFailures.isEmpty()) {
-            restoreOldClaims(ledger, oldClaims, attempts, rollbackFailures);
             abortFrom(attempts, 0, rollbackFailures);
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
@@ -278,7 +274,6 @@ public final class StructureSetHost {
                 rollbackMembers.add(attempt);
                 rollbackAttempts(rollbackMembers, Map.of(), ledger, rolledBack, cleanup);
                 abortFrom(attempts, index + 1, cleanup);
-                restoreOldClaims(ledger, oldClaims, attempts, cleanup);
                 attachCleanup(failure, cleanup);
                 throw failure;
             }
@@ -293,7 +288,6 @@ public final class StructureSetHost {
             List<Attempt> rollbackMembers = attemptsOf(settledMembers);
             rollbackAttempts(rollbackMembers, Map.of(), ledger, rolledBack, rollbackFailures);
             abortFrom(attempts, index, rollbackFailures);
-            restoreOldClaims(ledger, oldClaims, attempts, rollbackFailures);
             return result(outcomes, setFindings, settled, rolledBack, rollbackFailures, claims);
         }
         Map<NamespacedId, StructureInstance> instances = new LinkedHashMap<>();
@@ -314,7 +308,6 @@ public final class StructureSetHost {
             List<Finding> cleanup = new ArrayList<>();
             List<Attempt> rollbackMembers = attemptsOf(settledMembers);
             rollbackAttempts(rollbackMembers, instances, ledger, rolledBack, cleanup);
-            restoreOldClaims(ledger, oldClaims, attempts, cleanup);
             attachCleanup(failure, cleanup);
             throw failure;
         }
@@ -433,50 +426,27 @@ public final class StructureSetHost {
         }
     }
 
-    /** The rows the run replaces: this owner's rows at the member's siting, wherever their instance came from. */
-    private static @Nullable ClaimSnapshot snapshotClaims(
-        @Nullable ClaimLedger ledger,
-        List<Attempt> attempts,
-        StructureManager structures,
-        OwnerId owner
-    ) {
-        if (ledger == null) {
-            return null;
-        }
-        Map<InstanceId, List<ClaimRow>> rows = new LinkedHashMap<>();
-        for (Attempt attempt : attempts) {
-            ClaimView view = ledger.read(attempt.worldBounds());
-            for (ClaimRow row : view.rows()) {
-                if (!replacedBy(row, attempt.siting(), owner, structures)) {
-                    continue;
-                }
-                rows.computeIfAbsent(row.instance(), ignored -> new ArrayList<>()).add(row);
-            }
-        }
-        return new ClaimSnapshot(rows);
-    }
-
     private static void takeOver(
         @Nullable ClaimLedger ledger,
-        @Nullable ClaimSnapshot snapshot,
+        StructureManager structures,
+        OwnerId owner,
+        List<Attempt> attempts,
         List<Finding> failures
     ) {
-        if (ledger == null || snapshot == null) {
+        if (ledger == null) {
             return;
         }
-        for (Map.Entry<InstanceId, List<ClaimRow>> entry : snapshot.rows().entrySet()) {
+        for (Attempt attempt : attempts) {
+            @Nullable
+            StructureInstance previous = structures.find(attempt.draft().id().world(), owner, attempt.siting());
+            if (previous == null) {
+                continue;
+            }
             try {
-                ledger.release(entry.getKey());
+                ledger.release(previous.id());
             } catch (RuntimeException failure) {
-                Locus locus = Locus.world(CuboidSet.of(Cuboid.of(entry.getValue().get(0).cell().point())));
                 failures.add(
-                    problem(
-                        Codes.rollbackFailed,
-                        "the previous claim rows of " + entry.getKey() + " could not be released: "
-                                + detail(failure),
-                        locus,
-                        Phase.settle
-                    )
+                    rollbackFailure(attempt, "the previous instance could not be released: " + detail(failure))
                 );
             }
         }
@@ -505,55 +475,6 @@ public final class StructureSetHost {
         }
         StructureInstance formed = structures.find(row.instance());
         return formed != null && formed.owner().equals(owner);
-    }
-
-    private void restoreOldClaims(
-        @Nullable ClaimLedger ledger,
-        @Nullable ClaimSnapshot snapshot,
-        List<Attempt> members,
-        List<Finding> rollbackFailures
-    ) {
-        if (ledger == null || snapshot == null) {
-            return;
-        }
-        for (Attempt member : members) {
-            for (Map.Entry<InstanceId, List<ClaimRow>> entry : snapshot.rows().entrySet()) {
-                List<ClaimRow> rows = entry.getValue();
-                if (rows.isEmpty() || !rows.get(0).siting().equals(member.siting())) {
-                    continue;
-                }
-                restoreOne(ledger, entry.getKey(), member, rows, rollbackFailures);
-            }
-        }
-    }
-
-    private void restoreOne(
-        ClaimLedger ledger,
-        InstanceId instance,
-        Attempt attempt,
-        List<ClaimRow> rows,
-        List<Finding> rollbackFailures
-    ) {
-        for (int retry = 0; retry < 3; retry++) {
-            try {
-                long revision = ledger.read(Cuboid.of(rows.get(0).cell().point())).revision();
-                ClaimVerdict verdict = ledger.settle(new SettleRequest(instance, rows, revision));
-                if (verdict instanceof ClaimVerdict.Settled) {
-                    return;
-                }
-                if (verdict instanceof ClaimVerdict.RevisionMoved) {
-                    continue;
-                }
-                rollbackFailures.add(rollbackFailure(attempt, "the previous claim rows could not be restored"));
-                return;
-            } catch (RuntimeException failure) {
-                rollbackFailures.add(
-                    rollbackFailure(attempt, "the previous claim rows could not be restored: " + detail(failure))
-                );
-                return;
-            }
-        }
-        rollbackFailures.add(rollbackFailure(attempt, "the previous claim rows could not be restored"));
     }
 
     private static void attachCleanup(RuntimeException failure, List<Finding> cleanup) {
@@ -798,8 +719,6 @@ public final class StructureSetHost {
     ) {}
 
     private record Settled(Attempt attempt, MatchResult.Formed result) {}
-
-    private record ClaimSnapshot(Map<InstanceId, List<ClaimRow>> rows) {}
 
     private enum PresenceState {
         present, absent, unknown

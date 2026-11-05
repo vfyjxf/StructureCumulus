@@ -142,7 +142,7 @@ class ExpandedSetTest {
     }
 
     @Test
-    void aFailedReSettleOfSixteenMembersKeepsEveryOldInstanceAndRow() {
+    void aFailedReSettleOfSixteenMembersReleasesEveryOldRow() {
         Shape shape = shape(16);
         Fixture fixture = fixture(shape);
         StructureSetResult first = fixture.run();
@@ -155,16 +155,14 @@ class ExpandedSetTest {
         StructureSetResult second = fixture.run();
 
         assertFalse(second.formed());
-        assertEquals(oldRows, fixture.ledger.rows().size(), "a failed re-settle must restore every old row");
+        assertEquals(0, fixture.ledger.rows().size(), "a failed re-settle never restores the old rows (D-79)");
         assertEquals(17, oldInstances.size());
-        assertEquals(17, fixture.structures.instances().size());
+        assertEquals(17, fixture.structures.instances().size(), "the old identities stay as stale entries");
         for (InstanceId old : oldInstances) {
             assertNotNull(fixture.structures.find(old), () -> "a failed re-settle replaced " + old);
         }
         assertTrue(fixture.ledger.revision() > oldRevision);
-        for (StructureSet.Satellite satellite : fixture.plan.satellites()) {
-            assertNotNull(fixture.structures.find(owner, satellite.siting()));
-        }
+        assertTrue(oldRows > 0);
     }
 
     @Test
