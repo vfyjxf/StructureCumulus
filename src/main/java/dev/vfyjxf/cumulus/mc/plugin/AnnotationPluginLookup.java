@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.mc.plugin;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforgespi.language.ModFileScanData;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,24 +46,33 @@ public final class AnnotationPluginLookup<T extends ModPlugin> implements Plugin
         List<T> result = new ArrayList<>();
         for (ModFileScanData scanData : ModList.get().getAllScanData()) {
             scanData.getAnnotatedBy(annotation, ElementType.TYPE).forEach(annotationData -> {
-                String className = annotationData.memberName();
-                try {
-                    Class<?> clazz = Class.forName(className);
-                    if (!pluginClass.isAssignableFrom(clazz)) {
-                        return;
-                    }
-                    @SuppressWarnings("unchecked")
-                    T instance = (T) clazz.getConstructor().newInstance();
+                T instance = instantiate(annotationData.memberName());
+                if (instance != null) {
                     result.add(instance);
-                } catch (ClassNotFoundException exception) {
-                    logger.error("Plugin class not found: {}", className, exception);
-                } catch (NoSuchMethodException exception) {
-                    logger.error("Plugin class {} must have a public no-arg constructor", className, exception);
-                } catch (ReflectiveOperationException exception) {
-                    logger.error("Failed to instantiate plugin: {}", className, exception);
                 }
             });
         }
         return result;
+    }
+
+    @Nullable T instantiate(String className) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            if (!pluginClass.isAssignableFrom(clazz)) {
+                return null;
+            }
+            @SuppressWarnings("unchecked")
+            T instance = (T) clazz.getConstructor().newInstance();
+            return instance;
+        } catch (ClassNotFoundException exception) {
+            logger.error("Plugin class not found: {}", className, exception);
+        } catch (NoSuchMethodException exception) {
+            logger.error("Plugin class {} must have a public no-arg constructor", className, exception);
+        } catch (ReflectiveOperationException exception) {
+            logger.error("Failed to instantiate plugin: {}", className, exception);
+        } catch (LinkageError failure) {
+            logger.error("Plugin class {} could not be loaded: {}", className, failure.getMessage());
+        }
+        return null;
     }
 }
