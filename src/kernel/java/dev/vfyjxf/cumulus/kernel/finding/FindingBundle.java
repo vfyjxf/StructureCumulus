@@ -136,6 +136,7 @@ public final class FindingBundle {
                 finding.severity(),
                 finding.phase(),
                 finding.code(),
+                finding.message(),
                 finding.labels(),
                 finding.notes()
             );
@@ -296,7 +297,14 @@ public final class FindingBundle {
         FindingBundle build();
     }
 
-    private record DedupKey(Severity severity, Phase phase, FindingCode code, List<Label> labels, List<Note> notes) {}
+    private record DedupKey(
+        Severity severity,
+        Phase phase,
+        FindingCode code,
+        String message,
+        List<Label> labels,
+        List<Note> notes
+    ) {}
 
     private static final class BundleBuilder implements Builder {
         private final FindingOptions options;

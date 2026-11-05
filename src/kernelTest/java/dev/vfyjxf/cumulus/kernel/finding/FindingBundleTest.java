@@ -36,14 +36,25 @@ class FindingBundleTest {
     }
 
     @Test
-    void dedupKeepsTheFirstInsertion() {
-        Finding first = Finding.builder(Codes.expected).phase(Phase.check).message("first")
+    void identicalFindingsStillCollapse() {
+        Finding first = Finding.builder(Codes.expected).phase(Phase.check).message("same")
                 .label(local(0), "same label").build();
-        Finding duplicate = Finding.builder(Codes.expected).phase(Phase.check).message("second")
+        Finding duplicate = Finding.builder(Codes.expected).phase(Phase.check).message("same")
                 .label(local(0), "same label").build();
         FindingBundle bundle = FindingBundle.of(List.of(first, duplicate));
         assertEquals(1, bundle.size());
-        assertEquals("first", Objects.requireNonNull(bundle.primary(), "primary").message());
+        assertEquals("same", Objects.requireNonNull(bundle.primary(), "primary").message());
+        assertEquals(0, bundle.elided());
+        assertEquals(0, bundle.filtered());
+    }
+
+    @Test
+    void theSameCodeWithDifferentMessagesKeepsBoth() {
+        Finding first = Finding.builder(Codes.expected).phase(Phase.check).message("first").build();
+        Finding second = Finding.builder(Codes.expected).phase(Phase.check).message("second").build();
+        FindingBundle bundle = FindingBundle.of(List.of(first, second));
+        assertEquals(2, bundle.size());
+        assertEquals(List.of("first", "second"), bundle.findings().stream().map(Finding::message).toList());
         assertEquals(0, bundle.elided());
         assertEquals(0, bundle.filtered());
     }
