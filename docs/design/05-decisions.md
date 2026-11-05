@@ -1187,6 +1187,27 @@ visual layer, so the text keeps whatever the current renderer produces.
 minimal (staircase families blow up to one box per cell) and a minimal one that must enumerate cells,
 and it makes every construction pay for a property only the ordering actually needs.
 
+### D-54 — The command boundary is gated, guarded and self-cleaning
+
+`/cumulus` requires `Commands.LEVEL_GAMEMASTERS` (2) on the root literal. Every verb inherits it and
+none opts out. Each verb body runs inside one guard that catches `RuntimeException` and
+`StackOverflowError`, logs the failure at ERROR with the verb, answers
+`cumulus <verb> failed: <type>: <message>`, and returns 0. A verb that opened a draft closes it in a
+`finally`; a settle that wrote rows and then failed to commit releases that instance's key.
+
+**Why the root and not the verbs.** Every verb captures a region on the server thread, and one
+capture may read up to a million cells. `explain` is a debugging aid for the authors who write
+blueprints, not a player feature; a per-verb gate would only mean answering the same question again
+for each verb added later.
+
+**Why catch `StackOverflowError`.** It is the one error a command body could raise from document data
+(K10-D09), and an uncaught error reaches the tick loop. The expansion budget removes the cause; this
+is defence in depth. No other error is caught: an `OutOfMemoryError` leaves no safe state to report.
+
+**Why the draft closes in `finally`.** `begin` reserves `(world, owner, siting)` until abort or
+commit, so an exception between them locks that spot until the level unloads. A settle that formed
+and then threw leaves rows with no instance; releasing that key on the way out is the only cleanup.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

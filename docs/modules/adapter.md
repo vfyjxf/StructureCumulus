@@ -762,6 +762,15 @@ a mismatch is `SC-BPT-0006` anchor-invalid, and `SC-MC-0004` never becomes a `Re
 
 All commands run on the server thread. `check` returns 1 whenever it reaches a result (including a reported failed/undecided/dropped check) and 0 only on an argument/document/capture/siting failure; the mutating `settle` returns 1 only for `Formed`; `compile`, `explain` and `claims` return 1 on a produced result and 0 on a reported failure. The `set` pair runs the host in §13.5: `set check` returns 1 only when the set result carries no error finding and at least one admitted outcome, and `set settle` only when the result is `formed()`; a compile, placement, siting or capture failure is 0.
 
+The command boundary is gated, guarded and self-cleaning (D-54). The root literal requires
+`Commands.LEVEL_GAMEMASTERS` (2), so every verb inherits the gate and none opts out. Each verb body
+runs inside one `CommandSupport.guarded` that catches `RuntimeException` and `StackOverflowError`,
+logs the failure with the verb, answers `cumulus <verb> failed: <type>: <message>` and returns 0 —
+no other error is caught. A verb that opened a draft closes it in a `finally` through
+`CommandSupport.abortQuietly`; a `settle` that formed rows and then failed to commit releases that
+instance's key through `CommandSupport.releaseQuietly` instead of leaving an orphan until the level
+unloads.
+
 - `/cumulus check <id> <origin>` — capture, siting, read the per-level claims view for the captured
   bounds, then `check`; print the result and findings. The claims read and the check write nothing.
   An anchored blueprint captures twice (P1, `56c632c`): the anchor cell is captured, `McAnchors`
