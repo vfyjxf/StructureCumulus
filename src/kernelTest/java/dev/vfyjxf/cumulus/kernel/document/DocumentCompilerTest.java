@@ -42,6 +42,10 @@ class DocumentCompilerTest {
         return NamespacedId.of("test", path);
     }
 
+    private static NamespacedId kind(String path) {
+        return NamespacedId.of(path);
+    }
+
     private static CompilerContext context() {
         Catalogs catalogs = Catalogs.builtin();
         return new CompilerContext(
@@ -101,9 +105,9 @@ class DocumentCompilerTest {
                 new CheckSpec(
                     id("shell_bricks"),
                     id("shell"),
-                    id("bay"),
+                    kind("bay"),
                     Value.object(),
-                    id("each_cell"),
+                    kind("each_cell"),
                     Value.object(Map.of("element", block)),
                     null,
                     null
@@ -111,19 +115,19 @@ class DocumentCompilerTest {
                 new CheckSpec(
                     id("hollow_air"),
                     id("hollow"),
-                    id("bay"),
+                    kind("bay"),
                     Value.object(),
-                    id("each_cell"),
+                    kind("each_cell"),
                     Value.object(Map.of("element", airElement)),
                     null,
                     null
                 ),
-                new CheckSpec(id("lit"), id("fire"), id("occupant"), occupantCell, id("all_of"), allOf, null, null)
+                new CheckSpec(id("lit"), id("fire"), kind("occupant"), occupantCell, kind("all_of"), allOf, null, null)
             ),
             List.of(
                 new ComputationSpec(
                     id("air_cells"),
-                    id("air"),
+                    kind("air"),
                     Value.object(),
                     hollowCells,
                     null,
@@ -261,9 +265,9 @@ class DocumentCompilerTest {
                 new CheckSpec(
                     id("air"),
                     id("bay"),
-                    id("bay"),
+                    kind("bay"),
                     Value.object(),
-                    id("each_cell"),
+                    kind("each_cell"),
                     Value.object(Map.of("element", air)),
                     null,
                     null
@@ -327,9 +331,9 @@ class DocumentCompilerTest {
                 new CheckSpec(
                     id("wall_check"),
                     id("south/wall"),
-                    id("bay"),
+                    kind("bay"),
                     Value.object(),
-                    id("each_cell"),
+                    kind("each_cell"),
                     Value.object(Map.of("element", block)),
                     null,
                     null
@@ -385,9 +389,9 @@ class DocumentCompilerTest {
         CheckSpec missingBay = new CheckSpec(
             id("check"),
             id("absent"),
-            id("bay"),
+            kind("bay"),
             Value.object(),
-            id("each_cell"),
+            kind("each_cell"),
             Value.object(Map.of("element", Value.object(Map.of("kind", Value.string("air"))))),
             null,
             null
@@ -436,9 +440,9 @@ class DocumentCompilerTest {
                 new CheckSpec(
                     id("a_check"),
                     id("a"),
-                    id("bay"),
+                    kind("bay"),
                     Value.object(),
-                    id("each_cell"),
+                    kind("each_cell"),
                     Value.object(Map.of("element", air)),
                     null,
                     null
@@ -446,9 +450,9 @@ class DocumentCompilerTest {
                 new CheckSpec(
                     id("b_check"),
                     id("b"),
-                    id("bay"),
+                    kind("bay"),
                     Value.object(),
-                    id("each_cell"),
+                    kind("each_cell"),
                     Value.object(Map.of("element", air)),
                     null,
                     null
@@ -488,9 +492,9 @@ class DocumentCompilerTest {
                 new CheckSpec(
                     id("absent"),
                     id("bay"),
-                    id("occupant"),
+                    kind("occupant"),
                     cell,
-                    id("trait_absent"),
+                    kind("trait_absent"),
                     Value.object(Map.of("id", Value.string("test:energy"))),
                     null,
                     null

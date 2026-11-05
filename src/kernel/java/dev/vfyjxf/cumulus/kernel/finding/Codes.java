@@ -365,6 +365,15 @@ public final class Codes {
         "The port could not parse or format the document. Check the text and the port."
     );
 
+    public static final CodeEntry documentDeclared = entry(
+        FindingCode.Family.doc,
+        14,
+        Severity.error,
+        "A declaration disagrees with the factory that produces it.",
+        "The document and the registered factory disagree on a computation's id, output or inputs. "
+                + "The compiler never retargets a declaration; correct the document or the factory."
+    );
+
     public static final CodeEntry computationFailed = entry(
         FindingCode.Family.ctx,
         1,
@@ -594,6 +603,7 @@ public final class Codes {
         definitionMissing,
         noPositions,
         readerFailed,
+        documentDeclared,
         computationFailed,
         deriverMissing,
         deriverFailed,

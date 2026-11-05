@@ -60,6 +60,7 @@ class CodesTest {
             SC-DOC-0011 ERROR
             SC-DOC-0012 INFO
             SC-DOC-0013 ERROR
+            SC-DOC-0014 ERROR
             SC-CTX-0001 ERROR
             SC-CTX-0004 ERROR
             SC-CTX-0005 ERROR
@@ -101,7 +102,7 @@ class CodesTest {
                 rows.add(line);
             }
         }
-        assertEquals(65, rows.size());
+        assertEquals(66, rows.size());
         assertEquals(rows.size(), Codes.all.size());
 
         Set<FindingCode> seen = new HashSet<>();

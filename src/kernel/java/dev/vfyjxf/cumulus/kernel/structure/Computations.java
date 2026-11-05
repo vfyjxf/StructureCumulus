@@ -1,7 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.structure;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
-import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
@@ -70,11 +69,6 @@ public final class Computations {
             if (output.retention() != Retention.instance && output.retention() != Retention.match) {
                 throw new IllegalArgumentException("unsupported retention");
             }
-        }
-
-        @Override
-        public NamespacedId id() {
-            return output.id();
         }
 
         @Override

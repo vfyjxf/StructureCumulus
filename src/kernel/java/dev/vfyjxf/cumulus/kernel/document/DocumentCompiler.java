@@ -8,7 +8,6 @@ import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.Merge;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.SourceSpan;
 import dev.vfyjxf.cumulus.kernel.core.Value;
@@ -22,8 +21,6 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
-import dev.vfyjxf.cumulus.kernel.structure.AggregateComputation;
-import dev.vfyjxf.cumulus.kernel.structure.AggregateContext;
 import dev.vfyjxf.cumulus.kernel.structure.AnchorSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
@@ -41,8 +38,6 @@ import dev.vfyjxf.cumulus.kernel.structure.FocusFactory;
 import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.structure.Seam;
 import dev.vfyjxf.cumulus.kernel.structure.SeamId;
-import dev.vfyjxf.cumulus.kernel.structure.SectionComputation;
-import dev.vfyjxf.cumulus.kernel.structure.SectionContext;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import org.jspecify.annotations.Nullable;
 
@@ -355,6 +350,10 @@ public final class DocumentCompiler {
         if (merge == null) {
             return null;
         }
+        if (!merge.namespace().equals(NamespacedId.defaultNamespace)) {
+            error(findings, Codes.keyType, "unknown merge " + merge, spec.source(), null);
+            return null;
+        }
         String name = merge.path();
         Object candidate = switch (name) {
             case "sum" -> Long.class.equals(type) ? Merges.sum() : null;
@@ -567,8 +566,10 @@ public final class DocumentCompiler {
         FactoryContext factory,
         List<Finding> findings
     ) {
-        String name = kind.path();
-        if (name.equals("missing_kind")) {
+        String name = grammar(kind);
+        if (name == null) {
+            name = ""; // no grammar case matches; the default branch resolves the catalog
+        } else if (name.equals("missing_kind")) {
             error(findings, Codes.factoryUnknown, "an expectation has no kind", factory.source(), null);
             return null;
         }
@@ -832,7 +833,7 @@ public final class DocumentCompiler {
             if (!created.output().equals(output)) {
                 error(
                     findings,
-                    Codes.factoryBad,
+                    Codes.documentDeclared,
                     "computation factory " + spec.kind() + " produced " + created.output().id() + ", not "
                             + output.id(),
                     spec.source(),
@@ -841,82 +842,30 @@ public final class DocumentCompiler {
                 continue;
             }
             Set<ContextKey<?>> resolvedInputs = inputKeys(spec.inputs(), keys);
-            computations.add(
-                created.id().equals(spec.id()) && created.inputs().equals(resolvedInputs)
-                        ? created
-                        : wrap(created, spec.id(), output, resolvedInputs)
-            );
+            if (!spec.id().equals(spec.output())) {
+                error(
+                    findings,
+                    Codes.documentDeclared,
+                    "a computation's id is its output key: " + spec.id() + " != " + spec.output(),
+                    spec.source(),
+                    null
+                );
+                continue;
+            }
+            if (!created.inputs().equals(resolvedInputs)) {
+                error(
+                    findings,
+                    Codes.documentDeclared,
+                    "computation " + spec.output() + " declares inputs " + spec.inputs()
+                            + " but its factory declares " + created.inputs(),
+                    spec.source(),
+                    null
+                );
+                continue;
+            }
+            computations.add(created);
         }
         return computations;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Computation<?> wrap(
-        Computation<?> computation,
-        NamespacedId id,
-        ContextKey<?> output,
-        Set<ContextKey<?>> inputs
-    ) {
-        ContextKey<Object> typed = (ContextKey<Object>) output;
-        if (computation instanceof SectionComputation<?> section) {
-            return new WrappedSection(section, id, typed, inputs);
-        }
-        if (computation instanceof AggregateComputation<?> aggregate) {
-            return new WrappedAggregate(aggregate, id, typed, inputs);
-        }
-        throw new IllegalArgumentException("unknown computation kind");
-    }
-
-    private record WrappedSection(
-        SectionComputation<?> delegate,
-        NamespacedId id,
-        ContextKey<Object> output,
-        Set<ContextKey<?>> inputs
-    ) implements SectionComputation<Object> {
-        private WrappedSection {
-            Objects.requireNonNull(delegate, "delegate");
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(output, "output");
-            inputs = Set.copyOf(inputs);
-        }
-
-        @Override
-        public Outcome<Object> compute(SectionContext ctx) {
-            @SuppressWarnings("unchecked")
-            Outcome<Object> result = (Outcome<Object>) delegate.compute(ctx);
-            return result;
-        }
-
-        @Override
-        public CuboidSet region() {
-            return delegate.region();
-        }
-    }
-
-    private record WrappedAggregate(
-        AggregateComputation<?> delegate,
-        NamespacedId id,
-        ContextKey<Object> output,
-        Set<ContextKey<?>> inputs
-    ) implements AggregateComputation<Object> {
-        private WrappedAggregate {
-            Objects.requireNonNull(delegate, "delegate");
-            Objects.requireNonNull(id, "id");
-            Objects.requireNonNull(output, "output");
-            inputs = Set.copyOf(inputs);
-        }
-
-        @Override
-        public Outcome<Object> compute(AggregateContext ctx) {
-            @SuppressWarnings("unchecked")
-            Outcome<Object> result = (Outcome<Object>) delegate.compute(ctx);
-            return result;
-        }
-
-        @Override
-        public CuboidSet region() {
-            return delegate.region();
-        }
     }
 
     private static Set<ContextKey<?>> inputKeys(Set<NamespacedId> ids, Map<NamespacedId, ContextKey<?>> keys) {
@@ -964,11 +913,12 @@ public final class DocumentCompiler {
     }
 
     private static <T> @Nullable T lookup(Catalog<T> catalog, NamespacedId id) {
-        T value = catalog.get(id);
-        if (value == null) {
-            value = catalog.get(NamespacedId.of("structurecumulus", id.path()));
-        }
-        return value;
+        return catalog.get(id);
+    }
+
+    /** Grammar is the default namespace's; a qualified id is a catalog kind. */
+    private static @Nullable String grammar(NamespacedId kind) {
+        return kind.namespace().equals(NamespacedId.defaultNamespace) ? kind.path() : null;
     }
 
     private static @Nullable Locus documentLocus(Document document) {

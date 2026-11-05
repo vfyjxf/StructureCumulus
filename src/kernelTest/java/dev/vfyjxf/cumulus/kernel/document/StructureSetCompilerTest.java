@@ -61,6 +61,10 @@ class StructureSetCompilerTest {
         return NamespacedId.of("settest", path);
     }
 
+    private static NamespacedId kind(String path) {
+        return NamespacedId.of(path);
+    }
+
     private static CompilerContext context(DocumentSource source) {
         Catalogs catalogs = Catalogs.builtin();
         return new CompilerContext(
@@ -261,21 +265,21 @@ class StructureSetCompilerTest {
     }
 
     private static CheckSpec bayCheck(NamespacedId id, NamespacedId bay, NamespacedId block) {
-        return new CheckSpec(id, bay, id("bay"), Value.object(), id("each_cell"), eachCell(block), null, null);
+        return new CheckSpec(id, bay, kind("bay"), Value.object(), kind("each_cell"), eachCell(block), null, null);
     }
 
     private static CheckSpec occupantCheck(NamespacedId id, NamespacedId bay, LatticePoint cell, NamespacedId block) {
         return new CheckSpec(
             id,
             bay,
-            id("occupant"),
+            kind("occupant"),
             Value.object(
                 Map.of(
                     "cell",
                     Value.array(List.of(Value.number(cell.x()), Value.number(cell.y()), Value.number(cell.z())))
                 )
             ),
-            id("block"),
+            kind("block"),
             Value.object(Map.of("id", Value.string(block.text()))),
             null,
             null

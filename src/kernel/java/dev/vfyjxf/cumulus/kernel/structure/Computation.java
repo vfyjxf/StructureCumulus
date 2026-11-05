@@ -9,7 +9,10 @@ import java.util.Set;
 /** A declared producer of one context key. */
 public interface Computation<T> {
 
-    NamespacedId id();
+    /** This computation's identity: its output key's id. */
+    default NamespacedId id() {
+        return output().id();
+    }
 
     ContextKey<T> output();
 
