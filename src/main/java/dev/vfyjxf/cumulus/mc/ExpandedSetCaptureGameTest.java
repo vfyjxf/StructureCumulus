@@ -278,7 +278,13 @@ public final class ExpandedSetCaptureGameTest {
                 for (BlockPos anchor : anchors) {
                     helper.assertTrue(lease.view().nested(lattice(anchor)) != null, "the exact budget cut " + anchor);
                 }
-                helper.assertTrue(exactResult.report().isEmpty(), "the exact budget has no cut report");
+                helper.assertTrue(
+                    exactResult.report()
+                            .entries()
+                            .stream()
+                            .noneMatch(entry -> entry.notes().stream().anyMatch(note -> note.equals("reason: budget"))),
+                    "the exact budget cuts nothing for budget"
+                );
             }
 
             CaptureResult shortCapture = state.capture(level).capture(

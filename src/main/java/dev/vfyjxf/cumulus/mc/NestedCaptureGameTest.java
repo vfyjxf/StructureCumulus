@@ -172,13 +172,13 @@ public final class NestedCaptureGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void depthZeroQueriesNothingAndDepthOneBuildsOneLevel(GameTestHelper helper) {
+    public void depthZeroQueriesOnceAndDepthOneBuildsOneLevel(GameTestHelper helper) {
         BlockPos anchor = new BlockPos(0, 1, 0);
         helper.setBlock(anchor, Blocks.STONE);
         BlockPos worldAnchor = helper.absolutePos(anchor);
         LatticePoint localAnchor = LatticePoint.of(worldAnchor.getX(), worldAnchor.getY(), worldAnchor.getZ());
         FakeLookup lookup = new FakeLookup();
-        lookup.blocks.put(worldAnchor, extent("test:nested", worldAnchor, 2, 2, 2, worldAnchor));
+        lookup.blocks.put(worldAnchor, extent("test:nested", worldAnchor, 1, 1, 1, worldAnchor));
         Cuboid bounds = Cuboid.of(
             worldAnchor.getX(),
             worldAnchor.getY(),
@@ -198,11 +198,17 @@ public final class NestedCaptureGameTest {
             helper.assertTrue(lease.view().nested(localAnchor) == null, "depth zero cuts everything");
             helper.assertValueEqual(
                 lease.view().occupants(bounds, OccupantFilter.ofKind(OccupantKind.nested)).size(),
-                0,
-                "depth zero declares no nested body"
+                1,
+                "depth zero keeps the discovered body"
             );
         }
-        helper.assertValueEqual(lookup.blockQueries, 0, "depth zero queries no capability");
+        helper.assertValueEqual(lookup.blockQueries, 1, "depth zero queries the provider once");
+        helper.assertValueEqual(1, captured.report().size(), "depth zero reports the cut");
+        helper.assertValueEqual(AdapterCodes.cut, captured.report().entries().get(0).code(), "the cut code");
+        helper.assertTrue(
+            captured.report().entries().get(0).notes().stream().anyMatch(note -> note.equals("reason: depth")),
+            "the cut names the depth ceiling"
+        );
 
         CaptureResult nested = new LevelCapture(helper.getLevel(), lookup.lookup())
                 .capture(new CaptureRequest(bounds, policy(maxElements, 1, false)));
@@ -217,13 +223,14 @@ public final class NestedCaptureGameTest {
                 return;
             }
             helper.assertValueEqual(child.depth(), 1, "one nested level");
+            helper.assertTrue(child.nested(LatticePoint.origin) == null, "the cap child builds no grandchild");
             helper.assertValueEqual(
                 child.occupants(child.bounds(), OccupantFilter.ofKind(OccupantKind.nested)).size(),
-                0,
-                "the child at the ceiling does not nest"
+                1,
+                "the cap child keeps its discovered body"
             );
         }
-        helper.assertValueEqual(lookup.blockQueries, 1, "only the root cell is queried");
+        helper.assertValueEqual(lookup.blockQueries, 3, "the root and the cap child each query once");
         helper.succeed();
     }
 

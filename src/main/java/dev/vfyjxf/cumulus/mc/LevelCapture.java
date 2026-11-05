@@ -150,11 +150,15 @@ public final class LevelCapture implements WorldCapture {
             SnapshotId snapshot = new SnapshotId(world, revision);
             CaptureContext context = new CaptureContext(snapshot, policy, volume, orientation);
             FrameCapture rootCapture = new FrameCapture(context, 0, 0, bounds, LatticePoint.origin, true);
-            FrameData root = rootCapture.build(List.of());
+            Draft root = rootCapture.collect(null, LatticePoint.origin, List.of());
             if (root == null) {
                 return new CaptureResult.Unavailable(ReadStatus.notCaptured, notCaptured);
             }
-            LevelSnapshot view = new LevelSnapshot(snapshot, policy, root);
+            List<Draft> drafts = expand(context, root, rootCapture.watch());
+            for (int index = drafts.size() - 1; index >= 0; index--) {
+                drafts.get(index).attach();
+            }
+            LevelSnapshot view = new LevelSnapshot(snapshot, policy, root.data());
             LevelWatch.WatchHandle handle = acquire(rootCapture.watch());
             LevelLease lease = new LevelLease(
                 snapshot,
@@ -169,6 +173,79 @@ public final class LevelCapture implements WorldCapture {
                 revisions.decrementAndGet();
             }
         }
+    }
+
+    /** Level-order expansion: siblings of one level are captured before any child of the next. */
+    private List<Draft> expand(CaptureContext context, Draft root, LevelWatch.WatchRegion watch) {
+        List<Draft> drafts = new ArrayList<>();
+        drafts.add(root);
+        List<Draft> level = List.of(root);
+        while (!level.isEmpty()) {
+            List<Draft> next = new ArrayList<>();
+            for (Draft parent : level) {
+                for (Body body : parent.bodies) {
+                    Draft child = expandBody(context, parent, body, watch);
+                    if (child != null) {
+                        next.add(child);
+                    }
+                }
+            }
+            drafts.addAll(next);
+            level = next;
+        }
+        return drafts;
+    }
+
+    private @Nullable Draft expandBody(CaptureContext context, Draft parent, Body body, LevelWatch.WatchRegion watch) {
+        NestedExtent extent = body.extent();
+        LatticePoint anchor = body.worldAnchor();
+        if (parent.depth + 1 > context.policy().maxDepth()) {
+            context.cut("depth", extent, anchor, parent.frame, parent.root);
+            return null;
+        }
+        NestedKey key = new NestedKey(extent.type(), extent.origin());
+        if (parent.path.contains(key)) {
+            context.cut("cycle", extent, anchor, parent.frame, parent.root);
+            return null;
+        }
+        Cuboid childBounds = extent.bounds()
+                .translate(-extent.origin().x(), -extent.origin().y(), -extent.origin().z());
+        if (childBounds == null) {
+            StructureCumulus.logger.warn("nested extent {} leaves the lattice", extent);
+            context.cut("parent-frame", extent, anchor, parent.frame, parent.root);
+            return null;
+        }
+        long childVolume = childBounds.volume();
+        if (childVolume > context.policy().maxElements() - context.spent()) {
+            context.cut("budget", extent, anchor, parent.frame, parent.root);
+            return null;
+        }
+        if (!chunksLoaded(childBounds, extent.origin())) {
+            context.cut("unloaded", extent, anchor, parent.frame, parent.root);
+            return null;
+        }
+        long spentBefore = context.spent();
+        int frameBefore = context.nextFrame();
+        context.spend(childVolume);
+        int childFrame = context.reserveFrame();
+        List<NestedKey> childPath = new ArrayList<>(parent.path);
+        childPath.add(key);
+        FrameCapture childCapture = new FrameCapture(
+            context,
+            childFrame,
+            parent.depth + 1,
+            childBounds,
+            extent.origin(),
+            false
+        );
+        Draft child = childCapture.collect(parent, body.anchor(), childPath);
+        if (child == null) {
+            context.restore(spentBefore, frameBefore);
+            context.cut("unloaded", extent, anchor, parent.frame, parent.root);
+            return null;
+        }
+        watch.merge(childCapture.watch());
+        return child;
     }
 
     @Override
@@ -231,11 +308,11 @@ public final class LevelCapture implements WorldCapture {
             this.bounds = bounds;
             this.origin = origin;
             this.root = root;
-            this.nestedEnabled = context.policy().kinds().contains(OccupantKind.nested)
-                    && depth < context.policy().maxDepth();
+            this.nestedEnabled = context.policy().kinds().contains(OccupantKind.nested);
         }
 
-        private @Nullable FrameData build(List<NestedKey> path) {
+        /** Captures this frame alone: its sections, entities, host and nested declarations. */
+        private @Nullable Draft collect(@Nullable Draft parent, LatticePoint anchor, List<NestedKey> path) {
             if (!captureSections()) {
                 return null;
             }
@@ -249,34 +326,35 @@ public final class LevelCapture implements WorldCapture {
             Map<SectionKey, SectionSlot> digested = digestSections(host);
             Map<LatticePoint, NestedExtent> declarations = nestedDeclarations(candidates);
             List<OccupantSnapshot> nestedBodies = new ArrayList<>();
-            Map<LatticePoint, FrameData> children = new TreeMap<>();
+            List<Body> bodies = new ArrayList<>();
             for (Map.Entry<LatticePoint, NestedExtent> entry : declarations.entrySet()) {
                 NestedExtent extent = entry.getValue();
                 Cuboid footprint = extent.bounds().translate(-origin.x(), -origin.y(), -origin.z());
                 if (footprint == null) {
                     StructureCumulus.logger.warn("nested extent {} leaves the parent frame", extent);
-                    cut("parent-frame", extent, worldAnchor(entry.getKey()));
+                    context.cut("parent-frame", extent, worldAnchor(entry.getKey()), frame, root);
                     continue;
                 }
                 nestedBodies.add(
                     OccupantDescriptors.nested(context.snapshot(), frame, entry.getKey(), extent.type(), footprint)
                 );
-                FrameData child = child(extent, entry.getKey(), path);
-                if (child != null) {
-                    children.put(entry.getKey(), child);
-                }
+                bodies.add(new Body(entry.getKey(), extent, worldAnchor(entry.getKey())));
             }
-            return new FrameData(
-                context.snapshot(),
+            return new Draft(
+                context,
                 frame,
                 depth,
+                root,
                 origin,
                 bounds,
+                path,
                 digested,
                 entities,
                 nestedBodies,
-                children,
-                host
+                bodies,
+                host,
+                parent,
+                anchor
             );
         }
 
@@ -329,61 +407,6 @@ public final class LevelCapture implements WorldCapture {
         private static SectionSnapshot withHostDigest(SectionSnapshot section, SnapshotLevel host, Cuboid region) {
             return SectionSnapshot
                     .of(section.key(), section.occupants(), contentDigest(section.contentDigest(), host, region));
-        }
-
-        private @Nullable FrameData child(NestedExtent extent, LatticePoint localAnchor, List<NestedKey> path) {
-            LatticePoint anchor = worldAnchor(localAnchor);
-            if (depth + 1 > context.policy().maxDepth()) {
-                cut("depth", extent, anchor);
-                return null;
-            }
-            NestedKey key = new NestedKey(extent.type(), extent.origin());
-            if (path.contains(key)) {
-                cut("cycle", extent, anchor);
-                return null;
-            }
-            Cuboid childBounds = extent.bounds()
-                    .translate(-extent.origin().x(), -extent.origin().y(), -extent.origin().z());
-            if (childBounds == null) {
-                StructureCumulus.logger.warn("nested extent {} leaves the lattice", extent);
-                cut("parent-frame", extent, anchor);
-                return null;
-            }
-            long childVolume = childBounds.volume();
-            if (childVolume > context.policy().maxElements() - context.spent()) {
-                cut("budget", extent, anchor);
-                return null;
-            }
-            if (!chunksLoaded(childBounds, extent.origin())) {
-                cut("unloaded", extent, anchor);
-                return null;
-            }
-            long spentBefore = context.spent();
-            int frameBefore = context.nextFrame();
-            context.spend(childVolume);
-            int childFrame = context.reserveFrame();
-            List<NestedKey> childPath = new ArrayList<>(path);
-            childPath.add(key);
-            FrameCapture childCapture = new FrameCapture(
-                context,
-                childFrame,
-                depth + 1,
-                childBounds,
-                extent.origin(),
-                false
-            );
-            FrameData result = childCapture.build(childPath);
-            if (result == null) {
-                context.restore(spentBefore, frameBefore);
-                cut("unloaded", extent, anchor);
-                return null;
-            }
-            watch.merge(childCapture.watch);
-            return result;
-        }
-
-        private void cut(String reason, NestedExtent extent, LatticePoint anchor) {
-            context.cut(reason, extent, anchor, frame, root);
         }
 
         private LatticePoint worldAnchor(LatticePoint localAnchor) {
@@ -762,6 +785,86 @@ public final class LevelCapture implements WorldCapture {
     private record EntityCandidate(UUID id, NamespacedId type, LatticePoint anchor, Cuboid footprint, Entity entity) {}
 
     private record NestedKey(NamespacedId type, LatticePoint origin) {}
+
+    private record Body(LatticePoint anchor, NestedExtent extent, LatticePoint worldAnchor) {}
+
+    /** One frame's own capture, held back until every level is collected and the frames assemble. */
+    private static final class Draft {
+
+        final CaptureContext context;
+        final int frame;
+        final int depth;
+        final boolean root;
+        final LatticePoint origin;
+        final Cuboid bounds;
+        final List<NestedKey> path;
+        final Map<SectionKey, SectionSlot> sections;
+        final List<OccupantSnapshot> entities;
+        final List<OccupantSnapshot> nestedBodies;
+        final List<Body> bodies;
+        final SnapshotLevel host;
+        final @Nullable Draft parent;
+        final LatticePoint anchor;
+        final Map<LatticePoint, FrameData> children = new TreeMap<>();
+        private @Nullable FrameData data;
+
+        private Draft(
+            CaptureContext context,
+            int frame,
+            int depth,
+            boolean root,
+            LatticePoint origin,
+            Cuboid bounds,
+            List<NestedKey> path,
+            Map<SectionKey, SectionSlot> sections,
+            List<OccupantSnapshot> entities,
+            List<OccupantSnapshot> nestedBodies,
+            List<Body> bodies,
+            SnapshotLevel host,
+            @Nullable Draft parent,
+            LatticePoint anchor
+        ) {
+            this.context = context;
+            this.frame = frame;
+            this.depth = depth;
+            this.root = root;
+            this.origin = origin;
+            this.bounds = bounds;
+            this.path = path;
+            this.sections = sections;
+            this.entities = entities;
+            this.nestedBodies = nestedBodies;
+            this.bodies = bodies;
+            this.host = host;
+            this.parent = parent;
+            this.anchor = anchor;
+        }
+
+        /** Builds this frame over its already-assembled children and hands it to the parent. */
+        private void attach() {
+            FrameData built = new FrameData(
+                context.snapshot(),
+                frame,
+                depth,
+                origin,
+                bounds,
+                sections,
+                entities,
+                nestedBodies,
+                children,
+                host
+            );
+            if (parent == null) {
+                data = built;
+            } else {
+                parent.children.put(anchor, built);
+            }
+        }
+
+        private FrameData data() {
+            return Objects.requireNonNull(data, "the root draft was never attached");
+        }
+    }
 
     private record AuditKey(NamespacedId block, String property, String value) implements Comparable<AuditKey> {
 

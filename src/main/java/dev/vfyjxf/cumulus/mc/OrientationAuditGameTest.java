@@ -133,7 +133,13 @@ public final class OrientationAuditGameTest {
                     return;
                 }
             }
-            helper.assertTrue(captured.report().isEmpty(), "an upright siting reports no SC-MC-0004");
+            helper.assertTrue(
+                captured.report()
+                        .entries()
+                        .stream()
+                        .noneMatch(entry -> entry.code().equals(AdapterCodes.orientation)),
+                "an upright siting reports no SC-MC-0004"
+            );
             helper.assertTrue(
                 lookup.states.stream().anyMatch(state -> state.getValue(StairBlock.FACING) == Direction.EAST),
                 "the nested lookup receives the actual state"
