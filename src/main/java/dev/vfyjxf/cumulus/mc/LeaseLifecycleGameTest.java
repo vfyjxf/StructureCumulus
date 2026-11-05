@@ -137,7 +137,7 @@ public final class LeaseLifecycleGameTest {
 
             ServerState.unload(new LevelEvent.Unload(level));
             helper.assertFalse(managedLease.lease().isCurrent(), "unload closes the managed capture's leases");
-            helper.assertTrue(standaloneLease.lease().isCurrent(), "unload does not touch another capture");
+            helper.assertFalse(standaloneLease.lease().isCurrent(), "unload invalidates every capture of the level");
             helper.assertTrue(state.capture(level) != managed, "unload drops the cached capture");
             state.openLevel(level);
             helper.assertValueEqual(

@@ -110,6 +110,7 @@ public final class StructureLifecycleGameTest {
         ServerState.unload(new LevelEvent.Unload(level));
 
         helper.assertTrue(manager.find(instance.id()) == null, "the unloaded world drops the structure");
+        state.openLevel(level);
         helper.succeed();
     }
 

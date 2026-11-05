@@ -222,6 +222,12 @@ public final class LeaseMarkCounterGameTest {
         } finally {
             capture.close();
         }
+        ServerState state = ServerState.current();
+        if (state == null) {
+            helper.fail("server state is not open");
+            return;
+        }
+        state.openLevel(helper.getLevel());
         helper.succeed();
     }
 
