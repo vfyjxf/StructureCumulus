@@ -8,6 +8,8 @@ import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import org.junit.jupiter.api.Test;
 
+import java.util.Objects;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,7 +32,7 @@ class BlueprintRejectionTest {
         );
         assertTrue(rejected instanceof BlueprintRejected, () -> String.valueOf(rejected.getClass()));
         assertEquals(Codes.blueprintInvalid, ((BlueprintRejected) rejected).code());
-        String message = java.util.Objects.requireNonNull(rejected.getMessage(), "message");
+        String message = Objects.requireNonNull(rejected.getMessage(), "message");
         assertTrue(message.startsWith("SC-BPT-0001:"), message);
     }
 
@@ -39,11 +41,9 @@ class BlueprintRejectionTest {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         Bay left = Bay.of(id("left"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Bay right = Bay.of(id("right"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
-        BlueprintBuilder builder = Blueprint.builder(id("overlap")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(Check.of(id("left_cells"), left, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant())))
-                .check(
-                    Check.of(id("right_cells"), right, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()))
-                );
+        BlueprintBuilder builder = Blueprint.builder(id("overlap")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(
+            Check.of(id("left_cells"), left, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()))
+        ).check(Check.of(id("right_cells"), right, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant())));
         BlueprintRejected rejected = assertThrows(BlueprintRejected.class, builder::build);
         assertEquals(Codes.baysOverlap, rejected.code());
         assertEquals("SC-BPT-0002", rejected.code().code().text());
