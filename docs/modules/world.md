@@ -316,8 +316,9 @@ local origin. `parent()` is null at the root. **The root** has frame `0`, depth 
 `(0,0,0)` and world bounds/cells. **A child** has `origin` = the extent's origin (the world position
 of child-local `(0,0,0)`), local bounds = the extent's absolute bounds translated by `-origin`, and
 local cells; every world cell is `origin + local`. `policy()` is the same capture policy in every
-frame; `maxDepth` is the nested ceiling, so a view at `depth == policy().maxDepth()` cannot nest
-further.
+frame; `maxDepth` is the host-allowed hard ceiling on nested levels (the framework passes the constant
+`SnapshotPolicy.defaultMaxDepth`, 16), so a view at `depth == policy().maxDepth()` cannot nest
+further but still carries the bodies it discovered.
 
 There is no `nested` field on `OccupantSnapshot`; a child view is reached through
 `WorldView.nested(cell)` and a nested body is an ordinary parent-frame occupant with kind `nested`,
@@ -350,7 +351,9 @@ handle is open. `close()` releases the host's resource; the kernel never closes 
 it.
 
 `SnapshotPolicy` is a ceiling, not a request to over-read: `maxElements` bounds the total captured
-elements (root plus every child frame); `maxDepth` bounds the nested frames below the root; `kinds`
+elements (root plus every child frame); `maxDepth` is the host-allowed hard ceiling on nested levels
+below the root, and the framework's own captures pass the constant `SnapshotPolicy.defaultMaxDepth`
+(16) instead of deriving one from the blueprint (D-65); `kinds`
 and `traits` say what must be resolved; `windows` names the world-frame entity windows the host must
 include. The host derives the policy from `Blueprint.reads()` (`structure` §4.5), mapping the local
 windows through the siting. A required trait that cannot be resolved is a `TraitSlot.Refused` on the
@@ -412,15 +415,20 @@ and an anchor.
 ### 4.9 Nested frames
 
 A nested extent is a declaration from the host: `(type, absolute bounds, origin)`. The adapter owns
-the capture and builds one child frame for it, or cuts it; the kernel never queries a capability. The
-child frame has the same `SnapshotId`, a unique `frame`, `depth + 1`, the exposing view as `parent`,
-the extent origin and the translated local bounds. A nested body is indexed in the **parent** frame
-with kind `nested`, anchor at the capability cell and footprint = the extent's bounds translated into
-that parent's frame; it is not in any `SectionSnapshot` and does not enter a section digest.
+the capture and builds one child frame for it, or cuts it; the kernel never queries a capability.
+Expansion is automatic and level-order: every body discovered in the frames of level N is captured
+before any frame of level N+1 (D-65), so the cut set never depends on which body was visited first.
+The child frame has the same `SnapshotId`, a unique `frame`, `depth + 1`, the exposing view as
+`parent`, the extent origin and the translated local bounds. A nested body is indexed in the
+**parent** frame with kind `nested`, anchor at the capability cell and footprint = the extent's
+bounds translated into that parent's frame; it is not in any `SectionSnapshot` and does not enter a
+section digest.
 
 A child that cannot be built (depth ceiling, element budget, a repeated `(type, origin)` on the open
 frame path, unloaded chunk) is cut: the nested body stays, no child exists, `nested(cell)` returns
-`null`, and the consumer reports `SC-OCC-0003`. A cut is never a partial child and never air. A child
+`null`, and the consumer reports `SC-OCC-0003`. The frame at `depth == policy().maxDepth()` still
+discovers and keeps its bodies; each of them is cut by the depth ceiling rather than silently
+dropped. A cut is never a partial child and never air. A child
 whose bounds leave the level's build height keeps the child but its outside sections are
 `Refused`/`Partial`; those cells are never air. The nested body and child view are host-capture
 facts; the kernel treats a `null` `nested(cell)` as "not available here", not as an empty structure.
@@ -445,7 +453,7 @@ just took (or refused). The kernel carries the report and never interprets it.
   `world` label (a label-less entry is legal when it sets a message), copies the notes verbatim and
   applies the §4.1 trust guard. The kernel supplies the fact; the site supplies the finding.
 - **Order is canonical.** Entries are in the host's order (the shipped adapter: audit groups sorted
-  by `(type, property, value)`, then cuts in anchor order); the relayed `FindingBundle` re-orders
+  by `(type, property, value)`, then cuts in level-order expansion); the relayed `FindingBundle` re-orders
   them canonically anyway (`finding` §4.3).
 - **Empty is normal**, including on `Unavailable`, whose own code already is its finding. No arm may
   carry two entries for one fact, and a capture report is never merged into a `MatchResult` bundle:
@@ -530,7 +538,7 @@ The kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value cod
 - Lease gate: `isCurrent` false after the host invalidates; `check` returns `Dropped`.
 - `EntityWindow.of` inflation and lattice clamp; `maxEntitySpan` rejection.
 - `SnapshotPolicy`: `traits` is a set of ids; a non-empty set stays non-empty; duplicate ids collapse
-  to one entry; `maxDepth` is the child ceiling.
+  to one entry; `maxDepth` is the host-allowed child ceiling and `minimal()` passes the default 16.
 - Capture report: `empty()` is the compatibility answer and every two-argument constructor equals its
   three-argument form with `empty()`; `of` copies its entries and keeps insertion order; a null code,
   a blank message or a blank note is rejected; `cells` may be absent; equality includes the report; a

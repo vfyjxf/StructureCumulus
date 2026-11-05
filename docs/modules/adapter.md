@@ -175,7 +175,9 @@ The rules below are implemented.
   NamespacedId.of(entityType.namespace(), uuid.toString())`. Two entities of one type at one anchor
   are two refs and stay two occupants; §8.4 covers child frames.
 - Nested structures are discovered only when `policy.kinds()` contains `OccupantKind.nested`;
-  otherwise no capability is queried. Nested discovery queries loaded entities intersecting the
+  otherwise no capability is queried. Every frame discovers — including the frame sitting at the
+  depth ceiling, which queries once, keeps what it finds and reports each body as a cut (§8.4, D-65).
+  Nested discovery queries loaded entities intersecting the
   bounds for `NestedExtents.ENTITY` even when `entity` occupants are not captured; indexing the
   entity as an occupant itself still requires the `entity` kind. §8 owns the capability rules, frame
   construction, budgets and cuts.
@@ -611,14 +613,18 @@ The adapter queries only declarations, on the server thread, in a loaded chunk, 
 ### 8.4 Adapter-owned capture
 
 A provider value is a declaration only. The adapter owns validation, frame allocation, depth, parent,
-no-chunk reads, cycle detection, budget, refusal and the child view:
+no-chunk reads, cycle detection, budget, refusal and the child view. Expansion is automatic,
+level-order and capped (D-65): a frame only ever captures itself and discovers its own nested
+declarations, the driver expands one level at a time (parent order, then anchor order within a
+parent) and assembles the immutable frames bottom-up, and no author-declared depth exists anywhere.
 
 - One `SnapshotId` per capture. The root frame is `frame = 0`, `depth = 0`, `parent = null`, `origin =
   (0,0,0)`, with world bounds and world cells. A child gets a unique `frame`, `depth + 1`, the
   exposing view as `parent`, `origin = extent.origin()`, local bounds = `extent.bounds()` translated
-  by `-origin`, and local cells; its world cells are `origin + local`. Frames are assigned in capture
-  order (cell order, depth-first); a cut child rolls its frame number back, so sibling frames follow
-  the anchor order (`NestedCaptureGameTest.siblingFramesFollowTheAnchorOrder`).
+  by `-origin`, and local cells; its world cells are `origin + local`. Frames are assigned in
+  expansion order — every sibling of a level before any child of the next — so within one parent the
+  anchor order decides (`NestedCaptureGameTest.siblingFramesFollowTheAnchorOrder`,
+  `everySiblingIsCapturedBeforeAnyChild`); a cut child rolls its frame number back.
 - One public `LevelSnapshot` implements `WorldView` over every frame; `FrameData` is package-private
   and holds a frame's sections, entities, nested bodies/extents and children. There is no
   `NestedLevelSnapshot` and no second view type.
@@ -638,7 +644,10 @@ no-chunk reads, cycle detection, budget, refusal and the child view:
 - A child is **cut** when `depth + 1 > policy.maxDepth()`, when its volume would exceed the shared
   `maxElements` budget, when its `(type, origin)` already appears on the open frame path (a cycle),
   or when a chunk it needs is unloaded; a declaration that cannot be translated into its parent frame
-  is cut too, never dropped silently. A cut rolls back the budget and the reserved frame, keeps the
+  is cut too, never dropped silently. A frame at `depth == policy.maxDepth()` still discovers and
+  keeps its bodies — each of them is cut by the depth ceiling with one report entry, so "there is
+  something here, I did not expand it" is always said, never silent (D-65). A cut rolls back the
+  budget and the reserved frame, keeps the
   nested body, creates no child, makes `nested(cell)` return `null`, and the consumer reports
   `SC-OCC-0003`. A cut is never a refused child and never air. The adapter also reports the cut in
   the capture report as one `SC-MC-0003` entry (WARNING) with the reason and, when the cut happens in
@@ -819,7 +828,8 @@ never changes the exit code.
 section/`ReadRefusal`. `SC-MC-0002` unreadable trait or
 block-entity read: carried in a `TraitSlot.Refused` and relayed by the consumer, not a capture
 finding. `SC-MC-0003` a nested extent
-the adapter cut (depth, budget, cycle, unloaded chunk, or a declaration that does not fit its parent
+the adapter cut (depth — including a body discovered by the ceiling frame itself —, budget, cycle,
+unloaded chunk, or a declaration that does not fit its parent
 frame): a WARNING entry in the `CaptureResult.Captured` report, one per cut, with the reason; the
 check still reports `SC-OCC-0003` when it needs the child and the adapter never fabricates a refused
 child. `SC-MC-0004` a captured block state cannot express the siting orientation: a WARNING entry,
@@ -920,8 +930,9 @@ and a placement failure exits 0.
 
 The set capture is **one** `LevelCapture.capture` call for the bounding box of `rootBounds()` and
 every satellite's `worldBounds()`, with a null orientation. Its policy is one `SnapshotPolicy` with
-the adapter's element ceiling and the union of the root's and every satellite's `Blueprint.reads()`:
-maximum depth, union of kinds and traits (`ReadScope.union`), and the root and every satellite window
+the adapter's element ceiling, the nested-ceiling constant (`SnapshotPolicy.defaultMaxDepth`, 16)
+and the union of the root's and every satellite's `Blueprint.reads()`:
+union of kinds and traits (`ReadScope.union`), and the root and every satellite window
 mapped into world space by that member's own siting (`CommandSupport.windows`); a window that leaves
 the lattice under its siting is dropped. The capture report prints through `CaptureReports` before the
 set summary. The lease is closed after the host run.

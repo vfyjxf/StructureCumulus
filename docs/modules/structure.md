@@ -34,7 +34,7 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `ExpectationContext<T>` | interface | focus context + the subject and its re-typing |
 | `ExpectationMeta` | record | id, specificity, required keys, default mismatch code |
 | `Reply` | sealed | `Match`, `Mismatch`, `Unreadable`, `Abstain` |
-| `ReadScope` | record | cells + keys + trait ids + occupant kinds + depth + entity windows |
+| `ReadScope` | record | cells + keys + trait ids + occupant kinds + entity windows |
 | `BayView` | record | a bay's own read face; total `read` |
 | `DoorView` | record | the two halves of a door + its bay |
 | `Focuses` | final class | the shipped focus kinds |
@@ -163,15 +163,14 @@ public sealed interface Reply {
 
 public record ReadScope(CuboidSet cells, java.util.Set<ContextKey<?>> keys,
                         java.util.Set<NamespacedId> traits, java.util.Set<OccupantKind> kinds,
-                        int depth, java.util.List<EntityWindow> windows) {
-    public ReadScope { /* depth >= 0; canonical sets; windows deduplicated in declaration order */ }
+                        java.util.List<EntityWindow> windows) {
+    public ReadScope { /* canonical sets; windows deduplicated in declaration order */ }
     public static ReadScope none();
     public static ReadScope cells(CuboidSet cells);
     public ReadScope union(ReadScope other);
     public ReadScope withKeys(java.util.Set<ContextKey<?>> keys);
     public ReadScope withTraits(java.util.Set<NamespacedId> traits);
     public ReadScope withKinds(java.util.Set<OccupantKind> kinds);
-    public ReadScope withDepth(int depth);
     public ReadScope withWindows(java.util.List<EntityWindow> windows);
 }
 
@@ -463,7 +462,8 @@ false for an unknown custom focus; the shipped root block/entity focuses answer 
 footprint claims cells, the builder rejects a subject-binding focus that is not claimable with
 `SC-BPT-0005`. `reads` defaults to the
 static cells; an entity focus adds a window and the `entity` kind; a nested focus adds the `nested`
-kind and one level of depth; a trait expectation adds its trait id. An expectation that reads outside
+kind and declares no depth — how deep the capture expands is the framework's, not the author's
+(D-65); a trait expectation adds its trait id. An expectation that reads outside
 its cells declares it through `Expectation.reads()`.
 
 `Focuses.occupant(cell)` is air-aware: an air cell is `Taken(air, List.of(), notes)`, never
@@ -502,13 +502,13 @@ block occupant, and a host `fluid` expectation reads its captured fluid state in
 
 ### 4.5 Read scope
 
-`ReadScope` is the one read closure: `(cells, keys, traits, kinds, depth, windows)`. `cells` is the
+`ReadScope` is the one read closure: `(cells, keys, traits, kinds, windows)`. `cells` is the
 declared cell set, `keys` the context keys a check or computation reads, `traits` the trait ids, and
-`kinds` the occupant kinds the host must resolve. `depth` is the nested-frame ceiling the reads need
-(`0` for a blueprint that never nests). `union` combines cells/keys/traits/kinds by set union, takes
-the larger depth and appends the windows in declaration order with equal windows deduplicated;
-`withKeys`/`withTraits`/`withKinds`/`withWindows` union their argument and `withDepth` keeps the
-larger value, so a narrowed copy can never lower a requirement. `none()` is empty with depth `0`.
+`kinds` the occupant kinds the host must resolve. There is no depth: whether a blueprint reads
+nested bodies is the `nested` kind, never how deep (D-65). `union` combines cells/keys/traits/kinds
+by set union and appends the windows in declaration order with equal windows deduplicated;
+`withKeys`/`withTraits`/`withKinds`/`withWindows` union their argument, so a narrowed copy can never
+lower a requirement. `none()` is empty.
 
 A host expectation (§4.6) adds no scope entry: one snapshot carries every host payload, so the
 declared cells already bound which anchor the read sees.
@@ -523,8 +523,11 @@ promise: a check that reads a cell or key outside its scope is a bug (review), n
 non-`None` bay's cells must stay inside `bay.cells ∪ footprint`; a `Bound` footprint is checked at
 settle, a `Box`/`Declared` at build.
 
-The host derives `SnapshotPolicy` from `Blueprint.reads()`: `kinds`, `traits` and `depth` map
+The host derives `SnapshotPolicy` from `Blueprint.reads()`: `kinds` and `traits` map
 directly, and `windows` maps each blueprint-local window through the siting into the world frame.
+The nested ceiling is not derived: the framework passes its own constant
+(`SnapshotPolicy.defaultMaxDepth`, 16) and only a host that wants a lower ceiling sets `maxDepth`
+itself (D-65).
 `maxElements` and the capture bounds remain the host's choice. No hidden read is legal; a policy
 without the declared trait ids produces `TraitSlot.Refused` (or no slot), never a default value. A
 generic `occupant`/`bay` read declares no kind: it sees whatever the host captured. A blueprint that requires entity-over-block or a nested body therefore

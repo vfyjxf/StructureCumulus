@@ -440,7 +440,10 @@ cell is visible through the read. There is no partial child: a child either exis
 answered (readable or refused) or is cut entirely. **Status (v1.2):** implemented in
 `f3e0338`/`d6aefc2`. **Amendment (M5e):** the cut reason now travels as one `SC-MC-0003` entry in
 the capture report (D-28), a WARNING; `SC-OCC-0003` remains the check's finding, so the capture entry
-explains the cut and the check finding judges it.
+explains the cut and the check finding judges it. **Superseded by D-65:** nested expansion is now
+automatic, breadth-first and capped — the author no longer declares a depth, the frame at the
+ceiling keeps and reports the bodies it discovers, and the cut rules this decision sketched are
+owned by D-65's wording.
 
 **Why:** a refused child is a second structure that checks could walk and pass; the honest fact is
 that the child is not available. Keeping the body and returning `null` preserves the parent-frame
@@ -1202,6 +1205,39 @@ hook is cancelled by this decision — the feed existed only to invalidate on co
 **Status:** implemented with the tests that pin it: no `BlockEntity` or `CompoundTag` field on
 `SnapshotLevel`, a content change or removal without a block change keeps the lease current, and the
 `inventory` trait still reads the changed contents.
+
+### D-65 — Nested capture is automatic, breadth-first and capped
+
+A blueprint says whether it reads nested bodies, never how deep. The capture expands them by level:
+every body discovered in the frames of level N is captured before any frame of level N+1. Expansion
+stops at a fixed ceiling of 16 levels, at the capture's element budget, at a cycle, or when a body
+does not fit its parent frame.
+
+A body that is discovered but not captured stays in its parent's occupant list with its footprint, and
+the capture reports `SC-MC-0003` at that anchor. "There is something here, I did not expand it" is a
+fact the author can act on; silence is not.
+
+**Why no declared depth.** The number is unguessable for the author and unverifiable for the
+framework: an opaque expectation can go arbitrarily deep. A ceiling plus a budget bounds the same cost
+without asking a human to estimate it.
+
+**Why breadth-first.** With a budget, depth-first spends everything on the first chain and leaves its
+siblings uncaptured. Level order gives every sibling the same chance, and the cut set stops depending
+on which body happened to be visited first.
+
+**Why 16.** A structure nested sixteen deep is already pathological; the ceiling exists to make
+recursion terminate, not to shape normal content.
+
+**Consequence:** `ReadScope` loses `depth`/`withDepth`; a nested focus declares only the `nested`
+kind. `SnapshotPolicy.maxDepth` stays as the host-allowed ceiling, `minimal()` and the command policy
+pass `SnapshotPolicy.defaultMaxDepth` (16). `LevelCapture` captures each frame alone (`collect`) and
+a level-order driver expands and assembles the frames bottom-up; the frame at the ceiling still
+discovers its bodies and each is reported as a depth cut. `world` §4.6/§4.9, `structure` §4.4/§4.5
+and `adapter` §3/§8.4 state the rule. **Status:** implemented with the tests that pin it: a
+seventeen-level nest captures sixteen frames and reports one depth cut at the deepest anchor, both
+siblings are captured before any grandchild under a shared budget, a policy without the `nested`
+kind queries no provider, the ceiling frame queries its anchor exactly once and builds no child, and
+two captures of one world produce the same frame order and the same cut report.
 
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
