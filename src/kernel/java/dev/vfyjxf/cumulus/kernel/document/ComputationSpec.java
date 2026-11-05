@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.kernel.core.Value;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -28,6 +29,6 @@ public record ComputationSpec(
         Objects.requireNonNull(args, "args");
         Objects.requireNonNull(output, "output");
         Objects.requireNonNull(inputs, "inputs");
-        inputs = Set.copyOf(new TreeSet<>(inputs));
+        inputs = Collections.unmodifiableSet(new TreeSet<>(inputs));
     }
 }

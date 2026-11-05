@@ -20,6 +20,7 @@ import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.CancelToken;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.ContextView;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Merge;
@@ -1422,9 +1423,7 @@ public final class MatchEngine {
 
         @Override
         public Set<ContextKey<?>> keys() {
-            TreeSet<ContextKey<?>> sorted = new TreeSet<>(
-                Comparator.comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName())
-            );
+            TreeSet<ContextKey<?>> sorted = new TreeSet<>(ContextKeys.order());
             sorted.addAll(current.keySet());
             return Collections.unmodifiableSet(sorted);
         }
@@ -1437,9 +1436,7 @@ public final class MatchEngine {
 
         private MapContextView(Map<ContextKey<?>, Object> values) {
             this.values = values;
-            TreeSet<ContextKey<?>> sorted = new TreeSet<>(
-                Comparator.comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName())
-            );
+            TreeSet<ContextKey<?>> sorted = new TreeSet<>(ContextKeys.order());
             sorted.addAll(values.keySet());
             this.keys = Collections.unmodifiableSet(sorted);
         }

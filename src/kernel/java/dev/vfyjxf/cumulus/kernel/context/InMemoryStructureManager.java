@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.context;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
@@ -15,7 +16,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,9 +26,6 @@ import java.util.TreeMap;
 /** One server-thread, in-memory registry; the host dispatches lifecycle events into it. */
 @NullMarked
 final class InMemoryStructureManager implements StructureManager {
-
-    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
-            .thenComparing(key -> key.type().getName());
 
     private final TreeMap<InstanceId, StructureInstance> instances = new TreeMap<>();
     private final Map<SitingKey, InstanceId> bySiting = new HashMap<>();
@@ -249,7 +246,7 @@ final class InMemoryStructureManager implements StructureManager {
                 throw new IllegalArgumentException("only INSTANCE values are published: " + key.id());
             }
         }
-        TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(keyOrder);
+        TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(ContextKeys.order());
         merged.putAll(base.values());
         merged.putAll(values);
         return new StructureContext(

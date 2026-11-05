@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.context;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.Spend;
@@ -8,7 +9,6 @@ import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -32,8 +32,6 @@ public interface ContextStore {
 
     static ContextStore inMemory() {
         return new ContextStore() {
-            private static final Comparator<ContextKey<?>> keyOrder = Comparator
-                    .comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName());
             private final ConcurrentHashMap<InstanceId, StructureContext> contexts = new ConcurrentHashMap<>();
 
             @Override
@@ -70,7 +68,7 @@ public interface ContextStore {
                 }
                 return contexts.compute(instance, (ignored, current) -> {
                     StructureContext base = current == null ? StructureContext.empty(instance) : current;
-                    TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(keyOrder);
+                    TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(ContextKeys.order());
                     merged.putAll(base.values());
                     merged.putAll(values);
                     return new StructureContext(

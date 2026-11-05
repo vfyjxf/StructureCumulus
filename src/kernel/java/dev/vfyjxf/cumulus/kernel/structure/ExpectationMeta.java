@@ -1,11 +1,11 @@
 package dev.vfyjxf.cumulus.kernel.structure;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -20,9 +20,7 @@ public record ExpectationMeta(NamespacedId id, int specificity, Set<ContextKey<?
         if (specificity < 0) {
             throw new IllegalArgumentException("specificity >= 0");
         }
-        TreeSet<ContextKey<?>> sorted = new TreeSet<>(
-            Comparator.comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName())
-        );
+        TreeSet<ContextKey<?>> sorted = new TreeSet<>(ContextKeys.order());
         sorted.addAll(requires);
         requires = Collections.unmodifiableSet(sorted);
     }

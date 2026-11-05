@@ -1,13 +1,13 @@
 package dev.vfyjxf.cumulus.kernel.engine;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
 
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,16 +22,13 @@ public record MatchOutcome(
     Spend spend
 ) {
 
-    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
-            .thenComparing(key -> key.type().getName());
-
     public MatchOutcome {
         Objects.requireNonNull(view, "view");
         Objects.requireNonNull(values, "values");
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(reads, "reads");
         Objects.requireNonNull(spend, "spend");
-        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(keyOrder);
+        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(ContextKeys.order());
         for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
             ContextKey<?> key = Objects.requireNonNull(entry.getKey(), "key");
             Object value = Objects.requireNonNull(entry.getValue(), "value");
