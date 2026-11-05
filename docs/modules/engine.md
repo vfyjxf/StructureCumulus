@@ -341,7 +341,10 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
 - Pipe corner: eight asserted, four owned; neighbour does not conflict.
 - Entity pen: window read, subject footprint, `anySubject + Bound`.
 - Absence: a refused section makes the key absent; a read is `Unreadable`, never a short sum; a
-  partial section makes `count`/`air` `Missing` and reports the refusal, while `volume` stays total.
+  partial section makes `count`/`air` `Missing` and reports the refusal, while `volume` stays total;
+  a wrong-typed contribution, a throwing `merge.combine` and a wrong-typed merged value each mark the
+  key absent with their finding (`SC-ENG-0004`, `SC-SPI-0001`); an attempt that never reads the
+  broken key still forms and carries the finding.
 - Nested: a nested focus yields no subject; a nested body bound through an occupant focus is
   `Failed(SC-CLM-0004)` before rows; a child-frame subject is rejected the same way.
 - Budget: a too-small budget is `Undecided`; no claims.

@@ -1148,6 +1148,23 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-59 — A contributed key is complete or absent
+
+A section contribution whose value does not match the key's type marks the key absent. The engine
+still reports the defect and never folds the remaining sections. A `merge.combine` that throws, or a
+merged value of the wrong type, marks the key absent the same way. No partial sum is published.
+
+Whether the attempt forms is a separate question: a check that requires an absent key answers
+`Unreadable`, so the attempt is `Undecided`; an attempt that never reads the key may still form and
+carries the error finding. That matches the engine's existing error semantics — `budgetExhausted` and
+`foldRefused` are errors too, and they produce `Undecided`, not `Failed`.
+
+**Why keep the finding.** The defect is in extension code, and the finding is the only channel that
+tells the author. Bare absence would read as "the computation chose not to produce a value".
+
+**Why not `Failed`.** A broken computation that no check reads does not make the structure wrong;
+failing every attempt would turn one extension bug into a global outage.
+
 ### D-60 — Dropping a key is a release; a settle that changes nothing is not a write
 
 When the planner derives no rows, the engine releases the instance's key instead of settling an empty
