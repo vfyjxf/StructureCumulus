@@ -257,7 +257,8 @@ world.
 ### D-19 — One producer per code, one explanation
 
 `Codes.all` is the table; every entry has a code, a canonical severity and an explanation; the
-producer table in `finding.md` names one module/site per code. An unproduced code is deleted, not
+producer table in `finding.md` names the owning module and every emit site of the code's one
+meaning (D-69). An unproduced code is deleted, not
 marked reserved. `DESIGN` violations are findings from the compiler; a `Blueprint.build()` throw is a
 programmer proof failure with the code in the message. An adapter-only code outside `Codes.all` may be
 deferred (`SC-MC-0003`); it is not a kernel registry entry, so this rule does not license a dead
@@ -284,7 +285,7 @@ between `13` and `15`. A test asserts the table is bijective with the producers.
 | Q12 section phase read | `SectionComputation`/`SectionContext` has no `read(ContextKey)`; it does have a total cell `read(LatticePoint)` and `unreadable()` (D-24). `AggregateComputation` has no `contribute`. |
 | Q13 step vocabulary | No step types; `Plan` has sections/aggregates/checks; a check cannot read a derivation output. |
 | Q14 facade | Four operations, one final class, one `Host` (D-17; `siting` moved to the adapter, D-33). |
-| Q15 code table | One table in `finding`, one producer, no dead codes (D-19). |
+| Q15 code table | One table in `finding`, one meaning per code with every emit site listed, no dead codes (D-19, D-69). |
 | Q16 `LocusMap`/`definition` | `LocusMap` maps local↔world only; a definition label is created where the source is in hand; no `toDefinition`. |
 | Q18 U10 | Thin values + provider (D-16). |
 | Q19 named-but-unimplemented | `DataView`/`DataKind` → `Value`; `Codes` implemented; `Checks` in core; `Stability`/`ExplainBook` deleted; no empty names. |
@@ -1304,6 +1305,20 @@ dissimilar message; the key alone stops the collapse but leaves findings pointin
 
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
+
+### D-69 — A code has one meaning and one owning module; the table lists every emit site
+
+The producer column lists the classes that emit the code, not a single site and not a line number. A
+code keeps one meaning; a site that needs a different meaning gets a different code. A code that only
+appears inside a programmer-failure exception is marked `T` — thrown, never a finding value — and
+still has to be listed with its throw site.
+
+**Why not one emit site.** The same meaning is emitted from two phases (`check` predicts, `settle`
+concludes) and from the adapter that relays a host code; forcing one site would split one meaning into
+several codes or bend the call graph.
+
+**Why no line numbers.** They drift on every edit; the gate (X03-D04) checks class names, and a class
+is a stable anchor for a reader.
 
 ## 3. Consequences a reviewer should attack
 

@@ -311,84 +311,92 @@ Findings are produced in all three phases. `compile` findings carry a `definitio
 source span when the document has one; `check`/`settle` findings carry `local`/`world`/`key` labels.
 The engine collects a bundle; it never renders. `FindingBundle` is the only aggregator.
 
+A code has one meaning and one owning module, and the producer table below lists every class that
+emits that meaning (D-69). One meaning emitted from both `check` and `settle`, or relayed by the
+adapter, stays one code: N-07's "exactly one producer" reads as one meaning with one owner, not one
+emit site. A class name, never a line number, is the anchor. A code that only ever appears inside a
+programmer-failure exception is marked `T` and still lists its throw site.
+
 ## 6. Code producers
 
-`P` = a primary label is required; `–` = label-less allowed.
+`P` = a primary label is required; `–` = label-less allowed; `T` = thrown in a programmer-failure
+exception, never a finding value (D-69). Owner names the module that owns the meaning; Producer
+sites lists every class that emits it.
 
-| Code | Sev | P | Meaning | Producer |
-| --- | --- | --- | --- | --- |
-| `SC-SPC-0001` | ERROR | ✓ | a locus/cell cannot be mapped into the requested frame | `structure`/`engine` when `LocusMap`/`Siting` returns null |
-| `SC-SPC-0002` | ERROR | ✓ | a box operation leaves the lattice | `document`/`structure` build |
-| `SC-OCC-0001` | ERROR | ✓ | a focus needed a subject that is missing for a non-refusal reason | `Focuses` |
-| `SC-OCC-0002` | WARNING | ✓ | a footprint leaves the snapshot | `Focuses` |
-| `SC-OCC-0003` | ERROR | ✓ | a nested view was cut by depth, cap, cycle or an unloaded chunk | `Focuses.nested`/`WorldView` consumer |
-| `SC-OCC-0004` | ERROR | ✓ | a required read is unavailable (default refusal; also the substitute for a relayed kernel code) | `WorldView.read`, `Focuses`, `SectionContext`/`StructureContext` consumers |
-| `SC-EXP-0001` | ERROR | ✓ | the default element/state mismatch | `Expectations` leaf tests |
-| `SC-EXP-0002` | ERROR | ✓ | a negated test matched | `Expectations.not` |
-| `SC-EXP-0003` | ERROR | ✓ | a threshold cannot be met | `Expectations.atLeast/atMost/exactly` |
-| `SC-EXP-0004` | ERROR | ✓ | a factory kind is unknown | `DocumentCompiler` |
-| `SC-EXP-0005` | ERROR | ✓ | a factory returned null or bad args | `DocumentCompiler` |
-| `SC-EXP-0006` | ERROR | ✓ | a cell in the derived envelope holds a non-air occupant | `Expectations.envelopeAir` (the synthetic envelope check) |
-| `SC-CLM-0001` | ERROR | ✓ | two claims conflict | `engine.check`/`settle` |
-| `SC-CLM-0002` | WARNING | – | the ledger cannot answer | `engine.check` |
-| `SC-CLM-0003` | ERROR | – | the revision moved twice | `engine.settle` |
-| `SC-CLM-0004` | ERROR | ✓ | a binding is invalid (a nested or non-root subject, a foreign bay/cell) | `engine.check`/`settle` |
-| `SC-CLM-0005` | ERROR | ✓ | an exclusive bound footprint is empty | `ClaimPlanner`/`engine.settle` |
-| `SC-BPT-0001` | ERROR | ✓ | a blueprint has no checks/bounds | `Blueprint.build` |
-| `SC-BPT-0002` | ERROR | ✓ | two bays overlap with an exclusive side | `Blueprint.build` |
-| `SC-BPT-0003` | ERROR | ✓ | a bay is empty or outside bounds | `Blueprint.build` |
-| `SC-BPT-0004` | ERROR | ✓ | a bay/check/seam/anchor id is duplicated | `Blueprint.build` |
-| `SC-BPT-0005` | ERROR | ✓ | coverage/footprint rules R1–R4 fail | `Blueprint.build` |
-| `SC-BPT-0006` | ERROR | ✓ | anchor/orientation policy is invalid | `Blueprint.build` |
-| `SC-BPT-0007` | ERROR | ✓ | a computation plan is cyclic or has a missing/duplicate producer | `Blueprint.build` |
-| `SC-BPT-0008` | ERROR | ✓ | a derivation order/output is invalid | `Blueprint.build` |
-| `SC-BPT-0009` | ERROR | ✓ | a seam is outside every bay | `Blueprint.build` |
-| `SC-BPT-0010` | ERROR | ✓ | a declared footprint is outside bounds | `Blueprint.build` |
-| `SC-CHK-0001` | ERROR | ✓ | a check pairs different subject types | `Check` constructor |
-| `SC-CHK-0002` | ERROR | ✓ | a check reads a derivation output | `Blueprint.build` |
-| `SC-CHK-0003` | ERROR | ✓ | a focus's static cells leave its bay | `Blueprint.build` |
-| `SC-DOC-0001` | ERROR | ✓ | unsupported schema version | `DocumentCompiler` |
-| `SC-DOC-0002` | ERROR | ✓ | a field is missing or of the wrong kind | `DocumentCompiler` |
-| `SC-DOC-0003` | ERROR | ✓ | an unknown factory kind | `DocumentCompiler` |
-| `SC-DOC-0004` | ERROR | ✓ | a duplicate id in a document | `DocumentCompiler` |
-| `SC-DOC-0005` | ERROR | ✓ | a placement leaves the root bounds | `DocumentCompiler` |
-| `SC-DOC-0006` | ERROR | ✓ | a check names no merged bay | `DocumentCompiler` |
-| `SC-DOC-0007` | ERROR | ✓ | a spec names an undeclared key | `DocumentCompiler` |
-| `SC-DOC-0008` | ERROR | ✓ | a key's declared type does not match its producer | `DocumentCompiler` |
-| `SC-DOC-0009` | ERROR | ✓ | a definition cycle | `DocumentCompiler` |
-| `SC-DOC-0010` | ERROR | ✓ | two derivations share an output/order | `DocumentCompiler` |
-| `SC-DOC-0011` | ERROR | ✓ | a placement names a missing definition | `DocumentCompiler` |
-| `SC-DOC-0012` | INFO | – | the reader produced no spans | `DocumentReader` implementation |
-| `SC-DOC-0013` | ERROR | – | the reader/writer failed to parse/format | `DocumentReader`/`DocumentWriter` |
-| `SC-DOC-0014` | ERROR | ✓ | a declaration disagrees with the factory that produces it | `DocumentCompiler` |
-| `SC-CTX-0001` | ERROR | ✓ | a computation produced no value | `engine.check` |
-| `SC-CTX-0004` | ERROR | ✓ | a derivation names a missing deriver | `engine.derive` |
-| `SC-CTX-0005` | ERROR | ✓ | a deriver failed | `engine.derive` |
-| `SC-CTX-0006` | ERROR | ✓ | a fold has a refused section | `engine.check` |
-| `SC-CTX-0007` | ERROR | ✓ | a required key is absent | `Focuses.context` |
-| `SC-ENG-0001` | ERROR | – | the budget ran out | `engine.check` |
-| `SC-ENG-0002` | WARNING | – | the snapshot is no longer current | `engine.check`/`settle` |
-| `SC-ENG-0004` | ERROR | – | an internal plan invariant failed | `engine.check`/`contribute`/`fold` |
-| `SC-ENG-0005` | WARNING | – | the attempt was cancelled | `engine.check` |
-| `SC-DIA-0001` | WARNING | – | the bundle was truncated | `FindingBundle` |
-| `SC-RMD-0001` | ERROR | ✓ | a remedy provider threw | `StructureKernel.solve` guard |
-| `SC-RMD-0002` | ERROR | ✓ | a provider returned a malformed remedy | `StructureKernel.solve` |
-| `SC-SPI-0001` | ERROR | ✓ | an extension threw or returned a malformed finding | `engine` guard/`fold` |
-| `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
-| `SC-SET-0001` | ERROR | – | a required satellite is absent | host presence |
-| `SC-SET-0002` | ERROR | – | a satellite link distance is invalid | compiler/host link |
-| `SC-SET-0003` | ERROR | – | a link cell is outside its blueprint or not covered by a check | compiler, host re-check |
-| `SC-SET-0004` | ERROR | – | satellite presence is unreadable | host presence |
-| `SC-SET-0005` | ERROR | – | duplicate satellite placement | compiler |
-| `SC-SET-0006` | ERROR | – | duplicate parent face link | compiler |
-| `SC-SET-0007` | ERROR | – | structure set rollback failed | host settle |
-| `SC-SET-0008` | ERROR | – | root/satellite placement collision | compiler, `StructureSet.place`, host check |
-| `SC-MC-0006` | ERROR | ✓ | a block property does not match | adapter `property` (mismatch) |
-| `SC-MC-0007` | ERROR | ✓ | a block state does not match | adapter `state` (mismatch) |
-| `SC-MC-0008` | ERROR | ✓ | a block/fluid/entity tag does not match | adapter `tag` (mismatch) |
-| `SC-MC-0009` | ERROR | ✓ | a fluid does not match | adapter `fluid` (mismatch) |
-| `SC-MC-0010` | ERROR | ✓ | a host snapshot value was not captured | adapter host expectations (absent) and `McAnchors` (missing anchor state), always unreadable, never a mismatch |
-| `SC-MC-*` | — | — | adapter-only family; never minted by the kernel, never in `Codes.all`; the capture paths (`0001`–`0005`) relay through a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10), and the expectation paths (`0006`–`0010`) pass `SC-MC-0010` as the absent code of `Expectations.host` (`world` §4.11) | adapter |
+| Code | Sev | Label | Meaning | Owner | Producer sites |
+| --- | --- | --- | --- | --- | --- |
+| `SC-SPC-0001` | ERROR | P | a locus/cell cannot be mapped into the requested frame | space | `MatchEngine` check and settle, `ClaimPlanner` (`PlanRejected`), `StructureSetCompiler`, adapter `StructureSet`, `StructureSetHost` |
+| `SC-SPC-0002` | ERROR | P | a declared cell or box would leave the lattice | space | `BuiltinSupport` (the built-in focus factories) |
+| `SC-OCC-0001` | ERROR | P | a focus could not bind the subject it needs (none, more than one, or a missing part) | world | `Focuses` (built by `Check.missing`) |
+| `SC-OCC-0002` | WARNING | P | a footprint leaves the snapshot | world | `Focuses` |
+| `SC-OCC-0003` | ERROR | P | a nested view was cut by depth, an element cap, a cycle or an unloaded chunk | world | `Focuses.nested` |
+| `SC-OCC-0004` | ERROR | P | a required read is unavailable (default refusal; also the substitute for a relayed kernel code) | world | `Check.unreadable`/`Check.relay`, adapter `CaptureReports`; refusal default in `BayView`, `Expectations`, `MatchEngine`, `LevelSnapshot` |
+| `SC-EXP-0001` | ERROR | P | the default element/state mismatch | structure | `Expectations` leaf tests (default absent code in `ExpectationMeta`) |
+| `SC-EXP-0002` | ERROR | P | a negated test matched | structure | `Expectations.not` |
+| `SC-EXP-0003` | ERROR | P | a threshold cannot be met | structure | `Expectations` thresholds |
+| `SC-EXP-0004` | ERROR | P | a focus or expectation declaration names no kind (an unregistered kind is `SC-DOC-0003`) | document | `DocumentCompiler` |
+| `SC-EXP-0005` | ERROR | P | a factory returned null or bad args | document | `DocumentCompiler`, `BuiltinSupport` (for `BuiltinFocuses`/`BuiltinExpectations`), adapter `AdapterExpectations` |
+| `SC-EXP-0006` | ERROR | P | a cell in the derived envelope holds a non-air occupant | structure | `Expectations.envelopeAir` (the synthetic envelope check) |
+| `SC-CLM-0001` | ERROR | P | two claims conflict | claim | `MatchEngine` check and settle, `ClaimPlanner` (`PlanRejected`, planned rows overlap), `InMemoryClaimLedger` (settle verdict, forwarded by `MatchEngine`) |
+| `SC-CLM-0002` | WARNING | – | the ledger cannot answer | claim | `MatchEngine` check and settle |
+| `SC-CLM-0003` | ERROR | – | the revision moved twice | claim | `MatchEngine` settle |
+| `SC-CLM-0004` | ERROR | P | a binding names a nested or non-root subject, a bay this blueprint does not declare, or a ONE_SUBJECT footprint that is not its cells; a bay with no binding | claim | `MatchEngine` (validate), `ClaimPlanner` (`PlanRejected`) |
+| `SC-CLM-0005` | ERROR | P | an exclusive bay's resolved footprint is empty (a Bound footprint whose subjects are absent or air) | claim | `MatchEngine` (validate), `ClaimPlanner` (`PlanRejected`) |
+| `SC-BPT-0001` | ERROR | P | a blueprint has no checks/bounds | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0002` | ERROR | P | two bays overlap with an exclusive side | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0003` | ERROR | P | a bay is empty or outside bounds | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0004` | ERROR | P | a bay/check/seam/anchor id is duplicated | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0005` | ERROR | P | coverage/footprint rules R1–R4 fail | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0006` | ERROR | P | anchor/orientation policy is invalid | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel), adapter `McAnchors` |
+| `SC-BPT-0007` | ERROR | P | a computation plan is cyclic or has a missing/duplicate producer | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0008` | ERROR | P | a derivation order/output is invalid | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0009` | ERROR | P | a seam is outside every bay | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0010` | ERROR | P | a declared footprint is outside bounds | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-CHK-0001` | ERROR | T | a check pairs different subject types (the document path reports `SC-DOC-0002`) | structure | `Check` constructor |
+| `SC-CHK-0002` | ERROR | P | a check reads a derivation output | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-CHK-0003` | ERROR | P | a focus's static cells leave its bay | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-DOC-0001` | ERROR | P | unsupported schema version | document | `DocumentCompiler`, `StructureSetCompiler`, adapter `JsonReader`, `StructureSetReader` |
+| `SC-DOC-0002` | ERROR | P | a field is missing or of the wrong kind (ignored declarations and uncaught build refusals included) | document | `DocumentCompiler`, `StructureSetCompiler`, `BuiltinSupport`, adapter `JsonReader`, `StructureSetReader`, `JsonDocument`, `StructureSet.place`, `AdapterExpectations` |
+| `SC-DOC-0003` | ERROR | P | an unknown factory kind | document | `DocumentCompiler` |
+| `SC-DOC-0004` | ERROR | P | a duplicate id in a document | document | `DocumentCompiler`, adapter `StructureSet.place`, `StructureSetReader`, `DatapackBlueprints` |
+| `SC-DOC-0005` | ERROR | P | a placement leaves the root bounds or the lattice | document | `DocumentCompiler` |
+| `SC-DOC-0006` | ERROR | P | a check names no merged bay | document | `DocumentCompiler` |
+| `SC-DOC-0007` | ERROR | P | a spec names an undeclared key | document | `DocumentCompiler`, `BuiltinFocuses` (the context focus factory) |
+| `SC-DOC-0008` | ERROR | P | a key's declared type does not match its producer | document | `DocumentCompiler`, `BuiltinComputations` |
+| `SC-DOC-0009` | ERROR | P | a definition cycle | document | `DocumentCompiler` |
+| `SC-DOC-0010` | ERROR | P | two derivations share an output/order | document | `DocumentCompiler` |
+| `SC-DOC-0011` | ERROR | P | a placement or a set member names a missing definition | document | `DocumentCompiler`, `StructureSetCompiler` |
+| `SC-DOC-0012` | INFO | – | the reader produced no spans | document | adapter `JsonReader`, `StructureSetReader` |
+| `SC-DOC-0013` | ERROR | – | the reader failed to parse or format | document | adapter `JsonReader`, `DatapackBlueprints` |
+| `SC-DOC-0014` | ERROR | P | a declaration disagrees with the factory that produces it | document | `DocumentCompiler` |
+| `SC-CTX-0001` | ERROR | P | a computation produced no value | context | `MatchEngine` check |
+| `SC-CTX-0004` | ERROR | P | a derivation names a missing deriver | context | `MatchEngine` derive |
+| `SC-CTX-0005` | ERROR | P | a deriver produced no usable value (no value, wrong type, wrong output or a non-INSTANCE key; a deriver that throws is `SC-SPI-0001`) | context | `MatchEngine` derive |
+| `SC-CTX-0006` | ERROR | P | a fold has a refused section | context | `MatchEngine` check |
+| `SC-CTX-0007` | ERROR | P | a required key is absent | context | `Focuses.context`, `MatchEngine` check and derive |
+| `SC-ENG-0001` | ERROR | – | the budget ran out | engine | `MatchEngine` check |
+| `SC-ENG-0002` | WARNING | – | the snapshot is no longer current | engine | `MatchEngine` check and settle, adapter `StructureSetHost` |
+| `SC-ENG-0004` | ERROR | – | an internal plan invariant failed | engine | `MatchEngine` check and settle |
+| `SC-ENG-0005` | WARNING | – | the attempt was cancelled | engine | `MatchEngine` check |
+| `SC-DIA-0001` | WARNING | – | the bundle was truncated | finding | `FindingBundle` (only the builder mints it) |
+| `SC-RMD-0001` | ERROR | P | a remedy provider threw | remedy | `StructureKernel.solve` guard |
+| `SC-RMD-0002` | ERROR | P | a provider returned a malformed remedy | remedy | `StructureKernel.solve` |
+| `SC-SPI-0001` | ERROR | P | an extension threw or returned a malformed finding | spi | `MatchEngine` extension guard (check, derive, fold) |
+| `SC-SPI-0003` | ERROR | T | a catalog registration found a duplicate or a different value | spi | `Catalog.Builder.put` |
+| `SC-SET-0001` | ERROR | – | a required satellite is absent | adapter | `StructureSetHost` presence |
+| `SC-SET-0002` | ERROR | – | a satellite link distance is invalid | document | `StructureSetCompiler`, `StructureSetHost` link re-check |
+| `SC-SET-0003` | ERROR | – | a link cell is outside its blueprint or not covered by a check | document | `StructureSetCompiler`, `StructureSetHost` re-check |
+| `SC-SET-0004` | ERROR | – | satellite presence is unreadable | adapter | `StructureSetHost` presence |
+| `SC-SET-0005` | ERROR | – | duplicate satellite placement | document | `StructureSetCompiler`, adapter `StructureSet.place` |
+| `SC-SET-0006` | ERROR | – | duplicate parent face link | document | `StructureSetCompiler`, adapter `StructureSet.place` |
+| `SC-SET-0007` | ERROR | – | structure set rollback failed | adapter | `StructureSetHost` settle |
+| `SC-SET-0008` | ERROR | – | root/satellite placement collision | document | `StructureSetCompiler`, adapter `StructureSet.place`, `StructureSetHost` re-check |
+| `SC-MC-0006` | ERROR | P | a block property does not match | adapter | `property` expectation (mismatch) |
+| `SC-MC-0007` | ERROR | P | a block state does not match | adapter | `state` expectation (mismatch) |
+| `SC-MC-0008` | ERROR | P | a block/fluid/entity tag does not match | adapter | `tag` expectation (mismatch) |
+| `SC-MC-0009` | ERROR | P | a fluid does not match | adapter | `fluid` expectation (mismatch) |
+| `SC-MC-0010` | ERROR | P | a host snapshot value was not captured | adapter | host expectations (absent) and `McAnchors` (missing anchor state), always unreadable, never a mismatch |
+| `SC-MC-*` | — | — | adapter-only family; never minted by the kernel, never in `Codes.all`; the capture paths (`0001`–`0005`) relay through a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10), and the expectation paths (`0006`–`0010`) pass `SC-MC-0010` as the absent code of `Expectations.host` (`world` §4.11) | adapter | the adapter |
 
 `Codes.all` has 66 entries in this revision, matching the registry; the capture-report and host
 expectation channels add none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot
@@ -400,9 +408,9 @@ are mismatches and `0010` is the unreadable absent value (a missing anchor state
 the adapter catalog gives each its ERROR
 severity and explanation, and none enters `Codes.all`. A cut child is still reported by the check as
 `SC-OCC-0003` (`adapter` §8); the capture entry explains the cut, the check finding judges it, and
-neither channel suppresses the other. The producer rows stay as they are; where a producer refuses
-by exception (`structure` build, `engine` planning), the code rides on the rejection type —
-`BlueprintRejected`/`PlanRejected` carry the `CodeEntry` — and no caller parses a message (D-66).
+neither channel suppresses the other. Where a producer refuses by exception (`structure` build,
+`engine` planning), the code rides on the rejection type — `BlueprintRejected`/`PlanRejected` carry
+the `CodeEntry` — and no caller parses a message (D-66).
 
 ## 7. Tests
 
