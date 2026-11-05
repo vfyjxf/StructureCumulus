@@ -89,11 +89,8 @@ class CuboidSetOrderTest {
     @Test
     void firstCellIsTheSmallestCell() {
         CuboidSet columns = CuboidSet.of(Cuboid.of(2, 0, 2, 3, 1, 3), Cuboid.of(0, 1, 0, 1, 2, 2));
-        CuboidSet rows = CuboidSet.of(
-            Cuboid.of(0, 1, 0, 1, 2, 1),
-            Cuboid.of(0, 1, 1, 1, 2, 2),
-            Cuboid.of(2, 0, 2, 3, 1, 3)
-        );
+        CuboidSet rows = CuboidSet
+                .of(Cuboid.of(0, 1, 0, 1, 2, 1), Cuboid.of(0, 1, 1, 1, 2, 2), Cuboid.of(2, 0, 2, 3, 1, 3));
         LatticePoint smallest = LatticePoint.of(2, 0, 2);
         for (CuboidSet set : List.of(columns, rows)) {
             assertEquals(smallest, set.decomposition().get(0).min());
@@ -108,14 +105,9 @@ class CuboidSetOrderTest {
             int x = random.nextInt(8);
             int y = random.nextInt(8);
             int z = random.nextInt(8);
-            boxes.add(Cuboid.of(
-                x,
-                y,
-                z,
-                x + 1 + random.nextInt(3),
-                y + 1 + random.nextInt(3),
-                z + 1 + random.nextInt(3)
-            ));
+            boxes.add(
+                Cuboid.of(x, y, z, x + 1 + random.nextInt(3), y + 1 + random.nextInt(3), z + 1 + random.nextInt(3))
+            );
         }
         return CuboidSet.of(boxes);
     }

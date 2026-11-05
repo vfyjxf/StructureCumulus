@@ -280,9 +280,9 @@ final class CommandSupport {
         } catch (RuntimeException | StackOverflowError failure) {
             StructureCumulus.logger.error("/cumulus {} failed", verb, failure);
             String detail = failure.getMessage() == null ? "" : ": " + failure.getMessage();
-            context.getSource()
-                    .sendFailure(Component.literal(
-                        "cumulus " + verb + " failed: " + failure.getClass().getSimpleName() + detail));
+            context.getSource().sendFailure(
+                Component.literal("cumulus " + verb + " failed: " + failure.getClass().getSimpleName() + detail)
+            );
             return 0;
         }
     }

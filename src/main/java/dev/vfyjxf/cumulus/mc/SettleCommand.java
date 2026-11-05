@@ -83,8 +83,11 @@ final class SettleCommand {
                 );
                 MatchResult checked = kernel.check(request);
                 if (!(checked instanceof MatchResult.Admitted admitted)) {
-                    CommandSupport
-                            .printFindings(source, summary("check", blueprint.id(), origin, checked), checked.findings());
+                    CommandSupport.printFindings(
+                        source,
+                        summary("check", blueprint.id(), origin, checked),
+                        checked.findings()
+                    );
                     return checked;
                 }
                 settled = kernel.settle(request, admitted, draft);

@@ -35,44 +35,60 @@ public final class CumulusCommand {
     public static void register(RegisterCommandsEvent event) {
         event.getDispatcher()
                 .register(
-                    Commands.literal("cumulus")
-                            .requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                    Commands.literal("cumulus").requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                             .then(
-                                Commands.literal("check").then(
-                                    Commands.argument("id", ResourceLocationArgument.id()).then(
-                                        Commands.argument("origin", BlockPosArgument.blockPos())
-                                                .executes(context -> CommandSupport.guarded(context, "check", CumulusCommand::check))
-                                    )
-                                )
+                                Commands.literal("check")
+                                        .then(
+                                            Commands.argument("id", ResourceLocationArgument.id()).then(
+                                                Commands.argument("origin", BlockPosArgument.blockPos())
+                                                        .executes(
+                                                            context -> CommandSupport
+                                                                    .guarded(context, "check", CumulusCommand::check)
+                                                        )
+                                            )
+                                        )
                             )
                             .then(
                                 Commands.literal("settle")
                                         .then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(
                                                 Commands.argument("origin", BlockPosArgument.blockPos())
-                                                        .executes(context -> CommandSupport.guarded(context, "settle", SettleCommand::run))
+                                                        .executes(
+                                                            context -> CommandSupport
+                                                                    .guarded(context, "settle", SettleCommand::run)
+                                                        )
                                             )
                                         )
                             )
                             .then(
-                                Commands.literal("compile").then(
-                                    Commands.argument("id", ResourceLocationArgument.id())
-                                            .executes(context -> CommandSupport.guarded(context, "compile", CompileCommand::run))
-                                )
+                                Commands.literal("compile")
+                                        .then(
+                                            Commands.argument("id", ResourceLocationArgument.id())
+                                                    .executes(
+                                                        context -> CommandSupport
+                                                                .guarded(context, "compile", CompileCommand::run)
+                                                    )
+                                        )
                             )
                             .then(
-                                Commands.literal("explain").then(
-                                    Commands.argument("code", StringArgumentType.word())
-                                            .executes(context -> CommandSupport.guarded(context, "explain", ExplainCommand::run))
-                                )
+                                Commands.literal("explain")
+                                        .then(
+                                            Commands.argument("code", StringArgumentType.word()).executes(
+                                                context -> CommandSupport
+                                                        .guarded(context, "explain", ExplainCommand::run)
+                                            )
+                                        )
                             )
                             .then(
                                 Commands.literal("claims")
                                         .then(
-                                            Commands.argument("from", BlockPosArgument.blockPos()).then(
-                                                Commands.argument("to", BlockPosArgument.blockPos())
-                                                        .executes(context -> CommandSupport.guarded(context, "claims", ClaimsCommand::run))
-                                            )
+                                            Commands.argument("from", BlockPosArgument.blockPos())
+                                                    .then(
+                                                        Commands.argument("to", BlockPosArgument.blockPos()).executes(
+                                                            context -> CommandSupport
+                                                                    .guarded(context, "claims", ClaimsCommand::run)
+                                                        )
+                                                    )
                                         )
                             )
                             .then(
@@ -80,16 +96,20 @@ public final class CumulusCommand {
                                         .then(
                                             Commands.literal("check").then(
                                                 Commands.argument("id", ResourceLocationArgument.id()).then(
-                                                    Commands.argument("origin", BlockPosArgument.blockPos())
-                                                            .executes(context -> CommandSupport.guarded(context, "set check", SetCommand::check))
+                                                    Commands.argument("origin", BlockPosArgument.blockPos()).executes(
+                                                        context -> CommandSupport
+                                                                .guarded(context, "set check", SetCommand::check)
+                                                    )
                                                 )
                                             )
                                         )
                                         .then(
                                             Commands.literal("settle").then(
                                                 Commands.argument("id", ResourceLocationArgument.id()).then(
-                                                    Commands.argument("origin", BlockPosArgument.blockPos())
-                                                            .executes(context -> CommandSupport.guarded(context, "set settle", SetCommand::settle))
+                                                    Commands.argument("origin", BlockPosArgument.blockPos()).executes(
+                                                        context -> CommandSupport
+                                                                .guarded(context, "set settle", SetCommand::settle)
+                                                    )
                                                 )
                                             )
                                         )

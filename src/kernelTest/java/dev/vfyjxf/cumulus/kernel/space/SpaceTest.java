@@ -188,10 +188,8 @@ class SpaceTest {
 
     @Test
     void composeCountsANonZeroRootOffsetOnce() {
-        Siting root = Siting.of(
-            LatticePoint.of(10, 0, 0),
-            new Placement(Orientation.identity, LatticePoint.of(0, 1, 0))
-        );
+        Siting root = Siting
+                .of(LatticePoint.of(10, 0, 0), new Placement(Orientation.identity, LatticePoint.of(0, 1, 0)));
         Siting relative = Siting.of(LatticePoint.origin, Orientation.identity);
         Siting composed = root.compose(relative);
         assertNotNull(composed);
@@ -202,14 +200,9 @@ class SpaceTest {
     @Test
     void composeMatchesTheSequentialTransform() {
         Orientation quarter = Orientation.of(Turn.clockwise, Tilt.level, Flip.none);
-        Siting root = Siting.of(
-            LatticePoint.of(100, 64, -20),
-            new Placement(quarter, LatticePoint.of(2, -1, 3))
-        );
-        Siting relative = Siting.of(
-            LatticePoint.of(-4, 1, 7),
-            new Placement(Orientation.identity, LatticePoint.of(1, 0, -2))
-        );
+        Siting root = Siting.of(LatticePoint.of(100, 64, -20), new Placement(quarter, LatticePoint.of(2, -1, 3)));
+        Siting relative = Siting
+                .of(LatticePoint.of(-4, 1, 7), new Placement(Orientation.identity, LatticePoint.of(1, 0, -2)));
         Siting composed = root.compose(relative);
         assertNotNull(composed);
         for (LatticePoint local : List.of(
@@ -230,38 +223,22 @@ class SpaceTest {
             Siting a = randomSiting(random);
             Siting b = randomSiting(random);
             Siting c = randomSiting(random);
-            Siting left = Objects.requireNonNull(
-                Objects.requireNonNull(a.compose(b), "a∘b").compose(c),
-                "(a∘b)∘c"
-            );
-            Siting right = Objects.requireNonNull(
-                a.compose(Objects.requireNonNull(b.compose(c), "b∘c")),
-                "a∘(b∘c)"
-            );
+            Siting left = Objects.requireNonNull(Objects.requireNonNull(a.compose(b), "a∘b").compose(c), "(a∘b)∘c");
+            Siting right = Objects.requireNonNull(a.compose(Objects.requireNonNull(b.compose(c), "b∘c")), "a∘(b∘c)");
             assertEquals(left, right);
             for (int sample = 0; sample < 4; sample++) {
-                LatticePoint local = LatticePoint.of(
-                    random.nextInt(17) - 8,
-                    random.nextInt(17) - 8,
-                    random.nextInt(17) - 8
-                );
+                LatticePoint local = LatticePoint
+                        .of(random.nextInt(17) - 8, random.nextInt(17) - 8, random.nextInt(17) - 8);
                 assertEquals(left.toWorld(local), right.toWorld(local));
             }
         }
     }
 
     private static Siting randomSiting(Random random) {
-        LatticePoint origin = LatticePoint.of(
-            random.nextInt(129) - 64,
-            random.nextInt(65) - 32,
-            random.nextInt(129) - 64
-        );
+        LatticePoint origin = LatticePoint
+                .of(random.nextInt(129) - 64, random.nextInt(65) - 32, random.nextInt(129) - 64);
         Orientation orientation = Orientation.all().get(random.nextInt(48));
-        LatticePoint offset = LatticePoint.of(
-            random.nextInt(17) - 8,
-            random.nextInt(17) - 8,
-            random.nextInt(17) - 8
-        );
+        LatticePoint offset = LatticePoint.of(random.nextInt(17) - 8, random.nextInt(17) - 8, random.nextInt(17) - 8);
         return Siting.of(origin, new Placement(orientation, offset));
     }
 
