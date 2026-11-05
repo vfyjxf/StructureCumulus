@@ -1228,6 +1228,20 @@ were dead code.
 not a compile error; it matches nothing at match time. This is the one place a document names a
 registry object without resolving it.
 
+### D-70 — The set host documents the shape the code has
+
+`StructureSetHost` takes the manager it works against and one function that reserves a draft per
+spec. The module design shows both constructors, the `run(set, lease, owner, budget, drafts)`
+signature and a real call site; the instance-supplier sketch and the per-level instance expression
+are removed with it.
+
+**Why the function stays.** After D-40 the host owns instance creation, and rollback and commit
+verification target the manager the drafts came from. A test that needs to inject a failing draft
+wraps the same function; an instance supplier would force every caller through one fixed path.
+
+**What the second constructor buys.** Passing the manager explicitly turns a silent mismatch — a
+draft committed into another manager — into a verification step. It stays.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

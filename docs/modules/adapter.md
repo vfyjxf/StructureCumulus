@@ -899,7 +899,18 @@ and a range fan-in to one parent cell are legal.
 
 ### 13.4 Check all, settle all and rollback
 
-`StructureSetHost.run(set, lease, owner, budget, instances)` refuses a stale lease with
+The host's public shape (D-70):
+
+```java
+public final class StructureSetHost {
+    public StructureSetHost(StructureKernel kernel);
+    public StructureSetHost(StructureKernel kernel, StructureManager structures);
+    public StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner,
+                                  Budget budget, Function<StructureSpec, StructureAttempt> drafts);
+}
+```
+
+`StructureSetHost.run(set, lease, owner, budget, drafts)` refuses a stale lease with
 `SC-ENG-0002`, rejects a hand-built set whose satellite siting equals the root siting with
 `SC-SET-0008`, then runs the fixed order: presence, links, the root check, every present satellite
 check, then the root and the satellites in declaration order. Each check is one `MatchRequest` with
@@ -939,7 +950,17 @@ the lattice under its siting is dropped. The capture report prints through `Capt
 set summary. The lease is closed after the host run.
 
 The host then runs `StructureSetHost.check` or `StructureSetHost.run` with `Budget.unbounded()`, the
-server owner and `() -> state.instance(level)`. `check` is the same presence/link/check sequence and
+server owner and one drafts function that reserves each draft through the level's manager.
+`SetCommand` builds the call site:
+
+```java
+StructureSetHost host = new StructureSetHost(state.kernel(level));
+host.run(
+        plan, lease, state.owner(), Budget.unbounded(),
+        spec -> state.structures(level).begin(state.world(level), spec));
+```
+
+`check` is the same presence/link/check sequence and
 stops before the settle pass: no claim, no release, no rollback, empty `settled`/`claims`. The
 summary prints the set id and origin, the root and satellite outcomes (`admitted`/`not admitted` in
 plan order), `settled`, `rolledBack`, `rollbackFailures` count, per-structure claim row counts and

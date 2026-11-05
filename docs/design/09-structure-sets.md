@@ -546,10 +546,11 @@ record StructureSet(CompiledStructureSet compiled, Siting rootSiting, Cuboid roo
 
 final class StructureSetHost {
     StructureSetHost(StructureKernel kernel);
+    StructureSetHost(StructureKernel kernel, StructureManager structures);
     StructureSetResult check(StructureSet set, SnapshotLease lease, OwnerId owner,
-                             Budget budget, Supplier<InstanceId> instances);
+                             Budget budget, Function<StructureSpec, StructureAttempt> drafts);
     StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner,
-                           Budget budget, Supplier<InstanceId> instances);
+                           Budget budget, Function<StructureSpec, StructureAttempt> drafts);
 }
 
 record StructureSetResult(Map<NamespacedId, MatchOutcome> outcomes, List<Finding> setFindings,
@@ -562,13 +563,26 @@ record StructureSetResult(Map<NamespacedId, MatchOutcome> outcomes, List<Finding
 its world-space presence region; a mapping failure is `SC-SPC-0001`. A satellite whose composed
 siting equals the root siting is `SC-SET-0008`. The plan's structure keys are
 the root blueprint id and the satellite ids, so a satellite id equal to the root blueprint id is
-`SC-DOC-0004`. `StructureSetHost.run` takes the lease, owner, one budget and an instance supplier;
-the instances are allocated in check order root-first, and that one budget is shared by presence and
-every member attempt. `StructureSetHost.check` takes the same
+`SC-DOC-0004`. `StructureSetHost.run` takes the lease, owner, one budget and one function that
+reserves a draft per spec (D-70); the host calls it in check order root-first, and that one budget is
+shared by presence and every member attempt. `StructureSetHost.check` takes the same
 arguments, runs the same presence/link/check sequence and stops before the settle pass: it returns
 outcomes and set findings only, with empty `settled`, `rolledBack`, `rollbackFailures` and `claims`.
-The existing `run` signature is preserved. Rollback dispatches `StructureEvent.Broken` through the
+Rollback dispatches `StructureEvent.Broken` through the
 bound `StructureManager` for every formed attempt; it does not call `ContextStore.remove`.
+
+A caller binds the level's kernel and manager (D-70):
+
+```java
+StructureSetHost host = new StructureSetHost(state.kernel(level), state.structures(level));
+StructureSetResult result = host.run(
+        set,
+        lease,
+        state.owner(),
+        budget,
+        spec -> state.structures(level).begin(state.world(level), spec)
+);
+```
 
 ## 12. Document pipeline
 
