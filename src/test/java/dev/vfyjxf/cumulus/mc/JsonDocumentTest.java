@@ -1,7 +1,13 @@
 package dev.vfyjxf.cumulus.mc;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.Merges;
+import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
@@ -21,12 +27,17 @@ import dev.vfyjxf.cumulus.kernel.document.SeamSpec;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
+import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
+import dev.vfyjxf.cumulus.kernel.structure.AnchorSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
+import dev.vfyjxf.cumulus.kernel.structure.Computations;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
@@ -420,6 +431,176 @@ class JsonDocumentTest {
         assertEquals(NamespacedId.of("mymod", "campfire"), result.blueprint().id());
         assertEquals(3, result.blueprint().bays().size());
         assertEquals(3, result.blueprint().checks().size());
+    }
+
+    @Test
+    void anOmittedComputationIdDefaultsToTheOutput() {
+        Document document = read(campfireDocument);
+        ComputationSpec computation = document.root().computations().get(0);
+        assertEquals(computation.output(), computation.id(), "an omitted id defaults to the output");
+        assertNotNull(DocumentCompiler.compile(document, context()).blueprint());
+    }
+
+    @Test
+    void jsonAndBuilderProduceTheSameBlueprint() {
+        String apiCampfire = """
+                {
+                  "schemaVersion": 1,
+                  "id": "mymod:campfire",
+                  "bounds": [0, 0, 0, 3, 3, 3],
+                  "bays": [
+                    {"id": "mymod:shell", "boxes": [[0,0,0,3,3,3]], "minus": [[1,1,1,1,1,1], [1,0,1,1,1,1]],
+                     "coverage": "every_cell", "footprint": "box", "sharing": "exclusive"},
+                    {"id": "mymod:hollow", "box": [1,1,1,1,1,1], "coverage": "every_cell",
+                     "footprint": "box", "sharing": "exclusive"},
+                    {"id": "mymod:fire", "box": [1,0,1,1,1,1], "coverage": "every_cell",
+                     "footprint": "box", "sharing": "exclusive"}
+                  ],
+                  "checks": [
+                    {"id": "mymod:shell_bricks", "bay": "mymod:shell", "focus": {"kind": "bay"},
+                     "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone_bricks"}}},
+                    {"id": "mymod:hollow_air", "bay": "mymod:hollow", "focus": {"kind": "bay"},
+                     "expect": {"kind": "each_cell", "element": {"kind": "air"}}},
+                    {"id": "mymod:fire", "bay": "mymod:fire", "focus": {"kind": "occupant", "cell": [1,0,1]},
+                     "expect": {"kind": "block", "id": "minecraft:campfire"}}
+                  ],
+                  "computations": [
+                    {"kind": "air", "region": [[1,1,1,1,1,1]], "output": "mymod:air_cells"}
+                  ],
+                  "keys": [
+                    {"id": "mymod:air_cells", "type": "long", "retention": "instance", "merge": "sum"}
+                  ],
+                  "anchors": [{"role": "front", "property": "facing", "value": "north"}],
+                  "orientation": {"primary": "front",
+                    "allowed": ["identity", "clockwise", "half", "counterclockwise"], "upright": true}
+                }
+                """;
+        CompileResult campfireResult = DocumentCompiler.compile(read(apiCampfire), context());
+        assertTrue(campfireResult.findings().isEmpty(), () -> campfireResult.findings().findings().toString());
+        Blueprint compiledCampfire = campfireResult.blueprint();
+        assertNotNull(compiledCampfire);
+
+        CuboidSet shellCells = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(Cuboid.of(1, 1, 1, 2, 2, 2))
+                .subtract(Cuboid.of(1, 0, 1, 2, 1, 2));
+        CuboidSet hollowCells = CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2));
+        CuboidSet fireCells = CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2));
+        ContextKey<Long> airCells = ContextKeys
+                .of(NamespacedId.of("mymod", "air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        Blueprint javaCampfire = Blueprint.builder(NamespacedId.of("mymod", "campfire"))
+                .bounds(Cuboid.of(0, 0, 0, 3, 3, 3))
+                .check(
+                    Check.of(
+                        NamespacedId.of("mymod", "shell_bricks"),
+                        Bay.of(
+                            NamespacedId.of("mymod", "shell"),
+                            shellCells,
+                            Coverage.everyCell,
+                            Footprint.box(),
+                            Sharing.exclusive
+                        ),
+                        Focuses.bay(),
+                        Expectations.eachCell(Expectations.block(NamespacedId.of("minecraft", "stone_bricks")))
+                    )
+                )
+                .check(
+                    Check.of(
+                        NamespacedId.of("mymod", "hollow_air"),
+                        Bay.of(
+                            NamespacedId.of("mymod", "hollow"),
+                            hollowCells,
+                            Coverage.everyCell,
+                            Footprint.box(),
+                            Sharing.exclusive
+                        ),
+                        Focuses.bay(),
+                        Expectations.eachCell(Expectations.air())
+                    )
+                )
+                .check(
+                    Check.of(
+                        NamespacedId.of("mymod", "fire"),
+                        Bay.of(
+                            NamespacedId.of("mymod", "fire"),
+                            fireCells,
+                            Coverage.everyCell,
+                            Footprint.box(),
+                            Sharing.exclusive
+                        ),
+                        Focuses.occupant(LatticePoint.of(1, 0, 1)),
+                        Expectations.block(NamespacedId.of("minecraft", "campfire"))
+                    )
+                )
+                .computation(Computations.air(airCells, hollowCells))
+                .anchor(new AnchorSpec(NamespacedId.of("front"), "facing", "north"))
+                .orientation(
+                    OrientationPolicy.builder(NamespacedId.of("front"))
+                            .allow(
+                                Orientation.identity,
+                                Orientation.of(Turn.clockwise, Tilt.level, Flip.none),
+                                Orientation.of(Turn.half, Tilt.level, Flip.none),
+                                Orientation.of(Turn.counterclockwise, Tilt.level, Flip.none)
+                            )
+                            .uprightOnly()
+                            .build()
+                )
+                .build();
+        assertEquals(javaCampfire, compiledCampfire);
+
+        String counted = """
+                {"schemaVersion":1,"id":"test:computed","bounds":[0,0,0,2,1,1],
+                 "bays":[{"id":"test:cell","box":[0,0,0,2,1,1],"coverage":"every_cell",
+                          "footprint":"box","sharing":"shared"}],
+                 "checks":[{"id":"test:c","bay":"test:cell","focus":{"kind":"bay"},
+                            "expect":{"kind":"each_cell","element":{"kind":"air"}}}],
+                 "computations":[
+                   {"kind":"count","region":[[0,0,0,2,1,1]],"output":"test:bodies"},
+                   {"kind":"volume","region":[[0,0,0,2,1,1]],"output":"test:volume"}],
+                 "keys":[
+                   {"id":"test:bodies","type":"long","retention":"instance","merge":"sum"},
+                   {"id":"test:volume","type":"long","retention":"instance","merge":"sum"}]}
+                """;
+        CompileResult countedResult = DocumentCompiler.compile(read(counted), context());
+        assertTrue(countedResult.findings().isEmpty(), () -> countedResult.findings().findings().toString());
+        Blueprint compiledCounted = countedResult.blueprint();
+        assertNotNull(compiledCounted);
+
+        CuboidSet region = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
+        ContextKey<Long> bodies = ContextKeys
+                .of(NamespacedId.of("test", "bodies"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> volume = ContextKeys
+                .of(NamespacedId.of("test", "volume"), Long.class, Retention.instance, Merges.sum(), null);
+        Blueprint javaCounted = Blueprint.builder(NamespacedId.of("test", "computed"))
+                .bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
+                .check(
+                    Check.of(
+                        NamespacedId.of("test", "c"),
+                        Bay.of(
+                            NamespacedId.of("test", "cell"),
+                            region,
+                            Coverage.everyCell,
+                            Footprint.box(),
+                            Sharing.shared
+                        ),
+                        Focuses.bay(),
+                        Expectations.eachCell(Expectations.air())
+                    )
+                )
+                .computation(Computations.count(bodies, region))
+                .computation(Computations.volume(volume, region))
+                .build();
+        assertEquals(javaCounted, compiledCounted);
+    }
+
+    @Test
+    void theWriterOmitsTheDerivedId() {
+        Document document = read(campfireDocument);
+        String text = new JsonWriter().write(document);
+        JsonObject written = JsonParser.parseString(text).getAsJsonObject();
+        for (JsonElement element : written.getAsJsonArray("computations")) {
+            assertFalse(element.getAsJsonObject().has("id"), "the derived id is not written");
+        }
+        Document back = read(text);
+        assertEquals(withoutSpans(document), withoutSpans(back));
     }
 
     @Test

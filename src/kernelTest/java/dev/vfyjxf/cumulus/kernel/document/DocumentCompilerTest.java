@@ -3,22 +3,30 @@ package dev.vfyjxf.cumulus.kernel.document;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.context.Merges;
+import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.Value;
+import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
+import dev.vfyjxf.cumulus.kernel.structure.AggregateComputation;
+import dev.vfyjxf.cumulus.kernel.structure.AggregateContext;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
+import dev.vfyjxf.cumulus.kernel.structure.Computation;
+import dev.vfyjxf.cumulus.kernel.structure.ComputationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.Computations;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
+import dev.vfyjxf.cumulus.kernel.structure.FactoryContext;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import org.junit.jupiter.api.Test;
 
@@ -514,5 +522,213 @@ class DocumentCompilerTest {
         Blueprint blueprint = result.blueprint();
         assertNotNull(blueprint);
         assertEquals(Set.of(energy), blueprint.reads().traits());
+    }
+
+    @Test
+    void aQualifiedKindNeverFallsBack() {
+        CompileResult result = DocumentCompiler.compile(expectationDocument(NamespacedId.of("mymod", "air")), context());
+        assertNull(result.blueprint());
+        assertFalse(
+            result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 3)).isEmpty(),
+            () -> result.findings().findings().toString()
+        );
+    }
+
+    @Test
+    void aQualifiedGrammarKindIsNotBuiltin() {
+        CompileResult result = DocumentCompiler
+                .compile(expectationDocument(NamespacedId.of("mymod", "each_cell")), context());
+        assertNull(result.blueprint());
+        assertFalse(
+            result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 3)).isEmpty(),
+            () -> result.findings().findings().toString()
+        );
+    }
+
+    @Test
+    void aQualifiedMergeIsUnknown() {
+        BlueprintSpec root = new BlueprintSpec(
+            id("bad_merge"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(
+                new KeySpec(id("total"), "long", Retention.instance, NamespacedId.of("mymod", "sum"), null, null)
+            ),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 8));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("unknown merge"), () -> found.get(0).message());
+    }
+
+    @Test
+    void aComputationIdThatDiffersFromItsOutputIsRejected() {
+        BlueprintSpec root = new BlueprintSpec(
+            id("mismatched"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(
+                new ComputationSpec(
+                    id("a"),
+                    kind("air"),
+                    Value.object(),
+                    CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+                    null,
+                    id("b"),
+                    Set.of(),
+                    null
+                )
+            ),
+            List.of(new KeySpec(id("b"), "long", Retention.instance, NamespacedId.of("sum"), null, null)),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        assertEquals(
+            1,
+            result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 14)).size(),
+            () -> result.findings().findings().toString()
+        );
+    }
+
+    @Test
+    void aComputationWithDifferentInputsIsRejected() {
+        ContextKey<Long> input = ContextKeys.of(id("in"), Long.class, Retention.instance);
+        Catalog<ComputationFactory> factories = Catalog.<ComputationFactory>builder(NamespacedId.of("test", "computations"))
+                .put(id("gather"), gatheringFactory(input))
+                .build();
+        Catalogs builtin = Catalogs.builtin();
+        CompilerContext context = new CompilerContext(
+            builtin.focuses(),
+            builtin.expectations(),
+            factories,
+            Map.of(),
+            DocumentSource.empty()
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("undeclared_inputs"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(
+                new ComputationSpec(
+                    id("out"),
+                    id("gather"),
+                    Value.object(),
+                    CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+                    null,
+                    id("out"),
+                    Set.of(),
+                    null
+                )
+            ),
+            List.of(new KeySpec(id("out"), "long", Retention.instance, null, null, null)),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context);
+        assertNull(result.blueprint());
+        assertEquals(
+            1,
+            result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 14)).size(),
+            () -> result.findings().findings().toString()
+        );
+    }
+
+    private static Document expectationDocument(NamespacedId expectationKind) {
+        CuboidSet cell = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        BlueprintSpec root = new BlueprintSpec(
+            id("qualified_kind"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            Value.object(),
+            List.of(new BaySpec(id("cell"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(),
+            List.of(
+                new CheckSpec(
+                    id("c"),
+                    id("cell"),
+                    kind("bay"),
+                    Value.object(),
+                    expectationKind,
+                    Value.object(),
+                    null,
+                    null
+                )
+            ),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        return new Document(1, root, Map.of(), Map.of());
+    }
+
+    private static ComputationFactory gatheringFactory(ContextKey<Long> input) {
+        return new ComputationFactory() {
+            @Override
+            public NamespacedId id() {
+                return DocumentCompilerTest.id("gather");
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public Computation<?> create(Value args, ContextKey<?> output, CuboidSet region, FactoryContext context) {
+                ContextKey<Long> typed = (ContextKey<Long>) output;
+                return new AggregateComputation<Long>() {
+                    @Override
+                    public ContextKey<Long> output() {
+                        return typed;
+                    }
+
+                    @Override
+                    public Set<ContextKey<?>> inputs() {
+                        return Set.of(input);
+                    }
+
+                    @Override
+                    public CuboidSet region() {
+                        return region;
+                    }
+
+                    @Override
+                    public Outcome<Long> compute(AggregateContext ctx) {
+                        return Outcome.missing();
+                    }
+                };
+            }
+        };
     }
 }
