@@ -268,10 +268,11 @@ negated offset leaves the lattice. The inverse law holds when both are non-null:
 the inverse. A local delta must be oriented before it is added to a world point: `toWorld` is affine,
 not linear.
 
-`Siting.compose(relative)` places a relative siting in this siting's frame:
-`origin = toWorld(relative.origin())` and `placement = placement().compose(relative.placement())`, so
-the relative origin is a cell in this siting's local frame. It returns `null` when the origin image or
-the placement composition leaves the lattice.
+`Siting.compose(relative)` places a relative siting in this siting's frame: the result is
+`(origin_P, (o_P∘o_R, o_P(t_R)))` with `origin_P = toWorld(relative.origin())` and the placement
+composed from a rotation-only copy of this placement, so this siting's offset appears once, inside
+the origin. It returns `null` when the origin image or the placement composition leaves the
+lattice.
 
 ### 4.6 SectionKey
 

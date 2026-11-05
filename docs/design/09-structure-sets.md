@@ -222,12 +222,15 @@ Its absolute siting is:
 Siting satelliteSiting = rootSiting.compose(relative);
 ```
 
-`Siting.compose` is a new convenience over the existing `Placement.compose`:
+`Siting.compose` is a convenience over the existing `Placement.compose`:
 
 ```text
 origin = root.toWorld(relative.origin)
-placement = root.placement().compose(relative.placement())
+placement = (o_root ∘ o_relative, o_root(t_relative))
 ```
+
+The placement is composed from a rotation-only copy of the root placement, so the root offset
+appears once, inside the origin.
 
 - `at` is an origin in the root local frame;
 - `orientation` is relative to the root;

@@ -1148,6 +1148,25 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-49 — Composing a siting applies the root offset once
+
+`Siting#toWorld(p)` is `origin + orientation(p) + offset`. Composing a satellite onto a root must
+place it exactly where `root.toWorld(satellite.toWorld(p))` puts it.
+
+The old `compose` counted the root offset twice: `origin` already carried it through `toWorld`, and
+`Placement#compose` carried it again into the composed placement, so the result was `+2·t_root`.
+
+The fix keeps `origin = toWorld(relative.origin)` and composes the placement from a rotation-only
+root placement, giving `(origin_P, (o_P∘o_R, o_P(t_R)))` — one copy of the root offset, the one
+inside `origin`.
+
+`Placement#compose` is unchanged: it composes two transforms, and a transform includes its own
+offset. A non-zero placement offset stays legal for a host.
+
+Nothing observable changes while every siting is built by `Siting.of(origin, orientation)`, whose
+placement offset is zero; the defect is fixed in the kernel because a host can construct the other
+form.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
