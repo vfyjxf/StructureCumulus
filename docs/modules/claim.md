@@ -154,6 +154,9 @@ rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
   its rows never outlive their instances (D-44). The whole-instance granularity is the contract: there
   is no per-bay or per-row release; duplicate rows are a representation detail and are not
   independently releasable.
+- Because a settle compare-and-set replaces the whole of one instance's rows, `release` after a
+  `Formed` removes exactly the rows that settle wrote; it is the rollback companion of `settle`, not
+  a destructive clean-up.
 - All rows of a `SettleRequest` must name the request's `instance`; a mismatch is a programmer error
   (`IllegalArgumentException`) because the planner is the only source. A ledger may additionally
   refuse a row whose `sharing`/`bay` is inconsistent; that is `Conflict`/`SC-CLM-0004`, not an

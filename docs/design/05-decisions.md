@@ -959,7 +959,8 @@ context to the instance removes the map/serial/eviction side table; the host alr
 structure is formed, moved or gone.
 
 **Consequence:** `ContextStore` remains the narrow publish/read interface implemented by the manager
-and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` has an attempt overload.
+and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` takes a
+`StructureAttempt`.
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
 `AdversarialManagerTest`, `StructureLifecycleGameTest` and
 `StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0).
@@ -996,6 +997,48 @@ contract costs one paragraph and keeps the real API object for addons.
 `04-api` §4 keeps its `getStackInSlot` example and notes that the value is live; `10-host-data` §2-§4
 and `adapter` §8 rename the entity host read to `HostTypes.entityType`.
 
+### D-42 — Settle is a prepare step with exactly one fallible write
+
+`settle` validates everything it can before it writes, performs exactly one ledger compare-and-set,
+and leaves nothing that can fail after it.
+
+**The target.** The only legitimate publish target is the `StructureAttempt` that reserved the
+instance; `settle` takes it by type and a bare `ContextStore` is no longer an accepted argument. A
+closed attempt, an attempt of another `InstanceId`, and an attempt whose `StructureSpec` (owner,
+siting, structure) differs from the request are each `Undecided(designDefect)` with no write.
+
+**The write.** Exactly one `ClaimLedger.settle` per settle, including the zero-row case, which now
+replaces the `(owner, siting)` key with an empty row set instead of leaving a previous instance's
+rows behind. Every check that can fail runs before it: attempt validity, lease currency, `Admitted`
+belonging, bindings, the planner, and the publishable value set (already type-checked and non-null by
+construction). After the compare-and-set the kernel has no failing step: publishing into an open
+attempt cannot throw.
+
+**The protocol.** `settle` prepares (rows written, context staged in the attempt), `commit` forms,
+`release(instance)` plus `abort` rolls back. Because the compare-and-set replaces one instance's rows,
+`release` after a `Formed` removes exactly the rows the settle wrote: it is exact compensation, not a
+destructive one. A host that forms a set settles every member first, commits them together, and rolls
+back with that compensation.
+
+**Rejected.** Folding `commit` into `settle`: the set host needs the prepare/commit gap for its own
+rollback (`StructureSetHost` settles every member, then commits, then restores claims). A single
+`form(instanceId, rows, values)` port: it moves the same ordering decision into the host without
+adding atomicity, and the two stores have different lifetimes — the ledger is per-world and
+persisted, the context is per-instance and in memory. A `Prepared` handle that forces commit-or-
+release: it would make a result a resource, which `engine` §7 forbids.
+
+**Why:** two writes with no transaction cannot be made atomic by catching exceptions, because a
+ledger write is not undoable without knowing what it replaced. Ordering plus a total tail gives the
+same guarantee with no rollback path.
+
+**Consequence:** the two-argument `settle` is deleted; `StructureKernel.settle` and
+`MatchEngine.settle` take a `StructureAttempt`; `StructureAttempt` gains `isOpen()`; `04-api` §3
+shows `begin` / `settle` / `commit`; `engine` §5, `spi` §4.3, `12` §6, `02-model` §2/§5 and
+`context` §4.2.1 state the protocol; `claim` §4.5 states the compensation.
+
+**Host contracts:** a `ClaimLedger.settle` that throws is a host contract violation and its row state
+is undefined; so is a `StructureAttempt` whose `publish` or `commit` throws while `isOpen()` is true.
+
 ### D-44 — Claims are session-scoped
 
 A claim ledger lives exactly as long as the structure instances that own its rows: the adapter persists
@@ -1019,7 +1062,7 @@ that also wants durable claims re-settles its restored instances and the planner
 **A move is a removal.** With the instance as the key there is no second identity to reconcile when a
 structure is pushed: the adapter invalidates it and releases its rows, and a rebuild is a fresh settle.
 
-> Numbering note: D-42, D-43 and D-46 are still proposals carried by
+> Numbering note: D-43 and D-46 are still proposals carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; they enter this file when their code lands.
 
 ## 3. Consequences a reviewer should attack

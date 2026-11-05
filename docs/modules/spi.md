@@ -66,7 +66,8 @@ public final class StructureKernel {
 
     public CompileResult compile(Document document);
     public MatchResult check(MatchRequest request);
-    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted);
+    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted,
+                              StructureAttempt attempt);
     public StructureContext derive(MatchResult.Formed formed,
                                    java.util.List<DerivationSpec> derivations);
     public SolveResult solve(FindingBundle findings, RemedyContext context);
@@ -122,8 +123,11 @@ created without a host can compile and check, but `settle` with claimable rows i
   host's documents, then calls `DocumentCompiler.compile`. It never throws for bad data.
 - **`check(request)`** calls `MatchEngine.check`. The request carries its own frozen `ClaimView`; the
   facade's ledger is not read.
-- **`settle(request, admitted)`** calls `MatchEngine.settle` with the host's ledger and context
-  store. It takes the admitted result as a value; there is no lease transfer and no `close`.
+- **`settle(request, admitted, attempt)`** calls `MatchEngine.settle` with the host's ledger and the
+  attempt that reserved the instance. The attempt is the only accepted publish target: a closed
+  attempt, a foreign `InstanceId` and a mismatched `StructureSpec` are each `Undecided(designDefect)`
+  and write nothing. It takes the admitted result as a value; there is no lease transfer and no
+  `close`.
 - **`derive(formed, derivations)`** calls `MatchEngine.derive` with the derivers catalog and the
   host's context store.
 - **`solve(findings, context)`** iterates the remedy catalog by id, calls each provider once per
@@ -178,7 +182,11 @@ found a duplicate/different entry; `Catalogs.Builder.build`). A document naming 
 - `builtin()` resolves the leaf/grammar kinds; a custom factory added by a builder wins only for its
   own id; a duplicate throws.
 - `Host.empty()`: compile/check work; settle with claims is `Undecided`; settle without claims is
-  `Formed`.
+  `Formed` through an attempt.
+- The attempt is the only publish target: a closed attempt, a foreign instance id and a mismatched
+  spec are each `Undecided(designDefect)` with an unmoved ledger.
+- A zero-row settle with a ledger clears the key and bumps the revision; `Formed` then carries the
+  bumped revision.
 - Facade: each operation's absent/error path; `explain` null vs fallback; `solve` cap/order.
 - Two kernels over two catalogs do not share state; a late builder mutation does not change a built
   kernel.

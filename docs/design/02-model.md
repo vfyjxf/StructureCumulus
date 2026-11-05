@@ -61,7 +61,7 @@ MatchRequest(blueprint, siting, lease, instance, owner, budget, claims)
    │    → claim prediction against the frozen ClaimView
    │    → Admitted | Failed | Undecided | Dropped        (writes nothing)
    │
-   ├─ SETTLE       engine.settle(request, admitted)
+   ├─ SETTLE       engine.settle(request, admitted, attempt)
    │    gate → validate bindings → derive rows → one CAS → publish instance values
    │    → Formed | Failed | Undecided | Dropped          (the only writer)
    │
@@ -111,16 +111,22 @@ not a scheduling unit and not declared by a blueprint.
 
 ## 5. The settle pipeline
 
-1. Gate.
-2. Validate every binding: the bay is this blueprint's; every subject was minted under this
+1. Validate the attempt: open, this instance, and the same `(owner, siting, structure)` as the
+   request; any mismatch is `Undecided(designDefect)` and nothing is written.
+2. Gate.
+3. Validate every binding: the bay is this blueprint's; every subject was minted under this
    snapshot; the subjects' footprints lie inside the bay (equal for `oneSubject`); an `exclusive`
    `Bound` bay bound at least one non-air cell.
-3. Derive rows with `ClaimPlanner`; the caller supplied none.
-4. `ClaimLedger.settle(SettleRequest)` at the revision the check read.
-5. `RevisionMoved` → re-read the same box, re-run the matrix, retry once at the new revision.
-6. `Conflict` → `Failed` with the incumbent rows. `Moved` twice → `Undecided(ledgerMoved)`.
-7. `Settled` → publish the `instance` values to the `ContextStore` at `revision + 1`, then return
-   `Formed` carrying the `ClaimSet`, `contextRevision` and `ledgerRevision`.
+4. Derive rows with `ClaimPlanner`; the caller supplied none.
+5. `ClaimLedger.settle(SettleRequest)` once, at the revision the check read, even when the row set is
+   empty — an empty set clears the key.
+6. `RevisionMoved` → re-read the same box, re-run the matrix, retry once at the new revision; an
+   empty row set retries without a matrix. `Conflict` → `Failed` with the incumbent rows. Moved twice
+   → `Undecided(ledgerMoved)`.
+7. `Settled` → publish the `instance` values into the attempt at `revision + 1`, then return `Formed`
+   carrying the `ClaimSet`, `contextRevision` and `ledgerRevision`. Nothing after the compare-and-set
+   can fail: a `ClaimLedger.settle` that throws is a host contract violation and its row state is
+   undefined; so is a `StructureAttempt` whose `publish` or `commit` throws while `isOpen()` is true.
 
 ## 6. The value algebra
 

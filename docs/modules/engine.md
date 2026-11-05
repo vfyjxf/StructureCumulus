@@ -153,33 +153,44 @@ of §7.7 is what both aggregates and checks read.
 ## 5. The settle algorithm
 
 ```
-settle(request, admitted, ledger, contexts):
-  if !request.lease().isCurrent()                      -> Dropped(settle) + SC-ENG-0002
-  if admitted.phase() != check                          -> Undecided(designDefect)
+settle(request, admitted, ledger, attempt):
+  // ---- before the write: everything that can fail ----
+  if !attempt.isOpen()                                -> Undecided(designDefect)
+  if attempt.id() != request.instance()               -> Undecided(designDefect)
+  if attempt.spec() != (owner, siting, structure)     -> Undecided(designDefect)
+  if admitted.phase() != check or not this request    -> Undecided(designDefect)
+  if !request.lease().isCurrent()                     -> Dropped(settle) + SC-ENG-0002
   bindings = admitted.outcome().bindings()
-  validate(bindings)                                    // blueprint, snapshot, root frame, cells, no nested, oneSubject
+  validate(bindings)                                  // blueprint, snapshot, root frame, cells, no nested, oneSubject
       failure -> Failed(SC-CLM-0004)
-  rows = ClaimPlanner.derive(blueprint, siting, owner, bindings)
-  if rows.isEmpty():
-      context = contexts.publish(instance, instanceValues, findings, spend)
-      return Formed(settle, instance, siting, outcome, new ClaimSet([], ledger == null ? 0 : ledger.revision()),
-                    context.revision(), ledger == null ? 0 : ledger.revision(), findings)
-  if ledger == null                                     -> Undecided(ledgerUnavailable)
-  verdict = ledger.settle(new SettleRequest(owner, siting, rows, admitted.ledgerRevision()))
-  if RevisionMoved:
-      fresh = ledger.read(derived.footprint())
-      if !fresh.available()                             -> Undecided(ledgerUnavailable)
-      if matrix(rows, fresh.rows()) conflict            -> Failed(SC-CLM-0001)
-      verdict = ledger.settle(new SettleRequest(owner, siting, rows, fresh.revision()))
-      if RevisionMoved                                  -> Undecided(ledgerMoved)
-  if Conflict                                           -> Failed(SC-CLM-0001) with incumbents
-  Settled:
-      context = contexts.publish(instance, instanceValues, findings, spend)
-      return Formed(settle, instance, siting, outcome, new ClaimSet(rows, settled.revision()),
-                    context.revision(), settled.revision(), findings)
+  derived = ClaimPlanner.derive(blueprint, siting, instance, bindings)
+      failure -> Failed(plannerFailure)
+
+  // ---- the one fallible write ----
+  if ledger == null:
+      if !derived.rows().isEmpty()                    -> Undecided(ledgerUnavailable)
+      else: revision = 0                              // no ledger and zero rows: Formed
+  else:
+      verdict = ledger.settle(new SettleRequest(request.instance(), derived.rows(),
+                                                admitted.ledgerRevision()))
+      if RevisionMoved:
+          empty row set: retry once at ledger.revision(); there is no matrix to run
+          non-empty: fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
+              matrix(rows, fresh.rows()) conflict -> Failed(SC-CLM-0001); retry once at fresh.revision()
+          moved twice                                 -> Undecided(ledgerMoved)
+      if Conflict                                     -> Failed(SC-CLM-0001) with incumbents
+      revision = settled.revision()
+
+  // ---- after the write: total, no throw point ----
+  context = attempt.publish(instance, instanceValues, findings, spend)
+  return Formed(settle, instance, siting, outcome, new ClaimSet(derived.rows(), revision),
+                context.revision(), revision, findings)
 ```
 
-`settle` is the only writer. It closes nothing; a lease is host-owned.
+`settle` is the only writer. It closes nothing; a lease is host-owned. The compare-and-set is the
+only step that can fail; every step after it is total for an open attempt, so there is no rollback
+path. A `ClaimLedger.settle` that throws, or an attempt whose `publish` throws while `isOpen()` is
+true, is a host contract violation.
 
 ## 6. The derive algorithm
 

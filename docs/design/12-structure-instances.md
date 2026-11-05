@@ -195,8 +195,9 @@ no instance id survives the session.
 
 - `Host.contexts()` becomes `Host.structures()` (a `StructureManager`); the manager implements
   `ContextStore` for engine calls.
-- `StructureKernel.settle(request, admitted)` keeps using the host manager for formed instances;
-  a new `settle(request, admitted, StructureAttempt)` overload publishes the draft.
+- `StructureKernel.settle(request, admitted, attempt)` is the only settle form; the two-argument
+  overload is deleted. The attempt is the publish target, and a closed or foreign attempt is
+  `Undecided(designDefect)` before the ledger is touched.
 - `StructureKernel.derive(formed, derivations)` reads the context store supplied by the host; a caller
   that formed the instance through a non-host manager must derive against that manager.
 - The adapter's `ServerState` owns one `StructureManager` per level; `SetCommand` and

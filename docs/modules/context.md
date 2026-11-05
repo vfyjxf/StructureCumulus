@@ -171,8 +171,11 @@ draft the same way.
 is independent, and a formed instance at the tuple in the same world may be replaced by a later
 `commit`. `find(World, owner, siting)` is the unambiguous lookup; the two-argument `find` answers the
 tuple only when exactly one world holds it and throws on ambiguity. The settle pass publishes into
-the attempt. `commit(bounds)` forms the `StructureInstance`; `abort` discards the draft; `remove` on
-the draft closes it as above. The manager stores the world-frame `bounds` only for lifecycle lookup
+the attempt. Only an open attempt accepts it: a closed attempt is `Undecided(designDefect)` before
+the ledger is touched. `commit(bounds)` forms the `StructureInstance`; `abort` discards the draft;
+`remove` on the draft closes it as above. `release(instance)` plus `abort` is the rollback of a
+settled attempt, and it is exact — the settle compare-and-set replaced that instance's rows, so
+`release` removes exactly the rows that settle wrote. The manager stores the world-frame `bounds` only for lifecycle lookup
 (`findAt`/`findIn`); it does not interpret them. `findAt`, `findIn` and `instances` are
 registry-wide: they take no `World` and see every world held by the manager. `find(World, owner,
 siting)` is the world-qualified tuple lookup; the adapter's one-manager-per-level layout makes the

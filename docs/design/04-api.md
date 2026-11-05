@@ -82,18 +82,28 @@ WorldCapture capture = new MyCapture(level);              // host implementation
 CaptureResult result = capture.capture(new CaptureRequest(bounds, SnapshotPolicy.minimal()));
 if (result instanceof CaptureResult.Captured captured) {
     try (SnapshotLease lease = captured.lease()) {
-        MatchRequest request = MatchRequest.of(campfire, siting, lease, instance, owner,
+        StructureAttempt attempt = structures.begin(level, spec);
+        MatchRequest request = MatchRequest.of(campfire, siting, lease, attempt.id(), owner,
                 Budget.of(4096, 64), claims);
         MatchResult checked = kernel.check(request);
         if (checked instanceof MatchResult.Admitted admitted) {
-            MatchResult settled = kernel.settle(request, admitted);
+            MatchResult settled = kernel.settle(request, admitted, attempt);
             if (settled instanceof MatchResult.Formed formed) {
+                attempt.commit(bounds);                 // the host's world-frame cells
                 StructureContext values = kernel.derive(formed, campfire.derivations());
+            } else {
+                attempt.abort();
             }
+        } else {
+            attempt.abort();
         }
     }
 }
 ```
+
+A settle prepares: the claims are written and the values are staged in the attempt. `commit` forms
+the instance; a failed settle is rolled back with `abort`, and a `Formed` that is not wanted is
+rolled back with `ledger.release(instance)` before `abort`.
 
 The host owns the lease. The kernel never closes it, never retains it and never hands a child
 handle back. A result is a pure value; a lease is a resource the host scopes. An anchored blueprint
@@ -361,7 +371,7 @@ public final class StructureKernel {
 
     public CompileResult compile(Document document);
     public MatchResult check(MatchRequest request);
-    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted);
+    public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted, StructureAttempt attempt);
     public StructureContext derive(MatchResult.Formed formed, List<DerivationSpec> derivations);
     public SolveResult solve(FindingBundle findings, RemedyContext context);
     public @Nullable Explanation explain(FindingCode code);
@@ -369,8 +379,8 @@ public final class StructureKernel {
 }
 ```
 
-Four pipeline operations, three helpers, four lookups. `settle` takes only the request and the
-admitted result; it finds its ledger in the kernel's `Host`. `structures()` exposes the same host's manager; `contexts()` is its narrow engine port;
+Four pipeline operations, three helpers, four lookups. `settle` takes the request, the admitted
+result and the attempt that reserved the instance; it finds its ledger in the kernel's `Host`. `structures()` exposes the same host's manager; `contexts()` is its narrow engine port;
 per-instance store so a host can remove a rolled-back set member's context (D-35). `create(catalogs)`
 is the no-host form for compile-only use; `check` with a lease works, `settle` reports
 `Undecided(ledgerUnavailable)`.
