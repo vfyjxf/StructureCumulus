@@ -1,0 +1,17 @@
+blueprint 1642978994894412296
+finding settle SC-CTX-0004 no deriver is registered as determinism:ghost
+finding settle SC-CTX-0005 deriver determinism:crossed produces determinism:capacity, not determinism:declared_output
+claim (0,0,0) test:overworld#1 determinism:base_bay exclusive
+claim (1,0,0) test:overworld#1 determinism:base_bay exclusive
+claim (2,0,0) test:overworld#1 determinism:base_bay exclusive
+claim (0,0,1) test:overworld#1 determinism:base_bay exclusive
+claim (1,0,1) test:overworld#1 determinism:base_bay exclusive
+claim (2,0,1) test:overworld#1 determinism:base_bay exclusive
+claim (0,0,2) test:overworld#1 determinism:base_bay exclusive
+claim (1,0,2) test:overworld#1 determinism:base_bay exclusive
+claim (2,0,2) test:overworld#1 determinism:base_bay exclusive
+claim (2,1,0) test:overworld#1 determinism:pen_bay exclusive
+claim (1,1,1) test:overworld#1 determinism:base_bay exclusive
+context determinism:air_cells Long
+context determinism:capacity Long
+frame 0 (0,0,0)
