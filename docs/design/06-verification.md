@@ -10,7 +10,7 @@
 | **Compile** | `javac --release 21` over `src/kernel/java` with JSpecify only | every public signature in the module files exists and compiles |
 | **Purity** | `kernelPurity` text scan + no Minecraft on the kernel classpath | no `net.minecraft`, `net.neoforged`, `com.mojang` under `kernel.**` |
 | **Tests** | JUnit 5 over `src/kernelTest/java` | every test in §3 passes; no `@Disabled` |
-| **Spec index** | `tools/spec-check.py` | every documented public type and `SC-` code has a producer; no extra public type |
+| **Spec index** | `tools/spec-check.py` (name level, kernel + adapter) and `SpecIndexTest` / `AdapterIndexTest` (member level) | every documented public type and `SC-` code has a producer; no extra public type; every documented member matches the code and vice versa — the kernel wholesale, the adapter in batches whose uncovered list (`tools/spec-uncovered.txt`) only shrinks (D-74) |
 | **No stubs** | grep | no `TODO`, `FIXME`, `UnsupportedOperationException`, empty public method body |
 | **Determinism** | `determinismCheck` (three JVM processes vs `tools/golden/determinism.txt`) | one fixed scenario renders the same canonical text in three separate JVMs, equal to the golden file |
 
@@ -81,8 +81,16 @@ cannot express the pose is still `SC-MC-0004` in the capture report; a missing v
 `SC-MC-0010`, never a mismatch. The snapshot adds no kernel type beyond `HostType` and
 `WorldView.get`, so the spec index is unaffected.
 
-**Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
-in code documented; it is green. There is no documented-but-not-in-code list and no suppression.
+**Spec index.** Two layers. `tools/spec-check.py` (wired into `./gradlew check` as `specCheck`) is
+the name-level gate: every documented type present in code, every code type documented, every code
+`SC-` code produced, and — for the adapter — every public top-level type either documented in
+`adapter.md` §15 or listed with a reason in `tools/spec-uncovered.txt`, where the gate fails on a
+stale or doubly-registered line so the list only shrinks (D-74). The member-level gate runs in
+`kernelTest`: `SpecIndexTest` compares every kernel module's `## 3. Signatures` block with the
+compiled kernel through reflection (arity, parameter and return type names, `@Nullable` positions),
+and `AdapterIndexTest` compares the documented adapter batch with the sources under
+`src/main/java`. The kernel side has no list and no suppression; the adapter list is batch debt, not
+suppression, and batch 1 (set host, snapshot pair, host tokens, document family) is documented.
 
 ## 2. Requirement → module → test
 

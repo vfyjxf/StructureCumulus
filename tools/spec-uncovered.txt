@@ -1,0 +1,89 @@
+# Adapter public types not yet in docs/modules/adapter.md §15 (D-74).
+# One type per line: <fqn>  # <batch or reason>. A type leaves this file only by
+# joining the Signatures block; the gate fails if a listed type disappears or is
+# documented while still listed, so the list can only shrink.
+
+dev.vfyjxf.cumulus.Constants  # not API: mod constants
+dev.vfyjxf.cumulus.StructureCumulus  # not API: mod bootstrap entry
+dev.vfyjxf.cumulus.data.lang.LangEntry  # not API: language data
+dev.vfyjxf.cumulus.mc.CaptureAdversarialGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.CaptureAuditGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.CaptureGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.CheckClaimsGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.ClaimsGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.CommandCaptureReportGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.CommandGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.CumulusCommand  # batch 4: command layer
+dev.vfyjxf.cumulus.mc.CumulusHooks  # batch 5: mod event wiring
+dev.vfyjxf.cumulus.mc.DatapackBlueprints  # batch 5: datapack loading
+dev.vfyjxf.cumulus.mc.ExpandedLifecycleGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.ExpandedSetCaptureGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.LeaseLifecycleGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.LeaseMarkCounterGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.LevelLease  # batch 5: lease family
+dev.vfyjxf.cumulus.mc.McAnchors  # batch 5: anchor factories
+dev.vfyjxf.cumulus.mc.NestedCaptureGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.ObservationFunnelGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.OccupantDescriptors  # batch 5: occupant mapping
+dev.vfyjxf.cumulus.mc.OccupantTraits  # batch 3: trait factories
+dev.vfyjxf.cumulus.mc.OrientationAuditGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.OrientationMapping  # batch 5: orientation mapping
+dev.vfyjxf.cumulus.mc.RotatedSitingGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.ServerState  # batch 5: per-level state
+dev.vfyjxf.cumulus.mc.SetCommandGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.SettleCommandGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.StructureLifecycleAdversarialGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.StructureLifecycleGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.StructureSet  # batch 5: set model
+dev.vfyjxf.cumulus.mc.StructureSetAdversarialGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.StructureSetHostGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.StructureSetReader  # batch 5: set document reader
+dev.vfyjxf.cumulus.mc.StructureSetResult  # batch 5: set run result
+dev.vfyjxf.cumulus.mc.StructureSetWriter  # batch 5: set document writer
+dev.vfyjxf.cumulus.mc.TraitCaptureGameTest  # plan 36: moves to src/gametest, then out of this gate
+dev.vfyjxf.cumulus.mc.WatchEvents  # batch 5: per-level watch wiring
+dev.vfyjxf.cumulus.mc.capability.AttachmentHolder  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.AttachmentNestedExtentProvider  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.AttachmentNestedExtentProviders  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.AttachmentNestedExtentReader  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.AttachmentNestedExtentWriter  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.BlockNestedExtentContext  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentAccess  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentAccesses  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentProvider  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.CapabilityNestedExtentProviders  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.NestedExtent  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.NestedExtentProviders  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.capability.NestedExtents  # batch 6: nested-extent capability family
+dev.vfyjxf.cumulus.mc.mixin.BlockEntityChangedMixin  # not API: mixin wiring
+dev.vfyjxf.cumulus.mc.mixin.ChunkSetBlockStateMixin  # not API: mixin wiring
+dev.vfyjxf.cumulus.mc.plugin.AnnotationPluginLookup  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.plugin.ModPlugin  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.plugin.PluginDependency  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.plugin.PluginLoader  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.plugin.PluginLoadingException  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.plugin.PluginLookup  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.plugin.SpiPluginLookup  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.trait.BlockTraitContext  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.BlockTraitProviders  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.BuiltinTraitPlugin  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.CapabilityAccess  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.CapabilityAccesses  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.CapabilityTraitProvider  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.EntityTraitContext  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.EntityTraitProviders  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitCaptureContext  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitContext  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitContextKey  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitHolder  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitHolders  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitLookup  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitPlugin  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitProvider  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.trait.TraitRegister  # batch 3: trait providers
+dev.vfyjxf.cumulus.mc.visual.VisualClaim  # not API: dev-only visual scenarios
+dev.vfyjxf.cumulus.mc.visual.VisualInstance  # not API: dev-only visual scenarios
+dev.vfyjxf.cumulus.mc.visual.VisualSnapshot  # not API: dev-only visual scenarios

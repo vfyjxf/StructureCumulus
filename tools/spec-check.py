@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Check that every module's documented public types are in code and vice versa.
 
-This is a name-level gate, not a signature gate: it compares type names, not members. Member-level
-conformance is a review obligation (`07-regeneration.md` §4, row 5).
-Examples inside a module file are excluded by reading only the block after '## 3. Signatures'.
+The kernel side is a name-level gate over the module files; member-level conformance of the kernel
+is proven by SpecIndexTest and of the adapter by AdapterIndexTest, both in kernelTest. The adapter
+side (D-74) reads src/main/java as a second source root: every public top-level adapter type is
+either documented in adapter.md §15 or listed in tools/spec-uncovered.txt with a reason, and the
+list can only shrink. Examples inside a module file are excluded by reading only the block after
+'## 3. Signatures'.
 """
 from __future__ import annotations
 
@@ -17,11 +20,23 @@ MODULES = {
     "claim": "claim", "structure": "structure", "context": "context",
     "document": "document", "engine": "engine", "remedy": "remedy", "spi": "spi",
 }
+ADAPTER_ROOT = ROOT / "src" / "main" / "java"
+UNCOVERED = ROOT / "tools" / "spec-uncovered.txt"
+ADAPTER_SECTION = "## 15. Signatures"
 
 TYPE_RE = re.compile(
     r"(?m)^[ \t]{0,12}(?:public\s+)?(?:sealed\s+)?(?:static\s+)?(?:final\s+)?(?:record|class|interface|enum)\s+([A-Z][A-Za-z0-9_]*)"
 )
 CODE_RE = re.compile(r"SC-([A-Z]{2,6})-(\d{4})")
+ADAPTER_PUBLIC_RE = re.compile(
+    r"(?m)^\s*public\s+(?:final\s+|abstract\s+|sealed\s+|non-sealed\s+)*(?:class|interface|record|enum)\s+([A-Za-z0-9_]*)"
+)
+ADAPTER_ANY_RE = re.compile(
+    r"(?m)^\s*(?:(?:public|private|protected|static|final|abstract|sealed|non-sealed)\s+)*(?:class|interface|record|enum)\s+([A-Za-z0-9_]*)"
+)
+TOP_LEVEL_RE = re.compile(
+    r"(?m)^(?:public\s+)?(?:final\s+|abstract\s+|sealed\s+|non-sealed\s+)*(?:record|class|interface|enum)\s+([A-Z][A-Za-z0-9_]*)"
+)
 
 
 def docs_block(module: str) -> str:
@@ -50,6 +65,86 @@ def code_types(package: str) -> set[str]:
 
 def documented_types(module: str) -> set[str]:
     return {m.group(1) for m in TYPE_RE.finditer(docs_block(module))}
+
+
+def adapter_files() -> list[Path]:
+    return [p for p in sorted(ADAPTER_ROOT.rglob("*.java")) if p.name != "package-info.java"]
+
+
+def adapter_public_types() -> set[str]:
+    out: set[str] = set()
+    for path in adapter_files():
+        match = ADAPTER_PUBLIC_RE.search(path.read_text())
+        if match:
+            package = ".".join(path.relative_to(ADAPTER_ROOT).parts[:-1])
+            out.add(f"{package}.{match.group(1)}")
+    return out
+
+
+def adapter_declared_names() -> set[str]:
+    out: set[str] = set()
+    for path in adapter_files():
+        out.update(m.group(1) for m in ADAPTER_ANY_RE.finditer(path.read_text()))
+    return out
+
+
+def adapter_documented_names() -> tuple[set[str], set[str]]:
+    text = (ROOT / "docs" / "modules" / "adapter.md").read_text()
+    start = text.find(ADAPTER_SECTION)
+    if start < 0:
+        raise SystemExit(f"adapter: docs/modules/adapter.md has no '{ADAPTER_SECTION}' block")
+    block: list[str] = []
+    in_fence = False
+    for line in text[start:].split("\n"):
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            block.append(line)
+    text_block = "\n".join(block)
+    all_names = {m.group(1) for m in TYPE_RE.finditer(text_block)}
+    top_level = {m.group(1) for m in TOP_LEVEL_RE.finditer(text_block)}
+    return all_names, top_level
+
+
+def uncovered_types() -> dict[str, str]:
+    out: dict[str, str] = {}
+    for line in UNCOVERED.read_text().split("\n"):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        entry, _, reason = line.partition("#")
+        out[entry.strip()] = reason.strip()
+    return out
+
+
+def check_adapter() -> int:
+    problems = 0
+    public_types = adapter_public_types()
+    declared = adapter_declared_names()
+    documented, documented_top_level = adapter_documented_names()
+    listed = uncovered_types()
+    missing_in_code = sorted(name for name in documented if name not in declared)
+    if missing_in_code:
+        print(f"adapter: documented but not in code: {', '.join(missing_in_code)}")
+        problems += 1
+    unregistered = sorted(t for t in public_types
+                          if t.rsplit(".", 1)[1] not in documented_top_level and t not in listed)
+    if unregistered:
+        print(f"adapter: public type in neither adapter.md §15 nor spec-uncovered.txt: "
+              f"{', '.join(unregistered)}")
+        problems += 1
+    gone = sorted(t for t in listed if t not in public_types)
+    if gone:
+        print(f"adapter: listed in spec-uncovered.txt but no longer public, remove the line: "
+              f"{', '.join(gone)}")
+        problems += 1
+    both = sorted(t for t in listed if t.rsplit(".", 1)[1] in documented_top_level)
+    if both:
+        print(f"adapter: documented in adapter.md §15 while still listed, remove the line: "
+              f"{', '.join(both)}")
+        problems += 1
+    return problems
 
 
 def main() -> int:
@@ -82,6 +177,8 @@ def main() -> int:
     if unknown:
         print(f"codes in code but not in docs: {', '.join(unknown)}")
         problems += 1
+
+    problems += check_adapter()
 
     # Package edges: every kernel import in code must be allowed by the 03-modules table.
     table = (ROOT / "docs" / "design" / "03-modules.md").read_text()

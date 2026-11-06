@@ -311,8 +311,21 @@ tasks.register('kernelPurity') {
     }
 }
 
+tasks.register('specCheck', Exec) {
+    group = 'verification'
+    description = 'Runs the name-level spec gate over the kernel modules and the adapter batches.'
+    commandLine 'python3', 'tools/spec-check.py'
+    inputs.files(
+        fileTree('docs') { include '**/*.md' },
+        fileTree('src/main/java') { include '**/*.java' },
+        fileTree('src/kernel/java') { include '**/*.java' },
+        'tools/spec-check.py',
+        'tools/spec-uncovered.txt')
+}
+
 tasks.named('check') {
-    dependsOn 'kernelTest', 'kernelPurity', 'determinismCheck', 'compileUitestJava', 'verifyRunIsolation', 'verifyHarnessIsolation'
+    dependsOn 'kernelTest', 'kernelPurity', 'determinismCheck', 'compileUitestJava', 'verifyRunIsolation',
+        'verifyHarnessIsolation', 'specCheck'
 }
 
 // The harness runs are the only compositions that load structurecumulusuitest, and the harness is a

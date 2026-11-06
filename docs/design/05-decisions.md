@@ -1214,6 +1214,20 @@ holds for every settle that happens, but a settle whose plan owns nothing no lon
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
+### D-74 — The adapter joins the signature gate in batches, with a shrinking list
+
+`spec-check` reads `src/main/java` as a second source root and compares the adapter's public types
+with the `## 15. Signatures` section in `adapter.md`. Coverage arrives in batches: a type is either
+documented in that section or listed in `tools/spec-uncovered.txt` with a reason. The gate fails
+when a documented type drifts, when a public type is in neither place, and when a listed type no
+longer exists — so the list can only shrink.
+
+**Why not all at once.** The adapter has roughly ninety public types; writing their signatures takes
+longer than the gate itself, and a half-written section would produce failures nobody asked for.
+
+**Why a list and not a comment.** A comment rots silently. A file the gate reads forces every new
+public adapter type to be a decision, and every batch to remove entries.
+
 ### D-75 — Determinism is proven across processes, and the order dependence is removed at the source
 
 Two `Set.copyOf` sites decide the iteration order of a public collection: `SnapshotPolicy.kinds`,
