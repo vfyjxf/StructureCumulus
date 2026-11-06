@@ -594,7 +594,6 @@ final class StructureSetTestSupport {
         private final List<ClaimRow> rows = new ArrayList<>();
         private long revision;
 
-        boolean ledgerWide = true;
         @Nullable
         Siting movingSiting;
         @Nullable
@@ -660,7 +659,7 @@ final class StructureSetTestSupport {
                 sitings.put(request.instance(), requestSiting);
             }
             revision++;
-            return new ClaimVerdict.Settled(revision, ledgerWide ? List.copyOf(rows) : List.copyOf(request.rows()));
+            return new ClaimVerdict.Settled(revision, List.copyOf(request.rows()));
         }
 
         @Override
