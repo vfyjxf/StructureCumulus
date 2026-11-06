@@ -1,7 +1,9 @@
 package dev.vfyjxf.cumulus.mc.plugin;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.spi.CatalogRegistrar;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -128,8 +130,72 @@ public final class PluginLoader {
         Objects.requireNonNull(logger, "logger");
         Objects.requireNonNull(pluginCategory, "pluginCategory");
         LoadingResult<T> result = load(lookup);
+        enforce(logger, pluginCategory, result.failures());
+        return result.plugins();
+    }
+
+    /**
+     * Registers every loaded plugin's catalog contributions into {@code registrar}, in the loader's
+     * resolved order. A plugin that throws while registering is a fatal failure named by its id, and
+     * a plugin that depends on a failed one through a non-optional constraint is skipped.
+     */
+    public static <T extends ModPlugin> void register(
+        Logger logger,
+        String pluginCategory,
+        PluginLookup<T> lookup,
+        CatalogRegistrar registrar
+    ) {
+        Objects.requireNonNull(logger, "logger");
+        Objects.requireNonNull(pluginCategory, "pluginCategory");
+        Objects.requireNonNull(lookup, "lookup");
+        Objects.requireNonNull(registrar, "registrar");
+        LoadingResult<T> result = load(lookup);
+        List<LoadingFailure<T>> failures = new ArrayList<>(result.failures());
+        Set<NamespacedId> broken = new TreeSet<>(idOrder);
+        for (T plugin : result.plugins()) {
+            PluginDependency failed = failedDependency(plugin, broken);
+            if (failed != null) {
+                String reason = "dependency " + failed.pluginId() + " failed to register";
+                failures.add(
+                    new LoadingFailure<>(plugin, failed.required() ? FailureType.fatal : FailureType.warning, reason)
+                );
+                broken.add(plugin.pluginId());
+                continue;
+            }
+            try {
+                plugin.register(registrar);
+            } catch (RuntimeException failure) {
+                registrar.fail(plugin.pluginId(), failure);
+                failures.add(new LoadingFailure<>(plugin, FailureType.fatal, "register failed: " + failure));
+                broken.add(plugin.pluginId());
+            }
+        }
+        failures.sort(
+            Comparator.<LoadingFailure<T>, NamespacedId>comparing(failure -> failure.instance().pluginId(), idOrder)
+                    .thenComparing(LoadingFailure::type).thenComparing(LoadingFailure::reason)
+        );
+        enforce(logger, pluginCategory, failures);
+    }
+
+    private static <T extends ModPlugin> @Nullable PluginDependency failedDependency(
+        T plugin,
+        Set<NamespacedId> broken
+    ) {
+        for (PluginDependency dependency : dependencies(plugin)) {
+            if (!dependency.optional() && broken.contains(dependency.pluginId())) {
+                return dependency;
+            }
+        }
+        return null;
+    }
+
+    private static <T extends ModPlugin> void enforce(
+        Logger logger,
+        String pluginCategory,
+        List<LoadingFailure<T>> failures
+    ) {
         List<PluginLoadingException.Failure> fatal = new ArrayList<>();
-        for (LoadingFailure<T> failure : result.failures()) {
+        for (LoadingFailure<T> failure : failures) {
             if (failure.type() == FailureType.warning) {
                 logger.warn(
                     "{}: {} is skipped because: {}",
@@ -149,7 +215,6 @@ public final class PluginLoader {
         if (!fatal.isEmpty()) {
             throw new PluginLoadingException(List.copyOf(fatal));
         }
-        return result.plugins();
     }
 
     private static <T extends ModPlugin> List<PluginDependency> dependencies(T plugin) {

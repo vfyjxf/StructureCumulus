@@ -19,10 +19,14 @@ import dev.vfyjxf.cumulus.kernel.document.StructureSetCompiler;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.spi.CatalogRegistrar;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
+import dev.vfyjxf.cumulus.mc.plugin.AnnotationPluginLookup;
+import dev.vfyjxf.cumulus.mc.plugin.ModPlugin;
+import dev.vfyjxf.cumulus.mc.plugin.PluginLoader;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import dev.vfyjxf.cumulus.mc.visual.VisualClaim;
 import dev.vfyjxf.cumulus.mc.visual.VisualInstance;
@@ -65,8 +69,7 @@ public final class ServerState {
     private final Map<ResourceKey<Level>, LevelCapture> captures = new HashMap<>();
 
     private ServerState() {
-        this.catalogs = Catalogs.builder().expectations(AdapterExpectations.catalog()).codes(AdapterCodes.catalog())
-                .build();
+        this.catalogs = assembleCatalogs();
         this.blueprints = DatapackBlueprints.attach();
         DocumentSource builtin = BuiltinDocuments.source();
         // A datapack document wins over the built-in document on an id collision.
@@ -85,6 +88,15 @@ public final class ServerState {
         };
         this.kernel = StructureKernel.create(catalogs, new Host(documents, null, StructureManager.create(), hostTypes));
         this.traitLookup = TraitLookup.load(StructureCumulus.logger);
+    }
+
+    /** The session's one assembly: built-ins, the adapter's host kinds, then plugin contributions. */
+    private static Catalogs assembleCatalogs() {
+        CatalogRegistrar registrar = CatalogRegistrar.builtin();
+        AdapterCatalogs.seed(registrar);
+        PluginLoader
+                .register(StructureCumulus.logger, "catalog", AnnotationPluginLookup.of(ModPlugin.class), registrar);
+        return registrar.catalogs();
     }
 
     public static void open(ServerAboutToStartEvent event) {
