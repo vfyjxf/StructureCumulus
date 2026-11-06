@@ -493,7 +493,7 @@ public final class MatchEngine {
                 );
             }
             if (verdict instanceof ClaimVerdict.Conflict conflict) {
-                findings.addAll(conflict.findings().findings());
+                findings.addAll(conflicts(phase, derived.rows(), conflict.incumbents()));
                 return new MatchResult.Failed(phase, FindingBundle.of(findings));
             }
             ClaimVerdict.Settled settled = (ClaimVerdict.Settled) verdict;

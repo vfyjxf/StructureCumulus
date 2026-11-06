@@ -8,7 +8,6 @@ import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
-import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -101,7 +100,7 @@ class StructureValidationTest {
 
     @Test
     void aConflictExplainsItself() {
-        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of(), FindingBundle.empty()));
+        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of()));
     }
 
     @Test

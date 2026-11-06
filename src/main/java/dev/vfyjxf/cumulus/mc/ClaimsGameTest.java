@@ -81,7 +81,6 @@ public final class ClaimsGameTest {
             return;
         }
         helper.assertValueEqual(List.of(rowA), rejected.incumbents(), "the incumbent row");
-        helper.assertTrue(!rejected.findings().isEmpty(), "a conflict explains itself");
         long afterConflict = claims.revision();
         helper.assertValueEqual(revision + 1, afterConflict, "a conflict writes nothing");
 

@@ -1,15 +1,8 @@
 package dev.vfyjxf.cumulus.kernel.claim;
 
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
-import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.World;
-import dev.vfyjxf.cumulus.kernel.finding.Codes;
-import dev.vfyjxf.cumulus.kernel.finding.Finding;
-import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
-import dev.vfyjxf.cumulus.kernel.finding.Label;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
-import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
-import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import org.jspecify.annotations.Nullable;
 
@@ -112,51 +105,26 @@ final class InMemoryClaimLedger implements ClaimLedger {
     }
 
     private @Nullable ClaimVerdict conflicts(SettleRequest request, List<ClaimRow> incumbents) {
-        Map<String, Conflict> conflicts = new LinkedHashMap<>();
+        Map<String, Set<ClaimRow>> contested = new LinkedHashMap<>();
         for (ClaimRow requested : request.rows()) {
             for (ClaimRow incumbent : incumbents) {
                 if (!ClaimMatrix.conflicts(requested, incumbent)) {
                     continue;
                 }
-                String key = requested.bay().text() + "|" + incumbent.instance() + "|" + incumbent.bay().text();
-                Conflict conflict = conflicts
-                        .computeIfAbsent(key, ignored -> new Conflict(requested, incumbent, CuboidSet.empty()));
-                conflict.incumbents.add(incumbent);
-                conflict.cells = conflict.cells.union(Cuboid.of(requested.cell().point()));
+                contested.computeIfAbsent(
+                    requested.bay().text() + "|" + incumbent.instance() + "|" + incumbent.bay().text(),
+                    ignored -> new LinkedHashSet<>()
+                ).add(incumbent);
             }
         }
-        if (conflicts.isEmpty()) {
+        if (contested.isEmpty()) {
             return null;
         }
         Set<ClaimRow> allIncumbents = new LinkedHashSet<>();
-        List<Finding> findings = new ArrayList<>();
-        for (Conflict conflict : conflicts.values()) {
-            allIncumbents.addAll(conflict.incumbents);
-            findings.add(finding(conflict));
+        for (Set<ClaimRow> group : contested.values()) {
+            allIncumbents.addAll(group);
         }
-        return new ClaimVerdict.Conflict(new ArrayList<>(allIncumbents), FindingBundle.of(findings));
+        return new ClaimVerdict.Conflict(new ArrayList<>(allIncumbents));
     }
 
-    private static Finding finding(Conflict conflict) {
-        Locus locus = Locus.world(conflict.cells);
-        String message = conflict.incumbent.instance() + ":" + conflict.incumbent.bay() + " already holds "
-                + conflict.cells.volume() + " cell(s) of " + conflict.requested.bay();
-        return Finding.builder(Codes.claimConflict).phase(Phase.settle).message(message)
-                .label(Label.primary(locus, "contested cells"))
-                .note("this bay asks " + conflict.requested.sharing(), locus)
-                .note("the incumbent holds " + conflict.incumbent.sharing(), null).build();
-    }
-
-    private static final class Conflict {
-        private final ClaimRow requested;
-        private final ClaimRow incumbent;
-        private final Set<ClaimRow> incumbents = new LinkedHashSet<>();
-        private CuboidSet cells;
-
-        private Conflict(ClaimRow requested, ClaimRow incumbent, CuboidSet cells) {
-            this.requested = requested;
-            this.incumbent = incumbent;
-            this.cells = cells;
-        }
-    }
 }

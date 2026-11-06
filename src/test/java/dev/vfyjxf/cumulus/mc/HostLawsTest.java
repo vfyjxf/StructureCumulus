@@ -7,7 +7,6 @@ import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
-import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
@@ -340,11 +339,6 @@ class HostLawsTest {
                     ledger.settle(new SettleRequest(rival, List.of(contested), revision))
                 );
                 assertEquals(List.of(held), conflict.incumbents(), "the conflict carries the incumbent rows");
-                assertEquals(
-                    Codes.claimConflict.code(),
-                    conflict.findings().findings().get(0).code(),
-                    "the conflict explains itself with the claim code"
-                );
                 assertEquals(revision, ledger.revision(), "a conflict writes nothing");
                 assertEquals(List.of(held), ledger.read(Cuboid.of(cell)).rows(), "the incumbent rows are untouched");
             } finally {
