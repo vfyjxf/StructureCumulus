@@ -81,6 +81,23 @@ public final class CommandBoundaryGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aLinkageErrorIsReportedAndExitsZero(GameTestHelper helper) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        LinkageSource recording = new LinkageSource();
+        CommandSourceStack source = stack(helper, origin, 4, recording);
+        helper.assertValueEqual(
+            0,
+            execute(helper, source, "cumulus explain SC-ENG-0002"),
+            "a guarded LinkageError exits zero"
+        );
+        helper.assertTrue(
+            recording.text().startsWith("cumulus explain failed: NoClassDefFoundError"),
+            "the guard reports the LinkageError"
+        );
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
     public void onlyAGamemasterSourceCanUseCumulus(GameTestHelper helper) {
         BlockPos origin = helper.absolutePos(BlockPos.ZERO);
         CommandSourceStack player = stack(helper, origin, 0, new RecordingSource());
@@ -149,6 +166,41 @@ public final class CommandBoundaryGameTest {
                 throw new IllegalStateException("the output threw on " + text);
             }
             messages.add(text);
+        }
+
+        @Override
+        public boolean acceptsSuccess() {
+            return true;
+        }
+
+        @Override
+        public boolean acceptsFailure() {
+            return true;
+        }
+
+        @Override
+        public boolean shouldInformAdmins() {
+            return false;
+        }
+
+        private String text() {
+            return String.join("\n", messages);
+        }
+    }
+
+    /** Throws once from the first output, then records, so the guard's own report survives. */
+    private static final class LinkageSource implements CommandSource {
+
+        private final List<String> messages = new ArrayList<>();
+        private boolean thrown = false;
+
+        @Override
+        public void sendSystemMessage(Component message) {
+            if (!thrown) {
+                thrown = true;
+                throw new NoClassDefFoundError("the optional mod is absent");
+            }
+            messages.add(message.getString());
         }
 
         @Override

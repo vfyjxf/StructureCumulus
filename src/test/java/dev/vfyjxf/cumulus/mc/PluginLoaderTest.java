@@ -90,6 +90,40 @@ class PluginLoaderTest {
     }
 
     @Test
+    void aSkippedPluginSkipsItsDependentsToAFixedPoint() {
+        TestPlugin a = plugin(
+            "a",
+            dependency("missing", PluginDependency.Order.after, PluginDependency.Constraint.optionalRequired)
+        );
+        TestPlugin b = plugin(
+            "b",
+            dependency("a", PluginDependency.Order.after, PluginDependency.Constraint.optionalRequired)
+        );
+        TestPlugin c = plugin(
+            "c",
+            dependency("b", PluginDependency.Order.after, PluginDependency.Constraint.required)
+        );
+        TestPlugin d = plugin("d");
+        TestPlugin e = plugin(
+            "e",
+            dependency("a", PluginDependency.Order.after, PluginDependency.Constraint.optional)
+        );
+        PluginLoader.LoadingResult<TestPlugin> result = PluginLoader.load(lookup(a, b, c, d, e));
+        assertEquals(List.of(d, e), result.plugins(), "the skip cascades through b and c, an optional dependent loads");
+        assertEquals(3, result.failures().size());
+        assertEquals(PluginLoader.FailureType.warning, result.failures().get(0).type());
+        assertTrue(Objects.requireNonNull(result.failures().get(0).reason()).contains("missing dependency"));
+        assertEquals(PluginLoader.FailureType.warning, result.failures().get(1).type());
+        assertTrue(Objects.requireNonNull(result.failures().get(1).reason()).contains("was skipped"));
+        assertEquals(PluginLoader.FailureType.fatal, result.failures().get(2).type());
+        assertTrue(Objects.requireNonNull(result.failures().get(2).reason()).contains("was skipped"));
+        assertThrows(
+            PluginLoadingException.class,
+            () -> PluginLoader.loadPlugin(logger, "test", lookup(a, b, c, d, e))
+        );
+    }
+
+    @Test
     void aCycleIsFatal() {
         TestPlugin a = plugin("a", dependency("b", PluginDependency.Order.after, PluginDependency.Constraint.required));
         TestPlugin b = plugin("b", dependency("a", PluginDependency.Order.after, PluginDependency.Constraint.required));

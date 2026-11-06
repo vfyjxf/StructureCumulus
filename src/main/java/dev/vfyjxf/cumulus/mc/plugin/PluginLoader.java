@@ -60,6 +60,32 @@ public final class PluginLoader {
                 }
             }
         }
+        // a skipped plugin counts as absent, so the skip cascades through non-optional dependents
+        boolean cascaded = true;
+        while (cascaded) {
+            cascaded = false;
+            for (T plugin : discovered.values()) {
+                if (!skipped.contains(plugin.pluginId()) && failedDependency(plugin, skipped) != null) {
+                    skipped.add(plugin.pluginId());
+                    cascaded = true;
+                }
+            }
+        }
+        for (T plugin : discovered.values()) {
+            for (PluginDependency dependency : dependencies(plugin)) {
+                if (dependency.optional() || !skipped.contains(dependency.pluginId())) {
+                    continue;
+                }
+                String reason = "dependency " + dependency.pluginId() + " (" + dependency.constraint() + ") was skipped";
+                failures.add(
+                    new LoadingFailure<>(
+                        plugin,
+                        dependency.required() ? FailureType.fatal : FailureType.warning,
+                        reason
+                    )
+                );
+            }
+        }
 
         Map<NamespacedId, Set<NamespacedId>> outgoing = new TreeMap<>(idOrder);
         Map<NamespacedId, Integer> inDegree = new TreeMap<>(idOrder);

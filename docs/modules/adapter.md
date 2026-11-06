@@ -385,7 +385,8 @@ generic `TraitProvider<T, H>`:
 - a block state that has a block entity but whose captured block entity is `null` is
   `Refused(notCaptured)` before a provider reads it, so a capability lookup never falls back to a
   live block-entity lookup;
-- a provider that throws, returns `null` or answers a different trait id is `Refused(failed)`.
+- a provider that throws (`RuntimeException` or `LinkageError`), returns `null` or answers a
+  different trait id is `Refused(failed)`.
 
 The standard providers are declarations, not per-capability classes. `BlockTraitProviders` and
 `EntityTraitProviders` build the six `CapabilityTraitProvider` values from
@@ -408,8 +409,10 @@ The plugin core is a package-preserving adaption of CloudLib's `api/plugin` into
 dispatcher, progress tracker or dispatch queue; registration is sequential and deterministic.
 `PluginLoader` validates duplicate ids (fatal), missing `required` dependencies (fatal, plugin
 excluded), missing `optional` dependencies (warning, plugin loaded), missing `optionalRequired`
-dependencies (warning, plugin skipped) and cycles (fatal), and orders the remainder with Kahn's
-algorithm using `NamespacedId` order. A candidate class that cannot be loaded — a broken static
+dependencies (warning, plugin skipped) and cycles (fatal); a dependency on a skipped plugin skips
+the dependent through a non-optional constraint, cascading to a fixed point with the same
+fatal/warning split. The remainder is ordered with Kahn's algorithm using `NamespacedId` order. A
+candidate class that cannot be loaded — a broken static
 initializer, an unresolved reference — never reaches the loader: both lookups log the class name and
 the cause at error level and skip it (D-81); the `ServiceLoader` path catches `ServiceConfigurationError`
 too, which is how the JDK wraps an instantiation failure. Nothing enters the loading result, so a plugin
@@ -421,7 +424,9 @@ plugin overrides its dependencies to empty. `TraitLookup.builtin()` registers th
 directly; `TraitLookup.load(StructureCumulus.logger)` discovers `TraitPlugin`s with
 `AnnotationPluginLookup.of(TraitPlugin.class)`, ensures the built-in plugin is present, runs
 `PluginLoader.loadPlugin`, and calls each `registerTraits` once against the immutable builder; a
-duplicate `(trait id, holder id)` pair is fatal.
+plugin whose `registerTraits` throws — the builder's duplicate `(trait id, holder id)` rejection,
+or a `LinkageError` from a class it cannot resolve — is a fatal `PluginLoadingException` naming
+the plugin.
 
 `TraitCaptureContext(capabilityContext, hostContext)` is the approved A+B context: the nullable
 `Direction` capability context is passed to the block and sided entity capability accessors, while
@@ -805,7 +810,8 @@ All commands run on the server thread. `check` returns 1 whenever it reaches a r
 
 The command boundary is gated, guarded and self-cleaning (D-54). The root literal requires
 `Commands.LEVEL_GAMEMASTERS` (2), so every verb inherits the gate and none opts out. Each verb body
-runs inside one `CommandSupport.guarded` that catches `RuntimeException` and `StackOverflowError`,
+runs inside one `CommandSupport.guarded` that catches `RuntimeException`, `StackOverflowError` and
+`LinkageError`,
 logs the failure with the verb, answers `cumulus <verb> failed: <type>: <message>` and returns 0 —
 no other error is caught. A verb that opened a draft closes it in a `finally` through
 `CommandSupport.abortQuietly`; a `settle` that formed rows and then failed to commit releases that

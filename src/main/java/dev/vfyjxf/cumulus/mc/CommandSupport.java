@@ -277,7 +277,7 @@ final class CommandSupport {
     ) {
         try {
             return body.applyAsInt(context);
-        } catch (RuntimeException | StackOverflowError failure) {
+        } catch (RuntimeException | StackOverflowError | LinkageError failure) {
             StructureCumulus.logger.error("/cumulus {} failed", verb, failure);
             String detail = failure.getMessage() == null ? "" : ": " + failure.getMessage();
             context.getSource().sendFailure(

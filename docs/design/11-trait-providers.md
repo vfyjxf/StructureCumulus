@@ -174,7 +174,7 @@ private static <H> TraitSlot read(
     try {
         TraitSlot slot = provider.get(actual, capture);
         return slot == null || !slot.id().equals(id) ? refused(id, ReadStatus.failed) : slot;
-    } catch (RuntimeException failure) {
+    } catch (RuntimeException | LinkageError failure) {
         return refused(id, ReadStatus.failed);
     }
 }
