@@ -708,11 +708,14 @@ class BuildRulesTest {
                 .allowTurns(Turn.counterclockwise, Turn.clockwise).build();
         assertEquals(
             Orientation.of(Turn.clockwise, Tilt.level, Flip.none),
-            policy.select(Heading.east),
+            policy.select(Heading.north, Heading.east),
             "clockwise comes before counterclockwise in ordinal order"
         );
-        assertEquals(Orientation.of(Turn.counterclockwise, Tilt.level, Flip.none), policy.select(Heading.west));
-        assertNull(policy.select(Heading.up), "a level turn never maps north to up");
+        assertEquals(
+            Orientation.of(Turn.counterclockwise, Tilt.level, Flip.none),
+            policy.select(Heading.north, Heading.west)
+        );
+        assertNull(policy.select(Heading.north, Heading.up), "a level turn never maps north to up");
     }
 
     private static Bay anyCellBay() {
