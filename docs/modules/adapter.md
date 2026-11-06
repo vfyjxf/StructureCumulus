@@ -1127,6 +1127,7 @@ public final class LevelSnapshot implements WorldView {
     @Override public SectionKey sectionOf(LatticePoint cell);
     @Override public SectionSlot slot(SectionKey key);
     @Override public CellRead read(LatticePoint cell);
+    @Override public @Nullable OccupantSnapshot cellOccupant(LatticePoint cell);
     @Override public @Nullable OccupantSnapshot occupant(OccupantRef ref);
     @Override public java.util.List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
     @Override public @Nullable WorldView nested(LatticePoint cell);

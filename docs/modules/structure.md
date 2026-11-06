@@ -378,6 +378,7 @@ public final class Blueprint {
 public final class BlueprintBuilder {
     public BlueprintBuilder bounds(Cuboid bounds);
     public BlueprintBuilder envelope();
+    public BlueprintBuilder envelopeEntities();
     public BlueprintBuilder check(Check<?> check);
     public BlueprintBuilder check(java.util.List<? extends Check<?>> checks);
     public BlueprintBuilder checks(java.util.Collection<? extends Check<?>> checks);
