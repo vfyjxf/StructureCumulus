@@ -14,8 +14,6 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,9 +24,6 @@ import java.util.TreeMap;
 /** One server-thread, in-memory registry; the host dispatches lifecycle events into it. */
 @NullMarked
 final class InMemoryStructureManager implements StructureManager {
-
-    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
-            .thenComparing(key -> key.type().getName());
 
     private final TreeMap<InstanceId, StructureInstance> instances = new TreeMap<>();
     private final Map<SitingKey, InstanceId> bySiting = new HashMap<>();
@@ -126,7 +121,7 @@ final class InMemoryStructureManager implements StructureManager {
         if (formed == null) {
             throw new IllegalArgumentException("no structure instance " + instance);
         }
-        StructureContext merged = merge(formed.context(), values, findings, spend);
+        StructureContext merged = next(formed.context(), values, findings, spend);
         instances.put(instance, new StructureInstance(formed.id(), formed.spec(), merged, formed.bounds()));
         return merged;
     }
@@ -236,7 +231,7 @@ final class InMemoryStructureManager implements StructureManager {
         bySiting.put(key, instance.id());
     }
 
-    private static StructureContext merge(
+    private static StructureContext next(
         StructureContext base,
         Map<ContextKey<?>, Object> values,
         FindingBundle findings,
@@ -249,13 +244,10 @@ final class InMemoryStructureManager implements StructureManager {
                 throw new IllegalArgumentException("only INSTANCE values are published: " + key.id());
             }
         }
-        TreeMap<ContextKey<?>, Object> merged = new TreeMap<>(keyOrder);
-        merged.putAll(base.values());
-        merged.putAll(values);
         return new StructureContext(
             base.instance(),
             base.revision() + 1,
-            Collections.unmodifiableMap(merged),
+            values,
             findings,
             base.spend().plus(spend)
         );
@@ -331,7 +323,7 @@ final class InMemoryStructureManager implements StructureManager {
             if (!instance.equals(id)) {
                 throw new IllegalArgumentException("the draft belongs to " + id);
             }
-            context = merge(context, values, findings, spend);
+            context = next(context, values, findings, spend);
             return context;
         }
 

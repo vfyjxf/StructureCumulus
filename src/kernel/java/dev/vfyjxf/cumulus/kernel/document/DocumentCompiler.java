@@ -42,12 +42,14 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 
 /** The only lowering function: data in, blueprint or findings out. */
 public final class DocumentCompiler {
@@ -869,14 +871,14 @@ public final class DocumentCompiler {
     }
 
     private static Set<ContextKey<?>> inputKeys(Set<NamespacedId> ids, Map<NamespacedId, ContextKey<?>> keys) {
-        Set<ContextKey<?>> resolved = new HashSet<>();
+        Set<ContextKey<?>> resolved = new TreeSet<>(ContextKeys.order());
         for (NamespacedId id : ids) {
             ContextKey<?> key = keys.get(id);
             if (key != null) {
                 resolved.add(key);
             }
         }
-        return Set.copyOf(resolved);
+        return Collections.unmodifiableSet(resolved);
     }
 
     private static List<DerivationSpec> buildDerivations(

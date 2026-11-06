@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.structure;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.world.EntityWindow;
@@ -8,7 +9,6 @@ import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -25,9 +25,6 @@ public record ReadScope(
     List<EntityWindow> windows
 ) {
 
-    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
-            .thenComparing(key -> key.type().getName());
-
     public ReadScope {
         Objects.requireNonNull(cells, "cells");
         Objects.requireNonNull(keys, "keys");
@@ -37,7 +34,7 @@ public record ReadScope(
         if (depth < 0) {
             throw new IllegalArgumentException("depth >= 0");
         }
-        TreeSet<ContextKey<?>> sortedKeys = new TreeSet<>(keyOrder);
+        TreeSet<ContextKey<?>> sortedKeys = new TreeSet<>(ContextKeys.order());
         sortedKeys.addAll(keys);
         keys = Collections.unmodifiableSet(sortedKeys);
         TreeSet<NamespacedId> sortedTraits = new TreeSet<>();
@@ -102,7 +99,7 @@ public record ReadScope(
     }
 
     private static Set<ContextKey<?>> unionKeys(Set<ContextKey<?>> left, Set<ContextKey<?>> right) {
-        TreeSet<ContextKey<?>> merged = new TreeSet<>(keyOrder);
+        TreeSet<ContextKey<?>> merged = new TreeSet<>(ContextKeys.order());
         merged.addAll(left);
         merged.addAll(right);
         return merged;

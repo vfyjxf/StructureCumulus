@@ -33,4 +33,10 @@ public record ContextKey<T>(
     public boolean contributed() {
         return merge != null;
     }
+
+    /** Hashes the slot, {@code (id, type)}; equality stays the full record, so equal keys hash alike. */
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, type.getName());
+    }
 }

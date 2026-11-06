@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.kernel.context;
 
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.ContextView;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
@@ -9,7 +10,6 @@ import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -24,9 +24,6 @@ public record StructureContext(
     Spend spend
 ) implements ContextView {
 
-    private static final Comparator<ContextKey<?>> keyOrder = Comparator.comparing((ContextKey<?> key) -> key.id())
-            .thenComparing(key -> key.type().getName());
-
     public StructureContext {
         Objects.requireNonNull(instance, "instance");
         Objects.requireNonNull(values, "values");
@@ -35,7 +32,7 @@ public record StructureContext(
         if (revision < 0) {
             throw new IllegalArgumentException("revision >= 0");
         }
-        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(keyOrder);
+        TreeMap<ContextKey<?>, Object> sorted = new TreeMap<>(ContextKeys.order());
         for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
             ContextKey<?> key = Objects.requireNonNull(entry.getKey(), "key");
             Object value = Objects.requireNonNull(entry.getValue(), "value");

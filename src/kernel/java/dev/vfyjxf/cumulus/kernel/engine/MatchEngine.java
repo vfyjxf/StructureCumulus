@@ -20,6 +20,7 @@ import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.CancelToken;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.ContextView;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.Merge;
@@ -528,6 +529,12 @@ public final class MatchEngine {
         List<Finding> findings = new ArrayList<>(formed.findings().findings());
         List<DerivationSpec> ordered = new ArrayList<>(derivations);
         ordered.sort(Comparator.comparingInt(DerivationSpec::order).thenComparing(spec -> spec.deriver()));
+        Set<NamespacedId> declared = new HashSet<>();
+        for (DerivationSpec spec : ordered) {
+            declared.add(spec.output());
+        }
+        // A declared output the pass does not produce is absent, not stale (D-56).
+        values.keySet().removeIf(key -> declared.contains(key.id()));
         for (DerivationSpec spec : ordered) {
             Deriver<?> deriver = derivers.get(spec.deriver());
             if (deriver == null) {
@@ -576,7 +583,7 @@ public final class MatchEngine {
             }
             MapContextView view = new MapContextView(values);
             int before = findings.size();
-            DeriveCtx ctx = new DeriveCtx(base, view, findings);
+            DeriveCtx ctx = new DeriveCtx(view, findings);
             try {
                 Outcome<?> result = deriver.derive(ctx, spec.arguments());
                 if (result instanceof Outcome.Found<?> found) {
@@ -1422,9 +1429,7 @@ public final class MatchEngine {
 
         @Override
         public Set<ContextKey<?>> keys() {
-            TreeSet<ContextKey<?>> sorted = new TreeSet<>(
-                Comparator.comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName())
-            );
+            TreeSet<ContextKey<?>> sorted = new TreeSet<>(ContextKeys.order());
             sorted.addAll(current.keySet());
             return Collections.unmodifiableSet(sorted);
         }
@@ -1437,9 +1442,7 @@ public final class MatchEngine {
 
         private MapContextView(Map<ContextKey<?>, Object> values) {
             this.values = values;
-            TreeSet<ContextKey<?>> sorted = new TreeSet<>(
-                Comparator.comparing((ContextKey<?> key) -> key.id()).thenComparing(key -> key.type().getName())
-            );
+            TreeSet<ContextKey<?>> sorted = new TreeSet<>(ContextKeys.order());
             sorted.addAll(values.keySet());
             this.keys = Collections.unmodifiableSet(sorted);
         }
@@ -1469,19 +1472,12 @@ public final class MatchEngine {
 
     private static final class DeriveCtx implements DeriveContext {
 
-        private final StructureContext base;
         private final MapContextView view;
         private final List<Finding> findings;
 
-        private DeriveCtx(StructureContext base, MapContextView view, List<Finding> findings) {
-            this.base = base;
+        private DeriveCtx(MapContextView view, List<Finding> findings) {
             this.view = view;
             this.findings = findings;
-        }
-
-        @Override
-        public StructureContext base() {
-            return base;
         }
 
         @Override

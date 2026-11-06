@@ -1148,6 +1148,52 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-49 — A context key is identified by (id, type), not by its whole record
+
+`ContextKey` carries five components, but only two of them name the slot: `id` and `type`. `merge` and
+`whenAbsent` describe how the slot is filled; `retention` says when it is readable. Two keys with the
+same id and type are the same slot even when their merge functions differ, and the merge function is
+compared by reference on purpose — a lambda cannot be compared by value.
+
+**Equality stays the whole record.** `equals` compares every component so that a blueprint built twice
+stays equal only when the derived content is identical (I-13), and so that a duplicate key is a real
+duplicate rather than a silent merge.
+
+**Hashing and lookup use `(id, type)`.** The record's generated `hashCode` mixes in a `Class`, an enum
+and a lambda, so it varies across JVMs and across two equivalent lambda sites. That broke two things at
+once: a `HashMap`-backed lookup missed a key the `TreeMap`-backed one found, and `HashSet` iteration
+order leaked into results. `ContextKey#hashCode` therefore returns a hash of `(id, type.getName())`,
+which keeps the `equals`/`hashCode` contract (equal objects still hash equally) and makes every
+identity-hash dependency disappear.
+
+**One canonical order.** `ContextKeys.order()` sorts by `(id, type.getName())` and is the only order a
+`ContextKey` set may be iterated in; the comparators that re-implemented it are replaced by it.
+
+### D-56 — A publish is a new table, never a merge
+
+`ContextStore.publish(instance, values, findings, spend)` stores exactly `values` and returns a
+`StructureContext` built from scratch: a fresh immutable copy, `revision + 1`, this bundle's findings
+and the cumulative spend. The previously published object is not touched; a host that still holds it
+keeps the old table.
+
+`derive` therefore builds its whole table before publishing: take the base values, drop every key the
+blueprint declares as a derivation output, then add what this pass produced. A `Missing` output is
+absent, not stale.
+
+`DeriveContext.base()` is removed: it exposed the previous revision, the one thing a derivation must
+not read, and nothing calls it.
+
+**Why replacement.** `context.md` §4.3 says a missing derived value means the output is absent. A
+merge cannot express absence, so a derivation that stops producing a value leaves a stale one that
+the next reader takes for current.
+
+**Why a new object each publish.** A published context is a snapshot: the instance holds the latest
+one and a request may carry an older one as `CachedContext`. Publishing into a shared map would
+change yesterday's snapshot under its holder.
+
+**Why not a `removed` parameter.** Two ways to say "delete these keys" for one caller, and every host
+implementation would have to support both. Replacement makes the argument the whole truth.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
