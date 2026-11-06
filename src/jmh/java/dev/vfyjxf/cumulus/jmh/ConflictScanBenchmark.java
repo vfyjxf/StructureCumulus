@@ -1,7 +1,10 @@
 package dev.vfyjxf.cumulus.jmh;
 
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimMatrix;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
+import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -21,6 +24,7 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /** The request-rows-by-held-rows pair scan the settle path runs through ClaimMatrix. */
@@ -37,18 +41,23 @@ public class ConflictScanBenchmark {
 
     private ClaimRow[] requested;
     private ClaimRow[] held;
+    private ClaimLedger ledger;
+    private SettleRequest conflictingSettle;
 
     @Setup
     public void setUp() {
         InstanceId requester = new InstanceId(World.of(NamespacedId.of("bench", "world")), 1);
         InstanceId holder = new InstanceId(World.of(NamespacedId.of("bench", "world")), 2);
-        // both sides claim the same cells exclusively, so every matched cell runs the full predicate
-        requested = rowsOverCube(requester);
-        held = rowsOverCube(holder);
+        // a distinct siting keeps the holder's rows incumbent, so every call re-runs the contest
+        Siting requesterSiting = Siting.of(LatticePoint.of(1, 0, 0), Orientation.identity);
+        requested = rowsOverCube(requester, requesterSiting);
+        held = rowsOverCube(holder, Siting.of(LatticePoint.of(0, 0, 0), Orientation.identity));
+        ledger = ClaimLedger.inMemory(World.of(NamespacedId.of("bench", "world")));
+        ledger.settle(new SettleRequest(holder, List.of(held), 0));
+        conflictingSettle = new SettleRequest(requester, List.of(requested), ledger.revision());
     }
 
-    private ClaimRow[] rowsOverCube(InstanceId instance) {
-        Siting siting = Siting.of(LatticePoint.of(0, 0, 0), Orientation.identity);
+    private ClaimRow[] rowsOverCube(InstanceId instance, Siting siting) {
         NamespacedId bay = NamespacedId.of("bench", "bay");
         int edge = (int) Math.round(Math.cbrt(rowCount));
         ClaimRow[] rows = new ClaimRow[rowCount];
@@ -80,5 +89,11 @@ public class ConflictScanBenchmark {
             }
         }
         return conflicts;
+    }
+
+    /** The same contest settled through the ledger, the path a settle conflict actually takes. */
+    @Benchmark
+    public ClaimVerdict settleAgainstHeldRows() {
+        return ledger.settle(conflictingSettle);
     }
 }
