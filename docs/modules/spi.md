@@ -5,7 +5,7 @@
 
 ## 1. Scope
 
-**Owns:** `Catalogs`, `Catalogs.Builder`, `Host`, `StructureKernel`.
+**Owns:** `Catalogs`, `Catalogs.Builder`, `CatalogRegistrar`, `Host`, `StructureKernel`.
 
 **Does not own:** `Catalog<T>` (`core`), the factory interfaces (`structure`), the ports
 (`document`, `world`, `claim`, `context`), the engine (`engine`), the built-in code table (`finding`).
@@ -18,6 +18,7 @@
 | --- | --- | --- |
 | `Catalogs` | interface | six frozen families + `builtin()` + `builder()` |
 | `Catalogs.Builder` | interface | merge families over built-ins, then freeze |
+| `CatalogRegistrar` | interface | collect plugin contributions over the built-ins, then freeze |
 | `Host` | record | documents, ledger, context store, custom type registry |
 | `StructureKernel` | final class | the facade: four operations, three helpers, four lookups |
 
@@ -52,6 +53,20 @@ public record Host(DocumentSource documents, @Nullable ClaimLedger ledger,
                    StructureManager structures, java.util.Map<NamespacedId, Class<?>> types) {
     public Host { /* immutable; contexts non-null; types sorted */ }
     public static Host empty();
+}
+
+public interface CatalogRegistrar {
+    CatalogRegistrar expectation(NamespacedId id, ExpectationFactory factory);
+    CatalogRegistrar focus(NamespacedId id, FocusFactory factory);
+    CatalogRegistrar computation(NamespacedId id, ComputationFactory factory);
+    CatalogRegistrar deriver(NamespacedId id, Deriver<?> deriver);
+    CatalogRegistrar code(CodeEntry entry);
+    void fail(NamespacedId pluginId, RuntimeException failure);
+    java.util.List<RegistrationFailure> failures();
+    Catalogs catalogs();
+    static CatalogRegistrar builtin();
+
+    record RegistrationFailure(NamespacedId pluginId, RuntimeException cause) {}
 }
 
 public final class StructureKernel {
@@ -166,21 +181,42 @@ A kernel is safe for concurrent `compile`/`check`/`derive`/`solve`/`explain` giv
 A factory that cannot parse its args calls `ctx.report(...)` with `SC-DOC-0002` and returns null; the
 compiler turns a null into `SC-DOC-0003` if no finding was reported.
 
+### 4.5 CatalogRegistrar
+
+`CatalogRegistrar` is the one collection point for catalog contributions. `builtin()` starts from the
+six built-in tables; `expectation`/`focus`/`computation`/`deriver` add one entry each and return the
+registrar, `code` adds a `CodeEntry` keyed by its code text, and `catalogs()` freezes the six
+families. Remedies have no contribution method. A host calls the contributions at assembly time —
+the adapter through its plugin entry point (`ModPlugin.register`, adapter §7.5), once per plugin in
+the loader's resolved order — and every later compile reads the frozen snapshot. The kernel itself
+does no discovery, ordering or failure policy.
+
+Duplicates follow `Catalog.Builder.put`: one id with an equal value collapses, a different value
+throws `SC-SPI-0003` at the contribution call, so a built-in (or any already-registered) id cannot
+be replaced. `fail(pluginId, cause)` attributes one plugin's register failure to its id;
+`failures()` lists them in registration order for a host that runs its own loading.
+
 ## 5. Pipeline role
 
 `spi` is the composition root. It creates nothing at match time except the engine's request context;
-it resolves no class by reflection and holds no static mutable state.
+it resolves no class by reflection and holds no static mutable state. Catalog assembly
+(`CatalogRegistrar`, §4.5) belongs to that root: it runs once while the host composes the kernel,
+before any document is compiled.
 
 ## 6. Codes
 
 `SC-SPI-0001` (extension threw / malformed finding; engine guard), `SC-SPI-0003` (a catalog build
-found a duplicate/different entry; `Catalogs.Builder.build`). A document naming an unknown factory is
-`SC-DOC-0003` (the document compiler owns that surface).
+found a duplicate/different entry; `Catalogs.Builder.build` and the `CatalogRegistrar` contribution
+call). A document naming an unknown factory is `SC-DOC-0003` (the document compiler owns that
+surface).
 
 ## 7. Tests
 
 - `builtin()` resolves the leaf/grammar kinds; a custom factory added by a builder wins only for its
   own id; a duplicate throws.
+- `CatalogRegistrar`: an empty registrar freezes to `Catalogs.builtin()`; contributions enter the
+  frozen families; a builtin id and a duplicate id with a different value throw `SC-SPI-0003`; an
+  equal re-put collapses; `fail`/`failures` attribute a register failure to its plugin id.
 - `Host.empty()`: compile/check work; settle with claims is `Undecided`; settle without claims is
   `Formed` through an attempt.
 - The attempt is the only publish target: a closed attempt, a foreign instance id and a mismatched

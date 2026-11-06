@@ -180,6 +180,28 @@ state, and a check must never write through it (D-41). A blueprint that needs ca
 registers a captured trait. The same rule holds for `energy` (`IEnergyStorage`) and `fluid`
 (`IFluidHandler`): a trait carries the owning API object, never a framework wrapper.
 
+A mod teaches the document compiler its own kinds through the plugin entry point it already has:
+
+```java
+@PluginMarker
+public final class ReactorPlugin implements ModPlugin {
+    @Override
+    public NamespacedId pluginId() {
+        return NamespacedId.of("mymod", "reactor_plugin");
+    }
+
+    @Override
+    public void register(CatalogRegistrar registrar) {
+        registrar.expectation(NamespacedId.of("mymod", "reactor"), ReactorExpectation.factory());
+    }
+}
+```
+
+The host calls `register` once per loaded plugin, in the loader's resolved order, while it assembles
+the catalogs; after that the catalogs are a frozen snapshot. A kind the plugin never registered is
+still `SC-DOC-0003`, a built-in id cannot be replaced, and a plugin that throws while registering is
+a fatal load failure named by its id (D-72).
+
 ## 5. The document surface
 
 The same campfire as data. A document is the authoring form; the compiler lowers it to the same

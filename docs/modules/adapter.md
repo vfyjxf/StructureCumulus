@@ -74,7 +74,10 @@
   `SnapshotLevel`, the capture wiring, the typed `WorldView.get` dispatch, snapshot anchors and the
   digest content. H3 adds the `property`/`state`/`tag`/`fluid` expectation factories and catalog, the
   `SC-MC-0006`…`0010` entries and the anchor's declared-value constraint. H4 closes the docs, counts
-  and the `HostDataScenarioTest` stress group (`06-verification.md` §3.4).
+  and the `HostDataScenarioTest` stress group (`06-verification.md` §3.4). X05 opens the shipped
+  catalogs to plugin contributions: `ModPlugin.register(CatalogRegistrar)` contributes expectation,
+  focus, computation and deriver factories plus code entries, assembled once in `ServerState` over
+  `CatalogRegistrar.builtin()` and the adapter tables (D-72).
 - **Implemented (S6, retired by host-data H1; D-29 superseded by D-33).** A capture carrying a siting orientation
   audits every root block state through the inverse orientation and reports an unrepresentable state as
   `SC-MC-0004` (§3, §10). The definition-frame descriptor projection is retired: the kernel
@@ -96,6 +99,7 @@
 | `SnapshotLevel` | `BlockGetter` | package-private; one frame's immutable host snapshot: copied section states, fluids, detached block entities and captured entities, in local coordinates |
 | `HostTypes` | — | public final class; the four typed host-read tokens (`blockState`, `fluidState`, `entity`, `blockEntity`) |
 | `AdapterExpectations` | — | package-private; the four host expectation factories (`property`, `state`, `tag`, `fluid`) and their catalog |
+| `AdapterCatalogs` | — | package-private; seeds the catalog registrar with the adapter's expectation and code tables before any plugin contributes |
 | `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value → `(type, kind)` descriptor; entity body identity; nested body |
@@ -111,9 +115,9 @@
 | `BlockTraitContext` / `EntityTraitContext` | records (`trait`) | immutable provider inputs: level/pos/state/block entity or entity; the capture is a `get` parameter |
 | `BlockTraitProviders` / `EntityTraitProviders` | final classes (`trait`) | the six standard providers as `CapabilityTraitProvider` declarations (inventory/energy/fluid per holder) |
 | `CapabilityAccess<H, C>` / `CapabilityTraitProvider<T, H, C>` / `CapabilityAccesses` | functional interface / final class / final class (`trait`) | one generic capability provider; `block()`/`entity()`/`entityVoid()` map a holder to its normal capability get signature |
-| `ModPlugin` / `PluginDependency` | interface / record (`plugin`) | plugin id, `before`/`after`/`none` order and `required`/`optional`/`optionalRequired` constraints |
+| `ModPlugin` / `PluginDependency` | interface / record (`plugin`) | plugin id, `before`/`after`/`none` order, `required`/`optional`/`optionalRequired` constraints, and catalog contributions through `register(CatalogRegistrar)` (default no-op) |
 | `PluginLookup<T>` / `AnnotationPluginLookup<T>` / `SpiPluginLookup<T>` | interface / final classes (`plugin`) | plugin discovery; NeoForge annotation scan and Java SPI |
-| `PluginLoader` / `PluginLoadingException` | final class / exception (`plugin`) | deterministic Kahn loading; fatal missing/duplicate/cycle and warning/skip failures |
+| `PluginLoader` / `PluginLoadingException` | final class / exception (`plugin`) | deterministic Kahn loading; fatal missing/duplicate/cycle and warning/skip failures; the catalog register pass folds its failures into the same policy |
 | `PluginMarker` | annotation (`plugin`) | marks a plugin class for annotation discovery |
 | `NestedExtent` | record (capability) | one provider declaration: type, absolute bounds, world origin |
 | `NestedExtents` | final class (capability) | the `BLOCK` and `ENTITY` capabilities |
@@ -133,7 +137,7 @@
 | `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
 | `JsonDocument` / `StructureSetReader` / `StructureSetWriter` | — | `kind` dispatcher; Gson tree ↔ `StructureSetDocument`; canonical set output (S2) |
 | `DatapackBlueprints` | `DocumentSource` | reload listener; blueprint and structure-set ids under `data/<ns>/cumulus/structure/` (M4b + S3); wins over `BuiltinDocuments` on an id collision |
-| `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/structures, capture cache, merged set lookup (datapack over builtin, S5) and set compile |
+| `ServerState` | — | catalogs (built-ins plus the adapter's tables plus plugin contributions, assembled once over `CatalogRegistrar`), server-level and per-level kernels, per-level ledger/structures, capture cache, merged set lookup (datapack over builtin, S5) and set compile |
 | `StructureSet` | — | host plan: compiled set + host root siting + each satellite's composed siting, world bounds and world-space presence region; `place` reports mapping failures |
 | `StructureSet.Satellite` | record | one placed satellite: id, compiled satellite, absolute siting, world bounds, presence cells |
 | `StructureSet.Placement` | record | the placed set or the findings that prevented it |
@@ -260,8 +264,9 @@ registries are defaulted and a lookup must not answer the default. A tag id is t
 reference left unresolved: a later datapack may declare it, so an unknown tag matches nothing at match
 time.
 
-`ServerState` merges `AdapterExpectations.catalog()` into its expectation catalog, so an ordinary
-`checks` entry whose `expect.kind` is `property`, `state`, `tag` or `fluid` compiles through the same
+`ServerState` seeds `AdapterExpectations.catalog()` into its catalog registrar before any plugin
+contributes (§7.5), so an ordinary `checks` entry whose `expect.kind` is `property`, `state`, `tag`
+or `fluid` compiles through the same
 `DocumentCompiler` path as a kernel leaf. There is no `mc_checks` member, no separate MC JSON check
 type and no kernel MC kind; the built-in kernel catalog alone reports `SC-DOC-0003` for these kinds.
 A host expectation adds no `ReadScope` entry: the declared cells already pick the anchor the typed
@@ -426,6 +431,24 @@ build time and a wrong-type `get` throws `IllegalArgumentException`. `LevelCaptu
 `TraitLookup.builtin()` with `TraitCaptureContext.empty()`; the public
 `LevelCapture(ServerLevel, TraitLookup, TraitCaptureContext)` injects both, and the existing
 constructors are preserved.
+
+### 7.5 Catalog contributions (X05, D-72)
+
+`ModPlugin` gains one default method, `register(CatalogRegistrar)`; a plugin that contributes
+document kinds overrides it, every other plugin inherits the no-op, so trait plugins load unchanged.
+`ServerState` assembles the catalogs once per session while it opens: `CatalogRegistrar.builtin()`
+(the kernel's six tables), `AdapterCatalogs.seed` (the `property`/`state`/`tag`/`fluid` factories
+and the `SC-MC-*` code entries), then `PluginLoader.register(logger, "catalog",
+AnnotationPluginLookup.of(ModPlugin.class), registrar)` — every loaded plugin's `register`, once, in
+the loader's resolved order. `registrar.catalogs()` freezes the snapshot every compile reads; there
+is no runtime contribution and no second assembly.
+
+Failures use the loader's existing policy, not a new one. A plugin that throws while registering —
+including the `SC-SPI-0003` the registrar raises when a contribution would replace an id that is
+already registered — is a fatal failure named by its plugin id, and a plugin that depends on it
+through a non-optional constraint is skipped with the same fatal/warning split a missing dependency
+produces; warnings log, fatals throw `PluginLoadingException` out of `ServerState.open`. The
+registrar's `fail`/`failures` carry the same attribution for a host that assembles by hand.
 
 ## 8. Nested capability
 
