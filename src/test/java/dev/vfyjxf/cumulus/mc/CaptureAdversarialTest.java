@@ -320,12 +320,8 @@ class CaptureAdversarialTest {
         assertNull(view.get(cell, HostTypes.entityType), "no entity was captured");
         assertNull(view.get(cell, HostTypes.blockEntity), "no block entity was captured");
         assertNull(view.get(cell, HostType.of(NamespacedId.of("test", "custom"))), "an unknown host type answers null");
-        BlockState outside = view.get(LatticePoint.of(9, 0, 0), HostTypes.blockState);
-        assertTrue(outside != null && outside.isAir(), "an out-of-bounds host read is air, not null");
-        assertTrue(
-            Objects.requireNonNull(view.get(LatticePoint.of(9, 0, 0), HostTypes.fluidState)).isEmpty(),
-            "an out-of-bounds fluid read is empty"
-        );
+        assertNull(view.get(LatticePoint.of(9, 0, 0), HostTypes.blockState), "an out-of-bounds read is null");
+        assertNull(view.get(LatticePoint.of(9, 0, 0), HostTypes.fluidState), "an out-of-bounds read is null");
     }
 
     @Test
@@ -353,8 +349,7 @@ class CaptureAdversarialTest {
             view.get(negative, HostTypes.fluidState),
             "the negative cell resolves its own fluid"
         );
-        BlockState outside = view.get(LatticePoint.of(-40, 0, 0), HostTypes.blockState);
-        assertTrue(outside != null && outside.isAir(), "outside the snapshot is air");
+        assertNull(view.get(LatticePoint.of(-40, 0, 0), HostTypes.blockState), "outside the snapshot is null");
     }
 
     @Test

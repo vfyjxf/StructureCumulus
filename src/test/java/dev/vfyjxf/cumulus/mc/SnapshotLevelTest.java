@@ -26,7 +26,6 @@ import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,8 +93,41 @@ class SnapshotLevelTest {
         assertEquals(Fluids.EMPTY.defaultFluidState(), snapshot.getFluidState(new BlockPos(1, 0, 0)));
         assertNull(snapshot.getBlockEntity(new BlockPos(1, 0, 0)));
         assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.entityType));
-        assertTrue(Objects.requireNonNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.blockState), "air").isAir());
-        assertEquals(Fluids.EMPTY.defaultFluidState(), snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.fluidState));
+        assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.blockState), "the host face never substitutes");
+        assertNull(snapshot.get(LatticePoint.of(1, 0, 0), HostTypes.fluidState), "the host face never substitutes");
+    }
+
+    @Test
+    void anInBoundsCellOutsideACapturedSectionAnswersNull() {
+        LatticePoint origin = LatticePoint.origin;
+        Cuboid bounds = Cuboid.of(0, 0, 0, 32, 1, 1);
+        PalettedContainer<BlockState> states = states();
+        states.set(0, 0, 0, Blocks.STONE.defaultBlockState());
+        long key = SnapshotLevel.worldSectionKey(0, 0, 0);
+        SnapshotLevel snapshot = new SnapshotLevel(
+            origin,
+            bounds,
+            -64,
+            384,
+            Map.of(key, states),
+            Map.of(key, fluids()),
+            Map.of(),
+            List.of()
+        );
+
+        assertNull(snapshot.get(LatticePoint.of(16, 0, 0), HostTypes.blockState), "the section was never captured");
+        assertNull(snapshot.get(LatticePoint.of(16, 0, 0), HostTypes.fluidState), "the section was never captured");
+        assertNull(snapshot.get(LatticePoint.of(16, 0, 0), HostTypes.entityType), "the section was never captured");
+        assertNull(snapshot.get(LatticePoint.of(16, 0, 0), HostTypes.blockEntity), "the section was never captured");
+        assertTrue(snapshot.getBlockState(new BlockPos(16, 0, 0)).isAir(), "the BlockGetter face keeps its contract");
+    }
+
+    @Test
+    void aForgedTokenWithAKnownIdAnswersNull() {
+        SnapshotLevel snapshot = snapshot(Blocks.STONE.defaultBlockState());
+        HostType<Object> forged = HostType.of(NamespacedId.of("structurecumulus", "block_state"));
+
+        assertNull(snapshot.get(LatticePoint.origin, forged), "only the adapter's own tokens dispatch");
     }
 
     @Test

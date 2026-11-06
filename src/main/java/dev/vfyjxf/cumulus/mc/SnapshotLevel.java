@@ -109,19 +109,26 @@ final class SnapshotLevel implements BlockGetter {
 
     @SuppressWarnings("unchecked")
     <H> @Nullable H get(LatticePoint pos, HostType<H> type) {
-        if (type.equals(HostTypes.blockState)) {
+        if (!captured(pos)) {
+            return null;
+        }
+        if (type == HostTypes.blockState) {
             return (H) blockState(pos.x(), pos.y(), pos.z());
         }
-        if (type.equals(HostTypes.fluidState)) {
+        if (type == HostTypes.fluidState) {
             return (H) fluidState(pos.x(), pos.y(), pos.z());
         }
-        if (type.equals(HostTypes.entityType)) {
+        if (type == HostTypes.entityType) {
             return (H) entityTypeAt(pos);
         }
-        if (type.equals(HostTypes.blockEntity)) {
+        if (type == HostTypes.blockEntity) {
             return (H) blockEntityAt(pos);
         }
         return null;
+    }
+
+    private boolean captured(LatticePoint pos) {
+        return contains(pos.x(), pos.y(), pos.z()) && sections.containsKey(sectionAt(pos.x(), pos.y(), pos.z()));
     }
 
     long contentDigest(Cuboid cells) {

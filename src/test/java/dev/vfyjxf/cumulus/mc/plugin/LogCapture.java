@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Captures the formatted messages a named logger emits while attached. */
-final class LogCapture implements AutoCloseable {
+public final class LogCapture implements AutoCloseable {
 
     private final Logger logger;
     private final CapturingAppender appender;
@@ -21,16 +21,20 @@ final class LogCapture implements AutoCloseable {
         this.appender = appender;
     }
 
-    static LogCapture attach(Class<?> loggerOwner) {
+    public static LogCapture attach(Class<?> loggerOwner) {
+        return attach(loggerOwner.getName());
+    }
+
+    public static LogCapture attach(String loggerName) {
         LoggerContext context = (LoggerContext) LogManager.getContext(false);
-        Logger logger = context.getLogger(loggerOwner.getName());
+        Logger logger = context.getLogger(loggerName);
         CapturingAppender appender = new CapturingAppender();
         appender.start();
         logger.addAppender(appender);
         return new LogCapture(logger, appender);
     }
 
-    List<String> messages() {
+    public List<String> messages() {
         return appender.messages;
     }
 

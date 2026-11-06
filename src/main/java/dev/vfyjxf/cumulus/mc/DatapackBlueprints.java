@@ -3,11 +3,19 @@ package dev.vfyjxf.cumulus.mc;
 import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
+import dev.vfyjxf.cumulus.kernel.core.SourceSpan;
 import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
+import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
+import dev.vfyjxf.cumulus.kernel.finding.FindingRenderer;
+import dev.vfyjxf.cumulus.kernel.finding.Label;
+import dev.vfyjxf.cumulus.kernel.finding.LabelRole;
+import dev.vfyjxf.cumulus.kernel.finding.RenderContext;
+import dev.vfyjxf.cumulus.kernel.finding.SourceText;
+import dev.vfyjxf.cumulus.kernel.space.LocusFrame;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -60,9 +68,6 @@ public final class DatapackBlueprints implements DocumentSource {
     }
 
     static void receive(Snapshot prepared) {
-        for (Finding finding : prepared.findings()) {
-            StructureCumulus.logger.warn("{}: {}", finding.code().text(), finding.message());
-        }
         ServerState state = ServerState.current();
         if (state == null) {
             pending = prepared;
@@ -79,6 +84,7 @@ public final class DatapackBlueprints implements DocumentSource {
         Map<NamespacedId, Loaded> loaded = new TreeMap<>();
         Map<NamespacedId, LoadedSet> loadedSets = new TreeMap<>();
         List<Finding> findings = new ArrayList<>();
+        Map<NamespacedId, String> texts = new TreeMap<>();
         for (ResourceLocation path : ordered) {
             NamespacedId source = sourceId(path);
             Resource resource = resources.get(path);
@@ -93,8 +99,12 @@ public final class DatapackBlueprints implements DocumentSource {
                 continue;
             }
             List<Finding> errors = new ArrayList<>();
-            JsonDocument parsed = JsonDocument.read(source, new String(bytes, StandardCharsets.UTF_8), errors);
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            JsonDocument parsed = JsonDocument.read(source, text, errors);
             findings.addAll(errors);
+            if (!errors.isEmpty()) {
+                texts.put(source, text);
+            }
             if (parsed instanceof JsonDocument.Blueprint blueprint) {
                 Document document = blueprint.document();
                 NamespacedId id = document.root().id();
@@ -115,7 +125,36 @@ public final class DatapackBlueprints implements DocumentSource {
         loaded.forEach((id, value) -> documents.put(id, value.document()));
         Map<NamespacedId, StructureSetDocument> sets = new TreeMap<>();
         loadedSets.forEach((id, value) -> sets.put(id, value.document()));
+        report(findings, texts);
         return new Snapshot(documents, sets, findings);
+    }
+
+    private static void report(List<Finding> findings, Map<NamespacedId, String> texts) {
+        for (Finding finding : findings) {
+            RenderContext context = RenderContext.plain();
+            SourceSpan span = primarySpan(finding);
+            if (span != null) {
+                String text = texts.get(span.document());
+                if (text != null) {
+                    context = RenderContext.of(SourceText.of(span.document(), text));
+                }
+            }
+            String rendered = FindingRenderer.human(FindingBundle.of(List.of(finding)), context);
+            for (String line : rendered.split("\n", -1)) {
+                if (!line.isEmpty()) {
+                    StructureCumulus.logger.warn(line);
+                }
+            }
+        }
+    }
+
+    private static @Nullable SourceSpan primarySpan(Finding finding) {
+        for (Label label : finding.labels()) {
+            if (label.role() == LabelRole.primary && label.locus().frame() == LocusFrame.definition) {
+                return label.locus().source();
+            }
+        }
+        return null;
     }
 
     static @Nullable NamespacedId sourceId(ResourceLocation location) {

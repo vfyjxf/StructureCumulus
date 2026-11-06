@@ -215,8 +215,11 @@ The rules below are implemented.
 
 `SnapshotLevel` is the one host snapshot per frame. It implements `BlockGetter` in **local** frame
 coordinates: `getBlockState`, `getFluidState`, `getBlockEntity` and the typed `get(pos, HostType)`.
-Out-of-bounds reads answer air / empty fluid / null; a missing section answers the same without a
-world read. The snapshot retains no `Level` of its own: block states, fluids and block entities are
+The `BlockGetter` face keeps the vanilla contract — out-of-bounds or missing-section reads answer
+air / empty fluid / null. The typed host face never substitutes (`world.md` §4.11): a cell outside
+the frame bounds or in a section that was never captured answers null for every host type, and only
+the adapter's own `HostTypes` constants dispatch — a token that is not one of them answers null.
+The snapshot retains no `Level` of its own: block states, fluids and block entities are
 copies, and an entity cell carries the captured `EntityType`. A capability handle handed through the
 capture is host code's object and may reach one; it is live for the lease (D-41).
 
@@ -763,7 +766,9 @@ id namespaces are independent, so a blueprint and a set may share one id. A dupl
 different bytes is a reload finding per namespace; the first file in path order wins and the
 duplicate is reported. The reader/writer (M4a) and the datapack reload (M4b) are committed. S3
 makes the scan accept set files instead of rejecting them; a malformed set is a located finding and
-never kills the reload. `ServerState` installs one merged `DocumentSource` in both the server-level
+never kills the reload. Scan-time diagnostics are rendered per finding with
+`FindingRenderer.human` over the file's `SourceText`, so the reload log carries the document id,
+line, column and the offending source line, not just the code and message. `ServerState` installs one merged `DocumentSource` in both the server-level
 and the per-level host: a datapack document wins over a `BuiltinDocuments` document on an id
 collision, the built-in `structurecumulus:air_cell` remains the fallback, `findSet` delegates to the
 datapack source and then to the built-in sets (`structurecumulus:set_demo` since S5), and
