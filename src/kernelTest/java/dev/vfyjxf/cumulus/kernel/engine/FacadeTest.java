@@ -4,15 +4,28 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.DeriveContext;
+import dev.vfyjxf.cumulus.kernel.context.Deriver;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
+import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
+import dev.vfyjxf.cumulus.kernel.core.Retention;
+import dev.vfyjxf.cumulus.kernel.core.Value;
+import dev.vfyjxf.cumulus.kernel.document.BaySpec;
+import dev.vfyjxf.cumulus.kernel.document.BlueprintSpec;
+import dev.vfyjxf.cumulus.kernel.document.CheckSpec;
+import dev.vfyjxf.cumulus.kernel.document.CompileResult;
+import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
 import dev.vfyjxf.cumulus.kernel.finding.Applicability;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
@@ -39,18 +52,22 @@ import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
+import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FacadeTest {
@@ -151,5 +168,198 @@ class FacadeTest {
         assertEquals(2, result.remedies().size());
         assertInstanceOf(Remedy.Repair.class, result.remedies().get(0));
         assertTrue(result.findings().isEmpty());
+    }
+
+    @Test
+    void anEmptyHostCompilesChecksAndSettlesThroughAnAttempt() {
+        StructureKernel kernel = StructureKernel.create(Catalogs.builtin());
+        assertNull(kernel.ledger());
+        assertNull(kernel.document(id("nowhere")));
+        assertSame(kernel.structures(), kernel.contexts());
+
+        MatchResult.Formed formed = settleAndCommitAClaimFreeBlueprint(kernel);
+        assertTrue(formed.claims().rows().isEmpty());
+        assertEquals(0L, formed.ledgerRevision());
+        assertEquals(1, kernel.structures().instances().size());
+    }
+
+    @Test
+    void anEmptyHostSettlesClaimableRowsAsUndecided() {
+        Cuboid bounds = Cuboid.of(0, 0, 0, 2, 1, 1);
+        Bay bay = Bay.of(id("bay"), CuboidSet.of(bounds), Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Blueprint blueprint = Blueprint.builder(id("box")).bounds(bounds)
+                .check(Check.of(id("any"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant())))
+                .build();
+        TestWorld.View view = new TestWorld.View();
+        view.put(TestWorld.block(TestWorld.stone, LatticePoint.origin));
+        view.put(TestWorld.block(TestWorld.stone, LatticePoint.of(1, 0, 0)));
+        StructureKernel kernel = StructureKernel.create(Catalogs.builtin());
+
+        Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+        OwnerId owner = OwnerId.of(id("owner"));
+        StructureAttempt draft = kernel.structures()
+                .begin(TestWorld.world, new StructureSpec(owner, siting, blueprint.id()));
+        MatchRequest request = MatchRequest.of(
+            blueprint,
+            siting,
+            new TestWorld.Lease(view),
+            draft.id(),
+            owner,
+            Budget.unbounded(),
+            new ClaimView(List.of(), 0, true)
+        );
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, kernel.check(request));
+        MatchResult.Undecided undecided = assertInstanceOf(
+            MatchResult.Undecided.class,
+            kernel.settle(request, admitted, draft)
+        );
+        assertEquals(UndecidedReason.ledgerUnavailable, undecided.reason());
+    }
+
+    @Test
+    void twoKernelsDoNotShareState() {
+        StructureKernel first = StructureKernel.create(Catalogs.builtin());
+        StructureKernel second = StructureKernel.create(Catalogs.builtin());
+        settleAndCommitAClaimFreeBlueprint(first);
+        assertEquals(1, first.structures().instances().size());
+        assertTrue(second.structures().instances().isEmpty());
+    }
+
+    @Test
+    void deriveReadsTheHostManagerAfterCommit() {
+        ContextKey<Long> output = ContextKeys.of(id("derived"), Long.class, Retention.instance);
+        Deriver<Long> deriver = new Deriver<>() {
+            @Override
+            public ContextKey<Long> output() {
+                return output;
+            }
+
+            @Override
+            public Set<ContextKey<?>> requires() {
+                return Set.of();
+            }
+
+            @Override
+            public Outcome<Long> derive(DeriveContext ctx) {
+                return Outcome.found(7L);
+            }
+        };
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("constant_deriver"), deriver)
+                .build();
+        StructureKernel kernel = StructureKernel.create(Catalogs.builder().derivers(derivers).build());
+
+        MatchResult.Formed formed = settleAndCommitAClaimFreeBlueprint(kernel);
+        kernel.derive(formed, List.of(new DerivationSpec(id("constant_deriver"), Value.object(), output.id(), 0)));
+        StructureInstance instance = kernel.structures().find(formed.instance());
+        assertNotNull(instance);
+        assertEquals(Long.valueOf(7L), instance.context().get(output));
+    }
+
+    @Test
+    void solveCatchesAFailingProviderAsAProblemFinding() {
+        RemedyProvider failing = new RemedyProvider() {
+            @Override
+            public NamespacedId id() {
+                return FacadeTest.id("failing");
+            }
+
+            @Override
+            public List<Remedy> solve(Finding finding, RemedyContext context) {
+                throw new IllegalStateException("boom");
+            }
+        };
+        Catalog<RemedyProvider> remedies = Catalog.<RemedyProvider>builder(id("remedies")).put(failing.id(), failing)
+                .build();
+        StructureKernel kernel = StructureKernel.create(Catalogs.builder().remedies(remedies).build());
+        Bay bay = Bay.of(
+            id("solve_bay"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+            Coverage.everyCell,
+            Footprint.none(),
+            Sharing.shared
+        );
+        Blueprint blueprint = Blueprint.builder(id("empty")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(Check.of(id("probe"), bay, Focuses.occupant(LatticePoint.origin), Expectations.anyOccupant()))
+                .build();
+        Finding finding = Finding.builder(Codes.unreadableCell).phase(Phase.check).message("missing")
+                .label(Label.primary(Locus.local(CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1))), "missing")).build();
+        RemedyContext context = new RemedyContext(
+            blueprint,
+            Siting.of(LatticePoint.origin, Orientation.identity),
+            null,
+            0,
+            null,
+            null,
+            2
+        );
+
+        SolveResult result = kernel.solve(FindingBundle.of(List.of(finding)), context);
+        assertTrue(result.remedies().isEmpty());
+        assertEquals(1, result.findings().findings().size());
+        assertEquals(Codes.remedyFailed.code(), result.findings().findings().get(0).code());
+    }
+
+    private static MatchResult.Formed settleAndCommitAClaimFreeBlueprint(StructureKernel kernel) {
+        BaySpec bay = new BaySpec(
+            id("claim_free_bay"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1)),
+            Coverage.everyCell,
+            Footprint.none(),
+            Sharing.shared,
+            null,
+            null
+        );
+        CheckSpec probe = new CheckSpec(
+            id("claim_free_probe"),
+            id("claim_free_bay"),
+            NamespacedId.of("bay"),
+            Value.object(),
+            NamespacedId.of("each_cell"),
+            Value.object(Map.of("element", Value.object(Map.of("kind", Value.string("any_occupant"))))),
+            null,
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("claim_free"),
+            Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(bay),
+            List.of(),
+            List.of(probe),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult compiled = kernel.compile(new Document(1, root, Map.of(), Map.of()));
+        assertTrue(compiled.findings().isEmpty(), () -> compiled.findings().findings().toString());
+        Blueprint blueprint = Objects.requireNonNull(compiled.blueprint(), "blueprint");
+
+        Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+        OwnerId owner = OwnerId.of(id("owner"));
+        TestWorld.View view = new TestWorld.View();
+        view.put(TestWorld.block(TestWorld.stone, LatticePoint.origin));
+        view.put(TestWorld.block(TestWorld.stone, LatticePoint.of(1, 0, 0)));
+        StructureAttempt draft = kernel.structures()
+                .begin(TestWorld.world, new StructureSpec(owner, siting, blueprint.id()));
+        MatchRequest request = MatchRequest.of(
+            blueprint,
+            siting,
+            new TestWorld.Lease(view),
+            draft.id(),
+            owner,
+            Budget.unbounded(),
+            new ClaimView(List.of(), 0, true)
+        );
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, kernel.check(request));
+        MatchResult.Formed formed = assertInstanceOf(MatchResult.Formed.class, kernel.settle(request, admitted, draft));
+        draft.commit(CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1)));
+        return formed;
     }
 }

@@ -193,6 +193,36 @@ class ReadModelTest {
     }
 
     @Test
+    void refusedSectionAnswersEveryCellWithTheSlotCode() {
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("stone_bricks"), LatticePoint.of(1, 0, 0)));
+        SectionKey key = view.sectionOf(LatticePoint.origin);
+        view.refuseSection(key);
+
+        SectionSlot.Refused slot = assertInstanceOf(SectionSlot.Refused.class, view.slot(key));
+        assertEquals(ReadStatus.notCaptured, slot.status());
+        assertEquals(Codes.unreadableRead.code(), slot.code());
+        assertEquals(0L, view.contentDigest(key));
+
+        for (LatticePoint cell : List.of(
+            LatticePoint.origin,
+            LatticePoint.of(1, 0, 0),
+            LatticePoint.of(5, 7, 9),
+            LatticePoint.of(15, 15, 15)
+        )) {
+            CellRead.Unreadable unreadable = assertInstanceOf(CellRead.Unreadable.class, view.read(cell));
+            assertEquals(slot.status(), unreadable.refusal().status());
+            assertEquals(slot.code(), unreadable.refusal().code());
+            assertEquals(unreadable.refusal(), view.refusalAt(cell));
+            assertEquals(slot.status(), view.statusOf(cell));
+            assertNull(view.occupant(cell), cell::toString);
+            assertNull(view.cellOccupant(cell), cell::toString);
+        }
+
+        LatticePoint neighbourSection = LatticePoint.of(16, 0, 0);
+        assertTrue(Objects.requireNonNull(view.occupant(neighbourSection), "air").isAir());
+    }
+
+    @Test
     void viewDigestCoversContentAndRefusalStatusNotHostCode() {
         LatticePoint cell = LatticePoint.of(1, 0, 0);
         TestWorld.View first = new TestWorld.View().put(TestWorld.block(mc("stone_bricks"), LatticePoint.origin))
