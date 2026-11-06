@@ -133,7 +133,7 @@ Then the module files, in dependency order:
   containers), 440 adapter unit tests (46 containers) and 140 `@GameTest` methods; a full
   `./gradlew check` and `runGameTestServer` both pass at this revision (541 kernel tests, 440 adapter
   tests, 140/140 GameTests, 0 failures, 0 skipped). `Codes.all` has 66 entries
-  and the decision record has 80 decisions (D-82; D-29 and D-36 superseded, D-78 withdrawn).
+  and the decision record has 81 decisions (D-82; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 

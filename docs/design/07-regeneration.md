@@ -43,7 +43,7 @@ one union capture and the check-only host path (`09-structure-sets.md` §16). S6
 `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
 budget shared by presence and every member attempt. The tree registers
 **541 kernel tests in 65 containers, 440 adapter unit tests in 46 containers and 140 `@GameTest`
-methods**; `Codes.all` has 66 entries and the decision record has 80 decisions (D-82; D-29 and D-36
+methods**; `Codes.all` has 66 entries and the decision record has 81 decisions (D-82; D-29 and D-36
 superseded, D-78 withdrawn). Pending only: acting on the measured kernel-side cost debts and the
 live-level review items (§7), and fresh visual review screenshots.
 No regeneration milestone exists or is planned: the code is corrected against this set in place.

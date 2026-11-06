@@ -102,7 +102,7 @@ export const HERO_STATS = [
   { value: '541', label: 'tests', note: 'kernel JUnit 5 · adapter 440 · GameTests 140/140' },
   { value: '66', label: 'codes', note: '13 kernel families · one Codes table' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
-  { value: '80', label: 'decisions', note: 'D-82 · rulings, not preferences' },
+  { value: '81', label: 'decisions', note: 'D-82 · rulings, not preferences' },
 ];
 
 export const LAYERS = [

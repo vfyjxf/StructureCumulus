@@ -68,7 +68,7 @@ invalidation, and one set budget shared by presence and every member attempt (§
 observation into the funnel. The current
 suites total 541 kernel tests (65 containers), 440 adapter unit tests (46 containers) and 140
 `@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (541 kernel / 65 containers, 440 adapter / 46 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
-`Codes.all` has 66 entries and the decision record has 80 decisions (D-82; D-78 withdrawn). Model C, body identity,
+`Codes.all` has 66 entries and the decision record has 81 decisions (D-82; D-78 withdrawn). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
