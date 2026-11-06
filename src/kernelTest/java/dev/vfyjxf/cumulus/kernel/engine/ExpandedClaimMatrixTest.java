@@ -500,7 +500,7 @@ class ExpandedClaimMatrixTest {
 
     private static int count(CuboidSet cells) {
         int count = 0;
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             count += (box.max().x() - box.min().x())
                     * (box.max().y() - box.min().y())
                     * (box.max().z() - box.min().z());
@@ -518,7 +518,7 @@ class ExpandedClaimMatrixTest {
 
     private static Set<LatticePoint> cells(CuboidSet set) {
         Set<LatticePoint> cells = new LinkedHashSet<>();
-        for (Cuboid box : set.boxes()) {
+        for (Cuboid box : set.decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {

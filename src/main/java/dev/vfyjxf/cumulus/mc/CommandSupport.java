@@ -1,6 +1,10 @@
 package dev.vfyjxf.cumulus.mc;
 
 import com.mojang.brigadier.context.CommandContext;
+import dev.vfyjxf.cumulus.StructureCumulus;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
+import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
@@ -33,6 +37,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.ToIntFunction;
 
 /** The helpers shared by the {@code /cumulus} subcommands: arguments, documents, capture, siting and output. */
 @NullMarked
@@ -263,6 +268,39 @@ final class CommandSupport {
             return;
         }
         source.sendSuccess(() -> Component.literal(FindingRenderer.human(findings, RenderContext.plain())), false);
+    }
+
+    static int guarded(
+        CommandContext<CommandSourceStack> context,
+        String verb,
+        ToIntFunction<CommandContext<CommandSourceStack>> body
+    ) {
+        try {
+            return body.applyAsInt(context);
+        } catch (RuntimeException | StackOverflowError | LinkageError failure) {
+            StructureCumulus.logger.error("/cumulus {} failed", verb, failure);
+            String detail = failure.getMessage() == null ? "" : ": " + failure.getMessage();
+            context.getSource().sendFailure(
+                Component.literal("cumulus " + verb + " failed: " + failure.getClass().getSimpleName() + detail)
+            );
+            return 0;
+        }
+    }
+
+    static void abortQuietly(StructureAttempt draft) {
+        try {
+            draft.abort();
+        } catch (IllegalStateException ignored) {
+            // the manager already closed it
+        }
+    }
+
+    static void releaseQuietly(ClaimLedger ledger, InstanceId instance) {
+        try {
+            ledger.release(instance);
+        } catch (IllegalStateException ignored) {
+            // a quarantined ledger refuses writes; the guard still reports the original failure
+        }
     }
 
     /** One prepared capture: the world bounds, the resolved siting, the lease and the host report. */

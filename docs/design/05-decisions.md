@@ -1149,6 +1149,47 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
+### D-49 — Composing a siting applies the root offset once
+
+`Siting#toWorld(p)` is `origin + orientation(p) + offset`. Composing a satellite onto a root must
+place it exactly where `root.toWorld(satellite.toWorld(p))` puts it.
+
+The old `compose` counted the root offset twice: `origin` already carried it through `toWorld`, and
+`Placement#compose` carried it again into the composed placement, so the result was `+2·t_root`.
+
+The fix keeps `origin = toWorld(relative.origin)` and composes the placement from a rotation-only
+root placement, giving `(origin_P, (o_P∘o_R, o_P(t_R)))` — one copy of the root offset, the one
+inside `origin`.
+
+`Placement#compose` is unchanged: it composes two transforms, and a transform includes its own
+offset. A non-zero placement offset stays legal for a host.
+
+Nothing observable changes while every siting is built by `Siting.of(origin, orientation)`, whose
+placement offset is zero; the defect is fixed in the kernel because a host can construct the other
+form.
+
+
+### D-50 — A region is its cells; the box list is a decomposition
+
+`CuboidSet` holds a decomposition of a cell set. Which decomposition it holds is an implementation
+detail: equality and hashing already compare cells, and no consumer may use the box list as an
+identity or an ordering key.
+
+**Ordering is content-based.** Two regions compare by bounds, then cell count, then the first cell
+where they differ; the common case never enumerates cells. A decomposition that happens to differ
+therefore cannot reorder a finding.
+
+**The box list is renamed `decomposition()`** and documented as a decomposition, not a canonical
+form. `firstCell` already answers the region's smallest cell and needs no change.
+
+**Text is not specified.** Rendered finding text is debug output; the working error surface is the
+visual layer, so the text keeps whatever the current renderer produces.
+
+**Rejected: canonicalising the decomposition.** It forces a choice between a unique form that is not
+minimal (staircase families blow up to one box per cell) and a minimal one that must enumerate cells,
+and it makes every construction pay for a property only the ordering actually needs.
+
+
 ### D-51 — A context key is identified by (id, type), not by its whole record
 
 `ContextKey` carries five components, but only two of them name the slot: `id` and `type`. `merge` and
@@ -1169,6 +1210,29 @@ identity-hash dependency disappear.
 
 **One canonical order.** `ContextKeys.order()` sorts by `(id, type.getName())` and is the only order a
 `ContextKey` set may be iterated in; the comparators that re-implemented it are replaced by it.
+
+
+### D-54 — The command boundary is gated, guarded and self-cleaning
+
+`/cumulus` requires `Commands.LEVEL_GAMEMASTERS` (2) on the root literal. Every verb inherits it and
+none opts out. Each verb body runs inside one guard that catches `RuntimeException` and
+`StackOverflowError`, logs the failure at ERROR with the verb, answers
+`cumulus <verb> failed: <type>: <message>`, and returns 0. A verb that opened a draft closes it in a
+`finally`; a settle that wrote rows and then failed to commit releases that instance's key.
+
+**Why the root and not the verbs.** Every verb captures a region on the server thread, and one
+capture may read up to a million cells. `explain` is a debugging aid for the authors who write
+blueprints, not a player feature; a per-verb gate would only mean answering the same question again
+for each verb added later.
+
+**Why catch `StackOverflowError`.** It is the one error a command body could raise from document data
+(K10-D09), and an uncaught error reaches the tick loop. The expansion budget removes the cause; this
+is defence in depth. No other error is caught: an `OutOfMemoryError` leaves no safe state to report.
+
+**Why the draft closes in `finally`.** `begin` reserves `(world, owner, siting)` until abort or
+commit, so an exception between them locks that spot until the level unloads. A settle that formed
+and then threw leaves rows with no instance; releasing that key on the way out is the only cleanup.
+
 
 ### D-56 — A publish is a new table, never a merge
 
@@ -1195,6 +1259,7 @@ change yesterday's snapshot under its holder.
 **Why not a `removed` parameter.** Two ways to say "delete these keys" for one caller, and every host
 implementation would have to support both. Replacement makes the argument the whole truth.
 
+
 ### D-57 — A blueprint is refused only for conflicts it cannot outgrow
 
 The build refuses two bays of one blueprint whose owned cell sets are known at build time and
@@ -1215,6 +1280,28 @@ refused a `Declared` bay whose checked cells overlapped another bay while its ow
 and it treated a `Bound` bay's cells as if they were owned. It also ignored `Declared` against
 `Declared`, which the owned-set rule now refuses.
 
+
+### D-58 — A registry reference names its namespace and must resolve
+
+A factory argument that names a registry entry — `block`, `fluid`, and a tag id — must carry a
+namespace, and an unknown entry is a compile finding (`SC-EXP-0005`). A bare `"stone"` is refused with
+a hint naming `minecraft:stone`; it is not silently rewritten into the mod's namespace.
+
+**Why no default namespace here.** `NamespacedId.parse` fills `structurecumulus:`, which is right for
+document-local ids (a bay, a check, a key) and wrong for registry entries: every vanilla block would be
+spelled `minecraft:x` anyway, and a bare id silently becomes a lookup in a namespace no registry
+uses.
+
+**Why an unknown id is an error.** Both registries are defaulted: `BLOCK.get` answers air and
+`FLUID.get` answers the empty fluid, so a typo compiled into "expects air". For a fluid the mistake is
+worse: the empty fluid's block form is air, so "expects water" matched air. The two `== null` guards
+were dead code.
+
+**Tags stay unresolved.** A tag may be declared by a datapack that loads later, so an unknown tag is
+not a compile error; it matches nothing at match time. This is the one place a document names a
+registry object without resolving it.
+
+
 ### D-59 — A contributed key is complete or absent
 
 A section contribution whose value does not match the key's type marks the key absent. The engine
@@ -1231,6 +1318,7 @@ tells the author. Bare absence would read as "the computation chose not to produ
 
 **Why not `Failed`.** A broken computation that no check reads does not make the structure wrong;
 failing every attempt would turn one extension bug into a global outage.
+
 
 ### D-60 — Dropping a key is a release; a settle that changes nothing is not a write
 
@@ -1257,8 +1345,80 @@ bumps. A host that still bumps on a no-op stays correct — it only invalidates 
 holds for every settle that happens, but a settle whose plan owns nothing no longer happens; it is a
 `release`.
 
-> Numbering note: D-46 is still a proposal carried by
-> `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
+### D-62 — An expectation declares its read scope when it is built
+
+`Expectations.custom` gains a four-argument form carrying the expectation's `ReadScope`; the
+three-argument form keeps working for expectations that read nothing. An expectation written as a
+class overrides `Expectation.reads()`.
+
+The kernel cannot infer the scope: the body is an opaque function, and the `H` of a host read is
+never inspected. The declaration is the only signal, and it has to exist before capture, because the
+host builds its `SnapshotPolicy` from `blueprint.reads()`.
+
+**Why not `ExpectationMeta`.** Meta answers "what is this unit": its id orders the plan and its
+`requires` gates context reads. A read scope is a different question, and folding it in would change
+the identity and ordering of every meta.
+
+**Rejected: recording what an expectation actually reads.** Capture happens before any expectation
+runs. A runtime record answers a question that no longer matters, and it would need a hook on every
+read call.
+
+**Rejected: dropping the three-argument form.** A read-free custom check would have to pass
+`ReadScope.none()` for no gain; the two-argument distinction is the useful one, and the overload
+makes "I read nothing" the default rather than an omission.
+
+
+### D-68 — An anchor's value is a heading in the definition frame
+
+`AnchorSpec.value` names the anchor's heading in the blueprint's own coordinates. At check time the
+host reads the heading actually present at the anchor cell and asks the orientation policy for the
+allowed orientation that maps one to the other. One blueprint therefore matches every allowed turn.
+
+**What was wrong.** The same value was also the expected property value, so the literal comparison
+ran before any orientation was considered: placing the blueprint turned by 90° compared the
+observed `east` against the declared `north` and failed, and a policy that allowed every turn could
+only ever select the identity.
+
+**What it costs.** A document written for the old rule changes meaning: its `value` used to
+describe the world orientation it was drawn for. No shipped datapack declares an anchor (`grep`
+over `src/main/resources/data`), so the breakage is confined to third-party documents, which the
+module docs call out.
+
+### D-70 — The set host documents the shape the code has
+
+`StructureSetHost` takes the manager it works against and one function that reserves a draft per
+spec. The module design shows both constructors, the `run(set, lease, owner, budget, drafts)`
+signature and a real call site; the instance-supplier sketch and the per-level instance expression
+are removed with it.
+
+**Why the function stays.** After D-40 the host owns instance creation, and rollback and commit
+verification target the manager the drafts came from. A test that needs to inject a failing draft
+wraps the same function; an instance supplier would force every caller through one fixed path.
+
+**What the second constructor buys.** Passing the manager explicitly turns a silent mismatch — a
+draft committed into another manager — into a verification step. It stays.
+
+### D-72 — A mod contributes catalog entries through the plugin entry point it already has
+
+`ModPlugin` gains one default method, `register(CatalogRegistrar)`. A plugin that contributes document
+kinds overrides it; every plugin that does not inherits a no-op, so trait providers and other existing
+plugins are untouched. Discovery, ordering, duplicate detection and failure attribution stay with
+`PluginLookup` and `PluginLoader`.
+
+The host calls `register` once per loaded plugin, in the loader's resolved order, while it assembles
+`Catalogs` and before any document is compiled. The catalogs are then a frozen snapshot.
+
+**Why a default method and not a new interface.** One entry point means one discovery path, one order,
+one failure model. A second plugin interface would re-implement all three and behave differently from
+trait plugins in the same host.
+
+**What a plugin may add.** Expectation, focus, computation and deriver factories, plus code entries.
+Built-in ids cannot be replaced; a duplicate id with a different value is `SC-SPI-0003`, thrown while the
+catalog is built.
+
+**Failures.** A plugin that throws while registering — a `RuntimeException` or a `LinkageError`
+from a class it cannot resolve — is a fatal load failure named by its id, and every
+plugin that depends on it is skipped — the loader's existing classes, not a new one.
 
 ### D-74 — The adapter joins the signature gate in batches, with a shrinking list
 
@@ -1305,6 +1465,24 @@ removed the whole instance.
 
 **Law 6 stays absolute.** With the replay gone, `engine.settle` remains the only writer and every row
 it writes comes from the planner. D-78 is withdrawn.
+
+### D-81 — A plugin class that cannot be loaded is logged and skipped
+
+Discovery catches `LinkageError` around each candidate class, logs the class name and the cause at
+error level, and continues. Nothing is added to the loading result: a class that never loaded has no
+plugin id and no dependency edges, so the failure record — which names a plugin — cannot represent it.
+
+A plugin that declared a dependency on the skipped plugin still reports a missing dependency. That
+message is accurate about what happened to it and misleading about the cause; the module docs say so.
+
+**Why not abort (C).** One broken third-party plugin would take the whole game down; the host already
+degrades by skipping, and a skipped plugin surfaces as unknown kinds at document compile time.
+
+**Why not extend the failure record (A).** A record that can hold "an instance or a class name" changes
+a public shape for one message that the log already carries.
+
+> Numbering note: D-46 is still a proposal carried by
+> `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
 > Numbering note: D-78 was a proposal (`37-law-6-host-may-replay.md`) whose plan was withdrawn before
 > landing; it never entered this file, so the withdrawal above closes a proposal, not a recorded

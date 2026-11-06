@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
+import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.Flip;
@@ -27,7 +28,9 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.material.FluidState;
@@ -62,10 +65,10 @@ class McAnchorsTest {
     }
 
     @Test
-    void theDeclaredValueSelectsTheCapturedHeading() {
+    void theObservedHeadingSelectsTheTurningOrientation() {
         BlockState stairs = Blocks.OAK_STAIRS.defaultBlockState()
                 .setValue(HorizontalDirectionalBlock.FACING, Direction.EAST);
-        SitingResult result = McAnchors.resolve(blueprint("east"), LatticePoint.origin, view(stairs));
+        SitingResult result = McAnchors.resolve(blueprint("north"), LatticePoint.origin, view(stairs));
 
         assertTrue(result.succeeded());
         Siting siting = result.outcome().fold(value -> value, () -> {
@@ -75,7 +78,7 @@ class McAnchorsTest {
     }
 
     @Test
-    void theDeclaredValueComparesIgnoringCase() {
+    void theDeclaredHeadingParsesIgnoringCase() {
         BlockState furnace = Blocks.FURNACE.defaultBlockState()
                 .setValue(HorizontalDirectionalBlock.FACING, Direction.NORTH);
 
@@ -85,14 +88,34 @@ class McAnchorsTest {
     }
 
     @Test
-    void aDeclaredValueThatDiffersFromTheCapturedPropertyIsAnchorInvalid() {
+    void aTiltIsStillRefusedWhenNotAllowed() {
+        BlockState rod = Blocks.END_ROD.defaultBlockState().setValue(DirectionalBlock.FACING, Direction.UP);
+
+        SitingResult result = McAnchors.resolve(blueprint("north"), LatticePoint.origin, view(rod));
+
+        assertFalse(result.succeeded());
+        assertAnchorInvalid(result, "no allowed orientation turns north into up");
+    }
+
+    @Test
+    void aDeclaredValueThatIsNotAHeadingIsRefused() {
         BlockState furnace = Blocks.FURNACE.defaultBlockState()
                 .setValue(HorizontalDirectionalBlock.FACING, Direction.NORTH);
 
-        SitingResult result = McAnchors.resolve(blueprint("south"), LatticePoint.origin, view(furnace));
+        SitingResult result = McAnchors.resolve(blueprint("x"), LatticePoint.origin, view(furnace));
 
         assertFalse(result.succeeded());
-        assertEquals(Codes.anchorInvalid.code(), Objects.requireNonNull(result.findings().primary(), "finding").code());
+        assertAnchorInvalid(result, "the declared value is not a heading: x");
+    }
+
+    @Test
+    void anObservedValueThatIsNotAHeadingIsRefused() {
+        BlockState log = Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X);
+
+        SitingResult result = McAnchors.resolve(blueprint("axis", "north"), LatticePoint.origin, view(log));
+
+        assertFalse(result.succeeded());
+        assertAnchorInvalid(result, "the property is not a heading: x");
     }
 
     @Test
@@ -124,6 +147,12 @@ class McAnchorsTest {
 
         assertFalse(result.succeeded());
         assertEquals(Codes.anchorInvalid.code(), Objects.requireNonNull(result.findings().primary(), "finding").code());
+    }
+
+    private static void assertAnchorInvalid(SitingResult result, String messagePart) {
+        Finding primary = Objects.requireNonNull(result.findings().primary(), "finding");
+        assertEquals(Codes.anchorInvalid.code(), primary.code());
+        assertTrue(primary.message().contains(messagePart), () -> "message: " + primary.message());
     }
 
     private static LevelSnapshot view(BlockState state) {
@@ -173,6 +202,10 @@ class McAnchorsTest {
     }
 
     private static Blueprint blueprint(String value) {
+        return blueprint("facing", value);
+    }
+
+    private static Blueprint blueprint(String property, String value) {
         Bay bay = Bay.of(
             NamespacedId.of("test", "anchor_bay"),
             CuboidSet.of(bounds),
@@ -181,7 +214,7 @@ class McAnchorsTest {
             Sharing.exclusive
         );
         return Blueprint.builder(NamespacedId.of("test", "anchor")).bounds(bounds)
-                .anchor(new AnchorSpec(role, "facing", value))
+                .anchor(new AnchorSpec(role, property, value))
                 .orientation(
                     OrientationPolicy.builder(role)
                             .allowTurns(Turn.none, Turn.clockwise, Turn.half, Turn.counterclockwise).build()

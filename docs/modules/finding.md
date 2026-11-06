@@ -326,7 +326,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-EXP-0002` | ERROR | ✓ | a negated test matched | `Expectations.not` |
 | `SC-EXP-0003` | ERROR | ✓ | a threshold cannot be met | `Expectations.atLeast/atMost/exactly` |
 | `SC-EXP-0004` | ERROR | ✓ | a factory kind is unknown | `DocumentCompiler` |
-| `SC-EXP-0005` | ERROR | ✓ | a factory returned null or bad args | `DocumentCompiler` |
+| `SC-EXP-0005` | ERROR | ✓ | a factory returned null or bad args | `DocumentCompiler`/`AdapterExpectations` |
 | `SC-EXP-0006` | ERROR | ✓ | a cell in the derived envelope holds a non-air occupant | `Expectations.envelopeAir` (the synthetic envelope check) |
 | `SC-CLM-0001` | ERROR | ✓ | two claims conflict | `engine.check`/`settle` |
 | `SC-CLM-0002` | WARNING | – | the ledger cannot answer | `engine.check` |

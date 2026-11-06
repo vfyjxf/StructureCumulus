@@ -145,11 +145,11 @@ final class AdapterExpectations {
     }
 
     private static @Nullable Expectation<?> state(Value args, FactoryContext context) {
-        NamespacedId blockId = id(args, "block", context);
+        NamespacedId blockId = registryId(args, "block", context);
         if (blockId == null) {
             return null;
         }
-        Block block = BuiltInRegistries.BLOCK.get(location(blockId));
+        Block block = BuiltInRegistries.BLOCK.getOptional(location(blockId)).orElse(null);
         if (block == null) {
             report(context, Codes.factoryBad, "unknown block " + blockId);
             return null;
@@ -188,7 +188,7 @@ final class AdapterExpectations {
 
     private static @Nullable Expectation<?> tag(Value args, FactoryContext context) {
         String registry = string(args, "registry", context);
-        NamespacedId tagId = id(args, "id", context);
+        NamespacedId tagId = registryId(args, "id", context);
         if (registry == null || tagId == null) {
             return null;
         }
@@ -205,11 +205,11 @@ final class AdapterExpectations {
     }
 
     private static @Nullable Expectation<?> fluid(Value args, FactoryContext context) {
-        NamespacedId fluidId = id(args, "id", context);
+        NamespacedId fluidId = registryId(args, "id", context);
         if (fluidId == null) {
             return null;
         }
-        Fluid fluid = BuiltInRegistries.FLUID.get(location(fluidId));
+        Fluid fluid = BuiltInRegistries.FLUID.getOptional(location(fluidId)).orElse(null);
         if (fluid == null) {
             report(context, Codes.factoryBad, "unknown fluid " + fluidId);
             return null;
@@ -217,14 +217,22 @@ final class AdapterExpectations {
         return fluid(fluid);
     }
 
-    private static @Nullable NamespacedId id(Value args, String key, FactoryContext context) {
+    private static @Nullable NamespacedId registryId(Value args, String key, FactoryContext context) {
         String text = string(args, key, context);
         if (text == null) {
             return null;
         }
+        if (text.indexOf(':') < 0) {
+            report(
+                context,
+                Codes.factoryBad,
+                "a registry id needs a namespace: " + text + " (write minecraft:" + text + ")"
+            );
+            return null;
+        }
         NamespacedId id = NamespacedId.parse(text);
         if (id == null) {
-            report(context, Codes.documentField, "invalid id at " + key + ": " + text);
+            report(context, Codes.factoryBad, "invalid id at " + key + ": " + text);
         }
         return id;
     }

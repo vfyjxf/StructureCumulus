@@ -256,7 +256,7 @@ final class StructureSetTestSupport {
         Cuboid bounds = Cuboid.of(0, 0, 0, 3, 1, 3);
         CuboidSet body = bounds.asSet().subtract(CuboidSet.of(Cuboid.of(leftParent), Cuboid.of(rightParent)));
         List<LatticePoint> cells = new ArrayList<>();
-        for (Cuboid box : body.boxes()) {
+        for (Cuboid box : body.decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {

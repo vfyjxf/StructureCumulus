@@ -3,8 +3,6 @@ package dev.vfyjxf.cumulus.kernel.finding;
 import dev.vfyjxf.cumulus.kernel.core.Checks;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
-import dev.vfyjxf.cumulus.kernel.space.Cuboid;
-import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.KeyLocus;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.LocusFrame;
@@ -247,7 +245,7 @@ public final class FindingBundle {
         }
         return switch (frame) {
             case definition -> compareDefinitions(left, right);
-            case local, world -> compareBoxes(left.cells(), right.cells());
+            case local, world -> left.cells().compareTo(right.cells());
             case key -> compareKeys(left.key(), right.key());
         };
     }
@@ -262,19 +260,6 @@ public final class FindingBundle {
         }
         int byStart = Integer.compare(left.source().start(), right.source().start());
         return byStart != 0 ? byStart : Integer.compare(left.source().end(), right.source().end());
-    }
-
-    private static int compareBoxes(CuboidSet left, CuboidSet right) {
-        int shared = Math.min(left.boxCount(), right.boxCount());
-        for (int index = 0; index < shared; index++) {
-            Cuboid leftBox = left.boxes().get(index);
-            Cuboid rightBox = right.boxes().get(index);
-            int byBox = leftBox.compareTo(rightBox);
-            if (byBox != 0) {
-                return byBox;
-            }
-        }
-        return Integer.compare(left.boxCount(), right.boxCount());
     }
 
     private static int compareKeys(@Nullable KeyLocus left, @Nullable KeyLocus right) {

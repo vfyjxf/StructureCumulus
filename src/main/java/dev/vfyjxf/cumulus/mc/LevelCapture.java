@@ -127,6 +127,9 @@ public final class LevelCapture implements WorldCapture {
         if (closed) {
             throw new IllegalStateException("capture is closed");
         }
+        if (!level.getServer().isSameThread()) {
+            throw new IllegalStateException("capture must run on the server thread");
+        }
         Cuboid bounds = request.bounds();
         SnapshotPolicy policy = request.policy();
         long volume = bounds.volume();

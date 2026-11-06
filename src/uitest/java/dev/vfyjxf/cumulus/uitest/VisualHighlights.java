@@ -394,12 +394,12 @@ public final class VisualHighlights {
     }
 
     private static int boxesOf(CuboidSet bounds) {
-        return bounds.boxes().size();
+        return bounds.decomposition().size();
     }
 
     private static double sortDistance(CuboidSet bounds, Vec3 camera) {
         double distance = 0.0D;
-        for (Cuboid box : bounds.boxes()) {
+        for (Cuboid box : bounds.decomposition()) {
             distance = Math.max(distance, camera.distanceToSqr(center(box)));
         }
         return Math.sqrt(distance);
@@ -564,7 +564,7 @@ public final class VisualHighlights {
         public void draw(WorldUiPanel.Frame frame) {
             BufferBuilder buffer = Tesselator.getInstance()
                     .begin(VertexFormat.Mode.DEBUG_LINES, DefaultVertexFormat.POSITION_COLOR);
-            for (Cuboid box : bounds.boxes()) {
+            for (Cuboid box : bounds.decomposition()) {
                 emitBox(buffer, frame.worldToView(), box, color);
             }
             drawLines(buffer);

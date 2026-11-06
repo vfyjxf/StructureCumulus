@@ -499,8 +499,8 @@ class LevelSnapshotTest {
         assertSame(chest, view.get(anchor, HostTypes.blockEntity));
         assertSame(EntityType.CHICKEN, view.get(anchor, HostTypes.entityType));
         assertNull(view.get(anchor, HostType.of(NamespacedId.of("test", "unknown"))));
-        assertTrue(Objects.requireNonNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockState), "air").isAir());
-        assertEquals(Fluids.EMPTY.defaultFluidState(), view.get(LatticePoint.of(2, 0, 0), HostTypes.fluidState));
+        assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockState), "outside the snapshot is null");
+        assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.fluidState), "outside the snapshot is null");
         assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.entityType));
         assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockEntity));
     }

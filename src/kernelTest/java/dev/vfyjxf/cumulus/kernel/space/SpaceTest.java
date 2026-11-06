@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -177,12 +178,68 @@ class SpaceTest {
         assertNull(high.compose(Siting.of(LatticePoint.of(2, 0, 0), Orientation.identity)));
         Siting low = Siting.of(LatticePoint.of(LatticePoint.minXz + 1, 0, 0), Orientation.identity);
         assertNull(low.compose(Siting.of(LatticePoint.of(-2, 0, 0), Orientation.identity)));
-        Siting shifted = Siting.of(
+        Siting mirror = Siting.of(LatticePoint.origin, Orientation.of(Turn.none, Tilt.level, Flip.frontBack));
+        Siting extreme = Siting.of(
             LatticePoint.origin,
-            new Placement(Orientation.identity, LatticePoint.of(LatticePoint.maxXz, 0, 0))
+            new Placement(Orientation.identity, LatticePoint.of(LatticePoint.minXz, 0, 0))
         );
-        Siting relative = Siting.of(LatticePoint.origin, new Placement(Orientation.identity, LatticePoint.of(1, 0, 0)));
-        assertNull(shifted.compose(relative));
+        assertNull(mirror.compose(extreme));
+    }
+
+    @Test
+    void composeCountsANonZeroRootOffsetOnce() {
+        Siting root = Siting
+                .of(LatticePoint.of(10, 0, 0), new Placement(Orientation.identity, LatticePoint.of(0, 1, 0)));
+        Siting relative = Siting.of(LatticePoint.origin, Orientation.identity);
+        Siting composed = root.compose(relative);
+        assertNotNull(composed);
+        assertEquals(LatticePoint.of(10, 1, 0), composed.origin());
+        assertEquals(LatticePoint.of(10, 1, 0), composed.toWorld(LatticePoint.origin));
+    }
+
+    @Test
+    void composeMatchesTheSequentialTransform() {
+        Orientation quarter = Orientation.of(Turn.clockwise, Tilt.level, Flip.none);
+        Siting root = Siting.of(LatticePoint.of(100, 64, -20), new Placement(quarter, LatticePoint.of(2, -1, 3)));
+        Siting relative = Siting
+                .of(LatticePoint.of(-4, 1, 7), new Placement(Orientation.identity, LatticePoint.of(1, 0, -2)));
+        Siting composed = root.compose(relative);
+        assertNotNull(composed);
+        for (LatticePoint local : List.of(
+            LatticePoint.origin,
+            LatticePoint.of(1, 2, 3),
+            LatticePoint.of(-4, 7, -2),
+            LatticePoint.of(11, -5, 0)
+        )) {
+            LatticePoint sequential = root.toWorld(Objects.requireNonNull(relative.toWorld(local), "relative image"));
+            assertEquals(sequential, composed.toWorld(local));
+        }
+    }
+
+    @Test
+    void composeIsAssociativeOnSampledPoints() {
+        Random random = new Random(20261101L);
+        for (int trial = 0; trial < 16; trial++) {
+            Siting a = randomSiting(random);
+            Siting b = randomSiting(random);
+            Siting c = randomSiting(random);
+            Siting left = Objects.requireNonNull(Objects.requireNonNull(a.compose(b), "a∘b").compose(c), "(a∘b)∘c");
+            Siting right = Objects.requireNonNull(a.compose(Objects.requireNonNull(b.compose(c), "b∘c")), "a∘(b∘c)");
+            assertEquals(left, right);
+            for (int sample = 0; sample < 4; sample++) {
+                LatticePoint local = LatticePoint
+                        .of(random.nextInt(17) - 8, random.nextInt(17) - 8, random.nextInt(17) - 8);
+                assertEquals(left.toWorld(local), right.toWorld(local));
+            }
+        }
+    }
+
+    private static Siting randomSiting(Random random) {
+        LatticePoint origin = LatticePoint
+                .of(random.nextInt(129) - 64, random.nextInt(65) - 32, random.nextInt(129) - 64);
+        Orientation orientation = Orientation.all().get(random.nextInt(48));
+        LatticePoint offset = LatticePoint.of(random.nextInt(17) - 8, random.nextInt(17) - 8, random.nextInt(17) - 8);
+        return Siting.of(origin, new Placement(orientation, offset));
     }
 
     @Test

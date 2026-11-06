@@ -449,7 +449,7 @@ final class VisualFixtureSupport {
             () -> "no fixture instance at " + owner.id().text() + "@" + siting
         );
         List<ClaimRow> rows = new ArrayList<>();
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {

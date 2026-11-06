@@ -143,6 +143,7 @@ final class HatchExpectation implements Expectation<OccupantSnapshot> {
     @Override public ExpectationMeta meta() {
         return ExpectationMeta.of(id, 80, Codes.expected.code());
     }
+    @Override public ReadScope reads() { return ReadScope.none().withTraits(Set.of(inventory.id())); }
     @Override public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
         OccupantSnapshot occupant = ctx.subject();
         return switch (occupant.slot(inventory.id())) {
@@ -168,7 +169,9 @@ final class HatchExpectation implements Expectation<OccupantSnapshot> {
 }
 ```
 
-One interface, one catalog registration, no engine access. `ctx.phase()` is always `check`.
+One interface, one catalog registration, no engine access. `ctx.phase()` is always `check`. Without
+the `reads()` override the `inventory` trait never enters `blueprint.reads()`, so the host's capture
+policy never asks for it and this expectation can never read the trait.
 
 The standard `structurecumulus:inventory` trait value is the live `IItemHandler` itself, so the check
 above reads `((IItemHandler) present.trait().value()).getStackInSlot(0)` when it needs slot contents;
@@ -176,6 +179,28 @@ there is no copied slot list. The value is live: a check that reads it accepts d
 state, and a check must never write through it (D-41). A blueprint that needs capture-time contents
 registers a captured trait. The same rule holds for `energy` (`IEnergyStorage`) and `fluid`
 (`IFluidHandler`): a trait carries the owning API object, never a framework wrapper.
+
+A mod teaches the document compiler its own kinds through the plugin entry point it already has:
+
+```java
+@PluginMarker
+public final class ReactorPlugin implements ModPlugin {
+    @Override
+    public NamespacedId pluginId() {
+        return NamespacedId.of("mymod", "reactor_plugin");
+    }
+
+    @Override
+    public void register(CatalogRegistrar registrar) {
+        registrar.expectation(NamespacedId.of("mymod", "reactor"), ReactorExpectation.factory());
+    }
+}
+```
+
+The host calls `register` once per loaded plugin, in the loader's resolved order, while it assembles
+the catalogs; after that the catalogs are a frozen snapshot. A kind the plugin never registered is
+still `SC-DOC-0003`, a built-in id cannot be replaced, and a plugin that throws while registering is
+a fatal load failure named by its id (D-72).
 
 ## 5. The document surface
 

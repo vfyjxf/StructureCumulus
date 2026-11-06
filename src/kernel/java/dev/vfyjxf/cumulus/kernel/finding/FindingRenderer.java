@@ -184,7 +184,7 @@ public final class FindingRenderer {
             if (index > 0) {
                 out.append(", ");
             }
-            Cuboid box = cells.boxes().get(index);
+            Cuboid box = cells.decomposition().get(index);
             out.append('[').append(pointText(box.min().x(), box.min().y(), box.min().z())).append("..")
                     .append(pointText(box.max().x(), box.max().y(), box.max().z())).append(')');
         }
@@ -287,7 +287,7 @@ public final class FindingRenderer {
             if (index > 0) {
                 out.append(',');
             }
-            Cuboid box = cells.boxes().get(index);
+            Cuboid box = cells.decomposition().get(index);
             out.append('[').append(box.min().x()).append(',').append(box.min().y()).append(',').append(box.min().z())
                     .append(',').append(box.max().x()).append(',').append(box.max().y()).append(',')
                     .append(box.max().z()).append(']');

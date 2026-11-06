@@ -262,7 +262,7 @@ public final class StructureSetCompiler {
             Locus.local(presence.cells()),
             blueprintCellLabel(
                 blueprint,
-                presence.cells().boxes().get(0).min(),
+                presence.cells().decomposition().get(0).min(),
                 "the satellite blueprint " + compiled.spec().blueprint().text()
             )
         );

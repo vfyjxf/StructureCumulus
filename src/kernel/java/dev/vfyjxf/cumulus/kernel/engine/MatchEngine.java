@@ -846,7 +846,7 @@ public final class MatchEngine {
     private static List<SectionKey> sectionsOf(CuboidSet cells, WorldView view) {
         TreeSet<SectionKey> keys = new TreeSet<>();
         int size = view.cellSize();
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             int x0 = Math.floorDiv(box.min().x(), size);
             int y0 = Math.floorDiv(box.min().y(), size);
             int z0 = Math.floorDiv(box.min().z(), size);
@@ -1155,7 +1155,7 @@ public final class MatchEngine {
 
     private static List<LatticePoint> pointsOf(CuboidSet cells) {
         List<LatticePoint> points = new ArrayList<>();
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {

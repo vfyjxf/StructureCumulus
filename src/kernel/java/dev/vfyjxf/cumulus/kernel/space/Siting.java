@@ -34,8 +34,10 @@ public record Siting(LatticePoint origin, Placement placement) {
         if (origin == null) {
             return null;
         }
-        Placement placement = this.placement.compose(relative.placement());
-        return placement == null ? null : new Siting(origin, placement);
+        // origin already carries this siting's offset; composing with it again would add it twice
+        Placement rotation = new Placement(placement.orientation(), LatticePoint.origin);
+        Placement composed = rotation.compose(relative.placement());
+        return composed == null ? null : new Siting(origin, composed);
     }
 
     public @Nullable LatticePoint toWorld(LatticePoint local) {

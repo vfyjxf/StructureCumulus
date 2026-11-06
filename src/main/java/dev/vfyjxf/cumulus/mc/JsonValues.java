@@ -73,7 +73,7 @@ final class JsonValues {
 
     static JsonArray boxSet(CuboidSet cells) {
         JsonArray array = new JsonArray();
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             array.add(box(box));
         }
         return array;

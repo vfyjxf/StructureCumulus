@@ -206,6 +206,29 @@ class TraitLookupTest {
     }
 
     @Test
+    void aLinkageErrorReturnsAFailedRefusal() {
+        TraitKey<Integer> absent = new TraitKey<>(NamespacedId.of("test", "absent_mod"), Integer.class);
+        TraitProvider<Integer, BlockTraitContext> provider = new TraitProvider<>() {
+            @Override
+            public TraitKey<Integer> key() {
+                return absent;
+            }
+
+            @Override
+            public TraitHolder<BlockTraitContext> holder() {
+                return TraitHolders.block;
+            }
+
+            @Override
+            public TraitSlot get(BlockTraitContext actual, TraitCaptureContext context) {
+                throw new NoClassDefFoundError("the optional mod is absent");
+            }
+        };
+        TraitSlot slot = blockSlot(TraitLookup.builder().add(provider).build(), absent.id()).get(0);
+        assertEquals(ReadStatus.failed, refused(slot).refusal().status());
+    }
+
+    @Test
     void aNullOrWrongIdSlotReturnsAFailedRefusal() {
         TraitKey<Integer> wrong = new TraitKey<>(NamespacedId.of("test", "other"), Integer.class);
         TraitProvider<Integer, BlockTraitContext> nullSlot = new TraitProvider<>() {

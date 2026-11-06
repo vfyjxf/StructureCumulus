@@ -74,7 +74,10 @@
   `SnapshotLevel`, the capture wiring, the typed `WorldView.get` dispatch, snapshot anchors and the
   digest content. H3 adds the `property`/`state`/`tag`/`fluid` expectation factories and catalog, the
   `SC-MC-0006`…`0010` entries and the anchor's declared-value constraint. H4 closes the docs, counts
-  and the `HostDataScenarioTest` stress group (`06-verification.md` §3.4).
+  and the `HostDataScenarioTest` stress group (`06-verification.md` §3.4). X05 opens the shipped
+  catalogs to plugin contributions: `ModPlugin.register(CatalogRegistrar)` contributes expectation,
+  focus, computation and deriver factories plus code entries, assembled once in `ServerState` over
+  `CatalogRegistrar.builtin()` and the adapter tables (D-72).
 - **Implemented (S6, retired by host-data H1; D-29 superseded by D-33).** A capture carrying a siting orientation
   audits every root block state through the inverse orientation and reports an unrepresentable state as
   `SC-MC-0004` (§3, §10). The definition-frame descriptor projection is retired: the kernel
@@ -96,10 +99,11 @@
 | `SnapshotLevel` | `BlockGetter` | package-private; one frame's immutable host snapshot: copied section states, fluids, detached block entities and captured entities, in local coordinates |
 | `HostTypes` | — | public final class; the four typed host-read tokens (`blockState`, `fluidState`, `entity`, `blockEntity`) |
 | `AdapterExpectations` | — | package-private; the four host expectation factories (`property`, `state`, `tag`, `fluid`) and their catalog |
+| `AdapterCatalogs` | — | package-private; seeds the catalog registrar with the adapter's expectation and code tables before any plugin contributes |
 | `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value → `(type, kind)` descriptor; entity body identity; nested body |
-| `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the declared `AnchorSpec.value` is compared at the definition origin; a missing state is `SC-MC-0010`; no live read |
+| `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the allowed orientation that maps the declared heading to the observed one wins; a missing state is `SC-MC-0010`; no live read |
 | `OccupantTraits` | — | the three stable capability trait keys and generic provider dispatch into four-state slots |
 | `TraitLookup` | final class (`trait`) | immutable registry keyed by `(trait id, holder id)`; `builtin()` and sequential plugin-loaded `load(Logger)`; `provider(id, holder)`, `knows(id)` |
 | `TraitProvider<T, H>` | interface (`trait`) | one typed provider: `key()`, `holder()`, `get(actual, capture)` |
@@ -111,9 +115,9 @@
 | `BlockTraitContext` / `EntityTraitContext` | records (`trait`) | immutable provider inputs: level/pos/state/block entity or entity; the capture is a `get` parameter |
 | `BlockTraitProviders` / `EntityTraitProviders` | final classes (`trait`) | the six standard providers as `CapabilityTraitProvider` declarations (inventory/energy/fluid per holder) |
 | `CapabilityAccess<H, C>` / `CapabilityTraitProvider<T, H, C>` / `CapabilityAccesses` | functional interface / final class / final class (`trait`) | one generic capability provider; `block()`/`entity()`/`entityVoid()` map a holder to its normal capability get signature |
-| `ModPlugin` / `PluginDependency` | interface / record (`plugin`) | plugin id, `before`/`after`/`none` order and `required`/`optional`/`optionalRequired` constraints |
+| `ModPlugin` / `PluginDependency` | interface / record (`plugin`) | plugin id, `before`/`after`/`none` order, `required`/`optional`/`optionalRequired` constraints, and catalog contributions through `register(CatalogRegistrar)` (default no-op) |
 | `PluginLookup<T>` / `AnnotationPluginLookup<T>` / `SpiPluginLookup<T>` | interface / final classes (`plugin`) | plugin discovery; NeoForge annotation scan and Java SPI |
-| `PluginLoader` / `PluginLoadingException` | final class / exception (`plugin`) | deterministic Kahn loading; fatal missing/duplicate/cycle and warning/skip failures |
+| `PluginLoader` / `PluginLoadingException` | final class / exception (`plugin`) | deterministic Kahn loading; fatal missing/duplicate/cycle and warning/skip failures; the catalog register pass folds its failures into the same policy |
 | `PluginMarker` | annotation (`plugin`) | marks a plugin class for annotation discovery |
 | `NestedExtent` | record (capability) | one provider declaration: type, absolute bounds, world origin |
 | `NestedExtents` | final class (capability) | the `BLOCK` and `ENTITY` capabilities |
@@ -133,7 +137,7 @@
 | `JsonReader` / `JsonWriter` | `DocumentReader` / `DocumentWriter` | Gson tree ↔ `Document`; canonical output (M4a) |
 | `JsonDocument` / `StructureSetReader` / `StructureSetWriter` | — | `kind` dispatcher; Gson tree ↔ `StructureSetDocument`; canonical set output (S2) |
 | `DatapackBlueprints` | `DocumentSource` | reload listener; blueprint and structure-set ids under `data/<ns>/cumulus/structure/` (M4b + S3); wins over `BuiltinDocuments` on an id collision |
-| `ServerState` | — | catalogs (including the adapter's `SC-MC-*` code entries), server-level and per-level kernels, per-level ledger/structures, capture cache, merged set lookup (datapack over builtin, S5) and set compile |
+| `ServerState` | — | catalogs (built-ins plus the adapter's tables plus plugin contributions, assembled once over `CatalogRegistrar`), server-level and per-level kernels, per-level ledger/structures, capture cache, merged set lookup (datapack over builtin, S5) and set compile |
 | `StructureSet` | — | host plan: compiled set + host root siting + each satellite's composed siting, world bounds and world-space presence region; `place` reports mapping failures |
 | `StructureSet.Satellite` | record | one placed satellite: id, compiled satellite, absolute siting, world bounds, presence cells |
 | `StructureSet.Placement` | record | the placed set or the findings that prevented it |
@@ -151,6 +155,9 @@ refusal, M2d adds nested frames, and M5e adds the capture report and, with it, t
 The rules below are implemented.
 
 - One server-thread call. `ServerChunkCache.getChunkNow`; the capture never calls `Level.getChunk`.
+  `LevelCapture.capture` entered from another thread is rejected with an `IllegalStateException`
+  naming the server thread, before any chunk is touched. Snapshot reads are exempt: a lease's view
+  is an immutable snapshot and may be read from any thread.
   This covers the capture's own reads: a capability provider is host code and is handed the live
   `Level`, so a provider that reads a neighbour may cause a load — the vanilla double chest does,
   through `ChestBlock.getContainer`. That read is the provider's, not the capture's.
@@ -208,8 +215,11 @@ The rules below are implemented.
 
 `SnapshotLevel` is the one host snapshot per frame. It implements `BlockGetter` in **local** frame
 coordinates: `getBlockState`, `getFluidState`, `getBlockEntity` and the typed `get(pos, HostType)`.
-Out-of-bounds reads answer air / empty fluid / null; a missing section answers the same without a
-world read. The snapshot retains no `Level` of its own: block states, fluids and block entities are
+The `BlockGetter` face keeps the vanilla contract — out-of-bounds or missing-section reads answer
+air / empty fluid / null. The typed host face never substitutes (`world.md` §4.11): a cell outside
+the frame bounds or in a section that was never captured answers null for every host type, and only
+the adapter's own `HostTypes` constants dispatch — a token that is not one of them answers null.
+The snapshot retains no `Level` of its own: block states, fluids and block entities are
 copies, and an entity cell carries the captured `EntityType`. A capability handle handed through the
 capture is host code's object and may reach one; it is live for the lease (D-41).
 
@@ -253,8 +263,16 @@ cell passes both. The composed check's `ExpectationMeta` is the kernel `Junction
 reads `HostTypes.fluidState`; the entity tag reads `HostTypes.entityType`; the fluid check reads both
 block and fluid state. A missing value is `Unreadable` with `SC-MC-0010`, never a mismatch.
 
-`ServerState` merges `AdapterExpectations.catalog()` into its expectation catalog, so an ordinary
-`checks` entry whose `expect.kind` is `property`, `state`, `tag` or `fluid` compiles through the same
+A registry reference — the `state` factory's `block`, the `fluid` factory's `id` and a tag's `id` — must
+carry a namespace; a bare id is refused with a hint naming `minecraft:<id>` rather than read in the
+mod's namespace. An unknown block or fluid is the compile finding `SC-EXP-0005`, because both
+registries are defaulted and a lookup must not answer the default. A tag id is the one registry
+reference left unresolved: a later datapack may declare it, so an unknown tag matches nothing at match
+time.
+
+`ServerState` seeds `AdapterExpectations.catalog()` into its catalog registrar before any plugin
+contributes (§7.5), so an ordinary `checks` entry whose `expect.kind` is `property`, `state`, `tag`
+or `fluid` compiles through the same
 `DocumentCompiler` path as a kernel leaf. There is no `mc_checks` member, no separate MC JSON check
 type and no kernel MC kind; the built-in kernel catalog alone reports `SC-DOC-0003` for these kinds.
 A host expectation adds no `ReadScope` entry: the declared cells already pick the anchor the typed
@@ -373,7 +391,8 @@ generic `TraitProvider<T, H>`:
 - a block state that has a block entity but whose captured block entity is `null` is
   `Refused(notCaptured)` before a provider reads it, so a capability lookup never falls back to a
   live block-entity lookup;
-- a provider that throws, returns `null` or answers a different trait id is `Refused(failed)`.
+- a provider that throws (`RuntimeException` or `LinkageError`), returns `null` or answers a
+  different trait id is `Refused(failed)`.
 
 The standard providers are declarations, not per-capability classes. `BlockTraitProviders` and
 `EntityTraitProviders` build the six `CapabilityTraitProvider` values from
@@ -396,15 +415,24 @@ The plugin core is a package-preserving adaption of CloudLib's `api/plugin` into
 dispatcher, progress tracker or dispatch queue; registration is sequential and deterministic.
 `PluginLoader` validates duplicate ids (fatal), missing `required` dependencies (fatal, plugin
 excluded), missing `optional` dependencies (warning, plugin loaded), missing `optionalRequired`
-dependencies (warning, plugin skipped) and cycles (fatal), and orders the remainder with Kahn's
-algorithm using `NamespacedId` order.
+dependencies (warning, plugin skipped) and cycles (fatal); a dependency on a skipped plugin skips
+the dependent through a non-optional constraint, cascading to a fixed point with the same
+fatal/warning split. The remainder is ordered with Kahn's algorithm using `NamespacedId` order. A
+candidate class that cannot be loaded — a broken static
+initializer, an unresolved reference — never reaches the loader: both lookups log the class name and
+the cause at error level and skip it (D-81); the `ServiceLoader` path catches `ServiceConfigurationError`
+too, which is how the JDK wraps an instantiation failure. Nothing enters the loading result, so a plugin
+that declared a dependency on the skipped class reports a missing dependency — that message is accurate
+about what happened to it and misleading about the cause.
 
 `TraitPlugin` extends `ModPlugin` with the `builtin` id and the `afterBuiltin` dependency; the built-in
 plugin overrides its dependencies to empty. `TraitLookup.builtin()` registers the built-in providers
 directly; `TraitLookup.load(StructureCumulus.logger)` discovers `TraitPlugin`s with
 `AnnotationPluginLookup.of(TraitPlugin.class)`, ensures the built-in plugin is present, runs
 `PluginLoader.loadPlugin`, and calls each `registerTraits` once against the immutable builder; a
-duplicate `(trait id, holder id)` pair is fatal.
+plugin whose `registerTraits` throws — the builder's duplicate `(trait id, holder id)` rejection,
+or a `LinkageError` from a class it cannot resolve — is a fatal `PluginLoadingException` naming
+the plugin.
 
 `TraitCaptureContext(capabilityContext, hostContext)` is the approved A+B context: the nullable
 `Direction` capability context is passed to the block and sided entity capability accessors, while
@@ -414,6 +442,25 @@ build time and a wrong-type `get` throws `IllegalArgumentException`. `LevelCaptu
 `TraitLookup.builtin()` with `TraitCaptureContext.empty()`; the public
 `LevelCapture(ServerLevel, TraitLookup, TraitCaptureContext)` injects both, and the existing
 constructors are preserved.
+
+### 7.5 Catalog contributions (X05, D-72)
+
+`ModPlugin` gains one default method, `register(CatalogRegistrar)`; a plugin that contributes
+document kinds overrides it, every other plugin inherits the no-op, so trait plugins load unchanged.
+`ServerState` assembles the catalogs once per session while it opens: `CatalogRegistrar.builtin()`
+(the kernel's six tables), `AdapterCatalogs.seed` (the `property`/`state`/`tag`/`fluid` factories
+and the `SC-MC-*` code entries), then `PluginLoader.register(logger, "catalog",
+AnnotationPluginLookup.of(ModPlugin.class), registrar)` — every loaded plugin's `register`, once, in
+the loader's resolved order. `registrar.catalogs()` freezes the snapshot every compile reads; there
+is no runtime contribution and no second assembly.
+
+Failures use the loader's existing policy, not a new one. A plugin that throws while registering —
+a `RuntimeException` or a `LinkageError` from a class it cannot resolve, including the
+`SC-SPI-0003` the registrar raises when a contribution would replace an id that is
+already registered — is a fatal failure named by its plugin id, and a plugin that depends on it
+through a non-optional constraint is skipped with the same fatal/warning split a missing dependency
+produces; warnings log, fatals throw `PluginLoadingException` out of `ServerState.open`. The
+registrar's `fail`/`failures` carry the same attribution for a host that assembles by hand.
 
 ## 8. Nested capability
 
@@ -719,7 +766,9 @@ id namespaces are independent, so a blueprint and a set may share one id. A dupl
 different bytes is a reload finding per namespace; the first file in path order wins and the
 duplicate is reported. The reader/writer (M4a) and the datapack reload (M4b) are committed. S3
 makes the scan accept set files instead of rejecting them; a malformed set is a located finding and
-never kills the reload. `ServerState` installs one merged `DocumentSource` in both the server-level
+never kills the reload. Scan-time diagnostics are rendered per finding with
+`FindingRenderer.human` over the file's `SourceText`, so the reload log carries the document id,
+line, column and the offending source line, not just the code and message. `ServerState` installs one merged `DocumentSource` in both the server-level
 and the per-level host: a datapack document wins over a `BuiltinDocuments` document on an id
 collision, the built-in `structurecumulus:air_cell` remains the fallback, `findSet` delegates to the
 datapack source and then to the built-in sets (`structurecumulus:set_demo` since S5), and
@@ -754,13 +803,29 @@ the capture report is the only trace of the capability; the check's own value ex
 H3 host factories, which read the snapshot rather than a descriptor. The audit transform is the
 inverse-orientation `OrientationMapping.transform` result described above, not a descriptor
 publication: a value check compares the captured world state, so a host that needs definition-frame
-values must capture them (D-33). `FocusContext.siting()` is unchanged. The definition origin's anchor property is read from the captured anchor `BlockState` (the
-phase-1 capture is not audited) and its declared `AnchorSpec.value` is compared there, case-insensitively;
-a mismatch is `SC-BPT-0006` anchor-invalid, and `SC-MC-0004` never becomes a `ReadRefusal`.
+values must capture them (D-33). `FocusContext.siting()` is unchanged. The definition origin's
+anchor property is read from the captured anchor `BlockState` (the phase-1 capture is not audited):
+the captured value is the observed heading, `AnchorSpec.value` names the declared heading in the
+blueprint's own coordinates (D-68), and `OrientationPolicy.select(declared, observed)` picks the
+allowed orientation that maps one to the other. A value on either side that is not a heading, or
+no admissible orientation, is `SC-BPT-0006` anchor-invalid, and `SC-MC-0004` never becomes a
+`ReadRefusal`. A document written for the pre-D-68 rule changes meaning: its `value` named the
+world orientation the drawing was made for, and it must be rewritten to the blueprint-frame
+heading.
 
 ## 11. Commands and lifecycle
 
 All commands run on the server thread. `check` returns 1 whenever it reaches a result (including a reported failed/undecided/dropped check) and 0 only on an argument/document/capture/siting failure; the mutating `settle` returns 1 only for `Formed`; `compile`, `explain` and `claims` return 1 on a produced result and 0 on a reported failure. The `set` pair runs the host in §13.5: `set check` returns 1 only when the set result carries no error finding and at least one admitted outcome, and `set settle` only when the result is `formed()`; a compile, placement, siting or capture failure is 0.
+
+The command boundary is gated, guarded and self-cleaning (D-54). The root literal requires
+`Commands.LEVEL_GAMEMASTERS` (2), so every verb inherits the gate and none opts out. Each verb body
+runs inside one `CommandSupport.guarded` that catches `RuntimeException`, `StackOverflowError` and
+`LinkageError`,
+logs the failure with the verb, answers `cumulus <verb> failed: <type>: <message>` and returns 0 —
+no other error is caught. A verb that opened a draft closes it in a `finally` through
+`CommandSupport.abortQuietly`; a `settle` that formed rows and then failed to commit releases that
+instance's key through `CommandSupport.releaseQuietly` instead of leaving an orphan until the level
+unloads.
 
 - `/cumulus check <id> <origin>` — capture, siting, read the per-level claims view for the captured
   bounds, then `check`; print the result and findings. The claims read and the check write nothing.
@@ -769,8 +834,10 @@ All commands run on the server thread. `check` returns 1 whenever it reaches a r
   sited bounds are the capture the orientation audit runs on. The phase-1 view is closed after
   resolution. The capture policy maps the blueprint's entity windows through that siting, dropping a
   window that leaves the lattice (`CommandSupport.policy(Blueprint, Siting)`). The anchor property
-  still selects the orientation, and `AnchorSpec.value` is now a real constraint: a captured value
-  that differs from the declaration (case-insensitively) is `SC-BPT-0006` anchor-invalid. An
+  still selects the orientation: the captured value is the observed heading, `AnchorSpec.value` is
+  the declared heading in the blueprint's own frame (D-68), and the allowed orientation that maps
+  one to the other wins; a value on either side that is not a heading, or no admissible
+  orientation, is `SC-BPT-0006` anchor-invalid. An
   uncaptured anchor state is `SC-MC-0010`, the same host-value-not-captured code as the expectation
   absent value; `SC-MC-0001` remains the capture refusal (§3.2, §12).
 - `/cumulus compile <id>` — host document → blueprint (server kernel); print the compile outcome and
@@ -883,7 +950,18 @@ and a range fan-in to one parent cell are legal.
 
 ### 13.4 Check all, settle all and rollback
 
-`StructureSetHost.run(set, lease, owner, budget, instances)` refuses a stale lease with
+The host's public shape (D-70):
+
+```java
+public final class StructureSetHost {
+    public StructureSetHost(StructureKernel kernel);
+    public StructureSetHost(StructureKernel kernel, StructureManager structures);
+    public StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner,
+                                  Budget budget, Function<StructureSpec, StructureAttempt> drafts);
+}
+```
+
+`StructureSetHost.run(set, lease, owner, budget, drafts)` refuses a stale lease with
 `SC-ENG-0002`, rejects a hand-built set whose satellite siting equals the root siting with
 `SC-SET-0008`, then runs the fixed order: presence, links, the root check, every present satellite
 check, then the root and the satellites in declaration order. Each check is one `MatchRequest` with
@@ -927,7 +1005,17 @@ the lattice under its siting is dropped. The capture report prints through `Capt
 set summary. The lease is closed after the host run.
 
 The host then runs `StructureSetHost.check` or `StructureSetHost.run` with `Budget.unbounded()`, the
-server owner and `() -> state.instance(level)`. `check` is the same presence/link/check sequence and
+server owner and one drafts function that reserves each draft through the level's manager.
+`SetCommand` builds the call site:
+
+```java
+StructureSetHost host = new StructureSetHost(state.kernel(level));
+host.run(
+        plan, lease, state.owner(), Budget.unbounded(),
+        spec -> state.structures(level).begin(state.world(level), spec));
+```
+
+`check` is the same presence/link/check sequence and
 stops before the settle pass: no claim, no release, no rollback, empty `settled`/`claims`. The
 summary prints the set id and origin, the root and satellite outcomes (`admitted`/`not admitted` in
 plan order), `settled`, `rolledBack`, `rollbackFailures` count, per-structure claim row counts and

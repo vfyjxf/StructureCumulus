@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import dev.vfyjxf.cumulus.mc.plugin.AnnotationPluginLookup;
 import dev.vfyjxf.cumulus.mc.plugin.PluginLoader;
+import dev.vfyjxf.cumulus.mc.plugin.PluginLoadingException;
 import dev.vfyjxf.cumulus.mc.plugin.PluginLookup;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -37,8 +38,12 @@ public final class TraitLookup {
     }
 
     public static TraitLookup load(Logger logger) {
+        return load(logger, AnnotationPluginLookup.of(TraitPlugin.class));
+    }
+
+    static TraitLookup load(Logger logger, PluginLookup<TraitPlugin> discovered) {
         Objects.requireNonNull(logger, "logger");
-        PluginLookup<TraitPlugin> discovered = AnnotationPluginLookup.of(TraitPlugin.class);
+        Objects.requireNonNull(discovered, "discovered");
         PluginLookup<TraitPlugin> lookup = () -> {
             Collection<TraitPlugin> plugins = new ArrayList<>(discovered.findPlugins());
             if (plugins.stream().noneMatch(plugin -> TraitPlugin.builtin.equals(plugin.pluginId()))) {
@@ -50,7 +55,13 @@ public final class TraitLookup {
         Builder builder = builder();
         TraitRegister register = register(builder);
         for (TraitPlugin plugin : plugins) {
-            plugin.registerTraits(register);
+            try {
+                plugin.registerTraits(register);
+            } catch (RuntimeException | LinkageError failure) {
+                throw new PluginLoadingException(
+                    List.of(new PluginLoadingException.Failure(plugin.pluginId(), failure))
+                );
+            }
         }
         return builder.build();
     }

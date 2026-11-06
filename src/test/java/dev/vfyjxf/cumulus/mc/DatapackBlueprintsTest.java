@@ -13,6 +13,7 @@ import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.resources.MultiPackResourceManager;
+import dev.vfyjxf.cumulus.mc.plugin.LogCapture;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.jspecify.annotations.Nullable;
@@ -183,6 +184,21 @@ class DatapackBlueprintsTest {
         }
         assertNull(ServerState.current());
         assertNull(state.blueprints().find(NamespacedId.of("test", "tower")), "a stopped server serves nothing");
+    }
+
+    @Test
+    void scanLogsRenderedDiagnosticsWithFileLineAndColumn() throws IOException {
+        try (MultiPackResourceManager resources = manager(
+            Map.of("test:cumulus/structure/broken.json", "{\"schemaVersion\": 1,")
+        )) {
+            try (LogCapture capture = LogCapture.attach(dev.vfyjxf.cumulus.StructureCumulus.logger.getName())) {
+                DatapackBlueprints.scan(resources);
+                assertTrue(
+                    capture.messages().stream().anyMatch(line -> line.contains("--> test:broken:1:")),
+                    () -> "the reload log carries file, line and column: " + capture.messages()
+                );
+            }
+        }
     }
 
     private static MultiPackResourceManager manager(Map<String, String> files) {

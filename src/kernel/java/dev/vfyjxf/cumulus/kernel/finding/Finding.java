@@ -104,7 +104,7 @@ public record Finding(
     }
 
     private static LatticePoint firstCell(Locus locus) {
-        return locus.cells().boxes().get(0).min();
+        return locus.cells().decomposition().get(0).min();
     }
 
     public static final class Builder {

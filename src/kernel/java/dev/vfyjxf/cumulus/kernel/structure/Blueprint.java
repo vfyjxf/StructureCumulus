@@ -191,7 +191,7 @@ public final class Blueprint {
     static CuboidSet unionOfCells(List<Bay> bays) {
         List<Cuboid> boxes = new ArrayList<>();
         for (Bay bay : bays) {
-            boxes.addAll(bay.cells().boxes());
+            boxes.addAll(bay.cells().decomposition());
         }
         return CuboidSet.of(boxes);
     }

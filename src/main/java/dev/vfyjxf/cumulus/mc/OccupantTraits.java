@@ -38,7 +38,7 @@ public final class OccupantTraits {
 
     public static final TraitKey<IFluidHandler> fluid = new TraitKey<>(id("fluid"), IFluidHandler.class);
 
-    private static final FindingCode unreadableTrait = FindingCode.of(FindingCode.Family.mc, 2);
+    private static final FindingCode unreadableTrait = AdapterCodes.unreadableTrait;
 
     static List<TraitSlot> block(
         SnapshotPolicy policy,
@@ -116,7 +116,7 @@ public final class OccupantTraits {
         try {
             TraitSlot slot = provider.get(actual, capture);
             return slot == null || !slot.id().equals(id) ? refused(id, ReadStatus.failed) : slot;
-        } catch (RuntimeException failure) {
+        } catch (RuntimeException | LinkageError failure) {
             return refused(id, ReadStatus.failed);
         }
     }

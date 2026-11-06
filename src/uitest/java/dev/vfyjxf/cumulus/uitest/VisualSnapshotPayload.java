@@ -55,8 +55,8 @@ public record VisualSnapshotPayload(VisualSnapshot snapshot) implements CustomPa
             buffer.writeVarLong(instance.id().serial());
             writeId(buffer, instance.owner().id());
             writeSiting(buffer, instance.siting());
-            buffer.writeVarInt(instance.bounds().boxes().size());
-            for (Cuboid box : instance.bounds().boxes()) {
+            buffer.writeVarInt(instance.bounds().decomposition().size());
+            for (Cuboid box : instance.bounds().decomposition()) {
                 writePoint(buffer, box.min());
                 writePoint(buffer, box.max());
             }

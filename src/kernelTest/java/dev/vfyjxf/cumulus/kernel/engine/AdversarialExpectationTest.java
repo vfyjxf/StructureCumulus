@@ -27,11 +27,13 @@ import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focus;
 import dev.vfyjxf.cumulus.kernel.structure.FocusResult;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
+import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
 import dev.vfyjxf.cumulus.kernel.structure.Reply;
 import dev.vfyjxf.cumulus.kernel.world.OccupantDescriptor;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
+import dev.vfyjxf.cumulus.kernel.world.TraitKey;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -318,6 +320,29 @@ class AdversarialExpectationTest {
         assertEquals(UndecidedReason.unreadable, undecided.reason());
         assertTrue(MagicFixtures.hasCode(undecided, Codes.keyAbsent));
         assertFalse(called.get(), "the expectation test is not called when a required key is absent");
+    }
+
+    @Test
+    void anUndeclaredTraitIsRefused() {
+        TraitKey<Long> inventory = new TraitKey<>(id("inventory"), Long.class);
+        Expectation<OccupantSnapshot> undeclared = Expectations.custom(
+            OccupantSnapshot.class,
+            ExpectationMeta.anonymous(),
+            ReadScope.none(),
+            ctx -> Expectations.trait(inventory).test(ctx)
+        );
+        Blueprint blueprint = singleCellBlueprint(undeclared);
+        TestWorld.View view = MagicFixtures.view().put(blockAt(stone, origin));
+
+        MatchResult result = check(blueprint, view);
+
+        MatchResult.Undecided undecided = assertInstanceOf(MatchResult.Undecided.class, result);
+        assertEquals(UndecidedReason.unreadable, undecided.reason());
+        assertTrue(MagicFixtures.hasCode(undecided, Codes.unreadableRead));
+        assertEquals(
+            "trait " + inventory.id() + " is unreadable",
+            Objects.requireNonNull(undecided.findings().primary(), "primary").message()
+        );
     }
 
     @Test

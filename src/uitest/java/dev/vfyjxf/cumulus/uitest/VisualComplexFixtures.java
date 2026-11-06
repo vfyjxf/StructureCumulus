@@ -69,7 +69,7 @@ final class VisualComplexFixtures {
             int maxY = Integer.MIN_VALUE;
             int maxZ = Integer.MIN_VALUE;
             for (Member member : members) {
-                for (Cuboid box : member.bounds().boxes()) {
+                for (Cuboid box : member.bounds().decomposition()) {
                     minX = Math.min(minX, box.min().x());
                     minY = Math.min(minY, box.min().y());
                     minZ = Math.min(minZ, box.min().z());

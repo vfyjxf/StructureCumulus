@@ -35,41 +35,60 @@ public final class CumulusCommand {
     public static void register(RegisterCommandsEvent event) {
         event.getDispatcher()
                 .register(
-                    Commands.literal("cumulus")
+                    Commands.literal("cumulus").requires(source -> source.hasPermission(Commands.LEVEL_GAMEMASTERS))
                             .then(
-                                Commands.literal("check").then(
-                                    Commands.argument("id", ResourceLocationArgument.id()).then(
-                                        Commands.argument("origin", BlockPosArgument.blockPos())
-                                                .executes(CumulusCommand::check)
-                                    )
-                                )
+                                Commands.literal("check")
+                                        .then(
+                                            Commands.argument("id", ResourceLocationArgument.id()).then(
+                                                Commands.argument("origin", BlockPosArgument.blockPos())
+                                                        .executes(
+                                                            context -> CommandSupport
+                                                                    .guarded(context, "check", CumulusCommand::check)
+                                                        )
+                                            )
+                                        )
                             )
                             .then(
                                 Commands.literal("settle")
                                         .then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(
                                                 Commands.argument("origin", BlockPosArgument.blockPos())
-                                                        .executes(SettleCommand::run)
+                                                        .executes(
+                                                            context -> CommandSupport
+                                                                    .guarded(context, "settle", SettleCommand::run)
+                                                        )
                                             )
                                         )
                             )
                             .then(
-                                Commands.literal("compile").then(
-                                    Commands.argument("id", ResourceLocationArgument.id()).executes(CompileCommand::run)
-                                )
+                                Commands.literal("compile")
+                                        .then(
+                                            Commands.argument("id", ResourceLocationArgument.id())
+                                                    .executes(
+                                                        context -> CommandSupport
+                                                                .guarded(context, "compile", CompileCommand::run)
+                                                    )
+                                        )
                             )
                             .then(
-                                Commands.literal("explain").then(
-                                    Commands.argument("code", StringArgumentType.word()).executes(ExplainCommand::run)
-                                )
+                                Commands.literal("explain")
+                                        .then(
+                                            Commands.argument("code", StringArgumentType.word()).executes(
+                                                context -> CommandSupport
+                                                        .guarded(context, "explain", ExplainCommand::run)
+                                            )
+                                        )
                             )
                             .then(
                                 Commands.literal("claims")
                                         .then(
-                                            Commands.argument("from", BlockPosArgument.blockPos()).then(
-                                                Commands.argument("to", BlockPosArgument.blockPos())
-                                                        .executes(ClaimsCommand::run)
-                                            )
+                                            Commands.argument("from", BlockPosArgument.blockPos())
+                                                    .then(
+                                                        Commands.argument("to", BlockPosArgument.blockPos()).executes(
+                                                            context -> CommandSupport
+                                                                    .guarded(context, "claims", ClaimsCommand::run)
+                                                        )
+                                                    )
                                         )
                             )
                             .then(
@@ -77,16 +96,20 @@ public final class CumulusCommand {
                                         .then(
                                             Commands.literal("check").then(
                                                 Commands.argument("id", ResourceLocationArgument.id()).then(
-                                                    Commands.argument("origin", BlockPosArgument.blockPos())
-                                                            .executes(SetCommand::check)
+                                                    Commands.argument("origin", BlockPosArgument.blockPos()).executes(
+                                                        context -> CommandSupport
+                                                                .guarded(context, "set check", SetCommand::check)
+                                                    )
                                                 )
                                             )
                                         )
                                         .then(
                                             Commands.literal("settle").then(
                                                 Commands.argument("id", ResourceLocationArgument.id()).then(
-                                                    Commands.argument("origin", BlockPosArgument.blockPos())
-                                                            .executes(SetCommand::settle)
+                                                    Commands.argument("origin", BlockPosArgument.blockPos()).executes(
+                                                        context -> CommandSupport
+                                                                .guarded(context, "set settle", SetCommand::settle)
+                                                    )
                                                 )
                                             )
                                         )
@@ -132,19 +155,22 @@ public final class CumulusCommand {
             ClaimView claims = state.claims(level).read(prepared.bounds());
             StructureAttempt draft = state.structures(level)
                     .begin(state.world(level), new StructureSpec(state.owner(), prepared.siting(), blueprint.id()));
-            MatchRequest request = MatchRequest.of(
-                blueprint,
-                prepared.siting(),
-                prepared.lease(),
-                draft.id(),
-                state.owner(),
-                Budget.unbounded(),
-                claims
-            );
-            MatchResult checked = state.kernel().check(request);
-            draft.abort();
-            print(source, summary(blueprint.id(), origin, checked), checked.findings());
-            return checked;
+            try {
+                MatchRequest request = MatchRequest.of(
+                    blueprint,
+                    prepared.siting(),
+                    prepared.lease(),
+                    draft.id(),
+                    state.owner(),
+                    Budget.unbounded(),
+                    claims
+                );
+                MatchResult checked = state.kernel().check(request);
+                print(source, summary(blueprint.id(), origin, checked), checked.findings());
+                return checked;
+            } finally {
+                CommandSupport.abortQuietly(draft);
+            }
         }
     }
 

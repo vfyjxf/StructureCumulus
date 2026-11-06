@@ -69,7 +69,7 @@ public final class StructureSetWriter {
     private static JsonObject presence(PresenceSpec presence) {
         JsonObject json = new JsonObject();
         if (presence.cells().boxCount() == 1) {
-            Cuboid box = presence.cells().boxes().get(0);
+            Cuboid box = presence.cells().decomposition().get(0);
             if (box.sizeX() == 1 && box.sizeY() == 1 && box.sizeZ() == 1) {
                 json.add("cell", JsonValues.point(box.min()));
                 return json;

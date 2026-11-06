@@ -935,7 +935,7 @@ class AdversarialFuzzTest {
                     manager.find(instance.id().world(), instance.owner(), instance.siting()),
                     where + " find(world, owner, siting)"
                 );
-                for (Cuboid box : instance.bounds().boxes()) {
+                for (Cuboid box : instance.bounds().decomposition()) {
                     assertTrue(manager.findAt(box.min()).contains(instance), where + " findAt covers the bounds");
                 }
                 assertTrue(manager.findIn(instance.bounds()).contains(instance), where + " findIn covers the bounds");
@@ -1072,7 +1072,7 @@ class AdversarialFuzzTest {
                 case Footprint.Bound ignored -> CuboidSet.empty();
                 case Footprint.None ignored -> CuboidSet.empty();
             };
-            for (Cuboid box : owned.boxes()) {
+            for (Cuboid box : owned.decomposition()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
@@ -1140,7 +1140,7 @@ class AdversarialFuzzTest {
 
     private static Set<LatticePoint> pointsOf(CuboidSet cells) {
         Set<LatticePoint> points = new TreeSet<>();
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             points.addAll(pointsIn(box));
         }
         return points;

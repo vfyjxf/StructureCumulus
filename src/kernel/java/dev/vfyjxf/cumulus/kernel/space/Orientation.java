@@ -127,7 +127,7 @@ public record Orientation(int ordinal) implements Comparable<Orientation> {
 
     public @Nullable CuboidSet apply(CuboidSet cells) {
         List<Cuboid> boxes = new ArrayList<>(cells.boxCount());
-        for (Cuboid box : cells.boxes()) {
+        for (Cuboid box : cells.decomposition()) {
             Cuboid image = apply(box);
             if (image == null) {
                 return null;

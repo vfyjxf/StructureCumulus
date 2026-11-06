@@ -427,7 +427,7 @@ key instead of retaining the stale instance and rows; regression
 | Module | Must test |
 | --- | --- |
 | `core` | id grammar, catalog freeze, Value content equality, budget, key equality |
-| `space` | packing bijection, cuboid edges, CuboidSet normalization and semantic-equality laws, 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
+| `space` | packing bijection, cuboid edges, CuboidSet semantic-equality laws, content order independent of the decomposition (`firstCell` is the smallest cell), 48 orientations, mirror `1-`, placement laws, section frame, locus frames |
 | `finding` | code parse, `Codes.all` bijection, builder validation, bundle dedup/order/cap, renderers, source text |
 | `world` | total read vs bounds/air, partial/refused section, body identity and nullable order, trait four states and id lookup, `SnapshotPolicy.traits` ids, root/child origin and local bounds, `statusOf` derivation, window, capture-report payload and its compatibility constructors, the typed `get` default and the expectation absent code (`HostExpectationTest`) |
 | `claim` | matrix four pairs, ledger CAS/release, canonical order, footprint resolution, nested/non-root subject rejection (`SC-CLM-0004`) |

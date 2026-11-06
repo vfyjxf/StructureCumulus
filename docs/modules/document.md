@@ -220,8 +220,8 @@ check before the "at least one check" rule (`structure` §4.11). An envelope-onl
 `"bays": []` and `"checks": []` is therefore legal.
 
 A box is `[x, y, z, sizeX, sizeY, sizeZ]` (origin + size). A bay has `box` or `boxes` plus optional
-`minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a normalized set; the compiler
-canonicalises again.
+`minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a cell set with a box decomposition;
+the compiler builds it through `of`.
 
 A definition is the same `BlueprintSpec` shape without `schemaVersion`; its `id` is the map key. A
 placement is `{"definition": "mymod:shell", "as": "mymod:south", "at": [0,0,0]}`. The compiler
@@ -239,7 +239,10 @@ custom kind is `namespace:path`. A host payload check (`property`, `state`, `tag
 catalog entry that lowers to `Expectations.host`, not a kernel kind
 ([design/10](../design/10-host-data.md) §7). The four kinds are ordinary `checks` entries: there is no
 `mc_checks` member and no separate MC JSON check type; the adapter's expectation catalog registers
-them, and the kernel's built-in catalog alone rejects them as `SC-DOC-0003`. The `state` kind resolves
+them, and the kernel's built-in catalog alone rejects them as `SC-DOC-0003`. Kind resolution order
+is fixed: the built-in kernel tables first, then the host's own entries, then plugin contributions
+collected once at startup over `CatalogRegistrar` (`spi` §4.5) — one frozen catalog per session, and
+a kind absent from that snapshot is `SC-DOC-0003`. The `state` kind resolves
 its `block` + `properties` to a `BlockState` at compile time; a malformed declaration is a compile
 finding, not a runtime error. A computation's identity is its output key: `id` is optional and
 defaults to `output`, and when both are written they must be equal. A factory that returns a
@@ -403,6 +406,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 - Host kinds: `property`, `state`, `tag` and `fluid` read as ordinary `checks` and compile only
   through the adapter catalog; the same declarations built through the adapter factories produce the
   same check shape and the same match/mismatch verdicts. There is no `mc_checks` member.
+- Plugin kinds: a kind contributed through `ModPlugin.register` compiles like any catalog entry, and
+  the same kind without the plugin stays `SC-DOC-0003`.
 - Determinism: reordered object members and definition order produce equal blueprints.
 - Reader/writer round-trip: a `Document` written by a test writer reads back equal (content, not
   spans).
@@ -444,7 +449,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   or whose factory returns a different output key or a different `inputs` set, is `SC-DOC-0014`;
   the compiler never silently retargets and adds no wrapper.
 - A kind is resolved by exact id. The default namespace is applied by the reader; a catalog lookup
-  never falls back, and a built-in grammar form applies only in `structurecumulus`.
+  never falls back, and a built-in grammar form applies only in `structurecumulus`. The catalog
+  itself is one frozen snapshot per session: built-ins, host entries, then plugin contributions.
 - Document content never throws. Every malformed field, cycle, unknown factory or invalid blueprint
   becomes a located finding; `CompileResult.blueprint()` is null whenever an error exists.
 - A blueprint document is kindless or `blueprint`; a set document is `structure_set`. A set names
