@@ -7,8 +7,8 @@ import dev.vfyjxf.cumulus.kernel.space.Siting;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -108,26 +108,26 @@ final class InMemoryClaimLedger implements ClaimLedger {
     }
 
     private @Nullable ClaimVerdict conflicts(SettleRequest request, List<ClaimRow> incumbents) {
-        Map<String, Set<ClaimRow>> contested = new LinkedHashMap<>();
+        Map<Long, List<ClaimRow>> byCell = new HashMap<>(incumbents.size() * 2);
+        for (ClaimRow incumbent : incumbents) {
+            byCell.computeIfAbsent(incumbent.cell().packed(), ignored -> new ArrayList<>()).add(incumbent);
+        }
+        Set<ClaimRow> contested = new LinkedHashSet<>();
         for (ClaimRow requested : request.rows()) {
-            for (ClaimRow incumbent : incumbents) {
-                if (!ClaimMatrix.conflicts(requested, incumbent)) {
-                    continue;
+            List<ClaimRow> atCell = byCell.get(requested.cell().packed());
+            if (atCell == null) {
+                continue;
+            }
+            for (ClaimRow incumbent : atCell) {
+                if (ClaimMatrix.conflicts(requested, incumbent)) {
+                    contested.add(incumbent);
                 }
-                contested.computeIfAbsent(
-                    requested.bay().text() + "|" + incumbent.instance() + "|" + incumbent.bay().text(),
-                    ignored -> new LinkedHashSet<>()
-                ).add(incumbent);
             }
         }
         if (contested.isEmpty()) {
             return null;
         }
-        Set<ClaimRow> allIncumbents = new LinkedHashSet<>();
-        for (Set<ClaimRow> group : contested.values()) {
-            allIncumbents.addAll(group);
-        }
-        return new ClaimVerdict.Conflict(new ArrayList<>(allIncumbents));
+        return new ClaimVerdict.Conflict(new ArrayList<>(contested));
     }
 
 }
