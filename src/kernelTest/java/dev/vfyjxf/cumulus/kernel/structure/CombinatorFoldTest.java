@@ -111,6 +111,11 @@ class CombinatorFoldTest {
     }
 
     @Test
+    void notMetaNamesTheNegationCode() {
+        assertEquals(Codes.negationMatched.code(), Expectations.not(leaf(Reply.match())).meta().mismatchCode());
+    }
+
+    @Test
     void thresholdAbstainBranches() {
         assertInstanceOf(Reply.Abstain.class, Expectations.atMost(0, leaf(Reply.abstain())).test(context()));
         assertInstanceOf(

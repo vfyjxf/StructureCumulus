@@ -633,7 +633,7 @@ public final class Expectations {
 
         @Override
         public ExpectationMeta meta() {
-            return new ExpectationMeta(id("not"), 0, child.meta().requires(), code(1));
+            return new ExpectationMeta(id("not"), 0, child.meta().requires(), Codes.negationMatched.code());
         }
 
         @Override
