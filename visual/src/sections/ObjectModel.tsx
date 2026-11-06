@@ -186,7 +186,7 @@ export function ObjectModel() {
               <div><span className="k">nested</span><span className="v">NestedExtentLookup</span></div>
               <div><span className="k">instance</span><span className="v">StructureInstance</span></div>
               <div><span className="k">manager</span><span className="v">StructureManager</span></div>
-              <div><span className="k">events</span><span className="v">Broken · Moved · Loaded · Unloaded · Invalidated</span></div>
+              <div><span className="k">events</span><span className="v">Broken · Invalidated · Loaded · Unloaded</span></div>
               <div><span className="k">D-29</span><span className="v">{zh ? '已被取代' : 'superseded'}</span></div>
             </div>
             <p style={{ marginTop: 10 }}>

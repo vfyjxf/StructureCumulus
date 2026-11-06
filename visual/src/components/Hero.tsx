@@ -107,8 +107,8 @@ export function Hero({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
       </div>
 
       <div className="hero-foot">
-        <span>{zh ? 'Review 于 2026.10.29 · D-40 tree at 70857d7' : 'Reviewed 2026.10.29 · D-40 tree at 70857d7'}</span>
-        <span>{zh ? '英文设计是唯一权威 · adapter H1–H4 / T1–T3 / N1–N5 / S5–S6 · 74/74 GameTests' : 'English source only · adapter H1–H4 / T1–T3 / N1–N5 / S5–S6 · 74/74 GameTests'}</span>
+        <span>{zh ? 'Review 于 2026.11.06 · D-82 tree' : 'Reviewed 2026.11.06 · D-82 tree'}</span>
+        <span>{zh ? '英文设计是唯一权威 · adapter H1–H4 / T1–T3 / N1–N7 / S5–S6 · 140/140 GameTests' : 'English source only · adapter H1–H4 / T1–T3 / N1–N7 / S5–S6 · 140/140 GameTests'}</span>
       </div>
     </header>
   );
