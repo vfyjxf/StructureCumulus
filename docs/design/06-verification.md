@@ -422,11 +422,14 @@ funnel — is the shipped host. The suite needs no new source set and no depende
 | A refused cell reads `Unreadable` and answers no host value — never air (D-80) | `aRefusedCellReadsUnreadableAndAnswersNullNeverAir` |
 | A captured nested body opens its child frame and stays in the parent's occupants; a cut body opens no child, stays in the parent and carries one `SC-MC-0003` entry naming the reason (D-65) | `aCapturedNestedBodyHasAChildAndACutBodyCarriesAFinding` |
 | `Settled.rows` equals the requested rows of that key, and another key's rows never leak into an answer (`claim` §4.5) | `settleAnswersWithThisKeysRows` |
-| A conflicting settle answers `Conflict` with the incumbent rows and its `SC-CLM-0001` finding, and writes nothing (`claim` §4.6) | `aConflictCarriesItsIncumbentsAndWritesNothing` |
+| A conflicting settle answers `Conflict` with the incumbent rows only — the finding is the engine's (D-53) — and writes nothing (`claim` §4.6) | `aConflictCarriesItsIncumbentsAndWritesNothing` |
 | One real write inside the capture retires the lease (`isCurrent()` false) | `aWriteInsideTheCaptureRetiresTheLease` |
 
 The read-policy law is pinned by mutation: commenting out the entity-kind gates in `LevelCapture`
-turns it red. The doubles answer like the host — `kernelTest`'s `TestWorld.View` filters occupants by
+turns it red. The conflict law asserts data only (D-53); the finding half is covered by the booted
+host's check path (`CheckClaimsGameTest`: a real `check` over the shipped ledger answers
+`SC-CLM-0001`) and by the kernel-level equivalence of the two engine entries
+(`theSettleConflictRendersLikeThePreCheck`). The doubles answer like the host — `kernelTest`'s `TestWorld.View` filters occupants by
 the capture policy's kinds (blocks unconditionally, bodies by their kind), and the src/test support
 ledger answers settle with the requested rows — but they stay scenario doubles; no law test runs
 against a double.

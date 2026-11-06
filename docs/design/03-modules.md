@@ -40,7 +40,7 @@ The edges, exactly:
 | `space` | `core` |
 | `finding` | `core`, `space` |
 | `world` | `core`, `space` |
-| `claim` | `core`, `space`, `finding` |
+| `claim` | `core`, `space` |
 | `structure` | `core`, `space`, `finding`, `world`, `claim` |
 | `context` | `core`, `space`, `finding`, `world`, `structure` |
 | `document` | `core`, `space`, `finding`, `claim`, `world`, `structure`, `context` |
@@ -52,8 +52,8 @@ The edges, exactly:
 Notes:
 
 - `structure` depends on `claim` for `Sharing` and `Footprint`, and `claim` does not depend on
-  `structure`. `claim` uses `finding` only for the `FindingBundle` a conflict carries; the planner
-  lives in `engine`, which may depend on both.
+  `structure`. `claim` carries no finding: a conflict is data and the engine builds its wording
+  (D-53); the planner lives in `engine`, which may depend on both.
 - `context` depends on `structure` for the `Computation`/`Plan` types; a `Computation` is declared
   by a blueprint but its contexts (`SectionContext`/`AggregateContext`) live in `structure`, so the
   store can run them without a cycle.

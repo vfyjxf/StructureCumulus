@@ -328,7 +328,7 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-EXP-0004` | ERROR | ✓ | a factory kind is unknown | `DocumentCompiler` |
 | `SC-EXP-0005` | ERROR | ✓ | a factory returned null or bad args | `DocumentCompiler` |
 | `SC-EXP-0006` | ERROR | ✓ | a cell in the derived envelope holds a non-air occupant | `Expectations.envelopeAir` (the synthetic envelope check) |
-| `SC-CLM-0001` | ERROR | ✓ | two claims conflict | `engine.check`/`settle` |
+| `SC-CLM-0001` | ERROR | ✓ | two claims conflict | `engine.check`/`settle`, two entries over the one `conflicts(...)` builder (D-53) |
 | `SC-CLM-0002` | WARNING | – | the ledger cannot answer | `engine.check` |
 | `SC-CLM-0003` | ERROR | – | the revision moved twice | `engine.settle` |
 | `SC-CLM-0004` | ERROR | ✓ | a binding is invalid (a nested or non-root subject, a foreign bay/cell) | `engine.check`/`settle` |

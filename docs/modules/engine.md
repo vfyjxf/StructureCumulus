@@ -259,7 +259,7 @@ for a claimable bay. A nested structure is checkable but never claimable: a nest
 subject, and a check that binds a nested body through `Focuses.occupant` fails at claim prediction
 with `SC-CLM-0004` before an `Admitted` exists. Rows are one per cell per bay; a cell may carry two
 rows only when both bays are `shared` (the blueprint refuses an exclusive overlap). `rows` is sorted
-by `(cell, owner, bay, siting origin, placement orientation, placement offset, sharing)`.
+by `(cell, instance, bay, siting origin, placement orientation, placement offset, sharing)`.
 
 `check` rejects a nested or non-root binding while folding the verdict; it never returns an
 `Admitted` that carries one. `settle` revalidates before deriving: each bay is this blueprint's; each
@@ -270,8 +270,13 @@ footprint lies inside the bay's world cells; for `oneSubject` the union equals t
 `IllegalArgumentException` carrying `SC-CLM-0004` if a nested or non-root subject reaches it; that is
 a proof failure, because check and settle already validated the bindings.
 
+A conflict is data, not a report (D-53): the ledger's `Conflict` verdict carries the contesting
+incumbent rows and nothing else. The engine renders the finding through its one `conflicts(...)`
+builder — the check prediction over the frozen `ClaimView`, the settle refusal over the verdict's
+incumbents and the moved-revision re-read all call it — so both entries produce one wording.
+
 A ledger is free to answer `Formed.claims()` with its whole row set rather than only the replacement
-rows. A host that runs several structures must therefore filter the set by `(owner, siting, bay)`
+rows. A host that runs several structures must therefore filter the set by `(instance, siting, bay)`
 before attributing rows to one structure; the engine never does that filtering.
 
 ### 7.6 Budget and determinism

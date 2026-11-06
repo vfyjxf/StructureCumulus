@@ -10,10 +10,10 @@
 `SettleRequest`, `ClaimLedger`, `ClaimMatrix`.
 
 **Does not own:** which cells a check binds (`structure`), how rows are derived (`engine`), finding
-text (`finding`), persistence (`mc`), the bay's `Coverage` (`structure`). A conflict carries a
-`FindingBundle`; the engine builds its findings.
+text (`finding`), persistence (`mc`), the bay's `Coverage` (`structure`). A conflict carries only its
+incumbent rows; the engine builds its finding (D-53).
 
-**Imports:** `core`, `space`, `finding` (the bundle only).
+**Imports:** `core`, `space`.
 
 ## 2. Types
 
@@ -24,7 +24,7 @@ text (`finding`), persistence (`mc`), the bay's `Coverage` (`structure`). A conf
 | `ClaimRow` | record | one cell of one world held by one bay of one instance at one siting |
 | `ClaimSet` | record | the rows of one settlement + the revision written |
 | `ClaimView` | record | a read answer: rows, revision, availability |
-| `ClaimVerdict` | sealed | `Settled`, `Conflict`, `RevisionMoved` |
+| `ClaimVerdict` | sealed | `Settled`, `Conflict` (incumbent rows only, D-53), `RevisionMoved` |
 | `SettleRequest` | record | instance + rows + expected revision |
 | `ClaimLedger` | interface | one handle per world; `settle`/`release` the only writers |
 | `ClaimMatrix` | final class | the only conflict predicate |
@@ -70,24 +70,27 @@ public record ClaimView(java.util.List<ClaimRow> rows, long revision, boolean av
 
 public sealed interface ClaimVerdict {
     record Settled(long revision, java.util.List<ClaimRow> rows) implements ClaimVerdict {
-        public Settled { /* canonical rows; revision >= 1 */ }
+        public Settled { /* canonical rows; a writing settlement has revision >= 1 */ }
     }
-    record Conflict(java.util.List<ClaimRow> incumbents, FindingBundle findings)
-            implements ClaimVerdict { }
+    record Conflict(java.util.List<ClaimRow> incumbents) implements ClaimVerdict {
+        public Conflict { /* non-empty; canonical order */ }
+    }
     record RevisionMoved(long expected, long actual) implements ClaimVerdict { }
 }
 
-public record SettleRequest(OwnerId owner, Siting siting, java.util.List<ClaimRow> rows,
+public record SettleRequest(InstanceId instance, java.util.List<ClaimRow> rows,
                             long expectedRevision) {
-    public SettleRequest { /* rows owner/siting match; canonical */ }
+    public SettleRequest { /* rows belong to the instance; canonical */ }
 }
 
 public interface ClaimLedger {
+    static ClaimLedger inMemory(World world);
     World world();
     long revision();
     ClaimVerdict settle(SettleRequest request);
-    ClaimVerdict release(OwnerId owner, Siting siting);
+    ClaimVerdict release(InstanceId instance);
     ClaimView read(Cuboid box);
+    void retire();
 }
 
 public final class ClaimMatrix {
@@ -154,6 +157,9 @@ rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
   conflict check and write stay inside the one compare-and-set, so a failed settle leaves those
   incumbents in place. The ledger derives the replacement from the request's rows; no host passes a
   replacement list.
+- The ledger is a store, not a reporter (D-53): a verdict carries rows and revisions, never a
+  finding. `Conflict` names the contesting incumbent rows; the wording is the engine's one builder
+  (`engine` §7.5), so the port is implementable from the claim types alone.
 - `release(instance)` deletes every row of that instance and bumps the revision by one. An absent
   instance is a no-op and does **not** bump. It is safe to call on every instance removal and move; it
   is idempotent after the first. A world unload drops the ledger with the world's structure state, so
@@ -173,11 +179,14 @@ rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
 
 ### 4.6 Conflict findings
 
-The engine builds one finding per `(instance, bay)` pair, not per cell: the contested cells form one
-`CuboidSet` locus, the primary label sits on the first contested cell in row order, a note gives the
-count, and the two sharing values are named in the message. `Conflict.findings` is the report; the
-ledger never renders. The incumbent rows are carried so a caller can name both instances without
-re-reading; an owner is resolved through the structure manager, never stored on a row.
+The engine builds one finding per `(request bay, incumbent instance, incumbent bay)` group, not per
+cell (`MatchEngine.conflicts`): the group's contested cells form one world `CuboidSet` locus under
+the primary label, the message names the incumbent instance and bay, the contested cell count and
+the requesting bay, and two notes state the requested and the held sharing. The same builder serves
+the check prediction, the settle refusal and the moved-revision re-read, so one wording exists and
+the two entries cannot drift (D-53). `Conflict` itself carries the incumbent rows only — data, not
+a report — so a caller can name both instances without re-reading; an owner is resolved through the
+structure manager, never stored on a row.
 
 ## 5. Pipeline role
 
@@ -189,7 +198,8 @@ re-reading; an owner is resolved through the structure manager, never stored on 
 ## 6. Codes
 
 `SC-CLM-0001` (ERROR, primary): two claims conflict. Producer: `engine.check` (prediction) and
-`engine.settle` (authoritative). `SC-CLM-0002` (WARNING, no primary): the ledger cannot answer.
+`engine.settle` (authoritative), one `conflicts(...)` builder (D-53). `SC-CLM-0002` (WARNING, no
+primary): the ledger cannot answer.
 Producer: `engine.check`. `SC-CLM-0003` (ERROR): the revision moved twice. Producer:
 `engine.settle`. `SC-CLM-0004` (ERROR, primary): a settle binding is invalid. Producer:
 `engine.settle`. `SC-CLM-0005` (ERROR, primary): an exclusive `Bound` footprint is empty. Producer:
@@ -199,13 +209,15 @@ Producer: `engine.check`. `SC-CLM-0003` (ERROR): the revision moved twice. Produ
 
 - Matrix: all four sharing pairs; same owner/siting excluded; different cells; symmetry.
 - Ledger: CAS success/failure; replacement of the whole key; release absent/present; revision bumps;
-  unavailable read; conflict leaves bytes untouched; canonical order.
+  unavailable read; conflict leaves bytes untouched; canonical order. A conflict carries only its
+  incumbent rows (no finding), keeps every incumbent deduped and ordered, and rejects an empty
+  incumbent list (D-53).
 - Footprint resolution: pipe corner (`Bound` owns four of eight), door (`Bound` equals bay),
   cavity (`Box` owns air), `Declared` outside the bay, `None`.
 - `ClaimSet`/`ClaimView` ordering and immutability.
 
 ## 8. Dependencies
 
-`core` (`NamespacedId`, `World`, `OwnerId`, `LatticeKey`), `space` (`Cuboid`, `CuboidSet`,
-`Siting`) and `finding` (`FindingBundle` in a conflict). It does not import `structure` or `engine`;
-the engine builds the findings.
+`core` (`NamespacedId`, `World`, `InstanceId`, `LatticeKey`) and `space` (`Cuboid`, `CuboidSet`,
+`Siting`). It does not import `finding`, `structure` or `engine`: a conflict is data and the engine
+builds its finding (D-53).

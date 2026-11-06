@@ -1306,6 +1306,37 @@ turns the read-policy law red, and the kernel and adapter suites stay green over
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
+### D-53 — A conflict is data; the engine writes its finding
+
+`ClaimVerdict.Conflict` carries the incumbent rows and nothing else. The ledger detects a conflict and
+answers which rows contest the request; it does not choose a code, a phase, a locus or a sentence.
+
+The engine already builds that finding for its pre-settle check (`MatchEngine.conflicts`), from the
+requested rows and the held rows. The ledger's copy was a second implementation of the same text, and
+a host implementing `ClaimLedger` had to reproduce it a third time.
+
+**A ledger is a store, not a reporter.** With the finding removed, `InMemoryClaimLedger` loses its
+dependency on `Finding`, `Codes`, `Phase`, `Label` and `Locus`, and the port can be implemented from
+the claim types alone.
+
+**Rejected: keeping the findings as an optimisation** (the ledger already has both row sets, so
+building the finding there is "free"): it makes the wording part of every implementation instead of
+one place, and the engine has to run the same builder anyway for its pre-check.
+
+**Rejected: a middle `ConflictFacts` type**: it would be a second representation of the same two row
+lists, with one consumer.
+
+**Consequence:** the settle verdict renders through the same builder as the check prediction and the
+`RevisionMoved` re-read, so both entries produce one wording; the D-76 host law keeps its data half
+only — a conflicting settle answers the incumbent rows and writes nothing — and the finding half is
+covered by the booted host's check path (`CheckClaimsGameTest`: a real `check` over the shipped
+ledger answers `SC-CLM-0001`) and by the kernel-level equivalence of the two engine entries
+(`theSettleConflictRendersLikeThePreCheck`); `claim` §1/§4.5/§4.6, `engine` §7.5, `finding` §6 and
+`06-verification.md` §3.8 state the rule. **Status:** implemented
+with the tests that pin it: `aConflictCarriesNoFinding`, `aConflictKeepsEveryIncumbent`,
+`aConflictWithNoIncumbentIsRejected` (kernel claim) and `theSettleConflictRendersLikeThePreCheck`
+(kernel engine).
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
