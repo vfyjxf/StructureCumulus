@@ -64,7 +64,7 @@ public final class DeterminismDump {
     private static final CuboidSet hollowCells = CuboidSet.of(Cuboid.of(0, 1, 0, 3, 2, 3))
             .subtract(CuboidSet.of(Cuboid.of(plateCell))).subtract(CuboidSet.of(Cuboid.of(penCell)));
     private static final ContextKey<Long> airCells = ContextKeys
-            .of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+            .of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
     private static final ContextKey<Long> capacity = ContextKeys.of(id("capacity"), Long.class, Retention.instance);
 
     private DeterminismDump() {}
