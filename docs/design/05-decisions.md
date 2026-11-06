@@ -1320,6 +1320,19 @@ several codes or bend the call graph.
 **Why no line numbers.** They drift on every edit; the gate (X03-D04) checks class names, and a class
 is a stable anchor for a reader.
 
+### D-71 — A code may be thrown and never reported
+
+`SC-SPI-0003` is thrown by `Catalog.Builder.put` when one id is registered twice with different
+values. It is never a finding: the failure happens while catalogs are built, before any match exists.
+The message keeps the code prefix for a human reader, and nothing parses it. The producer table marks
+it `T` — thrown, never a finding value — and records `Catalog.Builder.put`.
+
+**Why keep it.** A startup failure still needs a citable number; without one the author reads a
+sentence and has nothing to look up.
+
+**Why not delete it (C) or strip the prefix (B).** Deleting loses the citation; stripping leaves a code
+that no line mentions, which the "unproduced codes are deleted" rule forbids.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
