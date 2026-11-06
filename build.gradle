@@ -63,6 +63,11 @@ sourceSets {
     }
     // The scenario mod's identity; toml only, folded into the structurecumulusuitest mod.
     uitestMod {}
+    // The GameTest scenarios sit in their own source set, loaded by the runs and kept out of the jar.
+    gametest {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
 }
 
 configurations {
@@ -91,6 +96,7 @@ neoForge {
     mods {
         structurecumulus {
             sourceSet(sourceSets.main)
+            sourceSet(sourceSets.gametest)
         }
         structurecumulusuitest {
             sourceSet(sourceSets.uitest)
