@@ -1104,6 +1104,38 @@ that also wants durable claims re-settles its restored instances and the planner
 **A move is a removal.** With the instance as the key there is no second identity to reconcile when a
 structure is pushed: the adapter invalidates it and releases its rows, and a rebuild is a fresh settle.
 
+### D-46 — Per-level state is created by the level lifecycle
+
+The adapter's per-level state is created when a level loads and dropped when it unloads. No read path
+creates it, and no map is keyed by a level object.
+
+**A deletion must not be undoable.** `ServerState.store(level)` was a `computeIfAbsent`, so any later
+read could recreate a store that `ServerState.unload` had just removed — which is what
+`WatchEvents.levelUnloaded` did, dispatching `Unloaded` into the fresh empty manager. The fix removes
+the ability instead of reordering: creation happens in `openLevel`, driven by `LevelEvent.Load`, and
+every accessor is a read that answers "no state" rather than building one.
+
+**One handler per transition.** `LevelEvent.Unload` is handled by `ServerState.unload` alone: it
+dispatches `Unloaded` to the store that still exists, then closes the store, closes the capture and
+forgets the watcher. `WatchEvents` keeps no unload handler. Handler order between mods is not a
+contract, so no behaviour may depend on it.
+
+**The key is the dimension.** Both per-level maps are keyed by `ResourceKey<Level>`
+(`ServerLevel#dimension()`), never by the level object: an object key pins an unloaded level and,
+after a reload, gives one dimension two entries. `LevelWatch` keeps its `LevelAccessor` entry points —
+its events arrive as `LevelAccessor` — and derives the resource key internally rather than narrowing
+its signatures to `Level`.
+
+**Rejected:** moving the dispatch into `ServerState.unload` while leaving the lazy creation — it fixes
+this occurrence, not the class, and any future listener can resurrect again. Keeping `LevelAccessor` as
+a key and passing the resource key separately — the map still pins. An attachment on the level is the
+better long-term shape, but it restructures every per-level accessor and belongs with the claim work,
+not with a P2 lifecycle fix.
+
+**Consequence:** `ServerState` gains `openLevel`, accessors become reads, `LevelEvent.Unload` has one
+producer, `WatchEvents` loses its dispatch, and the PMD rule `NoLevelAsCollectionKey` goes from three
+hits to zero.
+
 ### D-47 — A block change is observed at the write, not at the intent
 
 The adapter learns that a block changed by hooking the one method every server-side write goes
@@ -1847,8 +1879,9 @@ workflow cannot drift from it.
   `Refused(notCaptured)` (D-34), even a custom trait that reads only `BlockState`; that is the price
   of never letting `BlockCapability.getCapability` fall back to a live `Level.getBlockEntity`.
 
-> Numbering note: D-46 is still a proposal carried by
-> `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
+> Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
+> above records it, and the proposal that carried it is
+> `Data/StructureCumulus/plan-2026-11-01/05-a06-d03-creation-discipline.md`.
 > Numbering note: D-78 was a proposal (`37-law-6-host-may-replay.md`) whose plan was withdrawn before
 > landing; it never entered this file, so the withdrawal above closes a proposal, not a recorded
 > decision.
