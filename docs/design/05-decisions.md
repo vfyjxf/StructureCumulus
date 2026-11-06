@@ -1262,6 +1262,27 @@ cell, a refused section and an individually refused cell answer null for every h
 air cell and an all-air section still answer air, the `BlockGetter` face keeps answering air, and a
 check expecting stone over an uncaptured cell is `Unreadable`, never an air mismatch.
 
+### D-73 — Performance is a JMH number, produced on CI and on the development machine
+
+The kernel's cost is measured by JMH benchmarks in a `src/jmh` source set, run by a `jmh` task. There
+is no counting layer, no complexity bookkeeping and no threshold: a benchmark reports throughput and
+latency for one operation, and the numbers are compared by a person looking at two runs.
+
+**Why JMH alone.** JIT warmup, dead-code elimination and constant folding make a hand-timed loop
+meaningless, and a counter of "how many sorts happened" answers a question nobody asks once the wall
+time is known.
+
+**Where it runs.** `./gradlew jmh` on a developer machine and in CI. The build compiles the source set
+so it cannot rot; it never runs benchmarks inside `check`, because a shared runner's numbers are for
+comparison, not for gating.
+
+**What it cannot measure.** Capture against a live level and anything that needs a server tick. Those
+are not benchmarked at all; a change that touches them is reviewed by reading the code.
+
+**Status:** implemented — the `jmh` source set and task, and the six benchmarks of the cost pass
+(`06-verification.md` §7); the CI half is deferred until the repository has a remote, so no workflow
+file is kept yet.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 

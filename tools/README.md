@@ -15,6 +15,7 @@ JUnit Platform. On a normal machine, prefer:
 
 ```bash
 ./gradlew compileKernelJava kernelPurity kernelTest
+./gradlew jmh             # the JMH cost benchmarks (D-73); -PjmhArgs forwards runner options
 ./gradlew spotlessApply   # the project formatter owns import order and line width
 ```
 

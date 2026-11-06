@@ -490,7 +490,26 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
     (host: the plan is `rootSiting.compose(relativeSiting)`, and both endpoints are mapped through
     their own sitings; §3.3)
 
-## 7. What is not verified in this round
+## 7. Performance
+
+The kernel's cost is a JMH number, produced on a development machine and in CI (D-73). There is no
+counting layer, no complexity bookkeeping and no threshold: a benchmark reports throughput and
+latency for one operation, and the numbers are compared by a person looking at two runs.
+
+- Run: `./gradlew jmh`. The `src/jmh` source set runs with `@Fork(2)`, `@Warmup(3)` and
+  `@Measurement(5)` in both `Throughput` and `AverageTime` modes; `-PjmhArgs` forwards options to
+  `org.openjdk.jmh.Main`, for example `-PjmhArgs="ClaimPlanning -rf json -rff bench.json -foe true"`
+  (JMH creates only the result file, never its directory).
+- CI is deferred until the repository has a remote; when one exists it runs the same `./gradlew jmh`
+  and publishes the JSON result as a build artifact, and no workflow file is kept until then.
+  `check` only compiles the source set: a shared runner's numbers are for comparison, not for
+  gating, so no benchmark ever runs inside `check`.
+- A number worth keeping is copied to `Data/StructureCumulus/bench/<date>-<benchmark>.json`;
+  `07-regeneration.md` §7 records only the most recent conclusion.
+- Capture against a live level and anything that needs a server tick is not benchmarked at all; a
+  change that touches them is reviewed by reading the code.
+
+## 8. What is not verified in this round
 
 - The rest of the NeoForge adapter and its GameTests. The tree registers 126 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
