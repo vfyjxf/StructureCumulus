@@ -22,8 +22,6 @@ import static dev.vfyjxf.cumulus.mc.StructureSetStressFixtures.reactorId;
 import static dev.vfyjxf.cumulus.mc.StructureSetStressFixtures.reactorPort;
 import static dev.vfyjxf.cumulus.mc.StructureSetStressFixtures.reactorSet;
 import static dev.vfyjxf.cumulus.mc.StructureSetStressFixtures.solarSpec;
-import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.owner;
-import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.rival;
 import static dev.vfyjxf.cumulus.mc.StructureSetTestSupport.world;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

@@ -528,8 +528,7 @@ class JsonDocumentTest {
                         Focuses.occupant(LatticePoint.of(1, 0, 1)),
                         Expectations.block(NamespacedId.of("minecraft", "campfire"))
                     )
-                )
-                .computation(Computations.air(airCells, hollowCells))
+                ).computation(Computations.air(airCells, hollowCells))
                 .anchor(new AnchorSpec(NamespacedId.of("front"), "facing", "north"))
                 .orientation(
                     OrientationPolicy.builder(NamespacedId.of("front"))
@@ -538,11 +537,8 @@ class JsonDocumentTest {
                                 Orientation.of(Turn.clockwise, Tilt.level, Flip.none),
                                 Orientation.of(Turn.half, Tilt.level, Flip.none),
                                 Orientation.of(Turn.counterclockwise, Tilt.level, Flip.none)
-                            )
-                            .uprightOnly()
-                            .build()
-                )
-                .build();
+                            ).uprightOnly().build()
+                ).build();
         assertEquals(javaCampfire, compiledCampfire);
 
         String counted = """
@@ -568,25 +564,16 @@ class JsonDocumentTest {
                 .of(NamespacedId.of("test", "bodies"), Long.class, Retention.instance, Merges.sum());
         ContextKey<Long> volume = ContextKeys
                 .of(NamespacedId.of("test", "volume"), Long.class, Retention.instance, Merges.sum());
-        Blueprint javaCounted = Blueprint.builder(NamespacedId.of("test", "computed"))
-                .bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
-                .check(
-                    Check.of(
-                        NamespacedId.of("test", "c"),
-                        Bay.of(
-                            NamespacedId.of("test", "cell"),
-                            region,
-                            Coverage.everyCell,
-                            Footprint.box(),
-                            Sharing.shared
-                        ),
-                        Focuses.bay(),
-                        Expectations.eachCell(Expectations.air())
-                    )
-                )
-                .computation(Computations.count(bodies, region))
-                .computation(Computations.volume(volume, region))
-                .build();
+        Blueprint javaCounted = Blueprint.builder(NamespacedId.of("test", "computed")).bounds(
+            Cuboid.of(0, 0, 0, 2, 1, 1)
+        ).check(
+            Check.of(
+                NamespacedId.of("test", "c"),
+                Bay.of(NamespacedId.of("test", "cell"), region, Coverage.everyCell, Footprint.box(), Sharing.shared),
+                Focuses.bay(),
+                Expectations.eachCell(Expectations.air())
+            )
+        ).computation(Computations.count(bodies, region)).computation(Computations.volume(volume, region)).build();
         assertEquals(javaCounted, compiledCounted);
     }
 

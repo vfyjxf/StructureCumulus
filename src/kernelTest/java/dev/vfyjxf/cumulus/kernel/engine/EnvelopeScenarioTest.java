@@ -213,7 +213,8 @@ class EnvelopeScenarioTest {
         view.put(TestWorld.block(TestWorld.stone, LatticePoint.origin));
         view.putBody(TechFixtures.entity(TechFixtures.cow, LatticePoint.origin, Cuboid.of(LatticePoint.origin)));
         ClaimLedger ledger = TechFixtures.ledger();
-        MatchResult result = TechFixtures.settle(envelopeOnly("envelope/only_block_under_entity"), siting, view, ledger);
+        MatchResult result = TechFixtures
+                .settle(envelopeOnly("envelope/only_block_under_entity"), siting, view, ledger);
 
         assertEnvelopeFailureAt(result, LatticePoint.origin);
         assertEquals(0, TestWorld.rows(ledger).size());
@@ -237,7 +238,10 @@ class EnvelopeScenarioTest {
         Blueprint transparent = envelopeOnly("envelope/reads_off");
         Blueprint rejecting = envelopeEntitiesOnly("envelope/reads_on");
 
-        assertFalse(transparent.reads().kinds().contains(OccupantKind.entity), "the default envelope captures no entity");
+        assertFalse(
+            transparent.reads().kinds().contains(OccupantKind.entity),
+            "the default envelope captures no entity"
+        );
         assertTrue(rejecting.reads().kinds().contains(OccupantKind.entity), "the switch adds the entity kind");
     }
 

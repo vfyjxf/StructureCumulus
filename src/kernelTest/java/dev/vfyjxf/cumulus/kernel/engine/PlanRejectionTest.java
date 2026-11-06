@@ -51,8 +51,9 @@ class PlanRejectionTest {
             Sharing.exclusive
         );
         Blueprint atTheEdge = Blueprint.builder(id("edge")).bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
-                .check(Check.of(id("edge_cells"), box, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant())))
-                .build();
+                .check(
+                    Check.of(id("edge_cells"), box, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()))
+                ).build();
         PlanRejected offLattice = assertThrows(
             PlanRejected.class,
             () -> ClaimPlanner.derive(
@@ -64,7 +65,8 @@ class PlanRejectionTest {
         );
         assertEquals(Codes.locusUnmapped, offLattice.code());
 
-        Bay bound = MagicFixtures.bay(id("empty_bound"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Bay bound = MagicFixtures
+                .bay(id("empty_bound"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
         Blueprint boundBlueprint = Blueprint.builder(id("empty_bound")).bounds(Cuboid.of(origin))
                 .check(Check.of(id("empty_check"), bound, Focuses.occupant(origin), Expectations.anyOccupant()))
                 .build();
@@ -75,8 +77,10 @@ class PlanRejectionTest {
         assertEquals(Codes.boundEmpty, empty.code());
 
         OccupantSnapshot block = TestWorld.block(TestWorld.stone, origin);
-        Bay left = MagicFixtures.bay(id("conflict_left"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
-        Bay right = MagicFixtures.bay(id("conflict_right"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.shared);
+        Bay left = MagicFixtures
+                .bay(id("conflict_left"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Bay right = MagicFixtures
+                .bay(id("conflict_right"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.shared);
         Blueprint conflictBlueprint = Blueprint.builder(id("conflict")).bounds(Cuboid.of(origin))
                 .check(Check.of(id("left_check"), left, Focuses.occupant(origin), Expectations.anyOccupant()))
                 .check(Check.of(id("right_check"), right, Focuses.occupant(origin), Expectations.anyOccupant()))
@@ -98,7 +102,8 @@ class PlanRejectionTest {
             Cuboid.of(origin),
             List.of()
         );
-        Bay nestedBay = MagicFixtures.bay(id("nested_bay"), oneCell, Coverage.everyCell, Footprint.box(), Sharing.shared);
+        Bay nestedBay = MagicFixtures
+                .bay(id("nested_bay"), oneCell, Coverage.everyCell, Footprint.box(), Sharing.shared);
         Blueprint nestedBlueprint = Blueprint.builder(id("nested")).bounds(Cuboid.of(origin))
                 .check(Check.of(id("nested_check"), nestedBay, Focuses.occupant(origin), Expectations.anyOccupant()))
                 .build();
@@ -118,10 +123,10 @@ class PlanRejectionTest {
 
     @Test
     void theEngineSurfacesTheTypedPlannerRefusal() {
-        Bay bound = MagicFixtures.bay(id("air_bound"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Bay bound = MagicFixtures
+                .bay(id("air_bound"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
         Blueprint blueprint = Blueprint.builder(id("air_bound")).bounds(Cuboid.of(origin))
-                .check(Check.of(id("air_bound_check"), bound, Focuses.occupant(origin), Expectations.air()))
-                .build();
+                .check(Check.of(id("air_bound_check"), bound, Focuses.occupant(origin), Expectations.air())).build();
         TestWorld.View view = MagicFixtures.view().put(TestWorld.airOccupant(origin));
         MatchResult.Failed failed = assertInstanceOf(
             MatchResult.Failed.class,

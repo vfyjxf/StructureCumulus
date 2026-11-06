@@ -472,8 +472,7 @@ public final class StructureSetHost {
                 failures.add(
                     problem(
                         Codes.rollbackFailed,
-                        "the previous claim rows of " + entry.getKey() + " could not be released: "
-                                + detail(failure),
+                        "the previous claim rows of " + entry.getKey() + " could not be released: " + detail(failure),
                         locus,
                         Phase.settle
                     )

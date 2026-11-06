@@ -272,7 +272,11 @@ class AdversarialFuzzTest {
                 assertEquals(expected, ownAgain, where + " re-settle row set");
                 assertEquals(expected, sorted(TestWorld.rows(ledger)), where + " no duplicate rows after a re-settle");
                 long contentRevision = expected.isEmpty() ? 0L : 1L;
-                assertEquals(contentRevision, ledger.revision(), where + " the revision counts content changes, not writes");
+                assertEquals(
+                    contentRevision,
+                    ledger.revision(),
+                    where + " the revision counts content changes, not writes"
+                );
                 assertEquals(contentRevision, again.ledgerRevision(), where + " Formed carries the content revision");
                 assertRowLaws(ownAgain, where);
             }
@@ -313,10 +317,7 @@ class AdversarialFuzzTest {
                     MatchEngine.settle(rivalRequest, rivalAdmitted, ledger, TestAttempt.of(rivalRequest))
                 );
                 ClaimView frozen = ledger.read(Objects.requireNonNull(siting.toWorld(bounds), where + " world bounds"));
-                Siting oursSiting = Siting.of(
-                    worldCell,
-                    Orientation.of(Turn.clockwise, Tilt.level, Flip.none)
-                );
+                Siting oursSiting = Siting.of(worldCell, Orientation.of(Turn.clockwise, Tilt.level, Flip.none));
                 MatchRequest request = MatchRequest.of(
                     blueprint,
                     oursSiting,
@@ -414,7 +415,11 @@ class AdversarialFuzzTest {
                     );
                     List<ClaimRow> own = ownRows(formed, blueprint, MagicFixtures.instance);
                     assertRowLaws(own, where + " shared overlap");
-                    assertEquals(expectedRows(blueprint, sitings[0], MagicFixtures.instance), own, where + " shared rows");
+                    assertEquals(
+                        expectedRows(blueprint, sitings[0], MagicFixtures.instance),
+                        own,
+                        where + " shared rows"
+                    );
                     assertTrue(
                         own.stream().anyMatch(row -> row.cell().equals(LatticeKey.of(sharedCell))),
                         where + " shared cell row"

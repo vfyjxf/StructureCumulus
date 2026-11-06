@@ -37,8 +37,8 @@ class FindingBundleTest {
 
     @Test
     void identicalFindingsStillCollapse() {
-        Finding first = Finding.builder(Codes.expected).phase(Phase.check).message("same")
-                .label(local(0), "same label").build();
+        Finding first = Finding.builder(Codes.expected).phase(Phase.check).message("same").label(local(0), "same label")
+                .build();
         Finding duplicate = Finding.builder(Codes.expected).phase(Phase.check).message("same")
                 .label(local(0), "same label").build();
         FindingBundle bundle = FindingBundle.of(List.of(first, duplicate));

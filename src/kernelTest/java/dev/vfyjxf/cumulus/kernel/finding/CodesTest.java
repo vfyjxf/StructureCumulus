@@ -86,9 +86,19 @@ class CodesTest {
             SC-SET-0008 ERROR DASH document
             """;
 
-    private static final Set<String> OWNERS = Set.of(
-        "core", "space", "finding", "world", "claim", "structure", "context", "document", "engine",
-        "remedy", "spi", "adapter"
+    private static final Set<String> owners = Set.of(
+        "core",
+        "space",
+        "finding",
+        "world",
+        "claim",
+        "structure",
+        "context",
+        "document",
+        "engine",
+        "remedy",
+        "spi",
+        "adapter"
     );
 
     private static Severity severity(String wire) {
@@ -122,7 +132,7 @@ class CodesTest {
             assertEquals(severity(parts[1]), entry.severity());
             assertEquals(code, entry.explanation().code());
             assertTrue(parts[2].equals("P") || parts[2].equals("DASH") || parts[2].equals("T"), parts[0]);
-            assertTrue(OWNERS.contains(parts[3]), "unknown owning module for " + parts[0] + ": " + parts[3]);
+            assertTrue(owners.contains(parts[3]), "unknown owning module for " + parts[0] + ": " + parts[3]);
             assertTrue(seen.add(code), "duplicate code: " + code);
             if (previous != null) {
                 assertTrue(previous.compareTo(code) < 0, "codes are not in canonical order");

@@ -575,8 +575,7 @@ class ScenarioTest {
         Bay wall = Bay.of(id("wall"), wallCells, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
         Bay cavity = Bay.of(id("cavity"), cavityCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Bay mouth = Bay.of(id("mouth"), mouthCells, Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
-        ContextKey<Long> volume = ContextKeys
-                .of(id("cavity_volume"), Long.class, Retention.instance, Merges.sum());
+        ContextKey<Long> volume = ContextKeys.of(id("cavity_volume"), Long.class, Retention.instance, Merges.sum());
         Blueprint blueprint = Blueprint.builder(id("furnace")).bounds(Cuboid.of(0, 0, 0, 7, 6, 7)).check(
             Check.of(id("wall_bricks"), wall, Focuses.bay(), Expectations.eachCell(Expectations.block(TestWorld.stone)))
         ).check(Check.of(id("cavity_air"), cavity, Focuses.bay(), Expectations.eachCell(Expectations.air())))

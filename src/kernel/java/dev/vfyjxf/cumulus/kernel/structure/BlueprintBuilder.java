@@ -482,9 +482,7 @@ public final class BlueprintBuilder {
 
     private static void fail(String code, String message) {
         FindingCode findingCode = FindingCode.of(code);
-        CodeEntry entry = Codes.all.stream()
-                .filter(candidate -> candidate.code().equals(findingCode))
-                .findFirst()
+        CodeEntry entry = Codes.all.stream().filter(candidate -> candidate.code().equals(findingCode)).findFirst()
                 .orElse(Codes.blueprintInvalid);
         throw new BlueprintRejected(entry, message);
     }

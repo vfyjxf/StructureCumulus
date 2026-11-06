@@ -124,16 +124,9 @@ class ContextAggregateScenarioTest {
             Footprint.none(),
             Sharing.shared
         );
-        Blueprint blueprint = Blueprint.builder(MagicFixtures.id("context/uncontributed")).bounds(bounds)
-                .computation(silent)
-                .check(
-                    Check.of(
-                        MagicFixtures.id("context/uncontributed_check"),
-                        bay,
-                        Focuses.context(key),
-                        expectation(key)
-                    )
-                )
+        Blueprint blueprint = Blueprint.builder(MagicFixtures.id("context/uncontributed")).bounds(bounds).computation(
+            silent
+        ).check(Check.of(MagicFixtures.id("context/uncontributed_check"), bay, Focuses.context(key), expectation(key)))
                 .build();
         TestWorld.View view = MagicFixtures.view().air(LatticePoint.origin);
         MatchResult result = MagicFixtures.check(blueprint, siting, view, new ClaimView(List.of(), 0, true));

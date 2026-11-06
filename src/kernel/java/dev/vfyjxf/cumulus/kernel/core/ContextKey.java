@@ -12,12 +12,7 @@ import java.util.Objects;
  * @param retention whether the value is attempt-local or published
  * @param merge     non-null for a section-contributed key
  */
-public record ContextKey<T>(
-    NamespacedId id,
-    Class<T> type,
-    Retention retention,
-    @Nullable Merge<T> merge
-) {
+public record ContextKey<T>(NamespacedId id, Class<T> type, Retention retention, @Nullable Merge<T> merge) {
 
     public ContextKey {
         Objects.requireNonNull(id, "id");

@@ -538,7 +538,8 @@ class DocumentCompilerTest {
 
     @Test
     void aQualifiedKindNeverFallsBack() {
-        CompileResult result = DocumentCompiler.compile(expectationDocument(NamespacedId.of("mymod", "air")), context());
+        CompileResult result = DocumentCompiler
+                .compile(expectationDocument(NamespacedId.of("mymod", "air")), context());
         assertNull(result.blueprint());
         assertFalse(
             result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 3)).isEmpty(),
@@ -569,9 +570,7 @@ class DocumentCompilerTest {
             List.of(),
             List.of(),
             List.of(),
-            List.of(
-                new KeySpec(id("total"), "long", Retention.instance, NamespacedId.of("mymod", "sum"), null)
-            ),
+            List.of(new KeySpec(id("total"), "long", Retention.instance, NamespacedId.of("mymod", "sum"), null)),
             List.of(),
             List.of(),
             null,
@@ -629,9 +628,9 @@ class DocumentCompilerTest {
     @Test
     void aComputationWithDifferentInputsIsRejected() {
         ContextKey<Long> input = ContextKeys.of(id("in"), Long.class, Retention.instance);
-        Catalog<ComputationFactory> factories = Catalog.<ComputationFactory>builder(NamespacedId.of("test", "computations"))
-                .put(id("gather"), gatheringFactory(input))
-                .build();
+        Catalog<ComputationFactory> factories = Catalog
+                .<ComputationFactory>builder(NamespacedId.of("test", "computations"))
+                .put(id("gather"), gatheringFactory(input)).build();
         Catalogs builtin = Catalogs.builtin();
         CompilerContext context = new CompilerContext(
             builtin.focuses(),
@@ -713,7 +712,15 @@ class DocumentCompilerTest {
     @Test
     void envelopeEntitiesWithoutEnvelopeIsRejected() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        BaySpec bay = new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null);
+        BaySpec bay = new BaySpec(
+            id("wall"),
+            cells,
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive,
+            null,
+            null
+        );
         CheckSpec check = new CheckSpec(
             id("wall_check"),
             id("wall"),
@@ -860,7 +867,9 @@ class DocumentCompilerTest {
             false,
             true,
             Value.object(),
-            List.of(new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(
+                new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+            ),
             List.of(),
             List.of(),
             List.of(),

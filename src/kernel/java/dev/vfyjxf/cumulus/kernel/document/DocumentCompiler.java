@@ -361,8 +361,7 @@ public final class DocumentCompiler {
                     error(
                         findings,
                         Codes.schemaVersion,
-                        "definition " + placement.definition() + " uses schema version "
-                                + external.schemaVersion(),
+                        "definition " + placement.definition() + " uses schema version " + external.schemaVersion(),
                         placement.source(),
                         null,
                         owner
@@ -427,11 +426,7 @@ public final class DocumentCompiler {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static ContextKey<?> rawKey(
-        KeySpec spec,
-        Class<?> type,
-        @Nullable Merge<?> merge
-    ) {
+    private static ContextKey<?> rawKey(KeySpec spec, Class<?> type, @Nullable Merge<?> merge) {
         return ContextKeys.of(spec.id(), (Class) type, spec.retention(), (Merge) merge);
     }
 
