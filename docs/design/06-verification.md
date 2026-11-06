@@ -10,7 +10,7 @@
 | **Compile** | `javac --release 21` over `src/kernel/java` with JSpecify only | every public signature in the module files exists and compiles |
 | **Purity** | `kernelPurity` text scan + no Minecraft on the kernel classpath | no `net.minecraft`, `net.neoforged`, `com.mojang` under `kernel.**` |
 | **Tests** | JUnit 5 over `src/kernelTest/java` | every test in §3 passes; no `@Disabled` |
-| **Spec index** | `tools/spec-check.py` (name level, kernel + adapter) and `SpecIndexTest` / `AdapterIndexTest` (member level) | every documented public type and `SC-` code has a producer; no extra public type; every documented member matches the code and vice versa — the kernel wholesale, the adapter in batches whose uncovered list (`tools/spec-uncovered.txt`) only shrinks (D-74) |
+| **Spec index** | `tools/spec-check.py` (name level, kernel + adapter) and `SpecIndexTest` / `AdapterIndexTest` (member level) | every documented public type and `SC-` code has a producer; no extra public type; the producer table matches `Codes.all` row for row; every documented member matches the code and vice versa — the kernel wholesale, the adapter in batches whose uncovered list (`tools/spec-uncovered.txt`) only shrinks (D-74) |
 | **No stubs** | grep | no `TODO`, `FIXME`, `UnsupportedOperationException`, empty public method body |
 | **Determinism** | `determinismCheck` (three JVM processes vs `tools/golden/determinism.txt`) | one fixed scenario renders the same canonical text in three separate JVMs, equal to the golden file |
 
@@ -27,6 +27,22 @@ lines. The digest line folds the iteration order of `SnapshotPolicy.kinds`/`trai
 catch a hash-order leak — and every run must equal `tools/golden/determinism.txt`; `-PupdateGolden`
 rewrites the golden from the first run, `-PskipDeterminism` skips the gate. Reintroducing a
 `Set.copyOf` at either site fails the gate in at least one process.
+
+### 1.1 Green build
+
+Until the repository has a remote, the gates run on the development machine (D-82,
+`05-decisions.md`). A green build is exactly this list:
+
+| Command | Expected result |
+| --- | --- |
+| `./gradlew check` | exit 0 — every source set compiles (Error Prone and NullAway included), Spotless and the PMD gates pass, `kernelPurity` finds no host names, and the kernel and adapter unit suites are green |
+| `./gradlew kernelTest test` | exit 0 — the kernel suite and the adapter unit suite pass, no failure and no skipped test |
+| `./gradlew runGameTestServer` | the game-test server run completes with every registered `@GameTest` method green |
+| `python3 tools/spec-check.py` | prints `spec-check: ok` — every documented public type and `SC-` code has a producer, no extra public type, and the producer table matches `Codes.all` row for row |
+| `./gradlew jmh` | the JMH benchmarks run outside `check` and report throughput and latency; run it when a change touches the kernel's hot paths |
+
+When a remote exists, a workflow runs that same list; this document stays the source of truth so the
+workflow cannot drift from it.
 
 Current evidence (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): M1, M2a, M2b, M2c, M2d and
 M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
@@ -128,7 +144,7 @@ They are the acceptance suite; a module test that does not feed one of them is o
 6. **Entity pen** — `anySubject + Bound`, entity focus, window read; a footprint leaving the bay is
    `Failed`; two entities is ambiguous; a body wider than `maxEntitySpan` is a build error.
 7. **Absence** — a refused middle section makes a contributed key absent; a check reading it is
-   `Unreadable`, never a short sum; `whenAbsent` is used only when all sections are readable.
+   `Unreadable`, never a short sum.
 8. **Budget** — a budget too small for the section pass is `Undecided(budgetExhausted)`, no claims.
 9. **Gate** — a lease that is no longer current at the start or after the units is `Dropped`, no
    claims, no context publish.
@@ -214,7 +230,7 @@ being silently covered (`DoorCoverageScenarioTest`, `110e797`).
 ### 3.2 Stress batch `kernel-stress-batch-2`
 
 The second characterization batch, tagged `kernel-stress-batch-2` and committed at `3e60ed4`: 4 kernel
-scenario classes (17 tests) in `kernelTest/.../engine` and 3 adapter unit classes (11 tests) in
+scenario classes (19 tests) in `kernelTest/.../engine` and 3 adapter unit classes (11 tests) in
 `src/test/.../mc`. The one code change is the `NestedFocus` fix below; the suite stays
 characterization, not a new kernel promise.
 
@@ -222,7 +238,7 @@ characterization, not a new kernel promise.
 | --- | --- | --- | --- |
 | kernel | `NestedCoverageScenarioTest` | a nested focus binds no subject; `oneSubject + Bound` at build; `anySubject + Bound` with a non-claimable custom focus at build; a cut child; a child-frame occupant | 4 |
 | kernel | `ClaimStressScenarioTest` | shared/exclusive walls, per-owner release, whole-key settle replacement, duplicate rows | 5 |
-| kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, `whenAbsent` on a check-only key, a derivation output | 4 |
+| kernel | `ContextAggregateScenarioTest` | a custom aggregate, a missing aggregate result, an instance requirement without a producer, a derivation output, an uncontributed key staying absent, a contributed zero | 6 |
 | kernel | `GateBudgetScenarioTest` | stale lease at check, mid-attempt invalidation, invalidation before settle, a tiny budget | 4 |
 | adapter | `EntityWindowPolicyTest` | the blueprint-local entity window mapped into `CommandSupport.policy` through the siting (identity, nonzero and a dropped unmappable window), and a set's root/satellite windows mapped by their own sitings | 2 |
 | kernel | `StructureManagerTest` | begin/commit/abort, draft rejection, formed replacement, moved/broken/loaded/unloaded, bounds lookup and post-commit publish | 7 |
@@ -234,7 +250,6 @@ and not a pending list:
 | Gap | Asserted by |
 | --- | --- |
 | Two `shared` bays over one cell write duplicate claim rows | `ClaimStressScenarioTest.duplicateRowsAreCharacterized` |
-| `whenAbsent` is a dead path for a check-only key: it needs a section computation, so a check cannot reach it | `ContextAggregateScenarioTest.whenAbsentIsADeadPathForACheckOnlyKey` |
 
 **D4 fixed.** The host maps every blueprint-local entity window through its siting before it builds
 `SnapshotPolicy`: `CommandSupport.policy(blueprint, siting)` maps one blueprint's windows,
@@ -473,18 +488,27 @@ modules; they are listed in their sections and in `adapter.md` §13/§3.2, not i
 
 ## 5. Code producers
 
-The authoritative table is `finding.md` §6. `Codes.all` has 65 entries in this revision, matching the
-registry. A test reads `Codes.all` and asserts:
+The authoritative table is `finding.md` §6: one row per code with its severity, label policy
+(`P`/`–`/`T`), meaning, owning module and every emit site (D-69). `Codes.all` has 66 entries in this
+revision, matching the registry. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
-- every code appears exactly once in the producer table (a hand-maintained `Map<FindingCode,String>`
-  in the test, checked against `Codes.all`; the `SC-MC-*` wildcard row is excluded from the map);
+- every code appears exactly once in the producer table (a hand-maintained mirror in `CodesTest`
+  carrying code, severity, label policy and owning module, checked against `Codes.all`; the
+  `SC-MC-*` rows are excluded from the mirror);
+- the label policy is one of `P`, `–`, `T`, the owning module is a kernel module name or `adapter`,
+  and `T` appears only on `SC-CHK-0001` and `SC-SPI-0003`;
 - no producer row names a code absent from `Codes.all`;
 - `SC-MC-*` are absent from `Codes.all` (adapter-only), including the capture-report codes
   `SC-MC-0003`/`0004`/`0005` that M5e ships (D-28); the adapter registers them in its own code
   catalog, which is not the kernel registry;
 - a relayed host code is not allocated by the kernel, and a relayed code already in `Codes.all` is
   replaced by `SC-OCC-0004` with a note — the same guard covers a `CaptureReport` entry.
+
+`tools/spec-check.py` parses the same table and the `Codes.java` declarations, so a missing row, an
+extra row, a severity disagreement or an unreadable label policy fails the spec index without a
+build; it also reports a registered code that no kernel or adapter source references (an unproduced
+code).
 
 A code with no producer is deleted, not reserved. An unknown addon code is legal; it is not in
 `Codes.all`.

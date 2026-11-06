@@ -1,6 +1,5 @@
 package dev.vfyjxf.cumulus.kernel.structure;
 
-import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
@@ -79,29 +78,24 @@ class StructureValidationTest {
         ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.instance, (l, r) -> l);
         Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Check<?> check = Check.of(id("cells"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
-        assertThrows(
+        IllegalArgumentException duplicate = assertThrows(
             IllegalArgumentException.class,
             () -> Blueprint.builder(id("dup")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
                     .computation(Computations.volume(a, cells)).computation(Computations.volume(a, cells)).build()
         );
-        assertThrows(
+        assertTrue(
+            Objects.requireNonNull(duplicate.getMessage(), "message").startsWith("SC-BPT-0007"),
+            duplicate.getMessage()
+        );
+        IllegalArgumentException emptyRegion = assertThrows(
             IllegalArgumentException.class,
             () -> Blueprint.builder(id("empty")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
                     .computation(Computations.volume(a, CuboidSet.empty())).build()
         );
-    }
-
-    @Test
-    void whenAbsentMustMatchTheKeyType() {
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> new ContextKey(id("bad"), Long.class, Retention.instance, null, "x")
+        assertTrue(
+            Objects.requireNonNull(emptyRegion.getMessage(), "message").startsWith("SC-BPT-0007"),
+            emptyRegion.getMessage()
         );
-    }
-
-    @Test
-    void aConflictExplainsItself() {
-        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of()));
     }
 
     @Test

@@ -257,7 +257,8 @@ world.
 ### D-19 — One producer per code, one explanation
 
 `Codes.all` is the table; every entry has a code, a canonical severity and an explanation; the
-producer table in `finding.md` names one module/site per code. An unproduced code is deleted, not
+producer table in `finding.md` names the owning module and every emit site of the code's one
+meaning (D-69). An unproduced code is deleted, not
 marked reserved. `DESIGN` violations are findings from the compiler; a `Blueprint.build()` throw is a
 programmer proof failure with the code in the message. An adapter-only code outside `Codes.all` may be
 deferred (`SC-MC-0003`); it is not a kernel registry entry, so this rule does not license a dead
@@ -284,7 +285,7 @@ between `13` and `15`. A test asserts the table is bijective with the producers.
 | Q12 section phase read | `SectionComputation`/`SectionContext` has no `read(ContextKey)`; it does have a total cell `read(LatticePoint)` and `unreadable()` (D-24). `AggregateComputation` has no `contribute`. |
 | Q13 step vocabulary | No step types; `Plan` has sections/aggregates/checks; a check cannot read a derivation output. |
 | Q14 facade | Four operations, one final class, one `Host` (D-17; `siting` moved to the adapter, D-33). |
-| Q15 code table | One table in `finding`, one producer, no dead codes (D-19). |
+| Q15 code table | One table in `finding`, one meaning per code with every emit site listed, no dead codes (D-19, D-69). |
 | Q16 `LocusMap`/`definition` | `LocusMap` maps local↔world only; a definition label is created where the source is in hand; no `toDefinition`. |
 | Q18 U10 | Thin values + provider (D-16). |
 | Q19 named-but-unimplemented | `DataView`/`DataKind` → `Value`; `Codes` implemented; `Checks` in core; `Stability`/`ExplainBook` deleted; no empty names. |
@@ -610,7 +611,7 @@ definition is `SC-DOC-0002`; an empty `E` changes nothing. **Status:** implement
 values an earlier settle/derive produced. The current attempt is authoritative. A value computed or
 published in this attempt wins; a cached value is visible only for an instance key the plan declares
 (`ExpectationMeta.requires()` for a check, `Computation.inputs()` for an aggregate); a missing or
-wrong-typed cached value stays absent. Producer-only key fields (`merge`, `whenAbsent`, `retention`)
+wrong-typed cached value stays absent. Producer-only key fields (`merge`, `retention`)
 are not part of the lookup key. The kernel never writes, serialises, stamps, evicts or invalidates the
 cache; the host owns every freshness rule.
 
@@ -1174,7 +1175,6 @@ Nothing observable changes while every siting is built by `Siting.of(origin, ori
 placement offset is zero; the defect is fixed in the kernel because a host can construct the other
 form.
 
-
 ### D-50 — A region is its cells; the box list is a decomposition
 
 `CuboidSet` holds a decomposition of a cell set. Which decomposition it holds is an implementation
@@ -1194,7 +1194,6 @@ visual layer, so the text keeps whatever the current renderer produces.
 **Rejected: canonicalising the decomposition.** It forces a choice between a unique form that is not
 minimal (staircase families blow up to one box per cell) and a minimal one that must enumerate cells,
 and it makes every construction pay for a property only the ordering actually needs.
-
 
 ### D-51 — A context key is identified by (id, type), not by its whole record
 
@@ -1216,7 +1215,6 @@ identity-hash dependency disappear.
 
 **One canonical order.** `ContextKeys.order()` sorts by `(id, type.getName())` and is the only order a
 `ContextKey` set may be iterated in; the comparators that re-implemented it are replaced by it.
-
 
 ### D-52 — A ref read answers the occupant, not its cell
 
@@ -1243,7 +1241,6 @@ occupant chosen for a cell is a heuristic, not the identity the ref carries.
 **Consequence:** the kernel default guards snapshot, frame and body; `Expectations.host` reads the
 subject's ref; `SnapshotLevel` indexes entity types by body and answers the ref form, `LevelSnapshot`
 routes a no-body ref to its cell; `world` §4.4/§4.11 and `10-host-data` §3/§4 state the rule.
-
 
 ### D-53 — A conflict is data; the engine writes its finding
 
@@ -1276,7 +1273,6 @@ with the tests that pin it: `aConflictCarriesNoFinding`, `aConflictKeepsEveryInc
 `aConflictWithNoIncumbentIsRejected` (kernel claim) and `theSettleConflictRendersLikeThePreCheck`
 (kernel engine).
 
-
 ### D-54 — The command boundary is gated, guarded and self-cleaning
 
 `/cumulus` requires `Commands.LEVEL_GAMEMASTERS` (2) on the root literal. Every verb inherits it and
@@ -1298,6 +1294,23 @@ is defence in depth. No other error is caught: an `OutOfMemoryError` leaves no s
 commit, so an exception between them locks that spot until the level unloads. A settle that formed
 and then threw leaves rows with no instance; releasing that key on the way out is the only cleanup.
 
+### D-55 — The envelope judges cells; entities are opt-in
+
+The derived envelope judges the occupant stored at each cell: block state, fluid and block entity. An
+entity covering an envelope cell is transparent by default; a blueprint that wants entities rejected
+sets `envelopeEntities`, which also adds the entity kind to its read scope so the host captures them.
+
+**Why not "whatever the host captured".** Read kinds are the union over every check, so the same
+envelope could start rejecting animals after an unrelated check declared the entity kind. A check's
+verdict must not depend on its neighbours.
+
+**Why entities are opt-in.** An envelope is a claim about blocks. Animals wander and players walk;
+failing every large structure while a mob is inside makes the feature unusable and forces an entity
+scan the author did not ask for.
+
+**Why a second read.** `read(cell)` answers the body covering the cell, which would hide a foreign
+block under it. `cellOccupant(cell)` answers what the cell stores; a host that captures bodies must
+answer both, and one that cannot answers "undecided" rather than guessing.
 
 ### D-56 — A publish is a new table, never a merge
 
@@ -1324,7 +1337,6 @@ change yesterday's snapshot under its holder.
 **Why not a `removed` parameter.** Two ways to say "delete these keys" for one caller, and every host
 implementation would have to support both. Replacement makes the argument the whole truth.
 
-
 ### D-57 — A blueprint is refused only for conflicts it cannot outgrow
 
 The build refuses two bays of one blueprint whose owned cell sets are known at build time and
@@ -1344,7 +1356,6 @@ Replacing the old rule changes three cases. The old rule compared bay cells, not
 refused a `Declared` bay whose checked cells overlapped another bay while its owned cells did not,
 and it treated a `Bound` bay's cells as if they were owned. It also ignored `Declared` against
 `Declared`, which the owned-set rule now refuses.
-
 
 ### D-58 — A registry reference names its namespace and must resolve
 
@@ -1366,7 +1377,6 @@ were dead code.
 not a compile error; it matches nothing at match time. This is the one place a document names a
 registry object without resolving it.
 
-
 ### D-59 — A contributed key is complete or absent
 
 A section contribution whose value does not match the key's type marks the key absent. The engine
@@ -1383,7 +1393,6 @@ tells the author. Bare absence would read as "the computation chose not to produ
 
 **Why not `Failed`.** A broken computation that no check reads does not make the structure wrong;
 failing every attempt would turn one extension bug into a global outage.
-
 
 ### D-60 — Dropping a key is a release; a settle that changes nothing is not a write
 
@@ -1409,7 +1418,6 @@ bumps. A host that still bumps on a no-op stays correct — it only invalidates 
 **Supersedes:** the zero-row half of D-42's write rule — exactly one compare-and-set per settle still
 holds for every settle that happens, but a settle whose plan owns nothing no longer happens; it is a
 `release`.
-
 
 ### D-61 — Block entities are read live through traits; the snapshot keeps neither a copy nor a fingerprint
 
@@ -1437,7 +1445,6 @@ hook is cancelled by this decision — the feed existed only to invalidate on co
 `SnapshotLevel`, a content change or removal without a block change keeps the lease current, and the
 `inventory` trait still reads the changed contents.
 
-
 ### D-62 — An expectation declares its read scope when it is built
 
 `Expectations.custom` gains a four-argument form carrying the expectation's `ReadScope`; the
@@ -1460,6 +1467,43 @@ read call.
 `ReadScope.none()` for no gain; the two-argument distinction is the useful one, and the overload
 makes "I read nothing" the default rather than an omission.
 
+### D-63 — A document declaration the compiler ignores is an error
+
+Four shapes used to be accepted and dropped:
+
+- a bay that no check names — `Blueprint.bays()` is derived from checks, so the bay disappeared, and
+  with `envelope: true` its cells fell back into the envelope and had to be air;
+- a definition's `arguments` and `extensions` — parsed, then never read;
+- a definition that no placement reaches — its §4.2 obligations were never checked;
+- an external document used as a placement source with an unsupported `schemaVersion`.
+
+All four are errors now: the first two and the unplaced definition are `SC-DOC-0002`; the external
+version is `SC-DOC-0001`. A definition's `bounds` stays required and gains a meaning: its own bays
+and seams must lie inside it.
+
+**Why errors and not warnings.** A dropped declaration is invisible in the result: the structure
+matches with fewer cells than the author wrote, and the finding that eventually appears points at the
+envelope or at a neighbouring bay. Warnings do not survive that path.
+
+**Why not implement the dropped meanings.** A bay no check names has no obligation to state — its
+coverage is decided by checks; a definition's `arguments` and `extensions` would need placement-time
+semantics no document uses; an unreachable definition has no site.
+
+### D-64 — A key has no default value
+
+`ContextKey` loses `whenAbsent`, the document schema loses the field, and `fold` loses the branch that
+wrote a default when no section contributed. A key that nothing contributed is absent; an author who
+wants 0 on an empty region contributes 0.
+
+**Why delete instead of completing the decoder.** The document decoder resolves long, int, boolean,
+string and id — not `cuboid`, not `cuboid_set`, and not a custom type, which would need a value
+catalog of its own. Completing the built-ins would leave the field permanently half-supported, and the
+long case uses `Long.MIN_VALUE` as "absent", so `Long.MIN_VALUE` itself is rejected.
+
+**Why the field is nearly dead already.** The shipped computations always answer `Found`: `count`
+counts to zero rather than reporting missing. A default is only needed by a custom section computation
+that deliberately answers `Missing` for readable sections — and that case is better written as
+"answer zero".
 
 ### D-65 — Nested capture is automatic, breadth-first and capped
 
@@ -1494,6 +1538,42 @@ siblings are captured before any grandchild under a shared budget, a policy with
 kind queries no provider, the ceiling frame queries its anchor exactly once and builds no child, and
 two captures of one world produce the same frame order and the same cut report.
 
+### D-66 — A rejection carries its code
+
+The builder and the planner refuse with a kernel-internal `IllegalArgumentException` subtype that
+holds the `CodeEntry`; only its owning package constructs it. Callers read `code()` and never parse
+the message. The message stays the English diagnostic the finding carries today, prefixed with the
+code for compatibility with existing assertions.
+
+**Why.** The code used to be the first token of the message. Rewording a message — a translation, a
+shorter sentence, a reordered clause — silently changed which code the author saw.
+
+**Why a subtype and not the message.** The rejecting site and the reporting site sit in different
+packages, so the type is visible kernel-wide while its constructors stay package-private; the
+documented API keeps throwing `IllegalArgumentException`.
+
+**Localization.** `CodeEntry` already carries the localizable surface: `summary` and `body` in
+`Explanation`. Per-instance details stay English, like every other finding message in the kernel; a
+full localization layer would need templates and arguments and applies to all findings, not just these
+two rejection paths.
+
+**Consequence:** the compiler catches `BlueprintRejected`, the engine catches `PlanRejected`, and an
+`IllegalArgumentException` that is neither stays a programmer error. `DocumentCompiler.codeFromMessage`
+and `MatchEngine.plannerFailure`'s message dispatch are gone; the planner's refusal sites carry their
+`CodeEntry` directly (`SC-SPC-0001`, `SC-CLM-0001`, `SC-CLM-0004`, `SC-CLM-0005`).
+
+### D-67 — A compile finding always points somewhere, and a different message is a different finding
+
+`DocumentCompiler` attaches a primary label to every finding it reports. When a declaration has no
+source span and no cell locus, the label covers the blueprint's own bounds — "somewhere in this
+blueprint" is still a place, and it is honest about what the compiler knows.
+
+`FindingBundle` adds the message to its dedup key. Two findings that differ only in the sentence they
+carry are two findings; before, both were unlabelled and collapsed into one, so an author with two
+missing definitions was told about one.
+
+**Why both.** The label alone fixes the law but not the collapse for findings that share a code and a
+dissimilar message; the key alone stops the collapse but leaves findings pointing nowhere.
 
 ### D-68 — An anchor's value is a heading in the definition frame
 
@@ -1511,6 +1591,19 @@ describe the world orientation it was drawn for. No shipped datapack declares an
 over `src/main/resources/data`), so the breakage is confined to third-party documents, which the
 module docs call out.
 
+### D-69 — A code has one meaning and one owning module; the table lists every emit site
+
+The producer column lists the classes that emit the code, not a single site and not a line number. A
+code keeps one meaning; a site that needs a different meaning gets a different code. A code that only
+appears inside a programmer-failure exception is marked `T` — thrown, never a finding value — and
+still has to be listed with its throw site.
+
+**Why not one emit site.** The same meaning is emitted from two phases (`check` predicts, `settle`
+concludes) and from the adapter that relays a host code; forcing one site would split one meaning into
+several codes or bend the call graph.
+
+**Why no line numbers.** They drift on every edit; the gate (X03-D04) checks class names, and a class
+is a stable anchor for a reader.
 
 ### D-70 — The set host documents the shape the code has
 
@@ -1526,6 +1619,18 @@ wraps the same function; an instance supplier would force every caller through o
 **What the second constructor buys.** Passing the manager explicitly turns a silent mismatch — a
 draft committed into another manager — into a verification step. It stays.
 
+### D-71 — A code may be thrown and never reported
+
+`SC-SPI-0003` is thrown by `Catalog.Builder.put` when one id is registered twice with different
+values. It is never a finding: the failure happens while catalogs are built, before any match exists.
+The message keeps the code prefix for a human reader, and nothing parses it. The producer table marks
+it `T` — thrown, never a finding value — and records `Catalog.Builder.put`.
+
+**Why keep it.** A startup failure still needs a citable number; without one the author reads a
+sentence and has nothing to look up.
+
+**Why not delete it (C) or strip the prefix (B).** Deleting loses the citation; stripping leaves a code
+that no line mentions, which the "unproduced codes are deleted" rule forbids.
 
 ### D-72 — A mod contributes catalog entries through the plugin entry point it already has
 
@@ -1549,7 +1654,6 @@ catalog is built.
 from a class it cannot resolve — is a fatal load failure named by its id, and every
 plugin that depends on it is skipped — the loader's existing classes, not a new one.
 
-
 ### D-73 — Performance is a JMH number, produced on CI and on the development machine
 
 The kernel's cost is measured by JMH benchmarks in a `src/jmh` source set, run by a `jmh` task. There
@@ -1571,7 +1675,6 @@ are not benchmarked at all; a change that touches them is reviewed by reading th
 (`06-verification.md` §7); the CI half is deferred until the repository has a remote, so no workflow
 file is kept yet.
 
-
 ### D-74 — The adapter joins the signature gate in batches, with a shrinking list
 
 `spec-check` reads `src/main/java` as a second source root and compares the adapter's public types
@@ -1586,7 +1689,6 @@ longer than the gate itself, and a half-written section would produce failures n
 **Why a list and not a comment.** A comment rots silently. A file the gate reads forces every new
 public adapter type to be a decision, and every batch to remove entries.
 
-
 ### D-75 — Determinism is proven across processes, and the order dependence is removed at the source
 
 Two `Set.copyOf` sites decide the iteration order of a public collection: `SnapshotPolicy.kinds`,
@@ -1600,7 +1702,6 @@ identity hashes repeat within a process, so any hash-order dependence passes.
 **Why both.** The source fix makes the output correct; the gate makes it stay correct. The gate alone
 would pin today's accidental order in a file; the fix alone would regress the first time someone adds a
 `Set.copyOf`.
-
 
 ### D-76 — Host laws run on a real server, in the test source set that already has one
 
@@ -1622,7 +1723,6 @@ are documented in place; the kernel tests stay scenario tests, not law tests.
 server per class run through `HostServer`; commenting out the entity-kind gates in `LevelCapture`
 turns the read-policy law red, and the kernel and adapter suites stay green over the aligned doubles.
 
-
 ### D-79 — A rollback releases what the set wrote; it never restores the previous occupant
 
 When a structure set fails partway it releases the members it already settled and invalidates their
@@ -1640,7 +1740,6 @@ removed the whole instance.
 
 **Law 6 stays absolute.** With the replay gone, `engine.settle` remains the only writer and every row
 it writes comes from the planner. D-78 is withdrawn.
-
 
 ### D-80 — A cell that was not captured has no value
 
@@ -1665,7 +1764,6 @@ cell, a refused section and an individually refused cell answer null for every h
 air cell and an all-air section still answer air, the `BlockGetter` face keeps answering air, and a
 check expecting stone over an uncaptured cell is `Unreadable`, never an air mismatch.
 
-
 ### D-81 — A plugin class that cannot be loaded is logged and skipped
 
 Discovery catches `LinkageError` around each candidate class, logs the class name and the cause at
@@ -1681,11 +1779,14 @@ degrades by skipping, and a skipped plugin surfaces as unknown kinds at document
 **Why not extend the failure record (A).** A record that can hold "an instance or a class name" changes
 a public shape for one message that the log already carries.
 
+### D-82 — Gates run on the development machine until the repository has a remote
 
+No CI workflow is added. `06-verification.md` lists the exact commands that constitute a green build:
+`./gradlew check`, `./gradlew kernelTest test`, `./gradlew runGameTestServer`, `python3
+tools/spec-check.py` and, when a change touches the kernel's hot paths, `./gradlew jmh`.
 
-> Numbering note: D-78 was a proposal (`37-law-6-host-may-replay.md`) whose plan was withdrawn before
-> landing; it never entered this file, so the withdrawal above closes a proposal, not a recorded
-> decision.
+When a remote exists, a workflow runs that same list; the document is the source of truth so the
+workflow cannot drift from it.
 
 ## 3. Consequences a reviewer should attack
 
@@ -1745,3 +1846,9 @@ a public shape for one message that the log already carries.
 - A block state whose block entity was not captured answers every registered block trait with
   `Refused(notCaptured)` (D-34), even a custom trait that reads only `BlockState`; that is the price
   of never letting `BlockCapability.getCapability` fall back to a live `Level.getBlockEntity`.
+
+> Numbering note: D-46 is still a proposal carried by
+> `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
+> Numbering note: D-78 was a proposal (`37-law-6-host-may-replay.md`) whose plan was withdrawn before
+> landing; it never entered this file, so the withdrawal above closes a proposal, not a recorded
+> decision.

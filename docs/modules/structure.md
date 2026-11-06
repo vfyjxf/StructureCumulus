@@ -118,6 +118,7 @@ public interface FocusContext {
     Budget remaining();
     CancelToken cancel();
     CellRead read(LatticePoint cell);
+    default @Nullable OccupantSnapshot cellOccupant(LatticePoint cell);   // maps local to world
     default @Nullable OccupantSnapshot occupantAt(LatticePoint cell);
     default @Nullable ReadRefusal refusalAt(LatticePoint cell);
     java.util.List<ClaimRow> claimsAt(LatticePoint cell);
@@ -541,15 +542,19 @@ without the declared trait ids produces `TraitSlot.Refused` (or no slot), never 
 generic `occupant`/`bay` read declares no kind: it sees whatever the host captured. A blueprint that requires entity-over-block or a nested body therefore
 uses an `entity`/`nested` focus (or a custom focus that declares the kind), because `reads.kinds` is
 the only capture signal; an `occupant` focus over an entity the host never captured sees the block
-under it.
+under it. The envelope reads the stored cell, not whatever its siblings captured: its verdict follows
+`cellOccupant` and never drifts with another check's kind declaration — only `envelopeEntities`
+adds a kind, to the envelope's own check (§4.11, D-55).
 
 ### 4.6 Expectation context
 
 `FocusContext` is what a focus sees. `ExpectationContext` adds the subject and `withSubject`, which
 re-types the subject for `each_cell`. Both expose the same bay/view/siting/phase/locus/context/budget
-and the same `read`/`occupantAt`/`refusalAt`/`claimsAt`; there is no second session object. `read` maps
-the local cell through the siting before asking the view; an unmapped local cell is
-`Unreadable(outOfBounds, SC-OCC-0004)`, never air and never a silent skip. `BayView.read` is the same
+and the same `read`/`cellOccupant`/`occupantAt`/`refusalAt`/`claimsAt`; there is no second session
+object. `read` maps the local cell through the siting before asking the view; an unmapped local cell is
+`Unreadable(outOfBounds, SC-OCC-0004)`, never air and never a silent skip. `cellOccupant` maps the
+same way and adds no second verdict: it is the view's stored-cell answer (`world` §4.3). `BayView.read`
+is the same
 local-to-world total read; it does not clip to the bay, and a siting miss is the same refusal.
 
 The trait four states are normative (`world` §4.7): `Present` and `Present(null)` are positive facts,
@@ -704,8 +709,9 @@ declaration lists before the "at least one check" rule. An empty `E` is a silent
 check, no extra read, no charge, and the blueprint is structurally equal to the same build without
 `.envelope()`. A non-empty `E` appends one reserved bay and one reserved check, both id
 `structurecumulus:envelope`, **last** in the declared order: the bay is `E` with
-`Coverage.everyCell`, `Footprint.none`, `Sharing.shared`; the check is `Focuses.bay()` with
-`Expectations.eachCell(Expectations.envelopeAir())`. A declared bay or check already using the
+`Coverage.everyCell`, `Footprint.none`, `Sharing.shared`; the check is `Focuses.bay()` with the
+envelope's own cell rule (`Expectations.envelopeCells()`, or the body-narrowing rule when the
+blueprint also sets `envelopeEntities`). A declared bay or check already using the
 reserved id is `SC-BPT-0004`. There is no new plan or kernel type: the synthetic pair is an ordinary
 bay and check, so budget, read-scope, siting, refusal and finding paths are unchanged, and
 `Footprint.none` keeps the envelope out of the claim ledger.
@@ -713,9 +719,15 @@ bay and check, so budget, read-scope, siting, refusal and finding paths are unch
 The envelope is the bounds, not the declared bays. A block outside `bounds` is invisible, while a
 block inside `bounds` and outside every bay or declared footprint is foreign. A port, an ignored cell
 or an "any occupant" cell therefore has to be declared as a bay (for example an `everyCell` bay with
-`anyOccupant`); there is no allow-list API and no `envelope(CuboidSet)` overload. Air is strict: only
-`OccupantSnapshot.isAir()` passes; a fluid, an entity, a nested source or any other occupant is
-`SC-EXP-0006` located at the occupant's cell. An unreadable envelope cell is the ordinary
+`anyOccupant`); there is no allow-list API and no `envelope(CuboidSet)` overload. The envelope judges
+what each cell stores (`cellOccupant`, `world` §4.3): a block, fluid or block entity that is not air
+is `SC-EXP-0006` located at that cell. An entity covering an envelope cell is transparent (D-55):
+`BlueprintBuilder.envelopeEntities()` switches the rule to the body `read` narrows to and adds the
+`entity` kind to the envelope check's own reads so the host captures what it will judge; without the
+switch the envelope declares no kind, so its verdict never drifts with a sibling check's kind
+declarations. A nested body is outside this promise: the envelope captures no nested depth, and the
+narrowed body matters only under `envelopeEntities`. A host that cannot answer the stored cell makes
+the envelope `Unreadable`, never a silent pass; an unreadable envelope cell is the ordinary
 `SC-OCC-0004` relay and leaves the check `Unreadable`, never a mismatch. `BlueprintBuilder.build()`
 does not mutate the builder's lists, so it can be called twice with equal results.
 
@@ -733,6 +745,10 @@ does not mutate the builder's lists, so it can be called twice with equal result
 The producer table in `finding.md` is authoritative. A focus relay of a host `ReadRefusal` code is
 not a kernel producer row: the kernel only guarantees the `SC-OCC-0004` substitute for a code already
 in `Codes.all`.
+
+The builder refuses by throwing `BlueprintRejected`, an `IllegalArgumentException` subtype only this
+package constructs; the compiler reads the `CodeEntry` from the exception and never parses the
+message (D-66). The message keeps its `SC-…` prefix so existing message assertions hold.
 
 ## 7. Tests
 
@@ -756,7 +772,8 @@ in `Codes.all`.
 - Envelope: empty `E` no-op and equality with the plain build; uncovered cells and declared
   footprints; envelope-only blueprint; reserved id collision; two builds; `SC-EXP-0006` metadata;
   fusion void, AE2 empty envelope, PNC port, GT widened ring, unreadable, budget and outside-bounds
-  scenarios.
+  scenarios; an entity over an air cell is transparent, the block under it still fails, and
+  `envelopeEntities` rejects the entity while adding the `entity` kind to `reads()`.
 - Content count: predicate match, non-air, multi-section sum, one multi-cell body counted once by its
   anchor, a refused slice Missing with a relayed refusal and never a zero, a readable no-match slice
   zero, merge/region constructor errors.
@@ -768,7 +785,7 @@ in `Codes.all`.
 - Build: an `instance` requirement needs no producer; a `match` requirement without a producer is
   `SC-CHK-0002`; a derivation output is a legal `instance` requirement. Cached composition: instance
   keys only; eligible via check requires or computation inputs; `(id, type)` lookup answers a
-  host-decoded key with lost `merge`/`whenAbsent`; current values shadow; a `match` key is never read;
+  host-decoded key with lost `merge`; current values shadow; a `match` key is never read;
   a wrong type or host exception is absent; an aggregate sees the composite.
 
 ## 8. Dependencies

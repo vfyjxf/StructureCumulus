@@ -122,6 +122,7 @@ class StructureSetCompilerTest {
                 rootId,
                 bounds,
                 false,
+                false,
                 Value.object(Map.of("tier", Value.number(1), "material", Value.string("iron"))),
                 bays,
                 List.of(),
@@ -163,6 +164,7 @@ class StructureSetCompilerTest {
             new BlueprintSpec(
                 rootId,
                 bounds,
+                false,
                 false,
                 Value.object(),
                 bays,
@@ -211,6 +213,7 @@ class StructureSetCompilerTest {
                 preheaterId,
                 bounds,
                 false,
+                false,
                 Value.object(Map.of("tier", Value.number(1), "material", Value.string("iron"))),
                 bays,
                 List.of(),
@@ -233,6 +236,7 @@ class StructureSetCompilerTest {
             new BlueprintSpec(
                 solarId,
                 bounds,
+                false,
                 false,
                 Value.object(),
                 List.of(bay(id("cell"), bounds.asSet(), Coverage.everyCell, Footprint.box(), Sharing.exclusive)),

@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.core.World;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -16,6 +17,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -109,6 +111,42 @@ class CaptureReportTest {
     }
 
     @Test
+    void armsEqualByValueAndTheReportIsPartOfIt() {
+        StubView view = new StubView();
+        StubLease lease = new StubLease(view);
+        CaptureReport report = CaptureReport.of(List.of(new CaptureReport.Entry(hostCode(4), "mapped tilt")));
+        CaptureReport other = CaptureReport.of(List.of(new CaptureReport.Entry(hostCode(5), "over cap")));
+
+        assertEquals(
+            new CaptureResult.Captured(view, lease),
+            new CaptureResult.Captured(view, lease, CaptureReport.empty())
+        );
+        assertNotEquals(
+            new CaptureResult.Captured(view, lease, report),
+            new CaptureResult.Captured(view, lease, other)
+        );
+
+        Cuboid bounds = Cuboid.of(0, 0, 0, 4, 4, 4);
+        assertEquals(
+            new CaptureResult.TooLarge(bounds, 4096),
+            new CaptureResult.TooLarge(bounds, 4096, CaptureReport.empty())
+        );
+        assertNotEquals(
+            new CaptureResult.TooLarge(bounds, 4096, report),
+            new CaptureResult.TooLarge(bounds, 4096, other)
+        );
+
+        assertEquals(
+            new CaptureResult.Unavailable(ReadStatus.notCaptured, hostCode(2)),
+            new CaptureResult.Unavailable(ReadStatus.notCaptured, hostCode(2), CaptureReport.empty())
+        );
+        assertNotEquals(
+            new CaptureResult.Unavailable(ReadStatus.notCaptured, hostCode(2), report),
+            new CaptureResult.Unavailable(ReadStatus.notCaptured, hostCode(2), other)
+        );
+    }
+
+    @Test
     void tooLargeAndUnavailableArmsCarryTheReport() {
         Cuboid bounds = Cuboid.of(0, 0, 0, 4, 4, 4);
         CaptureResult.TooLarge tooLarge = new CaptureResult.TooLarge(bounds, 4096);
@@ -133,6 +171,10 @@ class CaptureReportTest {
         assertFalse(entry.code().text().isBlank());
         assertEquals(FindingCode.Family.mc, entry.code().family());
         assertEquals(3, entry.code().number());
+        assertTrue(
+            Codes.all.stream().noneMatch(codeEntry -> codeEntry.code().equals(entry.code())),
+            "a host code is never a kernel code"
+        );
     }
 
     private static final class StubView implements WorldView {

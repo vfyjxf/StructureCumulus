@@ -113,6 +113,28 @@ class LevelSnapshotTest {
     }
 
     @Test
+    void cellOccupantAnswersTheStoredCellUnderABody() {
+        SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 17);
+        LatticePoint foot = LatticePoint.origin;
+        LatticePoint head = LatticePoint.of(0, 1, 0);
+        SectionKey key = SectionKey.of(snapshot.world(), 0, foot, 16);
+        OccupantSnapshot stone = occupant(snapshot, foot, "stone");
+        SectionSnapshot section = SectionSnapshot.of(key, Map.of(foot, stone), 42L);
+        OccupantSnapshot zombie = entity(snapshot, foot, "zombie", Cuboid.of(0, 0, 0, 1, 2, 1));
+        LevelSnapshot view = new LevelSnapshot(
+            snapshot,
+            Cuboid.of(0, 0, 0, 2, 3, 2),
+            Map.of(key, new SectionSlot.Present(section)),
+            List.of(zombie)
+        );
+
+        assertSame(zombie, assertInstanceOf(CellRead.Found.class, view.read(head)).occupant());
+        assertSame(stone, view.cellOccupant(foot), "the stored cell answers the stone");
+        assertTrue(Objects.requireNonNull(view.cellOccupant(head), "air").isAir(), "the cell under the body is air");
+        assertNull(view.cellOccupant(LatticePoint.of(9, 9, 9)), "outside the bounds is not a cell answer");
+    }
+
+    @Test
     void equalFootprintsTieBreakByRef() {
         SnapshotId snapshot = new SnapshotId(World.of(NamespacedId.of("test", "world")), 2);
         LatticePoint foot = LatticePoint.origin;

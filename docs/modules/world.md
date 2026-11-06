@@ -158,6 +158,7 @@ public interface WorldView {
     SectionSlot slot(SectionKey key);
     CellRead read(LatticePoint cell);
     default @Nullable OccupantSnapshot occupant(LatticePoint cell);
+    default @Nullable OccupantSnapshot cellOccupant(LatticePoint cell);   // the stored cell, not the body
     default @Nullable ReadRefusal refusalAt(LatticePoint cell);
     default ReadStatus statusOf(LatticePoint cell);
     @Nullable OccupantSnapshot occupant(OccupantRef ref);
@@ -296,6 +297,12 @@ not this view's frame is not answerable here.
 `nested(cell)` is anchor-only and independent of this narrowing: it answers the child view registered
 at the anchor cell even when `occupant(cell)` narrows to a block or an entity over the same cell. A
 cell that a nested footprint covers but that is not its anchor answers `null`.
+
+`cellOccupant(cell)` answers what the cell stores, without this narrowing: the block, fluid or block
+entity, or air. The default derives it from `occupant(cell)` and answers `null` when that is an
+entity or a nested body, so a host that captures no bodies keeps the default and a host that captures
+bodies must override it. A `null` from a readable cell means the host cannot answer the stored
+occupant; a consumer treats that answer as undecided, never as passing.
 
 ### 4.4 Identity and frames
 
@@ -521,6 +528,8 @@ The kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value cod
 
 - `read` outside `bounds` is `outOfBounds`, never air; inside, `Found`/`Unreadable` agree with the
   derived `occupant`/`refusalAt`/`statusOf`.
+- `cellOccupant`: the stored cell answers the block under a captured body while `read` narrows to
+  the body; a readable empty cell answers air; outside `bounds` is `null`.
 - `Partial`: a refused cell is unreadable, its neighbours are readable, the map is non-empty and lies
   in the section; a missing cell outside the map is air.
 - Refused section: every cell unreadable with the slot's code; `occupant` null for all of them.

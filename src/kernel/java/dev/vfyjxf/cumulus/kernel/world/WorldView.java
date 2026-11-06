@@ -38,6 +38,16 @@ public interface WorldView {
         return read(cell) instanceof CellRead.Found found ? found.occupant() : null;
     }
 
+    /** What the cell stores; a body the host cannot see past makes the answer undecided, never guessed. */
+    default @Nullable OccupantSnapshot cellOccupant(LatticePoint cell) {
+        OccupantSnapshot found = occupant(cell);
+        if (found == null) {
+            return null;
+        }
+        OccupantKind kind = found.descriptor().kind();
+        return kind.equals(OccupantKind.entity) || kind.equals(OccupantKind.nested) ? null : found;
+    }
+
     default @Nullable ReadRefusal refusalAt(LatticePoint cell) {
         return read(cell) instanceof CellRead.Unreadable unreadable ? unreadable.refusal() : null;
     }

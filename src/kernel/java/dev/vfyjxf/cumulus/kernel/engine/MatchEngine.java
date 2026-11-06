@@ -365,7 +365,7 @@ public final class MatchEngine {
         try {
             derived = ClaimPlanner
                     .derive(request.blueprint(), request.siting(), request.instance(), outcome.bindings());
-        } catch (IllegalArgumentException rejected) {
+        } catch (PlanRejected rejected) {
             session.findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
         }
@@ -437,7 +437,7 @@ public final class MatchEngine {
         try {
             derived = ClaimPlanner
                     .derive(request.blueprint(), request.siting(), request.instance(), admitted.outcome().bindings());
-        } catch (IllegalArgumentException rejected) {
+        } catch (PlanRejected rejected) {
             findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(findings));
         }
@@ -903,14 +903,9 @@ public final class MatchEngine {
         return new MatchResult.Undecided(phase, reason, FindingBundle.of(session.findings), session.outcome());
     }
 
-    private static Finding plannerFailure(Phase phase, IllegalArgumentException rejected, Locus locus) {
+    private static Finding plannerFailure(Phase phase, PlanRejected rejected, Locus locus) {
         String message = rejected.getMessage() == null ? "claim planning failed" : rejected.getMessage();
-        CodeEntry entry = message.contains("SC-SPC-0001")
-                ? Codes.locusUnmapped
-                : message.contains("SC-CLM-0001")
-                        ? Codes.claimConflict
-                        : message.contains("SC-CLM-0005") ? Codes.boundEmpty : Codes.bindingInvalid;
-        return code(entry, phase, message, locus);
+        return code(rejected.code(), phase, message, locus);
     }
 
     private static Finding code(CodeEntry entry, Phase phase, String message, @Nullable Locus locus) {
@@ -1077,9 +1072,6 @@ public final class MatchEngine {
             }
             TreeMap<SectionKey, Object> parts = contributions.get(key);
             if (parts == null || parts.isEmpty()) {
-                if (key.whenAbsent() != null) {
-                    values.put(key, key.whenAbsent());
-                }
                 return;
             }
             Merge<Object> merge = (Merge<Object>) key.merge();

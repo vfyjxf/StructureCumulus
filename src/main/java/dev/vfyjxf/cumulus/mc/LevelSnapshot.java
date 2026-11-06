@@ -197,6 +197,21 @@ public final class LevelSnapshot implements WorldView {
     }
 
     @Override
+    public @Nullable OccupantSnapshot cellOccupant(LatticePoint cell) {
+        if (!data.bounds().contains(cell)) {
+            return null;
+        }
+        SectionSlot slot = slot(sectionOf(cell));
+        if (!slot.readable()) {
+            return null;
+        }
+        if (slot instanceof SectionSlot.Partial partial && partial.unreadable().containsKey(cell)) {
+            return null;
+        }
+        return readableOccupant(cell, slot);
+    }
+
+    @Override
     public @Nullable OccupantSnapshot occupant(OccupantRef ref) {
         if (!ref.from(snapshot) || ref.frame() != frame()) {
             return null;

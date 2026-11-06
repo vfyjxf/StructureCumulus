@@ -11,6 +11,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.core.Value;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
@@ -71,7 +72,7 @@ class DocumentCompilerTest {
                 .subtract(Cuboid.of(1, 0, 1, 2, 1, 2));
         CuboidSet hollowCells = CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2));
         CuboidSet fireCells = CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2));
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
 
         Value block = Value.object(Map.of("kind", Value.string("block"), "id", Value.string("minecraft:stone_bricks")));
         Value airElement = Value.object(Map.of("kind", Value.string("air")));
@@ -85,6 +86,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("campfire"),
             Cuboid.of(0, 0, 0, 3, 3, 3),
+            false,
             false,
             Value.object(),
             List.of(
@@ -144,7 +146,7 @@ class DocumentCompilerTest {
                     null
                 )
             ),
-            List.of(new KeySpec(id("air_cells"), "long", Retention.instance, NamespacedId.of("sum"), null, null)),
+            List.of(new KeySpec(id("air_cells"), "long", Retention.instance, NamespacedId.of("sum"), null)),
             List.of(),
             List.of(),
             null,
@@ -184,6 +186,7 @@ class DocumentCompilerTest {
             id("envelope_root"),
             bounds,
             true,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -215,6 +218,7 @@ class DocumentCompilerTest {
             id("unit"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             true,
+            false,
             Value.object(),
             List.of(new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
             List.of(),
@@ -231,6 +235,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("root"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -265,6 +270,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("envelope_off"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(new BaySpec(id("bay"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
@@ -314,6 +320,7 @@ class DocumentCompilerTest {
             id("unit"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
             List.of(),
@@ -331,6 +338,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("root"),
             Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(),
@@ -374,6 +382,7 @@ class DocumentCompilerTest {
             id("bad"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -408,6 +417,7 @@ class DocumentCompilerTest {
             id("bad"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -437,6 +447,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("overlap"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(
@@ -492,6 +503,7 @@ class DocumentCompilerTest {
         BlueprintSpec root = new BlueprintSpec(
             id("trait_absent"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(new BaySpec(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
@@ -552,12 +564,13 @@ class DocumentCompilerTest {
             id("bad_merge"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
             List.of(),
             List.of(),
-            List.of(new KeySpec(id("total"), "long", Retention.instance, NamespacedId.of("mymod", "sum"), null, null)),
+            List.of(new KeySpec(id("total"), "long", Retention.instance, NamespacedId.of("mymod", "sum"), null)),
             List.of(),
             List.of(),
             null,
@@ -578,6 +591,7 @@ class DocumentCompilerTest {
             id("mismatched"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -594,7 +608,7 @@ class DocumentCompilerTest {
                     null
                 )
             ),
-            List.of(new KeySpec(id("b"), "long", Retention.instance, NamespacedId.of("sum"), null, null)),
+            List.of(new KeySpec(id("b"), "long", Retention.instance, NamespacedId.of("sum"), null)),
             List.of(),
             List.of(),
             null,
@@ -629,6 +643,7 @@ class DocumentCompilerTest {
             id("undeclared_inputs"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -645,7 +660,7 @@ class DocumentCompilerTest {
                     null
                 )
             ),
-            List.of(new KeySpec(id("out"), "long", Retention.instance, null, null, null)),
+            List.of(new KeySpec(id("out"), "long", Retention.instance, null, null)),
             List.of(),
             List.of(),
             null,
@@ -662,11 +677,466 @@ class DocumentCompilerTest {
         );
     }
 
+    @Test
+    void aBayNoCheckNamesIsRejected() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        for (boolean envelope : List.of(false, true)) {
+            BlueprintSpec root = new BlueprintSpec(
+                id("unused_bay"),
+                Cuboid.of(0, 0, 0, 2, 1, 1),
+                envelope,
+                false,
+                Value.object(),
+                List.of(
+                    new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                ),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                List.of(),
+                Map.of(),
+                null
+            );
+            CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+            assertNull(result.blueprint(), "envelope=" + envelope);
+            List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+            assertEquals(1, found.size(), () -> "envelope=" + envelope + " " + result.findings().findings());
+            assertTrue(found.get(0).message().contains("used by no check"), () -> found.get(0).message());
+        }
+    }
+
+    @Test
+    void envelopeEntitiesWithoutEnvelopeIsRejected() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        BaySpec bay = new BaySpec(
+            id("wall"),
+            cells,
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive,
+            null,
+            null
+        );
+        CheckSpec check = new CheckSpec(
+            id("wall_check"),
+            id("wall"),
+            kind("bay"),
+            Value.object(),
+            kind("any_occupant"),
+            Value.object(),
+            null,
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("entity_switch_without_envelope"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            true,
+            Value.object(),
+            List.of(bay),
+            List.of(),
+            List.of(check),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("without envelope"), () -> found.get(0).message());
+    }
+
+    @Test
+    void aDefinitionThatLeaksOutsideItsBoundsIsRejected() {
+        BlueprintSpec definition = new BlueprintSpec(
+            id("leaky"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(
+                new BaySpec(
+                    id("wall"),
+                    CuboidSet.of(Cuboid.of(1, 0, 0, 2, 1, 1)),
+                    Coverage.everyCell,
+                    Footprint.box(),
+                    Sharing.exclusive,
+                    null,
+                    null
+                )
+            ),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 3, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("leaky"), LatticePoint.origin, id("placed"), null)),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler
+                .compile(new Document(1, root, Map.of(id("leaky"), definition), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("outside its own bounds"), () -> found.get(0).message());
+    }
+
+    @Test
+    void anUnplacedDefinitionIsRejected() {
+        BlueprintSpec ghost = new BlueprintSpec(
+            id("ghost"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler
+                .compile(new Document(1, root, Map.of(id("ghost"), ghost), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("is never placed"), () -> found.get(0).message());
+    }
+
+    @Test
+    void aCompileFailureWithoutASpanStillHasALabel() {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        BlueprintSpec root = new BlueprintSpec(
+            id("spanless"),
+            Cuboid.of(0, 0, 0, 3, 1, 1),
+            false,
+            true,
+            Value.object(),
+            List.of(
+                new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+            ),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        assertEquals(2, result.findings().size(), () -> result.findings().findings().toString());
+        for (Finding finding : result.findings().findings()) {
+            assertTrue(finding.hasPrimary(), () -> finding.toString());
+            assertEquals(
+                CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1)),
+                Objects.requireNonNull(finding.primaryLabel(), "primary").locus().cells()
+            );
+        }
+    }
+
+    @Test
+    void anEmptyBoundsBlueprintStillGetsALabel() {
+        BlueprintSpec root = new BlueprintSpec(
+            id("flat"),
+            Cuboid.of(0, 0, 0, 0, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        Finding finding = Objects.requireNonNull(result.findings().primary(), "primary");
+        assertTrue(finding.hasPrimary(), () -> finding.toString());
+        assertEquals(
+            CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+            Objects.requireNonNull(finding.primaryLabel(), "primary").locus().cells()
+        );
+    }
+
+    @Test
+    void twoMissingDefinitionsAreBothReported() {
+        BlueprintSpec root = new BlueprintSpec(
+            id("two_ghosts"),
+            Cuboid.of(0, 0, 0, 4, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(
+                new PlacementSpec(id("ghost_a"), LatticePoint.origin, id("a"), null),
+                new PlacementSpec(id("ghost_b"), LatticePoint.of(2, 0, 0), id("b"), null)
+            ),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(Codes.definitionMissing.code());
+        assertEquals(2, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("ghost_a"), () -> found.get(0).message());
+        assertTrue(found.get(1).message().contains("ghost_b"), () -> found.get(1).message());
+        for (Finding finding : found) {
+            assertTrue(finding.hasPrimary(), () -> finding.toString());
+        }
+    }
+
+    @Test
+    void aDefinitionReachableThroughAnotherPlacementIsAccepted() {
+        BlueprintSpec leaf = new BlueprintSpec(
+            id("leaf"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        BlueprintSpec middle = new BlueprintSpec(
+            id("middle"),
+            Cuboid.of(0, 0, 0, 2, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("leaf"), LatticePoint.origin, id("inner"), null)),
+            Map.of(),
+            null
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 2, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("middle"), LatticePoint.origin, id("outer"), null)),
+            Map.of(),
+            null
+        );
+        Document document = new Document(1, root, Map.of(id("middle"), middle, id("leaf"), leaf), Map.of());
+        CompileResult result = DocumentCompiler.compile(document, context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        assertNotNull(result.blueprint());
+    }
+
+    @Test
+    void anExternalDocumentWithAnotherSchemaVersionIsRejected() {
+        BlueprintSpec externalRoot = new BlueprintSpec(
+            id("external"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        Document external = new Document(2, externalRoot, Map.of(), Map.of());
+        Catalogs catalogs = Catalogs.builtin();
+        CompilerContext context = new CompilerContext(
+            catalogs.focuses(),
+            catalogs.expectations(),
+            catalogs.computations(),
+            Map.of(),
+            DocumentSource.of(Map.of(id("external"), external))
+        );
+        BlueprintSpec root = new BlueprintSpec(
+            id("root"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("external"), LatticePoint.origin, id("ext"), null)),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context);
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 1));
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertTrue(found.get(0).message().contains("schema version"), () -> found.get(0).message());
+    }
+
+    @Test
+    void aRewordedRejectionKeepsItsCode() {
+        assertEquals(Codes.baysOverlap.code(), overlapFinding("a", "b").code());
+        assertEquals(Codes.baysOverlap.code(), overlapFinding("north_wall_bay", "south_wall_bay").code());
+    }
+
+    private static Finding overlapFinding(String left, String right) {
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        Value air = Value.object(Map.of("kind", Value.string("air")));
+        BlueprintSpec root = new BlueprintSpec(
+            id("overlap"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            false,
+            Value.object(),
+            List.of(
+                new BaySpec(id(left), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null),
+                new BaySpec(id(right), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+            ),
+            List.of(),
+            List.of(
+                new CheckSpec(
+                    id(left),
+                    id(left),
+                    kind("bay"),
+                    Value.object(),
+                    kind("each_cell"),
+                    Value.object(Map.of("element", air)),
+                    null,
+                    null
+                ),
+                new CheckSpec(
+                    id(right),
+                    id(right),
+                    kind("bay"),
+                    Value.object(),
+                    kind("each_cell"),
+                    Value.object(Map.of("element", air)),
+                    null,
+                    null
+                )
+            ),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().findings();
+        assertEquals(1, found.size(), () -> found.toString());
+        return found.get(0);
+    }
+
     private static Document expectationDocument(NamespacedId expectationKind) {
         CuboidSet cell = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         BlueprintSpec root = new BlueprintSpec(
             id("qualified_kind"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
             false,
             Value.object(),
             List.of(new BaySpec(id("cell"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),

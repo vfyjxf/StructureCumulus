@@ -61,6 +61,7 @@ public final class JsonReader implements DocumentReader {
         "id",
         "bounds",
         "envelope",
+        "envelopeEntities",
         "definitions",
         "placements",
         "bays",
@@ -76,7 +77,6 @@ public final class JsonReader implements DocumentReader {
 
     private static final Set<String> definitionMembers = Set.of(
         "bounds",
-        "arguments",
         "bays",
         "seams",
         "checks",
@@ -85,8 +85,7 @@ public final class JsonReader implements DocumentReader {
         "derivations",
         "anchors",
         "orientation",
-        "placements",
-        "extensions"
+        "placements"
     );
 
     private static final Set<String> bayMembers = Set
@@ -98,7 +97,7 @@ public final class JsonReader implements DocumentReader {
 
     private static final Set<String> computationMembers = Set.of("id", "kind", "output", "bay", "region", "inputs");
 
-    private static final Set<String> keyMembers = Set.of("id", "type", "retention", "merge", "whenAbsent");
+    private static final Set<String> keyMembers = Set.of("id", "type", "retention", "merge");
 
     private static final Set<String> placementMembers = Set.of("definition", "as", "at");
 
@@ -245,6 +244,7 @@ public final class JsonReader implements DocumentReader {
             NamespacedId id = id(object, "id", "$");
             Cuboid bounds = box(required(object, "bounds", "$"), field("$", "bounds"));
             Boolean envelope = optionalBoolean(object, "envelope", "$");
+            Boolean envelopeEntities = optionalBoolean(object, "envelopeEntities", "$");
             Map<NamespacedId, BlueprintSpec> definitions = definitions(object);
             List<PlacementSpec> placements = placements(object, "$");
             List<BaySpec> bays = bays(object, "$", true);
@@ -263,6 +263,7 @@ public final class JsonReader implements DocumentReader {
                 id,
                 bounds,
                 Boolean.TRUE.equals(envelope),
+                Boolean.TRUE.equals(envelopeEntities),
                 arguments,
                 bays,
                 List.of(),
@@ -322,6 +323,7 @@ public final class JsonReader implements DocumentReader {
             return new BlueprintSpec(
                 id,
                 bounds,
+                false,
                 false,
                 arguments(object, path),
                 bays(object, path, false),
@@ -668,16 +670,10 @@ public final class JsonReader implements DocumentReader {
                 }
             }
             NamespacedId merge = optionalId(object, "merge", path);
-            Value whenAbsent = null;
-            @Nullable
-            JsonElement absentElement = object.get("whenAbsent");
-            if (absentElement != null) {
-                whenAbsent = value(absentElement, field(path, "whenAbsent"), 0);
-            }
             if (id == null || type == null || retention == null) {
                 return null;
             }
-            return new KeySpec(id, type, retention, merge, whenAbsent, span(path));
+            return new KeySpec(id, type, retention, merge, span(path));
         }
 
         private List<PlacementSpec> placements(JsonObject object, String path) {

@@ -116,8 +116,10 @@ structural expectation forms (`all_of`, `any_of`, `not`, `sequence`, `at_least`,
 factories for the children.
 
 `builder()` starts from `builtin()`; a supplied catalog is merged over the built-in family, kernel
-entries first. Two entries with one id and different values throw `IllegalArgumentException` at
-`build()`. A catalog is frozen at `create`; there is no late registration.
+entries first, and a setter merges as soon as it is called. Two entries with one id and different
+values make `Catalog.Builder.put` throw `IllegalArgumentException` (`SC-SPI-0003`, marked `T`: thrown
+while catalogs are built, never a finding). A catalog is frozen at `create`; there is no late
+registration.
 
 ### 4.2 Host
 
@@ -206,10 +208,9 @@ before any document is compiled.
 
 ## 6. Codes
 
-`SC-SPI-0001` (extension threw / malformed finding; engine guard), `SC-SPI-0003` (a catalog build
-found a duplicate/different entry; `Catalogs.Builder.build` and the `CatalogRegistrar` contribution
-call). A document naming an unknown factory is `SC-DOC-0003` (the document compiler owns that
-surface).
+`SC-SPI-0001` (extension threw / malformed finding; engine guard), `SC-SPI-0003` (`Catalog.Builder.put`
+throws it when one id is registered twice with different values; thrown, never a finding — `T`). A
+document naming an unknown factory is `SC-DOC-0003` (the document compiler owns that surface).
 
 ## 7. Tests
 

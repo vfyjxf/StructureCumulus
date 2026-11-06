@@ -188,6 +188,7 @@ public final class StructureSetCompiler {
             root.id(),
             root.bounds(),
             root.envelope(),
+            root.envelopeEntities(),
             arguments,
             root.bays(),
             root.seams(),

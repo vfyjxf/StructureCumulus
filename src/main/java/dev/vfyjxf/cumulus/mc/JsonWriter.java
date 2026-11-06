@@ -57,12 +57,18 @@ public final class JsonWriter implements DocumentWriter {
         if (!root.extensions().isEmpty()) {
             throw new IllegalStateException("root spec extensions are not in the v1 envelope; use Document.extensions");
         }
+        if (root.envelopeEntities() && !root.envelope()) {
+            throw new IllegalStateException("envelopeEntities is written only on a root that declares an envelope");
+        }
         JsonObject out = new JsonObject();
         out.addProperty("schemaVersion", document.schemaVersion());
         out.addProperty("id", JsonVocabulary.idText(root.id()));
         out.add("bounds", JsonValues.box(root.bounds()));
         if (root.envelope()) {
             out.addProperty("envelope", true);
+        }
+        if (root.envelopeEntities()) {
+            out.addProperty("envelopeEntities", true);
         }
         if (!document.definitions().isEmpty()) {
             JsonObject definitions = new JsonObject();
@@ -103,6 +109,9 @@ public final class JsonWriter implements DocumentWriter {
     private static JsonObject definition(BlueprintSpec spec) {
         if (spec.envelope()) {
             throw new IllegalStateException("a definition may not declare an envelope");
+        }
+        if (spec.envelopeEntities()) {
+            throw new IllegalStateException("a definition may not declare envelopeEntities");
         }
         JsonObject out = new JsonObject();
         out.add("bounds", JsonValues.box(spec.bounds()));
@@ -239,9 +248,6 @@ public final class JsonWriter implements DocumentWriter {
             json.addProperty("retention", JsonVocabulary.retentionName(key.retention()));
             if (key.merge() != null) {
                 json.addProperty("merge", JsonVocabulary.idText(key.merge()));
-            }
-            if (key.whenAbsent() != null) {
-                json.add("whenAbsent", JsonValues.value(key.whenAbsent()));
             }
             array.add(json);
         }

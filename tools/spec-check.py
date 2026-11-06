@@ -7,6 +7,8 @@ side (D-74) reads src/main/java as a second source root: every public top-level 
 either documented in adapter.md §15 or listed in tools/spec-uncovered.txt with a reason, and the
 list can only shrink. Examples inside a module file are excluded by reading only the block after
 '## 3. Signatures'.
+The producer table in `finding.md` §6 is compared with `Codes.java`, and every registered code must
+have at least one reference in the kernel or adapter sources (D-69).
 """
 from __future__ import annotations
 
@@ -36,6 +38,18 @@ ADAPTER_ANY_RE = re.compile(
 )
 TOP_LEVEL_RE = re.compile(
     r"(?m)^(?:public\s+)?(?:final\s+|abstract\s+|sealed\s+|non-sealed\s+)*(?:record|class|interface|enum)\s+([A-Z][A-Za-z0-9_]*)"
+)
+
+KERNEL_SOURCES = ROOT / "src" / "kernel" / "java"
+ADAPTER_SOURCES = ROOT / "src" / "main" / "java"
+PRODUCER_ROW_RE = re.compile(r"^\|\s*`(SC-[A-Z]{2,6}-\d{4})`\s*\|\s*(\S+)\s*\|\s*(\S+)\s*\|")
+ENTRY_RE = re.compile(
+    r"public static final CodeEntry (\w+) = entry\(\s*FindingCode\.Family\.(\w+),\s*(\d+),\s*Severity\.(\w+)"
+)
+FAMILY_TAG_RE = re.compile(r"(\w+)\(\s*\"([A-Z]+)\"\s*\)")
+CODE_HELPER_RE = re.compile(
+    r"private static FindingCode code\(int \w+\)\s*\{\s*return FindingCode\.of\(FindingCode\.Family\.(\w+), \w+\);",
+    re.S,
 )
 
 
@@ -147,6 +161,84 @@ def check_adapter() -> int:
     return problems
 
 
+def registry_entries() -> list[tuple[str, str, int, str]]:
+    """Codes.java entries as (field, family, number, severity) in declaration order."""
+    text = (KERNEL_SOURCES / "dev/vfyjxf/cumulus/kernel/finding/Codes.java").read_text()
+    return [(field, family, int(number), severity)
+            for field, family, number, severity in ENTRY_RE.findall(text)]
+
+
+def family_tags() -> dict[str, str]:
+    text = (KERNEL_SOURCES / "dev/vfyjxf/cumulus/kernel/core/FindingCode.java").read_text()
+    return dict(FAMILY_TAG_RE.findall(text))
+
+
+def producer_table_rows() -> dict[str, tuple[str, str]]:
+    """finding.md §6 rows as code -> (severity, label); SC-MC-* rows are adapter-only."""
+    text = (ROOT / "docs" / "modules" / "finding.md").read_text()
+    start = text.find("## 6. Code producers")
+    end = text.find("## 7.", start)
+    rows: dict[str, tuple[str, str]] = {}
+    for line in text[start:end].splitlines():
+        match = PRODUCER_ROW_RE.match(line)
+        if match and not match.group(1).startswith("SC-MC-"):
+            rows[match.group(1)] = (match.group(2), match.group(3))
+    return rows
+
+
+def check_producer_table() -> int:
+    problems = 0
+    table = producer_table_rows()
+    tags = family_tags()
+    registry = {f"SC-{tags[family]}-{number:04d}": severity.upper()
+                for _, family, number, severity in registry_entries()}
+    for code in sorted(set(table) | set(registry)):
+        row, severity = table.get(code), registry.get(code)
+        if severity is None:
+            print(f"producer table: {code} is in finding.md but not in Codes.all")
+            problems += 1
+        elif row is None:
+            print(f"producer table: {code} has no row in finding.md §6")
+            problems += 1
+        elif row[0] != severity:
+            print(f"producer table: {code} severity {row[0]} in finding.md, {severity} in Codes.all")
+            problems += 1
+        elif row[1] not in ("P", "\u2013", "T"):
+            print(f"producer table: {code} label {row[1]} is neither P, \u2013 nor T")
+            problems += 1
+    return problems
+
+
+def count_unproduced_codes() -> int:
+    """A registered code with no reference outside Codes.java and the GameTests is dead."""
+    corpus: list[str] = []
+    helpers: dict[str, str] = {}
+    for root in (KERNEL_SOURCES, ADAPTER_SOURCES):
+        for path in root.rglob("*.java"):
+            if path.name == "Codes.java" or path.name.endswith("GameTest.java"):
+                continue
+            text = path.read_text()
+            corpus.append(text)
+            helper = CODE_HELPER_RE.search(text)
+            if helper:
+                helpers.setdefault(helper.group(1), text)
+    blob = "\n".join(corpus)
+    tags = family_tags()
+    problems = 0
+    for field, family, number, _ in registry_entries():
+        code = f"SC-{tags[family]}-{number:04d}"
+        referenced = (
+            f"Codes.{field}" in blob
+            or f'"{code}' in blob
+            or f"Family.{family}, {number})" in blob
+            or f"code({number})" in helpers.get(family, "")
+        )
+        if not referenced:
+            print(f"unproduced code: {code} ({field}) has no emit site")
+            problems += 1
+    return problems
+
+
 def main() -> int:
     problems = 0
     for module, package in MODULES.items():
@@ -158,7 +250,7 @@ def main() -> int:
                     "BuiltinComputations", "BuiltinExpectations", "BuiltinFocuses",
                     "BuiltinSupport", "DefaultCatalogs", "DefaultCatalogRegistrar",
                     "BuilderImpl", "InMemoryClaimLedger",
-                    "CellIterator"}
+                    "CellIterator", "BlueprintRejected", "PlanRejected"}
         missing_in_doc = sorted((code - doc) - internal)
         if missing_in_code:
             print(f"{module}: documented but not in code: {', '.join(missing_in_code)}")
@@ -201,6 +293,9 @@ def main() -> int:
                 if imported not in allowed.get(package, set()):
                     print(f"{package}: imports {imported}, absent from 03-modules")
                     problems += 1
+
+    problems += check_producer_table()
+    problems += count_unproduced_codes()
 
     if problems:
         return 1

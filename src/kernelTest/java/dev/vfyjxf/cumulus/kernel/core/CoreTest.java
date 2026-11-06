@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -29,7 +30,44 @@ class CoreTest {
         assertNull(NamespacedId.parse("mymod:a:b"));
         assertNull(NamespacedId.parse("mymod:/a"));
         assertNull(NamespacedId.parse("mymod:a//b"));
+        assertNull(NamespacedId.parse("mymod:a/"));
+        assertNull(NamespacedId.parse(":a"));
+        assertNull(NamespacedId.parse("mymod:" + "a".repeat(257)));
+        assertNull(NamespacedId.parse("n".repeat(65) + ":a"));
         assertThrows(IllegalArgumentException.class, () -> NamespacedId.of("bad namespace", "x"));
+    }
+
+    @Test
+    void namespacedIdOrderIsTotalAndLocaleIndependent() {
+        Locale original = Locale.getDefault();
+        try {
+            Locale.setDefault(Locale.of("tr", "TR"));
+            List<NamespacedId> ids = List.of(
+                NamespacedId.parse("b:a"),
+                NamespacedId.parse("a:z"),
+                NamespacedId.parse("a:i"),
+                NamespacedId.parse("a:aa"),
+                NamespacedId.parse("a:0")
+            );
+            assertEquals(
+                List.of(
+                    NamespacedId.parse("a:0"),
+                    NamespacedId.parse("a:aa"),
+                    NamespacedId.parse("a:i"),
+                    NamespacedId.parse("a:z"),
+                    NamespacedId.parse("b:a")
+                ),
+                ids.stream().sorted().toList()
+            );
+            for (NamespacedId left : ids) {
+                assertEquals(0, left.compareTo(left));
+                for (NamespacedId right : ids) {
+                    assertEquals(Integer.signum(left.compareTo(right)), -Integer.signum(right.compareTo(left)));
+                }
+            }
+        } finally {
+            Locale.setDefault(original);
+        }
     }
 
     @Test
@@ -59,11 +97,16 @@ class CoreTest {
         assertEquals(List.of(NamespacedId.of("a"), NamespacedId.of("b")), catalog.ids());
         assertEquals("a", catalog.require(NamespacedId.of("a")));
         assertNull(catalog.get(NamespacedId.of("c")));
-        assertThrows(
+        Catalog<String> rePut = Catalog.<String>builder(NamespacedId.of("test")).put(NamespacedId.of("a"), "a")
+                .put(NamespacedId.of("b"), "b").put(NamespacedId.of("a"), "a").build();
+        assertEquals(catalog.ids(), rePut.ids());
+        assertEquals(List.of(NamespacedId.of("a"), NamespacedId.of("b")), List.copyOf(rePut.asMap().keySet()));
+        IllegalArgumentException duplicate = assertThrows(
             IllegalArgumentException.class,
             () -> Catalog.<String>builder(NamespacedId.of("test")).put(NamespacedId.of("a"), "a")
                     .put(NamespacedId.of("a"), "b")
         );
+        assertTrue(Objects.requireNonNull(duplicate.getMessage(), "message").startsWith("SC-SPI-0003: "));
         assertThrows(UnsupportedOperationException.class, () -> catalog.asMap().put(NamespacedId.of("c"), "c"));
     }
 
@@ -77,6 +120,22 @@ class CoreTest {
         assertTrue(Values.contentEquals(a, b));
         assertEquals(List.of("a", "b"), List.copyOf(a.members().keySet()));
         assertEquals(2, Objects.requireNonNull(a.get("b"), "b").asNumber(0));
+    }
+
+    @Test
+    void objectMembersSortByCodePointEvenBeyondTheBmp() {
+        Value members = Value
+                .object(Map.of("a", Value.number(1), "\uffff", Value.number(2), "\ud800\udc00", Value.number(3)));
+        assertEquals(List.of("a", "\uffff", "\ud800\udc00"), List.copyOf(members.members().keySet()));
+    }
+
+    @Test
+    void arraysKeepTheirOrderAndNumbersAreLongs() {
+        Value first = Value.string("z");
+        Value second = Value.string("a");
+        Value number = Value.number(Long.MAX_VALUE);
+        assertEquals(List.of(first, second, number), Value.array(List.of(first, second, number)).elements());
+        assertEquals(Long.MAX_VALUE, number.asNumber(0));
     }
 
     @Test
@@ -122,14 +181,29 @@ class CoreTest {
         assertFalse(budget.admits(new Spend(11, 2)));
         assertEquals(new Spend(3, 1), new Spend(1, 1).plus(new Spend(2, 0)));
         assertThrows(IllegalArgumentException.class, () -> new Spend(-1, 0));
+        assertTrue(Budget.zero.admits(Spend.zero));
+        assertFalse(Budget.zero.admits(new Spend(1, 0)));
+        assertTrue(Budget.unbounded().admits(new Spend(Integer.MAX_VALUE, Integer.MAX_VALUE)));
+        assertEquals(
+            new Spend(Integer.MAX_VALUE, Integer.MAX_VALUE),
+            new Spend(Integer.MAX_VALUE, Integer.MAX_VALUE).plus(new Spend(1, 1))
+        );
+    }
+
+    @Test
+    void phaseWireNamesAreUppercaseOverLowerCamelConstants() {
+        for (Phase phase : Phase.values()) {
+            assertEquals(phase.name().toLowerCase(Locale.ROOT), phase.name());
+            assertEquals(phase.name().toUpperCase(Locale.ROOT), phase.wireName());
+        }
     }
 
     @Test
     void twoKeysWithTheSameSlotHashAlike() {
         ContextKey<Long> a = ContextKeys
-                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right, 0L);
+                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right);
         ContextKey<Long> b = ContextKeys
-                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right, 1L);
+                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left * right);
         assertNotEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());
     }
@@ -151,11 +225,11 @@ class CoreTest {
     @Test
     void hashDoesNotDependOnIdentityHash() {
         List<ContextKey<?>> first = List.of(
-            ContextKeys.of(NamespacedId.of("a"), Long.class, Retention.instance, (left, right) -> left + right, 0L),
+            ContextKeys.of(NamespacedId.of("a"), Long.class, Retention.instance, (left, right) -> left + right),
             ContextKeys.of(NamespacedId.of("b"), String.class, Retention.match)
         );
         List<ContextKey<?>> second = List.of(
-            ContextKeys.of(NamespacedId.of("a"), Long.class, Retention.instance, (left, right) -> left + right, 0L),
+            ContextKeys.of(NamespacedId.of("a"), Long.class, Retention.instance, (left, right) -> left + right),
             ContextKeys.of(NamespacedId.of("b"), String.class, Retention.match)
         );
         for (int index = 0; index < first.size(); index++) {
@@ -169,9 +243,15 @@ class CoreTest {
         ContextKey<Long> b = ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.instance);
         assertEquals(a, b);
         assertFalse(a.contributed());
+        assertNotEquals(a, ContextKeys.of(NamespacedId.of("other"), Long.class, Retention.instance));
+        assertNotEquals(a, ContextKeys.of(NamespacedId.of("k"), String.class, Retention.instance));
+        assertNotEquals(a, ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.match));
         ContextKey<Long> c = ContextKeys
-                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right, 0L);
+                .of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> left + right);
         assertTrue(c.contributed());
-        assertEquals(0L, c.whenAbsent());
+        assertNotEquals(
+            c,
+            ContextKeys.of(NamespacedId.of("k"), Long.class, Retention.instance, (left, right) -> right)
+        );
     }
 }

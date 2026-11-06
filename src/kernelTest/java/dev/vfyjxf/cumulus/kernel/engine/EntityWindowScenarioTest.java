@@ -36,7 +36,7 @@ class EntityWindowScenarioTest {
         Blueprint blueprint = entityBlueprint("entity/local_window");
         LatticePoint worldCell = TechFixtures.world(siting, LatticePoint.origin);
         TestWorld.View view = new TestWorld.View()
-                .put(TechFixtures.entity(TechFixtures.cow, worldCell, Cuboid.of(worldCell)));
+                .putBody(TechFixtures.entity(TechFixtures.cow, worldCell, Cuboid.of(worldCell)));
         MatchResult.Admitted admitted = assertInstanceOf(
             MatchResult.Admitted.class,
             TechFixtures.check(blueprint, siting, view),
@@ -63,7 +63,7 @@ class EntityWindowScenarioTest {
         Blueprint blueprint = entityBlueprint("entity/claim");
         LatticePoint worldCell = TechFixtures.world(siting, LatticePoint.origin);
         TestWorld.View view = new TestWorld.View()
-                .put(TechFixtures.entity(TechFixtures.cow, worldCell, Cuboid.of(worldCell)));
+                .putBody(TechFixtures.entity(TechFixtures.cow, worldCell, Cuboid.of(worldCell)));
         ClaimLedger ledger = TechFixtures.ledger();
         MatchResult.Formed formed = assertInstanceOf(
             MatchResult.Formed.class,

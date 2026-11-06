@@ -29,10 +29,10 @@ all of its freshness rules.
 `ContextKey` is:
 
 ```text
-id + type + retention + merge + whenAbsent
+id + type + retention + merge
 ```
 
-`merge` and `whenAbsent` describe how a value is produced; they are not part of the value's
+`merge` describes how a value is produced; it is not part of the value's
 identity. A host cache normally stores only:
 
 ```text
@@ -104,7 +104,7 @@ For a `ContextView.get(key)` on the attempt context:
 1. Current attempt value with the exact `ContextKey` wins.
 2. Otherwise, if a current attempt value exists with the same `(id, type, Retention.instance)`,
    that value wins. This makes the current attempt shadow the cache even when the producer's
-   key object differs in `merge` or `whenAbsent`.
+   key object differs in `merge`.
 3. Otherwise, if the key is eligible, ask `cachedContext.get(key.id(), key.type())`.
 4. Otherwise the key is absent.
 
@@ -156,7 +156,7 @@ The host owns:
 The kernel only defines the read seam and the eligibility/precedence rules above.
 
 A host that decodes a previously published `StructureContext` may fill `CachedContext` by
-`(id, type)`; it does not need `merge` or `whenAbsent`.
+`(id, type)`; it does not need `merge`.
 
 ## 5. Examples
 
@@ -166,7 +166,7 @@ The blueprint declares:
 
 ```text
 casingCount = ContextKey<Long>(id=casing_count, type=Long,
-                              retention=instance, merge=sum, whenAbsent=null)
+                              retention=instance, merge=sum)
 coilTier    = ContextKey<Integer>(id=coil_tier, type=Integer, retention=instance)
 ```
 
@@ -212,10 +212,10 @@ exactly as before: only current section/aggregate values are visible.
 
 ## 8. Test obligations
 
-- Host-decoded cached key with `merge`/`whenAbsent` answers a blueprint key by `(id, type)`.
+- Host-decoded cached key with `merge` answers a blueprint key by `(id, type)`.
 - Aggregate input-only instance key is cache-eligible and visible through `AggregateContext`.
 - Current attempt value shadows cached, including when the current key object differs in
-  `merge`/`whenAbsent`.
+  `merge`.
 - `Retention.match` key is never read from cached.
 - Missing cached key reports `SC-CTX-0007`.
 - Wrong-type cached value is treated as absent.

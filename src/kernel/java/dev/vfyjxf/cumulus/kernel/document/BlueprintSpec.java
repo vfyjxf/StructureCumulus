@@ -20,6 +20,7 @@ public record BlueprintSpec(
     NamespacedId id,
     Cuboid bounds,
     boolean envelope,
+    boolean envelopeEntities,
     Value arguments,
     List<BaySpec> bays,
     List<SeamSpec> seams,

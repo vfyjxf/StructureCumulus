@@ -111,7 +111,7 @@ public interface Merge<T> {
 }
 
 public record ContextKey<T>(NamespacedId id, Class<T> type, Retention retention,
-                            @Nullable Merge<T> merge, @Nullable T whenAbsent) {
+                            @Nullable Merge<T> merge) {
     public ContextKey { /* non-null id, type, retention */ }
     public boolean contributed();
     public int hashCode(); // (id, type.getName()) only; equals stays the full record
@@ -121,8 +121,6 @@ public final class ContextKeys {
     public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention);
     public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention,
                                        @Nullable Merge<T> merge);
-    public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention,
-                                       @Nullable Merge<T> merge, @Nullable T whenAbsent);
     public static java.util.Comparator<ContextKey<?>> order();
     private ContextKeys() {}
 }
@@ -253,8 +251,8 @@ and no global counter in the kernel; the host supplies the numbers.
 explain a missing value builds the finding where the locus is known; `Outcome` is the common
 vocabulary of a lookup, not a report.
 
-**L4 — key identity.** `ContextKey` equality is the full record: id, type, retention, merge and
-`whenAbsent`. Lookup identity is the slot, `(id, type)`: two keys with one id and one type name the
+**L4 — key identity.** `ContextKey` equality is the full record: id, type, retention and `merge`.
+Lookup identity is the slot, `(id, type)`: two keys with one id and one type name the
 same value slot even when their merge functions differ, and `merge` is compared by reference — a
 lambda cannot be compared by value. `hashCode` uses `(id, type.getName())` only, so equal keys hash
 equally and no identity hash reaches a container. The canonical order is `ContextKeys.order()`,
@@ -265,8 +263,8 @@ constructor validates and `ContextKeys` is the intended factory.
 
 **L5 — merge is associative, with no identity.** `merge.combine` must be associative; the kernel
 never supplies an identity. A key with `merge != null` is section-contributed; a key with
-`merge == null` is single-writer. `whenAbsent` is used only when every section of the region was
-readable and no contribution was produced. It may be `null`, which means "absent".
+`merge == null` is single-writer. A key that nothing contributed is absent; a key has no default
+value.
 
 **L6 — retention is lifetime.** `match` values live in `MatchOutcome` and are readable by later
 units of the same attempt; they are never published. `instance` values are published once by a

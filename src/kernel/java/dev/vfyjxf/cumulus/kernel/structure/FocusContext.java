@@ -43,6 +43,11 @@ public interface FocusContext {
 
     CellRead read(LatticePoint cell);
 
+    default @Nullable OccupantSnapshot cellOccupant(LatticePoint local) {
+        LatticePoint world = siting().toWorld(local);
+        return world == null ? null : view().cellOccupant(world);
+    }
+
     default @Nullable OccupantSnapshot occupantAt(LatticePoint cell) {
         return read(cell) instanceof CellRead.Found found ? found.occupant() : null;
     }

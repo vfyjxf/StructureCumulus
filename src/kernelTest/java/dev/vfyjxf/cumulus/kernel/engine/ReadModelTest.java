@@ -119,6 +119,20 @@ class ReadModelTest {
     }
 
     @Test
+    void cellOccupantAnswersTheBlockUnderAnEntity() {
+        LatticePoint cell = LatticePoint.origin;
+        OccupantSnapshot stone = TestWorld.block(TestWorld.stone, cell);
+        OccupantSnapshot cow = TechFixtures.entity(TechFixtures.cow, cell, Cuboid.of(cell));
+        TestWorld.View view = new TestWorld.View().bounds(Cuboid.of(0, 0, 0, 2, 1, 1)).put(stone).putBody(cow);
+
+        assertEquals(cow, view.occupant(cell), "the body read answers the cow");
+        assertEquals(cow, assertInstanceOf(CellRead.Found.class, view.read(cell)).occupant());
+        assertEquals(stone, view.cellOccupant(cell), "the stored-cell read answers the stone under it");
+        assertTrue(Objects.requireNonNull(view.cellOccupant(LatticePoint.of(1, 0, 0)), "air").isAir());
+        assertNull(view.cellOccupant(LatticePoint.of(2, 0, 0)), "outside the bounds is not a cell answer");
+    }
+
+    @Test
     void occupantRefMustMatchSnapshotFrameAndBody() {
         OccupantSnapshot block = TestWorld.block(mc("stone_bricks"), LatticePoint.origin);
         TestWorld.View view = new TestWorld.View().put(block);
@@ -179,6 +193,36 @@ class ReadModelTest {
     }
 
     @Test
+    void refusedSectionAnswersEveryCellWithTheSlotCode() {
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("stone_bricks"), LatticePoint.of(1, 0, 0)));
+        SectionKey key = view.sectionOf(LatticePoint.origin);
+        view.refuseSection(key);
+
+        SectionSlot.Refused slot = assertInstanceOf(SectionSlot.Refused.class, view.slot(key));
+        assertEquals(ReadStatus.notCaptured, slot.status());
+        assertEquals(Codes.unreadableRead.code(), slot.code());
+        assertEquals(0L, view.contentDigest(key));
+
+        for (LatticePoint cell : List.of(
+            LatticePoint.origin,
+            LatticePoint.of(1, 0, 0),
+            LatticePoint.of(5, 7, 9),
+            LatticePoint.of(15, 15, 15)
+        )) {
+            CellRead.Unreadable unreadable = assertInstanceOf(CellRead.Unreadable.class, view.read(cell));
+            assertEquals(slot.status(), unreadable.refusal().status());
+            assertEquals(slot.code(), unreadable.refusal().code());
+            assertEquals(unreadable.refusal(), view.refusalAt(cell));
+            assertEquals(slot.status(), view.statusOf(cell));
+            assertNull(view.occupant(cell), cell::toString);
+            assertNull(view.cellOccupant(cell), cell::toString);
+        }
+
+        LatticePoint neighbourSection = LatticePoint.of(16, 0, 0);
+        assertTrue(Objects.requireNonNull(view.occupant(neighbourSection), "air").isAir());
+    }
+
+    @Test
     void viewDigestCoversContentAndRefusalStatusNotHostCode() {
         LatticePoint cell = LatticePoint.of(1, 0, 0);
         TestWorld.View first = new TestWorld.View().put(TestWorld.block(mc("stone_bricks"), LatticePoint.origin))
@@ -203,7 +247,7 @@ class ReadModelTest {
     void refusedComputationReportsAndIsMissingInsteadOfShortSum() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
         CuboidSet bayCells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
         Bay bay = bay(bayCells, Coverage.everyCell, Footprint.box());
         Blueprint blueprint = Blueprint.builder(id("partial")).bounds(Cuboid.of(0, 0, 0, 3, 1, 1))
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))
@@ -230,7 +274,7 @@ class ReadModelTest {
     void relayedKernelCodeBecomesRequiredReadUnavailable() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
         CuboidSet bayCells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
-        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
         Bay bay = bay(bayCells, Coverage.everyCell, Footprint.box());
         Blueprint blueprint = Blueprint.builder(id("kernel_code")).bounds(Cuboid.of(0, 0, 0, 3, 1, 1))
                 .check(Check.of(id("air"), bay, Focuses.occupant(LatticePoint.origin), Expectations.air()))

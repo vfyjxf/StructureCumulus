@@ -272,6 +272,70 @@ class AdversarialExpectationTest {
     }
 
     @Test
+    void allOfAnyOfSequenceFollowTheFoldTable() {
+        for (Reply first : List.of(Reply.match(), mismatchReply(), unreadableReply(), Reply.abstain())) {
+            for (Reply second : List.of(Reply.match(), mismatchReply(), unreadableReply(), Reply.abstain())) {
+                String pair = first + "+" + second;
+                assertAll(
+                    () -> assertFold(
+                        "all_of(" + pair + ")",
+                        Expectations.allOf(customIgnoringSubject(first), customIgnoringSubject(second)),
+                        foldAllOf(first, second)
+                    ),
+                    () -> assertFold(
+                        "any_of(" + pair + ")",
+                        Expectations.anyOf(customIgnoringSubject(first), customIgnoringSubject(second)),
+                        foldAnyOf(first, second)
+                    ),
+                    () -> assertFold(
+                        "sequence(" + pair + ")",
+                        Expectations.sequence(customIgnoringSubject(first), customIgnoringSubject(second)),
+                        foldAllOf(first, second)
+                    )
+                );
+            }
+        }
+    }
+
+    @Test
+    void aMismatchCarriesRefutationsAndUnknowns() {
+        Expectation<OccupantSnapshot> mismatched = Expectations
+                .allOf(customIgnoringSubject(mismatchReply()), customIgnoringSubject(unreadableReply()));
+        MatchResult.Failed failed = assertInstanceOf(
+            MatchResult.Failed.class,
+            check(singleCellBlueprint(mismatched), MagicFixtures.view().air(origin))
+        );
+        assertTrue(MagicFixtures.hasCode(failed, Codes.expected), "the refutation is merged");
+        assertTrue(MagicFixtures.hasCode(failed, Codes.unreadableRead), "the unknown is merged");
+    }
+
+    @Test
+    void sequenceEqualsAllOfIncludingFindings() {
+        TestWorld.View view = MagicFixtures.view().air(origin);
+        MatchResult sequence = check(
+            singleCellBlueprint(
+                Expectations.sequence(customIgnoringSubject(mismatchReply()), customIgnoringSubject(unreadableReply()))
+            ),
+            view
+        );
+        MatchResult allOf = check(
+            singleCellBlueprint(
+                Expectations.allOf(customIgnoringSubject(mismatchReply()), customIgnoringSubject(unreadableReply()))
+            ),
+            view
+        );
+        assertEquals(allOf.getClass(), sequence.getClass());
+        assertEquals(codeTexts(allOf), codeTexts(sequence));
+    }
+
+    @Test
+    void notKeepsUnreadableAndAbstain() {
+        assertFold("not(unreadable)", Expectations.not(customIgnoringSubject(unreadableReply())), "U");
+        assertFold("not(abstain)", Expectations.not(customIgnoringSubject(Reply.abstain())), "A");
+        assertFold("not(mismatch)", Expectations.not(customIgnoringSubject(mismatchReply())), "T");
+    }
+
+    @Test
     @SuppressWarnings("NullAway")
     void combinatorsRejectEmptyAndImpossibleShapes() {
         assertAll(
@@ -444,6 +508,55 @@ class AdversarialExpectationTest {
 
     private static Expectation<OccupantSnapshot> customIgnoringSubject(Reply reply) {
         return Expectations.custom(OccupantSnapshot.class, ExpectationMeta.anonymous(), ctx -> reply);
+    }
+
+    private static String foldAllOf(Reply first, Reply second) {
+        if (first instanceof Reply.Mismatch || second instanceof Reply.Mismatch) {
+            return "M";
+        }
+        if (first instanceof Reply.Unreadable || second instanceof Reply.Unreadable) {
+            return "U";
+        }
+        if (first instanceof Reply.Abstain || second instanceof Reply.Abstain) {
+            return "A";
+        }
+        return "T";
+    }
+
+    private static String foldAnyOf(Reply first, Reply second) {
+        if (first instanceof Reply.Match || second instanceof Reply.Match) {
+            return "T";
+        }
+        if (first instanceof Reply.Unreadable || second instanceof Reply.Unreadable) {
+            return "U";
+        }
+        if (first instanceof Reply.Mismatch || second instanceof Reply.Mismatch) {
+            return "M";
+        }
+        return "A";
+    }
+
+    private static void assertFold(String caseName, Expectation<OccupantSnapshot> expectation, String expected) {
+        MatchResult result = check(singleCellBlueprint(expectation), MagicFixtures.view().air(origin));
+        switch (expected) {
+            case "T" -> assertInstanceOf(MatchResult.Admitted.class, result, caseName);
+            case "M" -> assertInstanceOf(MatchResult.Failed.class, result, caseName);
+            case "U" -> assertEquals(
+                UndecidedReason.unreadable,
+                assertInstanceOf(MatchResult.Undecided.class, result, caseName).reason(),
+                caseName
+            );
+            case "A" -> assertEquals(
+                UndecidedReason.abstained,
+                assertInstanceOf(MatchResult.Undecided.class, result, caseName).reason(),
+                caseName
+            );
+            default -> throw new AssertionError(caseName + ": unknown fold " + expected);
+        }
+    }
+
+    private static List<String> codeTexts(MatchResult result) {
+        return result.findings().findings().stream().map(finding -> finding.code().text()).toList();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

@@ -9,6 +9,7 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,48 @@ class WorldTest {
     }
 
     @Test
+    void sectionSnapshotSortsBoxQueriesByRefAndCarriesItsDigest() {
+        SectionKey key = SectionKey.of(World.of(NamespacedId.of("w")), 0, LatticePoint.origin, 16);
+        OccupantSnapshot atFirstCell = TestBlocks.block(snapshot, NamespacedId.of("z"), LatticePoint.of(1, 0, 0));
+        OccupantSnapshot atSecondCell = TestBlocks.block(snapshot, NamespacedId.of("a"), LatticePoint.of(2, 0, 0));
+        SectionSnapshot section = SectionSnapshot.of(
+            key,
+            Map.of(atFirstCell.ref().anchor(), atFirstCell, atSecondCell.ref().anchor(), atSecondCell),
+            7L
+        );
+        assertEquals(7L, section.contentDigest());
+        assertEquals(
+            List.of(atFirstCell, atSecondCell),
+            List.copyOf(section.occupants().values()),
+            "the member map iterates by cell"
+        );
+        assertEquals(
+            List.of(atSecondCell, atFirstCell),
+            section.occupants(Cuboid.of(0, 0, 0, 3, 1, 1), OccupantFilter.any()),
+            "a box query answers in ref order"
+        );
+        assertEquals(
+            section,
+            SectionSnapshot.of(
+                key,
+                new LinkedHashMap<>(
+                    Map.of(atSecondCell.ref().anchor(), atSecondCell, atFirstCell.ref().anchor(), atFirstCell)
+                ),
+                7L
+            ),
+            "the member map is canonical"
+        );
+        assertNotEquals(
+            section,
+            SectionSnapshot.of(
+                key,
+                Map.of(atFirstCell.ref().anchor(), atFirstCell, atSecondCell.ref().anchor(), atSecondCell),
+                8L
+            )
+        );
+    }
+
+    @Test
     void entityWindowInflatesAndClamps() {
         EntityWindow window = EntityWindow.of(Cuboid.of(0, 0, 0, 1, 1, 1), NamespacedId.of("mob"));
         assertEquals(Cuboid.of(-3, -3, -3, 4, 4, 4), Objects.requireNonNull(window, "window").cells());
@@ -79,6 +122,20 @@ class WorldTest {
             NamespacedId.of("mob")
         );
         assertEquals(LatticePoint.minXz, Objects.requireNonNull(edge, "edge").cells().min().x());
+        EntityWindow ceiling = EntityWindow.of(
+            Cuboid.of(
+                LatticePoint.maxXz - 1,
+                LatticePoint.maxY - 1,
+                LatticePoint.maxXz - 1,
+                LatticePoint.maxXz,
+                LatticePoint.maxY,
+                LatticePoint.maxXz
+            ),
+            NamespacedId.of("mob")
+        );
+        assertEquals(LatticePoint.maxXz, Objects.requireNonNull(ceiling, "ceiling").cells().max().x());
+        assertEquals(LatticePoint.maxY, ceiling.cells().max().y());
+        assertNull(EntityWindow.of(Cuboid.of(0, 0, 0, 0, 1, 1), NamespacedId.of("mob")));
     }
 
     @Test

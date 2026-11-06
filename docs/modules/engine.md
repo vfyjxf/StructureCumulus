@@ -283,11 +283,14 @@ by `(cell, instance, bay, siting origin, placement orientation, placement offset
 subject's ref belongs to this snapshot and the root frame; no subject has kind `nested`; every subject
 footprint lies inside the bay's world cells; for `oneSubject` the union equals the bay; for
 `exclusive + Bound` at least one non-air subject exists. A failure is
-`Failed(SC-CLM-0004)`/`SC-CLM-0005` and nothing is written. `ClaimPlanner.derive` throws
-`IllegalArgumentException` carrying `SC-CLM-0004` if a nested or non-root subject reaches it; that is
-a proof failure, because check and settle already validated the bindings. It also throws
-`SC-CLM-0001` when two bays of one instance own one cell with an exclusive side; `plannerFailure`
-maps that to the conflict code, and check and settle answer `Failed` with nothing written.
+`Failed(SC-CLM-0004)`/`SC-CLM-0005` and nothing is written. Every planner refusal is thrown as
+`PlanRejected`, an `IllegalArgumentException` subtype only this package constructs that carries its
+`CodeEntry`; `plannerFailure` reads `code()` and never parses the message, and an
+`IllegalArgumentException` that is not a `PlanRejected` stays a programmer error instead of becoming
+a finding (D-66). `ClaimPlanner.derive` throws `SC-CLM-0004` if a nested or non-root subject reaches
+it; that is a proof failure, because check and settle already validated the bindings. It also throws
+`SC-CLM-0001` when two bays of one instance own one cell with an exclusive side; check and settle
+answer `Failed` with nothing written.
 
 A conflict is data, not a report (D-53): the ledger's `Conflict` verdict carries the contesting
 incumbent rows and nothing else. The engine renders the finding through its one `conflicts(...)`
@@ -323,7 +326,7 @@ persistence, and may pass `null`.
 1. the current attempt value with the exact `ContextKey` wins (folded section values, aggregate
    values and match values);
 2. otherwise a current attempt value with the same `(id, type, Retention.instance)` wins, so the
-   current attempt shadows the cache when its producer key object differs in `merge`/`whenAbsent`;
+   current attempt shadows the cache when its producer key object differs in `merge`;
 3. otherwise, when the key is `Retention.instance` and its `(id, type)` is eligible, the value is
    `cachedContext.get(key.id(), key.type())`;
 4. otherwise the key is absent.
@@ -373,7 +376,7 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
   aggregate and no claim or context write happens.
 - Context expectation: match/mismatch (`SC-EXP-0001`)/missing (`SC-CTX-0007`); the declared requires
   gate the key. Cached composition: instance-only; eligible via check requires or computation
-  inputs; `(id, type)` lookup answers a host-decoded key with lost `merge`/`whenAbsent`; the current
+  inputs; `(id, type)` lookup answers a host-decoded key with lost `merge`; the current
   value shadows the cached one; a `match` key is never read; a wrong type or host exception is
   absent; an aggregate sees the same composite; a cached value is never published; the same request
   and cache are deterministic.

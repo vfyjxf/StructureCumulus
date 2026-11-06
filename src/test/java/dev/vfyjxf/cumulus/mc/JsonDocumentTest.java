@@ -44,6 +44,7 @@ import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.structure.SeamId;
 import dev.vfyjxf.cumulus.kernel.structure.SeamKind;
+import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -108,9 +109,8 @@ class JsonDocumentTest {
                  "region": [[0,0,0,5,1,5]], "inputs": ["test:count"], "extra": {"nested": true}}
               ],
               "keys": [
-                {"id": "test:count", "type": "long", "retention": "instance", "merge": "sum",
-                 "whenAbsent": 0},
-                {"id": "test:flag", "type": "boolean", "retention": "match", "whenAbsent": false}
+                {"id": "test:count", "type": "long", "retention": "instance", "merge": "sum"},
+                {"id": "test:flag", "type": "boolean", "retention": "match"}
               ],
               "derivations": [
                 {"deriver": "test:counter", "output": "test:count", "order": 0,
@@ -177,7 +177,6 @@ class JsonDocumentTest {
             Value.object(Map.of("extra", Value.object(Map.of("nested", Value.bool(true))))),
             document.root().computations().get(0).args()
         );
-        assertEquals(Value.number(0), document.root().keys().get(0).whenAbsent());
         assertEquals(Retention.match, document.root().keys().get(1).retention());
         assertEquals(NamespacedId.of("test", "counter"), document.root().derivations().get(0).deriver());
         assertEquals(1, document.extensions().size());
@@ -485,7 +484,7 @@ class JsonDocumentTest {
         CuboidSet hollowCells = CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2));
         CuboidSet fireCells = CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2));
         ContextKey<Long> airCells = ContextKeys
-                .of(NamespacedId.of("mymod", "air_cells"), Long.class, Retention.instance, Merges.sum(), null);
+                .of(NamespacedId.of("mymod", "air_cells"), Long.class, Retention.instance, Merges.sum());
         Blueprint javaCampfire = Blueprint.builder(NamespacedId.of("mymod", "campfire"))
                 .bounds(Cuboid.of(0, 0, 0, 3, 3, 3))
                 .check(
@@ -562,9 +561,9 @@ class JsonDocumentTest {
 
         CuboidSet region = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
         ContextKey<Long> bodies = ContextKeys
-                .of(NamespacedId.of("test", "bodies"), Long.class, Retention.instance, Merges.sum(), null);
+                .of(NamespacedId.of("test", "bodies"), Long.class, Retention.instance, Merges.sum());
         ContextKey<Long> volume = ContextKeys
-                .of(NamespacedId.of("test", "volume"), Long.class, Retention.instance, Merges.sum(), null);
+                .of(NamespacedId.of("test", "volume"), Long.class, Retention.instance, Merges.sum());
         Blueprint javaCounted = Blueprint.builder(NamespacedId.of("test", "computed")).bounds(
             Cuboid.of(0, 0, 0, 2, 1, 1)
         ).check(
@@ -600,6 +599,7 @@ class JsonDocumentTest {
                 root.id(),
                 root.bounds(),
                 root.envelope(),
+                root.envelopeEntities(),
                 root.arguments(),
                 root.bays(),
                 List.of(
@@ -677,6 +677,38 @@ class JsonDocumentTest {
         assertFalse(offDocument.root().envelope());
         assertEquals(withoutSpans(absentDocument), withoutSpans(offDocument));
         assertFalse(new JsonWriter().write(offDocument).contains("\"envelope\""));
+    }
+
+    @Test
+    void envelopeEntitiesRoundTripsAndOldDocumentsReadFalse() {
+        String text = """
+                {"schemaVersion":1,"id":"test:envelope_entities","bounds":[0,0,0,2,1,1],
+                 "envelope":true,"envelopeEntities":true,"bays":[],"checks":[]}
+                """;
+        Document document = read(text);
+        assertTrue(document.root().envelopeEntities(), "the reader carries the root flag");
+        String written = new JsonWriter().write(document);
+        assertTrue(written.contains("\"envelopeEntities\": true"));
+        int envelope = written.indexOf("\"envelope\":");
+        int entities = written.indexOf("\"envelopeEntities\":");
+        assertTrue(envelope >= 0 && envelope < entities, "envelopeEntities follows envelope");
+        Document back = read(written);
+        assertEquals(withoutSpans(document), withoutSpans(back));
+        assertEquals(written, new JsonWriter().write(back), "the written form is a fixed point");
+
+        String oldText = """
+                {"schemaVersion":1,"id":"test:envelope_old","bounds":[0,0,0,2,1,1],
+                 "envelope":true,"bays":[],"checks":[]}
+                """;
+        Document old = read(oldText);
+        assertFalse(old.root().envelopeEntities(), "a document without the field reads false");
+        assertFalse(new JsonWriter().write(old).contains("\"envelopeEntities\""));
+
+        CompileResult result = DocumentCompiler.compile(back, context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        Blueprint blueprint = result.blueprint();
+        assertNotNull(blueprint);
+        assertTrue(blueprint.reads().kinds().contains(OccupantKind.entity), "the switch adds the entity kind");
     }
 
     @Test
@@ -832,6 +864,7 @@ class JsonDocumentTest {
             NamespacedId.of("test", "orientations"),
             Cuboid.of(0, 0, 0, 1, 1, 1),
             false,
+            false,
             Value.object(),
             List.of(),
             List.of(),
@@ -861,19 +894,18 @@ class JsonDocumentTest {
     }
 
     @Test
-    void keyTypesAndWhenAbsentArePreserved() {
+    void keyTypesArePreserved() {
         String text = """
                 {"schemaVersion":1,"id":"test:keys","bounds":[0,0,0,1,1,1],
                  "bays":[],"checks":[],
                  "keys":[
-                   {"id":"test:l","type":"long","retention":"instance","merge":"sum","whenAbsent":1},
-                   {"id":"test:i","type":"int","retention":"match","whenAbsent":2},
-                   {"id":"test:b","type":"boolean","retention":"instance","whenAbsent":true},
-                   {"id":"test:s","type":"string","retention":"instance","whenAbsent":"s"},
-                   {"id":"test:id","type":"id","retention":"instance","whenAbsent":"minecraft:stone"},
-                   {"id":"test:c","type":"cuboid","retention":"instance","whenAbsent":[0,0,0,1,1,1]},
-                   {"id":"test:cs","type":"cuboid_set","retention":"instance",
-                    "whenAbsent":[[0,0,0,1,1,1]]}]}
+                   {"id":"test:l","type":"long","retention":"instance","merge":"sum"},
+                   {"id":"test:i","type":"int","retention":"match"},
+                   {"id":"test:b","type":"boolean","retention":"instance"},
+                   {"id":"test:s","type":"string","retention":"instance"},
+                   {"id":"test:id","type":"id","retention":"instance"},
+                   {"id":"test:c","type":"cuboid","retention":"instance"},
+                   {"id":"test:cs","type":"cuboid_set","retention":"instance"}]}
                 """;
         Document document = read(text);
         List<KeySpec> keys = document.root().keys();
@@ -883,16 +915,23 @@ class JsonDocumentTest {
             keys.stream().map(KeySpec::type).toList()
         );
         assertEquals(NamespacedId.of("sum"), keys.get(0).merge());
-        assertEquals(Value.number(1), keys.get(0).whenAbsent());
-        assertEquals(Value.number(2), keys.get(1).whenAbsent());
-        assertEquals(Value.bool(true), keys.get(2).whenAbsent());
-        assertEquals(Value.string("s"), keys.get(3).whenAbsent());
-        assertEquals(Value.string("minecraft:stone"), keys.get(4).whenAbsent());
-        assertTrue(keys.get(5).whenAbsent() instanceof Value.ArrayValue);
-        assertTrue(keys.get(6).whenAbsent() instanceof Value.ArrayValue);
         String written = new JsonWriter().write(document);
         Document back = read(written);
         assertEquals(withoutSpans(document), withoutSpans(back));
+    }
+
+    @Test
+    void aDocumentThatDeclaresWhenAbsentIsRejected() {
+        String text = """
+                {"schemaVersion":1,"id":"test:when_absent","bounds":[0,0,0,1,1,1],
+                 "bays":[],"checks":[],
+                 "keys":[{"id":"test:l","type":"long","retention":"instance","merge":"sum","whenAbsent":0}]}
+                """;
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        Finding finding = errors.stream().filter(f -> f.code().equals(FindingCode.of(FindingCode.Family.doc, 2)))
+                .findFirst().orElseThrow();
+        assertTrue(finding.message().contains("unknown member 'whenAbsent'"), () -> finding.message());
     }
 
     @Test
@@ -949,12 +988,40 @@ class JsonDocumentTest {
     }
 
     @Test
+    void aDefinitionWithArgumentsIsRejected() {
+        String text = """
+                {"schemaVersion":1,"id":"test:definition_arguments","bounds":[0,0,0,1,1,1],
+                 "definitions":{"test:unit":{"bounds":[0,0,0,1,1,1],"arguments":{"k":1}}},
+                 "bays":[],"checks":[]}
+                """;
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        Finding finding = errors.stream().filter(f -> f.code().equals(FindingCode.of(FindingCode.Family.doc, 2)))
+                .findFirst().orElseThrow();
+        assertTrue(finding.message().contains("unknown member 'arguments'"), () -> finding.message());
+    }
+
+    @Test
+    void aDefinitionWithExtensionsIsRejected() {
+        String text = """
+                {"schemaVersion":1,"id":"test:definition_extensions","bounds":[0,0,0,1,1,1],
+                 "definitions":{"test:unit":{"bounds":[0,0,0,1,1,1],"extensions":{"test:vendor":{"v":1}}}},
+                 "bays":[],"checks":[]}
+                """;
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        Finding finding = errors.stream().filter(f -> f.code().equals(FindingCode.of(FindingCode.Family.doc, 2)))
+                .findFirst().orElseThrow();
+        assertTrue(finding.message().contains("unknown member 'extensions'"), () -> finding.message());
+    }
+
+    @Test
     void definitionsAndExtensionsAreOrdered() {
         String first = """
                 {"schemaVersion":1,"id":"test:order","bounds":[0,0,0,1,1,1],
                  "definitions":{
                    "test:z":{"bounds":[0,0,0,1,1,1]},
-                   "test:a":{"bounds":[0,0,0,1,1,1],"arguments":{"k":1}}},
+                   "test:a":{"bounds":[0,0,0,1,1,1]}},
                  "bays":[],"checks":[],
                  "extensions":{"test:z":{"v":1},"test:a":{"v":2}}}
                 """;
@@ -1086,6 +1153,7 @@ class JsonDocumentTest {
             spec.id(),
             spec.bounds(),
             spec.envelope(),
+            spec.envelopeEntities(),
             spec.arguments(),
             bays,
             seams,
@@ -1144,7 +1212,7 @@ class JsonDocumentTest {
     }
 
     private static KeySpec withoutSpans(KeySpec spec) {
-        return new KeySpec(spec.id(), spec.type(), spec.retention(), spec.merge(), spec.whenAbsent(), null);
+        return new KeySpec(spec.id(), spec.type(), spec.retention(), spec.merge(), null);
     }
 
     private static PlacementSpec withoutSpans(PlacementSpec spec) {

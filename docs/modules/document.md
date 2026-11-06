@@ -60,7 +60,8 @@ public record Document(int schemaVersion, BlueprintSpec root,
     public Document { /* version >= 1; maps immutable and ordered */ }
 }
 
-public record BlueprintSpec(NamespacedId id, Cuboid bounds, boolean envelope, Value arguments,
+public record BlueprintSpec(NamespacedId id, Cuboid bounds, boolean envelope, boolean envelopeEntities,
+                            Value arguments,
                             java.util.List<BaySpec> bays,
                             java.util.List<SeamSpec> seams,
                             java.util.List<CheckSpec> checks,
@@ -91,8 +92,7 @@ public record ComputationSpec(NamespacedId id, NamespacedId kind, Value args,
                               @Nullable SourceSpan source) { }
 
 public record KeySpec(NamespacedId id, String type, Retention retention,
-                      @Nullable NamespacedId merge, @Nullable Value whenAbsent,
-                      @Nullable SourceSpan source) { }
+                      @Nullable NamespacedId merge, @Nullable SourceSpan source) { }
 
 public record PlacementSpec(NamespacedId definition, LatticePoint offset, NamespacedId alias,
                             @Nullable SourceSpan source) { }
@@ -201,6 +201,7 @@ public interface DocumentWriter {
 | `id` | id | yes | the root blueprint id |
 | `bounds` | box | yes | the root local frame; every compiled cell is inside |
 | `envelope` | boolean | no | `true` derives the closed-world air pair over cells no bay or declared footprint covers; absent or `false` is off; root-only |
+| `envelopeEntities` | boolean | no | `true` makes that envelope count entities as foreign and adds the `entity` kind to its read scope (`structure` §4.11, D-55); absent or `false` leaves entities transparent; root-only, and `SC-DOC-0002` unless the root also declares `envelope: true` |
 | `definitions` | object id → spec | no | reusable specs, compiled on placement |
 | `placements` | placement[] | no | definitions placed into the root |
 | `bays` | bay[] | yes* | the root's own bays |
@@ -224,7 +225,9 @@ A box is `[x, y, z, sizeX, sizeY, sizeZ]` (origin + size). A bay has `box` or `b
 the compiler builds it through `of`.
 
 A definition is the same `BlueprintSpec` shape without `schemaVersion`; its `id` is the map key. A
-placement is `{"definition": "mymod:shell", "as": "mymod:south", "at": [0,0,0]}`. The compiler
+placement is `{"definition": "mymod:shell", "as": "mymod:south", "at": [0,0,0]}`. A placement may
+also name a document in the `DocumentSource` instead of a local definition; the placed spec is that
+document's root, and its `schemaVersion` must equal the current version (`SC-DOC-0001`). The compiler
 qualifies every placed bay/check/computation/seam id with the alias path: `alias.path + "/" + local`,
 and translates every placed cell by `at`. An anchor and the orientation policy come only from the
 root; a definition may not declare anchors (they would be duplicated or ambiguous).
@@ -261,16 +264,23 @@ check time, never a default.
 A key declaration maps a JSON type name to a `Class`: `long`, `int`, `boolean`, `string`, `id`,
 `cuboid`, `cuboid_set`. A custom type needs a `CompilerContext.types` entry; a document key is always
 a built-in type in v1. `merge` names `sum`, `union`, `min`, `max`, `and`, `or`; absent means
-single-writer. `whenAbsent` is decoded to the key type; a wrong kind is `SC-DOC-0008`.
+single-writer, and a merge that does not fit the type is `SC-DOC-0008`.
 
 ### 4.2 Definitions in v1
 
 A `definitions` entry contributes **bays, seams and placements** only. Checks, computations, keys,
-derivations, anchors, the orientation policy and `envelope` are root-only; a definition that
-declares one is `SC-DOC-0002`. This keeps a placed definition a pure geometry unit: its bays and
+derivations, anchors, the orientation policy, `envelope` and `envelopeEntities` are root-only; a
+definition that
+declares one is `SC-DOC-0002`. `arguments` and `extensions` are not members of a definition at all:
+the reader rejects them as unknown members (`SC-DOC-0002`). A definition's `bounds` is required and
+must contain the definition's own bays and seams; a cell outside them is `SC-DOC-0002`. This keeps a
+placed definition a pure geometry unit: its bays and
 seams are qualified with the alias path (`alias.path + "/" + local`) and translated by the placement
 offset, while every check and computation is written once in the root against the merged ids. Nested
 placements are allowed; a cycle is `SC-DOC-0009`.
+
+No declaration is dropped silently. A bay no check names — root or merged — is `SC-DOC-0002`, and a
+definition no placement reaches, directly or through another placement, is `SC-DOC-0002`.
 
 ### 4.3 Lowering
 
@@ -285,7 +295,8 @@ placements are allowed; a cycle is `SC-DOC-0009`.
 5. Build checks: resolve the focus factory and the expectation factory, check
    `focus.subject() == expectation.subject()`, then `Check.of`.
 6. Call `Blueprint.builder(...)`; when the root carries `envelope`, call `.envelope()` before
-   `build()`. A build exception is caught and reported as its own code (for example `SC-BPT-0004`
+   `build()`, and when it carries `envelopeEntities`, call `.envelopeEntities()`. A build exception
+   is caught and reported as its own code (for example `SC-BPT-0004`
    for a reserved envelope id); a clean compile never reaches that path.
 7. Return `CompileResult(bundle, blueprint)`; `findings` may contain warnings even when the
    blueprint is non-null.
@@ -295,10 +306,11 @@ hash-ordered collection. Equal documents produce equal blueprints (I-13).
 
 ### 4.4 Findings
 
-A `compile` finding carries a `definition` label when the reader supplied a span, otherwise a
-`local` label on the offending cells (or a label-less finding for a document-level failure). The
-compiler never throws for bad data; a reader that cannot parse returns `null` and appends
-`SC-DOC-0013`.
+A `compile` finding always carries a primary label: a `definition` label when the reader supplied a
+span, otherwise a `local` label on the offending cells, otherwise a `local` label over the whole
+blueprint bounds — a single origin cell when those bounds are empty (D-67). "Somewhere in this
+blueprint" is the floor; no compile finding is label-less. The compiler never throws for bad data;
+a reader that cannot parse returns `null` and appends `SC-DOC-0013`.
 
 ### 4.5 Structure sets
 
@@ -379,7 +391,7 @@ canonical blueprint form.
 | `SC-DOC-0005` | ERROR | placement/box outside root bounds | `DocumentCompiler` |
 | `SC-DOC-0006` | ERROR | a check names no merged bay | `DocumentCompiler` |
 | `SC-DOC-0007` | ERROR | a spec names an undeclared key | `DocumentCompiler` |
-| `SC-DOC-0008` | ERROR | key type/`whenAbsent` mismatch | `DocumentCompiler` |
+| `SC-DOC-0008` | ERROR | key type/merge mismatch | `DocumentCompiler` |
 | `SC-DOC-0009` | ERROR | definition cycle | `DocumentCompiler` |
 | `SC-DOC-0010` | ERROR | derivation output/order duplicate | `DocumentCompiler` |
 | `SC-DOC-0011` | ERROR | placement names a missing definition | `DocumentCompiler` |
@@ -400,7 +412,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 - Schema: missing/unknown/wrong-kind field; version 2; duplicate id; missing bay; missing key;
   type mismatch; cycle; missing definition; placement outside bounds.
 - Placement: alias qualification, offset, two placements of one definition, duplicate ids.
-- Keys: `long`/`int`/`boolean`/`string`/`id`/`cuboid`/`cuboid_set`; merge names; `whenAbsent`.
+- Keys: `long`/`int`/`boolean`/`string`/`id`/`cuboid`/`cuboid_set`; merge names; a removed key member
+  is an unknown member.
 - Reads: a `trait`/`trait_absent` declaration contributes its trait id, a `nested` focus its kind and
   depth; the document path and the Java builder produce equal `Blueprint.reads()`.
 - Host kinds: `property`, `state`, `tag` and `fluid` read as ordinary `checks` and compile only
@@ -415,6 +428,9 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   absent and `false` stay off; a definition-level member and a non-boolean value are `SC-DOC-0002`;
   an envelope root compiles to the same `Blueprint`, `Plan` and `ReadScope` as the Java `.envelope()`;
   an envelope-only root (`"bays": []`, `"checks": []`) yields one synthetic bay/check.
+  `"envelopeEntities": true` round-trips the same way, a document without it reads `false`, a
+  definition-level member is `SC-DOC-0002` like `envelope`, and a root that declares it without
+  `envelope` is `SC-DOC-0002` (D-63: a declaration the compiler would ignore).
 - Structure set: a valid set (root + two preheaters) reads, compiles and writes back equal content;
   `kind` selects the reader and is omitted on a canonically written blueprint; unknown members,
   wrong kind, bad `at`/`orientation`/`arguments`/link/presence members and a duplicate satellite id
@@ -442,7 +458,9 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 - A definition is geometry: bays, seams and placements only. Every check, computation, key and
   derivation is written once in the root.
 - `envelope` is a root boolean. A definition cannot declare it, and an absent member is off; the
-  schema version does not move for it.
+  schema version does not move for it. `envelopeEntities` follows the same rule and only modifies
+  what an `envelope` root would judge: a root declaring it without `envelope` is `SC-DOC-0002`, and
+  the writer refuses the combination instead of emitting it.
 - Kind ids are lowercase snake_case. Built-in structural forms are grammar, not catalog entries;
   an unqualified kind resolves in `structurecumulus`.
 - A declaration is confirmed, never repaired. A computation whose `id` differs from its `output`,

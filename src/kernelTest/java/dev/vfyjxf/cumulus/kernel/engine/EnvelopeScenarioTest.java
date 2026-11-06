@@ -19,6 +19,7 @@ import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.BlueprintBuilder;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
+import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -192,15 +193,56 @@ class EnvelopeScenarioTest {
     }
 
     @Test
-    void anEntityInTheEnvelopeFails() {
+    void anEntityOverAnAirCellIsTransparent() {
         Siting siting = TechFixtures.identity(LatticePoint.origin);
         TestWorld.View view = TechFixtures.view();
-        view.put(TechFixtures.entity(TechFixtures.cow, LatticePoint.origin, Cuboid.of(LatticePoint.origin)));
+        view.putBody(TechFixtures.entity(TechFixtures.cow, LatticePoint.origin, Cuboid.of(LatticePoint.origin)));
         ClaimLedger ledger = TechFixtures.ledger();
-        MatchResult result = TechFixtures.settle(envelopeOnly("envelope/only_entity"), siting, view, ledger);
+        MatchResult.Formed formed = assertInstanceOf(
+            MatchResult.Formed.class,
+            TechFixtures.settle(envelopeOnly("envelope/only_entity"), siting, view, ledger),
+            "a cow standing on an air cell does not open the envelope"
+        );
+        assertTrue(formed.claims().rows().isEmpty(), "the envelope owns nothing");
+    }
+
+    @Test
+    void anEnvelopeStillJudgesTheBlockUnderAnEntity() {
+        Siting siting = TechFixtures.identity(LatticePoint.origin);
+        TestWorld.View view = TechFixtures.view();
+        view.put(TestWorld.block(TestWorld.stone, LatticePoint.origin));
+        view.putBody(TechFixtures.entity(TechFixtures.cow, LatticePoint.origin, Cuboid.of(LatticePoint.origin)));
+        ClaimLedger ledger = TechFixtures.ledger();
+        MatchResult result = TechFixtures
+                .settle(envelopeOnly("envelope/only_block_under_entity"), siting, view, ledger);
 
         assertEnvelopeFailureAt(result, LatticePoint.origin);
         assertEquals(0, TestWorld.rows(ledger).size());
+    }
+
+    @Test
+    void envelopeEntitiesRejectsAnEntity() {
+        Siting siting = TechFixtures.identity(LatticePoint.origin);
+        TestWorld.View view = TechFixtures.view();
+        view.putBody(TechFixtures.entity(TechFixtures.cow, LatticePoint.origin, Cuboid.of(LatticePoint.origin)));
+        ClaimLedger ledger = TechFixtures.ledger();
+        MatchResult result = TechFixtures
+                .settle(envelopeEntitiesOnly("envelope/only_entity_rejecting"), siting, view, ledger);
+
+        assertEnvelopeFailureAt(result, LatticePoint.origin);
+        assertEquals(0, TestWorld.rows(ledger).size());
+    }
+
+    @Test
+    void envelopeEntitiesAddsTheEntityKindToReads() {
+        Blueprint transparent = envelopeOnly("envelope/reads_off");
+        Blueprint rejecting = envelopeEntitiesOnly("envelope/reads_on");
+
+        assertFalse(
+            transparent.reads().kinds().contains(OccupantKind.entity),
+            "the default envelope captures no entity"
+        );
+        assertTrue(rejecting.reads().kinds().contains(OccupantKind.entity), "the switch adds the entity kind");
     }
 
     @Test
@@ -248,6 +290,10 @@ class EnvelopeScenarioTest {
 
     private static Blueprint envelopeOnly(String path) {
         return Blueprint.builder(id(path)).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).envelope().build();
+    }
+
+    private static Blueprint envelopeEntitiesOnly(String path) {
+        return Blueprint.builder(id(path)).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).envelope().envelopeEntities().build();
     }
 
     private static Blueprint fusionBlueprint(String path) {
