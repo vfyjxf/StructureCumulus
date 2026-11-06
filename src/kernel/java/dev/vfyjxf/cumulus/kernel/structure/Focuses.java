@@ -176,11 +176,11 @@ public final class Focuses {
         public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
             CuboidSet worldCells = ctx.siting().toWorld(ctx.cells());
             if (worldCells == null) {
-                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: empty bay"));
+                return new FocusResult.Unavailable<>(missing(ctx, "empty bay"));
             }
             Cuboid bounds = worldCells.bounds();
             if (bounds == null) {
-                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: empty bay"));
+                return new FocusResult.Unavailable<>(missing(ctx, "empty bay"));
             }
             Map<OccupantRef, OccupantSnapshot> found = new LinkedHashMap<>();
             for (OccupantSnapshot candidate : ctx.view().occupants(bounds, OccupantFilter.ofType(type))) {
@@ -192,12 +192,10 @@ public final class Focuses {
             List<OccupantSnapshot> entities = new ArrayList<>(found.values());
             entities.sort(Comparator.comparing(OccupantSnapshot::ref));
             if (entities.isEmpty()) {
-                return new FocusResult.Unavailable<>(missing(ctx, "SC-OCC-0001: no " + type + " in the bay"));
+                return new FocusResult.Unavailable<>(missing(ctx, "no " + type + " in the bay"));
             }
             if (entities.size() > 1) {
-                return new FocusResult.Unavailable<>(
-                    missing(ctx, "SC-OCC-0001: more than one " + type + " in the bay")
-                );
+                return new FocusResult.Unavailable<>(missing(ctx, "more than one " + type + " in the bay"));
             }
             OccupantSnapshot entity = entities.get(0);
             FindingBundle gap = footprintGap(ctx, entity);
@@ -308,9 +306,7 @@ public final class Focuses {
                 );
             }
             if (first == null || second == null || first.isAir() || second.isAir()) {
-                return new FocusResult.Unavailable<>(
-                    missing(ctx, "SC-OCC-0001: a door needs two readable non-air halves")
-                );
+                return new FocusResult.Unavailable<>(missing(ctx, "a door needs two readable non-air halves"));
             }
             DoorView door = new DoorView(first, second, ctx.bay());
             return new FocusResult.Taken<>(door, List.of(first, second), FindingBundle.empty());

@@ -44,6 +44,10 @@ class EntityFocusScenarioTest {
                     .anyMatch(finding -> finding.code().equals(Codes.unreadableCell.code())),
             "zero entities of the type is SC-OCC-0001"
         );
+        assertTrue(
+            undecided.findings().findings().stream().noneMatch(finding -> finding.message().startsWith("SC-")),
+            "the message carries no code text"
+        );
     }
 
     @Test
@@ -57,6 +61,10 @@ class EntityFocusScenarioTest {
             undecided.findings().findings().stream()
                     .anyMatch(finding -> finding.code().equals(Codes.unreadableCell.code())),
             "more than one entity of the type is SC-OCC-0001"
+        );
+        assertTrue(
+            undecided.findings().findings().stream().noneMatch(finding -> finding.message().startsWith("SC-")),
+            "the message carries no code text"
         );
     }
 
