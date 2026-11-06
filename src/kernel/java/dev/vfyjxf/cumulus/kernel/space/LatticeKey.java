@@ -30,8 +30,14 @@ public record LatticeKey(long packed) implements Comparable<LatticeKey> {
         return (int) (packed << 26 >> 38);
     }
 
+    /** Layer, then row, then column, matching LatticePoint's order without decoding. */
     @Override
     public int compareTo(LatticeKey other) {
-        return point().compareTo(other.point());
+        int result = Integer.compare(y(), other.y());
+        if (result != 0) {
+            return result;
+        }
+        result = Integer.compare(z(), other.z());
+        return result != 0 ? result : Integer.compare(x(), other.x());
     }
 }

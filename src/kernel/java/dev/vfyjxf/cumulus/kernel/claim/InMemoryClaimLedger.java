@@ -47,12 +47,8 @@ final class InMemoryClaimLedger implements ClaimLedger {
         if (conflict != null) {
             return conflict;
         }
-        List<ClaimRow> replacement = new ArrayList<>(new LinkedHashSet<>(request.rows()));
-        replacement.sort(ClaimRow::compareTo);
-        List<ClaimRow> next = new ArrayList<>(incumbents.size() + replacement.size());
-        next.addAll(incumbents);
-        next.addAll(replacement);
-        next.sort(ClaimRow::compareTo);
+        List<ClaimRow> replacement = canonical(request.rows());
+        List<ClaimRow> next = mergeSorted(incumbents, replacement);
         if (next.equals(rows)) {
             return new ClaimVerdict.Settled(revision, replacement);
         }
@@ -60,6 +56,41 @@ final class InMemoryClaimLedger implements ClaimLedger {
         rows.addAll(next);
         revision++;
         return new ClaimVerdict.Settled(revision, replacement);
+    }
+
+    /** The sorted unique request rows, deduped after sorting instead of hashing every record. */
+    private static List<ClaimRow> canonical(List<ClaimRow> request) {
+        List<ClaimRow> sorted = new ArrayList<>(request);
+        sorted.sort(ClaimRow::compareTo);
+        int write = 0;
+        for (int read = 1; read < sorted.size(); read++) {
+            if (!sorted.get(write).equals(sorted.get(read))) {
+                write++;
+                sorted.set(write, sorted.get(read));
+            }
+        }
+        return write + 1 == sorted.size() ? sorted : new ArrayList<>(sorted.subList(0, write + 1));
+    }
+
+    /** Two sorted lists merged; ties keep the incumbent first, like a stable sort of both. */
+    private static List<ClaimRow> mergeSorted(List<ClaimRow> incumbents, List<ClaimRow> replacement) {
+        List<ClaimRow> merged = new ArrayList<>(incumbents.size() + replacement.size());
+        int left = 0;
+        int right = 0;
+        while (left < incumbents.size() && right < replacement.size()) {
+            if (incumbents.get(left).compareTo(replacement.get(right)) <= 0) {
+                merged.add(incumbents.get(left++));
+            } else {
+                merged.add(replacement.get(right++));
+            }
+        }
+        while (left < incumbents.size()) {
+            merged.add(incumbents.get(left++));
+        }
+        while (right < replacement.size()) {
+            merged.add(replacement.get(right++));
+        }
+        return merged;
     }
 
     /** The rows this settle leaves in place: not its own, not at a siting it takes over. */
