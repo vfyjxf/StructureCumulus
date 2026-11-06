@@ -12,6 +12,7 @@ import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
+import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
@@ -158,6 +159,7 @@ class ApiExamplesTest {
         StructureKernel kernel = StructureKernel
                 .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
         Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+        Siting turned = MagicFixtures.turn(LatticePoint.origin, Turn.clockwise);
         OwnerId owner = OwnerId.of(id("owner"));
         StructureSpec spec = new StructureSpec(owner, siting, campfire.id());
 
@@ -282,6 +284,88 @@ class ApiExamplesTest {
     }
 
     @Test
+    void theSharedHatchSettlesTwiceAndRefusesAnExclusiveOwner() {
+        CuboidSet hatchCells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+        Bay hatch = Bay.of(id("hatch"), hatchCells, Coverage.oneSubject, Footprint.bound(), Sharing.shared);
+        Check<?> hatchCheck = Check
+                .of(id("hatch"), hatch, Focuses.occupant(LatticePoint.origin), Expectations.anyOccupant());
+        Blueprint ownerA = Blueprint.builder(id("hatch_a")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(hatchCheck)
+                .build();
+        Blueprint ownerB = Blueprint.builder(id("hatch_b")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(hatchCheck)
+                .build();
+
+        TestWorld.View view = new TestWorld.View().put(TestWorld.block(mc("barrel"), LatticePoint.origin));
+        ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
+        StructureManager structures = StructureManager.create();
+        StructureKernel kernel = StructureKernel
+                .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
+        Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+        Siting turned = MagicFixtures.turn(LatticePoint.origin, Turn.clockwise);
+
+        OwnerId ownerOfA = OwnerId.of(id("a"));
+        StructureAttempt attemptA = structures.begin(TestWorld.world, new StructureSpec(ownerOfA, siting, ownerA.id()));
+        MatchRequest requestA = MatchRequest.of(
+            ownerA,
+            siting,
+            new TestWorld.Lease(view),
+            attemptA.id(),
+            ownerOfA,
+            Budget.unbounded(),
+            new ClaimView(List.of(), 0, true)
+        );
+        MatchResult.Admitted admittedA = assertInstanceOf(MatchResult.Admitted.class, kernel.check(requestA));
+        MatchResult.Formed formedA = assertInstanceOf(
+            MatchResult.Formed.class,
+            kernel.settle(requestA, admittedA, attemptA)
+        );
+        assertEquals(1, formedA.claims().rows().size(), "owner A settles one hatch row");
+
+        OwnerId ownerOfB = OwnerId.of(id("b"));
+        StructureAttempt attemptB = structures.begin(TestWorld.world, new StructureSpec(ownerOfB, turned, ownerB.id()));
+        MatchRequest requestB = MatchRequest.of(
+            ownerB,
+            turned,
+            new TestWorld.Lease(view),
+            attemptB.id(),
+            ownerOfB,
+            Budget.unbounded(),
+            ledger.read(Cuboid.of(0, 0, 0, 1, 1, 1))
+        );
+        MatchResult.Admitted admittedB = assertInstanceOf(
+            MatchResult.Admitted.class,
+            kernel.check(requestB),
+            "a shared hatch does not conflict with an incumbent shared row"
+        );
+        assertInstanceOf(MatchResult.Formed.class, kernel.settle(requestB, admittedB, attemptB));
+        assertEquals(2, TestWorld.rows(ledger).size(), "both hatch rows coexist");
+
+        Bay exclusive = Bay.of(id("hatch"), hatchCells, Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
+        Blueprint ownerC = Blueprint.builder(id("hatch_c")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
+                .check(
+                    Check.of(id("hatch"), exclusive, Focuses.occupant(LatticePoint.origin), Expectations.anyOccupant())
+                ).build();
+        MatchRequest requestC = MatchRequest.of(
+            ownerC,
+            turned,
+            new TestWorld.Lease(view),
+            new InstanceId(TestWorld.world, 3),
+            OwnerId.of(id("c")),
+            Budget.unbounded(),
+            ledger.read(Cuboid.of(0, 0, 0, 1, 1, 1))
+        );
+        MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, kernel.check(requestC));
+        assertTrue(
+            failed.findings().findings().stream()
+                    .anyMatch(finding -> finding.code().equals(Codes.claimConflict.code())),
+            "an exclusive owner fails SC-CLM-0001"
+        );
+        assertTrue(
+            failed.findings().findings().stream().anyMatch(finding -> finding.message().contains("already holds")),
+            "the failure reports the incumbent rows"
+        );
+    }
+
+    @Test
     void theClosedWorldEnvelopeFormsWithOnlyTheRingClaimed() {
         CuboidSet torus = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5)).subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 4, 2, 4)));
         Bay ring = Bay.of(id("ring"), torus, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
@@ -305,6 +389,7 @@ class ApiExamplesTest {
         StructureKernel kernel = StructureKernel
                 .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
         Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
+        Siting turned = MagicFixtures.turn(LatticePoint.origin, Turn.clockwise);
         OwnerId owner = OwnerId.of(id("owner"));
         StructureAttempt attempt = structures.begin(TestWorld.world, new StructureSpec(owner, siting, reactor.id()));
         MatchRequest request = MatchRequest.of(
@@ -505,7 +590,7 @@ class ApiExamplesTest {
     @Test
     void theEnvelopeDocumentAsWrittenLowers() {
         CuboidSet ringCells = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5))
-                .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 5, 2, 5)));
+                .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 4, 2, 4)));
         BlueprintSpec root = new BlueprintSpec(
             NamespacedId.of("mymod", "fusion"),
             Cuboid.of(0, 0, 0, 5, 5, 5),

@@ -439,7 +439,9 @@ producer bug (the `Unavailable` constructor rejects it).
 
 The four states are total and distinct. `Mismatch` has at least one finding; `Unreadable` has at
 least one; `Match` and `Abstain` carry none. A `Mismatch` is a refutation, an `Unreadable` is "not
-looked at", an `Abstain` is a refusal.
+looked at", an `Abstain` is a refusal. An `Unreadable` result carries only the findings of its
+`Unreadable` children; a `Mismatch` result carries the findings of all its `Mismatch` and
+`Unreadable` children.
 
 Combinators evaluate every child (diagnostics matter more than a short-circuit) and fold:
 

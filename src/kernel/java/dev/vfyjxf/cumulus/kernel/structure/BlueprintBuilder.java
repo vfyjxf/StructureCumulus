@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.kernel.structure;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
+import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
@@ -343,9 +344,18 @@ public final class BlueprintBuilder {
             }
         }
         for (Computation<?> computation : computations) {
-            for (ContextKey<?> input : computation.inputs()) {
-                if (!byOutput.containsKey(input.id())) {
+            for (ContextKey<?> input : computation.inputs().stream().sorted(ContextKeys.order()).toList()) {
+                Computation<?> producer = byOutput.get(input.id());
+                if (producer == null) {
                     fail("SC-BPT-0007", "computation " + computation.id() + " reads unknown key " + input.id());
+                    throw new AssertionError("unreachable");
+                }
+                if (producer.output().type() != input.type()) {
+                    fail(
+                        "SC-BPT-0007",
+                        "computation " + computation.id() + " reads " + input.id() + " as " + input.type().getName()
+                                + ", but its producer writes " + producer.output().type().getName()
+                    );
                 }
             }
             if (computation.region().isEmpty()) {
@@ -364,13 +374,11 @@ public final class BlueprintBuilder {
                 }
             }
         }
-        Set<ContextKey<?>> produced = new HashSet<>();
-        for (Computation<?> computation : computations) {
-            produced.add(computation.output());
-        }
         for (Check<?> check : declaredChecks) {
             for (ContextKey<?> required : check.expectation().meta().requires()) {
-                if (!produced.contains(required) && required.retention() != Retention.instance) {
+                Computation<?> producer = byOutput.get(required.id());
+                boolean produced = producer != null && producer.output().type() == required.type();
+                if (!produced && required.retention() != Retention.instance) {
                     fail(
                         "SC-CHK-0002",
                         "check " + check.id() + " requires " + required.id() + ", which no computation produces"
@@ -396,6 +404,12 @@ public final class BlueprintBuilder {
         List<SectionComputation<?>> sections = new ArrayList<>();
         List<AggregateComputation<?>> aggregateList = new ArrayList<>();
         for (Computation<?> computation : computations) {
+            if (computation instanceof SectionComputation<?> && computation instanceof AggregateComputation<?>) {
+                fail(
+                    "SC-BPT-0007",
+                    "computation " + computation.id() + " is both a section and an aggregate computation"
+                );
+            }
             if (computation instanceof SectionComputation<?> section) {
                 sections.add(section);
             } else if (computation instanceof AggregateComputation<?> aggregate) {
@@ -433,7 +447,8 @@ public final class BlueprintBuilder {
             int dependencies = 0;
             for (ContextKey<?> input : aggregate.inputs()) {
                 Computation<?> producer = byOutput.get(input.id());
-                if (producer instanceof AggregateComputation<?> upstream) {
+                boolean sameType = producer != null && producer.output().type() == input.type();
+                if (sameType && producer instanceof AggregateComputation<?> upstream) {
                     dependencies++;
                     dependents.computeIfAbsent(upstream.id(), ignored -> new ArrayList<>()).add(aggregate);
                 }

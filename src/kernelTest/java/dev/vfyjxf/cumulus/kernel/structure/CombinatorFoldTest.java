@@ -72,6 +72,24 @@ class CombinatorFoldTest {
     }
 
     @Test
+    void anUnreadableCarriesNoRefutation() {
+        Reply.Unreadable anyOf = assertInstanceOf(
+            Reply.Unreadable.class,
+            Expectations.anyOf(leaf(mismatch()), leaf(unreadable())).test(context())
+        );
+        assertEquals(List.of(Codes.unreadableRead.code()), codes(anyOf), "any_of(M, U) keeps only the unknown");
+        Reply.Unreadable threshold = assertInstanceOf(
+            Reply.Unreadable.class,
+            Expectations.atLeast(2, leaf(mismatch()), leaf(unreadable()), leaf(Reply.match())).test(context())
+        );
+        assertEquals(
+            List.of(Codes.unreadableRead.code()),
+            codes(threshold),
+            "atLeast(2, M, U, T) keeps only the unknown"
+        );
+    }
+
+    @Test
     void sequenceEqualsAllOfIncludingFindings() {
         Reply sequence = Expectations.sequence(leaf(mismatch()), leaf(unreadable())).test(context());
         Reply allOf = Expectations.allOf(leaf(mismatch()), leaf(unreadable())).test(context());
@@ -90,6 +108,11 @@ class CombinatorFoldTest {
             Expectations.not(leaf(Reply.match())).test(context())
         );
         assertEquals(List.of(Codes.negationMatched.code()), codes(negated));
+    }
+
+    @Test
+    void notMetaNamesTheNegationCode() {
+        assertEquals(Codes.negationMatched.code(), Expectations.not(leaf(Reply.match())).meta().mismatchCode());
     }
 
     @Test
