@@ -113,9 +113,14 @@ public final class JsonWriter implements DocumentWriter {
         if (spec.envelopeEntities()) {
             throw new IllegalStateException("a definition may not declare envelopeEntities");
         }
+        if (!(spec.arguments() instanceof Value.ObjectValue members) || !members.members().isEmpty()) {
+            throw new IllegalStateException("a definition may not declare arguments");
+        }
+        if (!spec.extensions().isEmpty()) {
+            throw new IllegalStateException("a definition may not declare extensions");
+        }
         JsonObject out = new JsonObject();
         out.add("bounds", JsonValues.box(spec.bounds()));
-        JsonValues.addArguments(out, spec.arguments());
         if (!spec.bays().isEmpty()) {
             out.add("bays", bays(spec.bays()));
         }
@@ -143,7 +148,6 @@ public final class JsonWriter implements DocumentWriter {
         if (!spec.placements().isEmpty()) {
             addPlacements(out, spec.placements());
         }
-        JsonValues.addExtensions(out, spec.extensions());
         return out;
     }
 
