@@ -8,6 +8,7 @@ import dev.vfyjxf.cumulus.kernel.context.StructureContext;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
+import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
@@ -24,8 +25,8 @@ import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
 import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
-import org.junit.jupiter.api.Test;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,11 +60,8 @@ class DeriveScenarioTest {
         Deriver<Long> firstDeriver = constant(first, 3L, ran, "first");
         Deriver<Long> alpha = echo(second, first, 100L, ran, "alpha");
         Deriver<Long> zeta = constant(third, 7L, ran, "zeta");
-        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers"))
-                .put(id("first"), firstDeriver)
-                .put(id("alpha"), alpha)
-                .put(id("zeta"), zeta)
-                .build();
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("first"), firstDeriver)
+                .put(id("alpha"), alpha).put(id("zeta"), zeta).build();
         List<DerivationSpec> specs = List.of(
             new DerivationSpec(id("zeta"), Value.object(), third.id(), 1),
             new DerivationSpec(id("alpha"), Value.object(), second.id(), 1),
@@ -89,10 +87,8 @@ class DeriveScenarioTest {
         List<String> ran = new ArrayList<>();
         Deriver<Long> reader = echo(derived, heat, 0L, ran, "reader");
         Deriver<Long> skipped = echo(absent, absent, 0L, ran, "skipped");
-        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers"))
-                .put(id("reader"), reader)
-                .put(id("skipped"), skipped)
-                .build();
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("reader"), reader)
+                .put(id("skipped"), skipped).build();
         List<DerivationSpec> specs = List.of(
             new DerivationSpec(id("reader"), Value.object(), derived.id(), 0),
             new DerivationSpec(id("skipped"), Value.object(), absent.id(), 0)
@@ -130,7 +126,10 @@ class DeriveScenarioTest {
         assertNull(context.get(ghostOut), "a missing deriver leaves its output absent");
         assertEquals(5L, context.get(realOut));
         Finding finding = finding(context, Codes.deriverMissing.code());
-        assertTrue(finding.message().contains("no deriver is registered as " + id("ghost").text()), () -> finding.message());
+        assertTrue(
+            finding.message().contains("no deriver is registered as " + id("ghost").text()),
+            () -> finding.message()
+        );
     }
 
     @Test
@@ -164,10 +163,8 @@ class DeriveScenarioTest {
 
         Deriver<Long> firstDeriver = constant(first, 10L, new ArrayList<>(), "first");
         Deriver<Long> secondDeriver = constant(second, 20L, new ArrayList<>(), "second");
-        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers"))
-                .put(id("first"), firstDeriver)
-                .put(id("second"), secondDeriver)
-                .build();
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("first"), firstDeriver)
+                .put(id("second"), secondDeriver).build();
         List<DerivationSpec> specs = List.of(
             new DerivationSpec(id("first"), Value.object(), first.id(), 0),
             new DerivationSpec(id("second"), Value.object(), second.id(), 1)
@@ -209,10 +206,8 @@ class DeriveScenarioTest {
             }
         };
         Deriver<Long> last = constant(later, 30L, new ArrayList<>(), "last");
-        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers"))
-                .put(id("silent"), silent)
-                .put(id("last"), last)
-                .build();
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("silent"), silent)
+                .put(id("last"), last).build();
         List<DerivationSpec> specs = List.of(
             new DerivationSpec(id("silent"), Value.object(), failing.id(), 0),
             new DerivationSpec(id("last"), Value.object(), later.id(), 1)
@@ -234,12 +229,8 @@ class DeriveScenarioTest {
         store.publish(instance, Map.of(), FindingBundle.empty(), Spend.zero);
         store.startPass();
 
-        StructureContext context = MatchEngine.derive(
-            formed(instance),
-            List.of(),
-            Catalog.empty(id("derivers")),
-            store
-        );
+        StructureContext context = MatchEngine
+                .derive(formed(instance), List.of(), Catalog.empty(id("derivers")), store);
         assertEquals(1, store.publishes);
         assertEquals(2, context.revision());
     }
@@ -300,7 +291,8 @@ class DeriveScenarioTest {
                 return Outcome.missing();
             }
         };
-        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("reporting"), reporting).build();
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("reporting"), reporting)
+                .build();
         List<DerivationSpec> specs = List.of(new DerivationSpec(id("reporting"), Value.object(), out.id(), 0));
 
         StructureContext context = MatchEngine.derive(formed(instance), specs, derivers, store);
@@ -318,7 +310,8 @@ class DeriveScenarioTest {
         ContextStore store = ContextStore.inMemory();
 
         Deriver<Long> matchDeriver = constant(matchOut, 1L, new ArrayList<>(), "match");
-        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("match"), matchDeriver).build();
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("match"), matchDeriver)
+                .build();
         List<DerivationSpec> specs = List.of(new DerivationSpec(id("match"), Value.object(), matchOut.id(), 0));
 
         StructureContext context = MatchEngine.derive(formed(instance), specs, derivers, store);
@@ -373,10 +366,8 @@ class DeriveScenarioTest {
         };
     }
 
-    private static Finding finding(StructureContext context, dev.vfyjxf.cumulus.kernel.core.FindingCode code) {
-        return context.findings().findings().stream()
-                .filter(finding -> finding.code().equals(code))
-                .findFirst()
+    private static Finding finding(StructureContext context, FindingCode code) {
+        return context.findings().findings().stream().filter(finding -> finding.code().equals(code)).findFirst()
                 .orElseThrow(() -> new AssertionError("no finding with code " + code));
     }
 

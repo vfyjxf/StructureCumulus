@@ -4,12 +4,12 @@ import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.Merges;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureContext;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
 import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
-import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -20,13 +20,21 @@ import dev.vfyjxf.cumulus.kernel.document.BaySpec;
 import dev.vfyjxf.cumulus.kernel.document.BlueprintSpec;
 import dev.vfyjxf.cumulus.kernel.document.CheckSpec;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
+import dev.vfyjxf.cumulus.kernel.document.CompilerContext;
 import dev.vfyjxf.cumulus.kernel.document.ComputationSpec;
 import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.document.DocumentCompiler;
 import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
-import dev.vfyjxf.cumulus.kernel.document.CompilerContext;
 import dev.vfyjxf.cumulus.kernel.document.KeySpec;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
+import dev.vfyjxf.cumulus.kernel.space.Cuboid;
+import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Flip;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.space.Orientation;
+import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
+import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
@@ -38,30 +46,22 @@ import dev.vfyjxf.cumulus.kernel.structure.Computations;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.DoorView;
 import dev.vfyjxf.cumulus.kernel.structure.Expectation;
+import dev.vfyjxf.cumulus.kernel.structure.ExpectationContext;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.structure.Reply;
-import dev.vfyjxf.cumulus.kernel.structure.ExpectationContext;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldCapture;
-import dev.vfyjxf.cumulus.kernel.context.Merges;
-import dev.vfyjxf.cumulus.kernel.space.Cuboid;
-import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
-import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import dev.vfyjxf.cumulus.kernel.space.Flip;
-import dev.vfyjxf.cumulus.kernel.space.Orientation;
-import dev.vfyjxf.cumulus.kernel.space.Tilt;
-import dev.vfyjxf.cumulus.kernel.space.Turn;
-import dev.vfyjxf.cumulus.kernel.space.Siting;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -106,23 +106,32 @@ class ApiExamplesTest {
                 .subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)))
                 .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2)));
 
-        Bay shell = Bay.of(id("shell"), shellCells, Coverage.everyCell,
-                Footprint.box(), Sharing.exclusive);
-        Bay hollow = Bay.of(id("hollow"), CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)),
-                Coverage.everyCell, Footprint.box(), Sharing.exclusive);
-        Bay fire = Bay.of(id("fire"), CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2)),
-                Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay shell = Bay.of(id("shell"), shellCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay hollow = Bay.of(
+            id("hollow"),
+            CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
+        );
+        Bay fire = Bay.of(
+            id("fire"),
+            CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2)),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
+        );
 
-        return Blueprint.builder(campfireId)
-                .bounds(Cuboid.of(0, 0, 0, 3, 3, 3))
-                .check(Check.of(id("shell_bricks"), shell, Focuses.bay(),
-                        Expectations.eachCell(Expectations.block(mc("stone_bricks")))))
-                .check(Check.of(id("hollow_air"), hollow, Focuses.bay(),
-                        Expectations.eachCell(Expectations.air())))
-                .check(Check.of(id("fire"), fire, Focuses.occupant(LatticePoint.of(1, 0, 1)),
-                        Expectations.block(mc("campfire"))))
-                .computation(Computations.air(air, hollow.cells()))
-                .build();
+        return Blueprint.builder(campfireId).bounds(Cuboid.of(0, 0, 0, 3, 3, 3)).check(
+            Check.of(
+                id("shell_bricks"),
+                shell,
+                Focuses.bay(),
+                Expectations.eachCell(Expectations.block(mc("stone_bricks")))
+            )
+        ).check(Check.of(id("hollow_air"), hollow, Focuses.bay(), Expectations.eachCell(Expectations.air()))).check(
+            Check.of(id("fire"), fire, Focuses.occupant(LatticePoint.of(1, 0, 1)), Expectations.block(mc("campfire")))
+        ).computation(Computations.air(air, hollow.cells())).build();
     }
 
     @Test
@@ -147,7 +156,8 @@ class ApiExamplesTest {
 
         ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         StructureManager structures = StructureManager.create();
-        StructureKernel kernel = StructureKernel.create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
+        StructureKernel kernel = StructureKernel
+                .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
         Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
         OwnerId owner = OwnerId.of(id("owner"));
         StructureSpec spec = new StructureSpec(owner, siting, campfire.id());
@@ -158,8 +168,15 @@ class ApiExamplesTest {
         if (result instanceof CaptureResult.Captured captured) {
             try (SnapshotLease lease = captured.lease()) {
                 StructureAttempt attempt = structures.begin(TestWorld.world, spec);
-                MatchRequest request = MatchRequest.of(campfire, siting, lease, attempt.id(), owner,
-                        Budget.of(4096, 64), new ClaimView(List.of(), 0, true));
+                MatchRequest request = MatchRequest.of(
+                    campfire,
+                    siting,
+                    lease,
+                    attempt.id(),
+                    owner,
+                    Budget.of(4096, 64),
+                    new ClaimView(List.of(), 0, true)
+                );
                 MatchResult checked = kernel.check(request);
                 if (checked instanceof MatchResult.Admitted admitted) {
                     MatchResult settled = kernel.settle(request, admitted, attempt);
@@ -171,7 +188,8 @@ class ApiExamplesTest {
                         assertNotNull(structures.find(attempt.id()));
                         StructureContext values = kernel.derive(formed, campfire.derivations());
                         assertEquals(2, values.revision());
-                        ContextKey<Long> air = ContextKeys.of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
+                        ContextKey<Long> air = ContextKeys
+                                .of(id("air_cells"), Long.class, Retention.instance, Merges.sum());
                         assertEquals(1L, values.get(air));
                     } else {
                         attempt.abort();
@@ -189,28 +207,33 @@ class ApiExamplesTest {
 
     @Test
     void theHugeFurnaceBuilds() {
-        CuboidSet shell = CuboidSet.of(Cuboid.of(0, 0, 0, 7, 6, 7))
-                .subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 6, 5, 6)))
+        CuboidSet shell = CuboidSet.of(Cuboid.of(0, 0, 0, 7, 6, 7)).subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 6, 5, 6)))
                 .subtract(CuboidSet.of(Cuboid.of(3, 1, 0, 4, 3, 1)));
         Bay wall = Bay.of(id("wall"), shell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
-        Bay cavity = Bay.of(id("cavity"), CuboidSet.of(Cuboid.of(1, 1, 1, 6, 5, 6)),
-                Coverage.everyCell, Footprint.box(), Sharing.exclusive);
-        Bay mouth = Bay.of(id("mouth"), CuboidSet.of(Cuboid.of(3, 1, 0, 4, 3, 1)),
-                Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
+        Bay cavity = Bay.of(
+            id("cavity"),
+            CuboidSet.of(Cuboid.of(1, 1, 1, 6, 5, 6)),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
+        );
+        Bay mouth = Bay.of(
+            id("mouth"),
+            CuboidSet.of(Cuboid.of(3, 1, 0, 4, 3, 1)),
+            Coverage.oneSubject,
+            Footprint.bound(),
+            Sharing.exclusive
+        );
 
         ContextKey<Long> volume = ContextKeys.of(id("volume"), Long.class, Retention.instance, Merges.sum());
         ContextKey<Long> capacity = ContextKeys.of(id("capacity"), Long.class, Retention.instance);
 
-        Blueprint furnace = Blueprint.builder(id("huge_furnace"))
-                .bounds(Cuboid.of(0, 0, 0, 7, 6, 7))
-                .check(Check.of(id("wall_bricks"), wall, Focuses.bay(),
-                        Expectations.eachCell(Expectations.block(mc("bricks")))))
-                .check(Check.of(id("cavity_air"), cavity, Focuses.bay(),
-                        Expectations.eachCell(Expectations.air())))
-                .check(Check.of(id("mouth_door"), mouth, Focuses.door(LatticePoint.of(3, 1, 0)),
-                        new OakDoorExpectation()))
-                .computation(Computations.volume(volume, cavity.cells()))
-                .build();
+        Blueprint furnace = Blueprint.builder(id("huge_furnace")).bounds(Cuboid.of(0, 0, 0, 7, 6, 7)).check(
+            Check.of(id("wall_bricks"), wall, Focuses.bay(), Expectations.eachCell(Expectations.block(mc("bricks"))))
+        ).check(Check.of(id("cavity_air"), cavity, Focuses.bay(), Expectations.eachCell(Expectations.air())))
+                .check(
+                    Check.of(id("mouth_door"), mouth, Focuses.door(LatticePoint.of(3, 1, 0)), new OakDoorExpectation())
+                ).computation(Computations.volume(volume, cavity.cells())).build();
 
         assertEquals(Cuboid.of(0, 0, 0, 7, 6, 7), furnace.bounds());
         assertEquals(3, furnace.bays().size());
@@ -220,14 +243,17 @@ class ApiExamplesTest {
 
     @Test
     void theDoorBuilds() {
-        Bay doorBay = Bay.of(id("door"),
-                CuboidSet.of(Cuboid.of(3, 0, 0, 4, 1, 1), Cuboid.of(3, 1, 0, 4, 2, 1)),
-                Coverage.oneSubject, Footprint.bound(), Sharing.exclusive);
-        Blueprint door = Blueprint.builder(id("door"))
-                .bounds(Cuboid.of(0, 0, 0, 8, 4, 8))
-                .check(Check.of(id("oak_door"), doorBay, Focuses.door(LatticePoint.of(3, 0, 0)),
-                        new OakDoorExpectation()))
-                .build();
+        Bay doorBay = Bay.of(
+            id("door"),
+            CuboidSet.of(Cuboid.of(3, 0, 0, 4, 1, 1), Cuboid.of(3, 1, 0, 4, 2, 1)),
+            Coverage.oneSubject,
+            Footprint.bound(),
+            Sharing.exclusive
+        );
+        Blueprint door = Blueprint.builder(id("door")).bounds(Cuboid.of(0, 0, 0, 8, 4, 8))
+                .check(
+                    Check.of(id("oak_door"), doorBay, Focuses.door(LatticePoint.of(3, 0, 0)), new OakDoorExpectation())
+                ).build();
 
         assertEquals(Cuboid.of(0, 0, 0, 8, 4, 8), door.bounds());
         assertEquals(1, door.bays().size());
@@ -238,21 +264,18 @@ class ApiExamplesTest {
     @Test
     void thePipeCornerBuilds() {
         CuboidSet cornerCells = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 2, 2));
-        Bay corner = Bay.of(id("corner"), cornerCells, Coverage.everyCell,
-                Footprint.bound(), Sharing.exclusive);
+        Bay corner = Bay.of(id("corner"), cornerCells, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
         List<Check<?>> checks = new ArrayList<>();
         for (LatticePoint p : List.of(point(0, 0, 0), point(1, 0, 0), point(0, 0, 1), point(1, 0, 1)))
-            checks.add(Check.of(id("pipe_" + p.x() + p.z()), corner, Focuses.occupant(p),
-                    Expectations.block(mc("pipe"))));
+            checks.add(
+                Check.of(id("pipe_" + p.x() + p.z()), corner, Focuses.occupant(p), Expectations.block(mc("pipe")))
+            );
         for (LatticePoint p : List.of(point(0, 1, 0), point(1, 1, 0), point(0, 1, 1), point(1, 1, 1)))
-            checks.add(Check.of(id("air_" + p.x() + p.z()), corner, Focuses.occupant(p),
-                    Expectations.air()));
-        Cuboid cornerBounds = java.util.Objects.requireNonNull(cornerCells.bounds());
-        Blueprint pipe = Blueprint.builder(id("pipe_corner"))
-                .bounds(cornerBounds)
-                .check(checks.get(0)).check(checks.get(1)).check(checks.get(2)).check(checks.get(3))
-                .check(checks.get(4)).check(checks.get(5)).check(checks.get(6)).check(checks.get(7))
-                .build();
+            checks.add(Check.of(id("air_" + p.x() + p.z()), corner, Focuses.occupant(p), Expectations.air()));
+        Cuboid cornerBounds = Objects.requireNonNull(cornerCells.bounds());
+        Blueprint pipe = Blueprint.builder(id("pipe_corner")).bounds(cornerBounds).check(checks.get(0))
+                .check(checks.get(1)).check(checks.get(2)).check(checks.get(3)).check(checks.get(4))
+                .check(checks.get(5)).check(checks.get(6)).check(checks.get(7)).build();
 
         assertEquals(8, pipe.checks().size());
         Blueprint oneLine = Blueprint.builder(id("pipe_corner")).bounds(cornerBounds).check(checks).build();
@@ -261,16 +284,12 @@ class ApiExamplesTest {
 
     @Test
     void theClosedWorldEnvelopeFormsWithOnlyTheRingClaimed() {
-        CuboidSet torus = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5))
-                .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 4, 2, 4)));
+        CuboidSet torus = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5)).subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 4, 2, 4)));
         Bay ring = Bay.of(id("ring"), torus, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
 
-        Blueprint reactor = Blueprint.builder(id("fusion"))
-                .bounds(Cuboid.of(0, 0, 0, 5, 5, 5))
-                .check(Check.of(id("ring"), ring, Focuses.bay(),
-                        Expectations.eachCell(Expectations.block(id("fusion_torus")))))
-                .envelope()
-                .build();
+        Blueprint reactor = Blueprint.builder(id("fusion")).bounds(Cuboid.of(0, 0, 0, 5, 5, 5)).check(
+            Check.of(id("ring"), ring, Focuses.bay(), Expectations.eachCell(Expectations.block(id("fusion_torus"))))
+        ).envelope().build();
 
         TestWorld.View view = new TestWorld.View();
         for (Cuboid box : torus.decomposition()) {
@@ -284,26 +303,44 @@ class ApiExamplesTest {
         }
         ClaimLedger ledger = ClaimLedger.inMemory(TestWorld.world);
         StructureManager structures = StructureManager.create();
-        StructureKernel kernel = StructureKernel.create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
+        StructureKernel kernel = StructureKernel
+                .create(Catalogs.builtin(), new Host(DocumentSource.empty(), ledger, structures, Map.of()));
         Siting siting = Siting.of(LatticePoint.origin, Orientation.identity);
         OwnerId owner = OwnerId.of(id("owner"));
-        StructureAttempt attempt = structures
-                .begin(TestWorld.world, new StructureSpec(owner, siting, reactor.id()));
-        MatchRequest request = MatchRequest.of(reactor, siting, new TestWorld.Lease(view), attempt.id(), owner,
-                Budget.unbounded(), new ClaimView(List.of(), 0, true));
+        StructureAttempt attempt = structures.begin(TestWorld.world, new StructureSpec(owner, siting, reactor.id()));
+        MatchRequest request = MatchRequest.of(
+            reactor,
+            siting,
+            new TestWorld.Lease(view),
+            attempt.id(),
+            owner,
+            Budget.unbounded(),
+            new ClaimView(List.of(), 0, true)
+        );
 
         MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, kernel.check(request));
-        MatchResult.Formed formed = assertInstanceOf(MatchResult.Formed.class, kernel.settle(request, admitted, attempt));
+        MatchResult.Formed formed = assertInstanceOf(
+            MatchResult.Formed.class,
+            kernel.settle(request, admitted, attempt)
+        );
         assertEquals(torus.volume(), formed.claims().rows().size(), "only the ring cells are claimed");
 
         view.put(TestWorld.block(id("crystal"), LatticePoint.of(0, 4, 0)));
         TestWorld.Lease refused = new TestWorld.Lease(view);
-        MatchRequest crystal = MatchRequest.of(reactor, siting, refused, attempt.id(), owner,
-                Budget.unbounded(), new ClaimView(List.of(), 0, true));
+        MatchRequest crystal = MatchRequest.of(
+            reactor,
+            siting,
+            refused,
+            attempt.id(),
+            owner,
+            Budget.unbounded(),
+            new ClaimView(List.of(), 0, true)
+        );
         MatchResult failed = kernel.check(crystal);
         MatchResult.Failed failure = assertInstanceOf(MatchResult.Failed.class, failed);
         assertTrue(
-            failure.findings().findings().stream().anyMatch(finding -> finding.code().equals(Codes.envelopeOpen.code())),
+            failure.findings().findings().stream()
+                    .anyMatch(finding -> finding.code().equals(Codes.envelopeOpen.code())),
             "a crystal in the envelope fails SC-EXP-0006"
         );
     }
@@ -320,7 +357,7 @@ class ApiExamplesTest {
                 new BaySpec(
                     sc("shell"),
                     CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 3, 3, 3)))
-                        .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 3, 1, 3))),
+                            .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 3, 1, 3))),
                     Coverage.everyCell,
                     Footprint.box(),
                     Sharing.exclusive,
@@ -336,7 +373,15 @@ class ApiExamplesTest {
                     null,
                     null
                 ),
-                new BaySpec(sc("fire"), CuboidSet.of(Cuboid.of(1, 0, 1, 3, 1, 3)), Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                new BaySpec(
+                    sc("fire"),
+                    CuboidSet.of(Cuboid.of(1, 0, 1, 3, 1, 3)),
+                    Coverage.everyCell,
+                    Footprint.box(),
+                    Sharing.exclusive,
+                    null,
+                    null
+                )
             ),
             List.of(),
             List.of(
@@ -347,7 +392,12 @@ class ApiExamplesTest {
                     Value.object(),
                     sc("each_cell"),
                     Value.object(
-                        Map.of("element", Value.object(Map.of("kind", Value.string("block"), "id", Value.string("minecraft:stone_bricks"))))
+                        Map.of(
+                            "element",
+                            Value.object(
+                                Map.of("kind", Value.string("block"), "id", Value.string("minecraft:stone_bricks"))
+                            )
+                        )
                     ),
                     null,
                     null
@@ -366,7 +416,9 @@ class ApiExamplesTest {
                     sc("fire"),
                     sc("fire"),
                     sc("occupant"),
-                    Value.object(Map.of("cell", Value.array(List.of(Value.number(1), Value.number(0), Value.number(1))))),
+                    Value.object(
+                        Map.of("cell", Value.array(List.of(Value.number(1), Value.number(0), Value.number(1))))
+                    ),
                     sc("block"),
                     Value.object(Map.of("id", Value.string("minecraft:campfire"))),
                     null,
@@ -403,23 +455,25 @@ class ApiExamplesTest {
             null
         );
 
-        CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(), Map.of()), documentContext());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), documentContext());
         assertNull(result.blueprint(), "the §5 document as written does not lower to a blueprint");
         assertTrue(
-            result.findings().findings().stream().anyMatch(finding -> finding.code().equals(Codes.coverageInvalid.code())),
+            result.findings().findings().stream()
+                    .anyMatch(finding -> finding.code().equals(Codes.coverageInvalid.code())),
             () -> result.findings().findings().toString()
         );
         assertTrue(
-            result.findings().findings().stream()
-                    .anyMatch(finding -> finding.message().contains("EVERY_CELL bay structurecumulus:fire has undecided cells")),
+            result.findings().findings().stream().anyMatch(
+                finding -> finding.message().contains("EVERY_CELL bay structurecumulus:fire has undecided cells")
+            ),
             () -> result.findings().findings().toString()
         );
     }
 
     @Test
     void theEnvelopeDocumentAsWrittenDoesNotLower() {
-        CuboidSet ringCells = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5)).subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 5, 2, 5)));
+        CuboidSet ringCells = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5))
+                .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 5, 2, 5)));
         BlueprintSpec root = new BlueprintSpec(
             NamespacedId.of("mymod", "fusion"),
             Cuboid.of(0, 0, 0, 5, 5, 5),
@@ -455,7 +509,12 @@ class ApiExamplesTest {
                     Value.object(),
                     sc("each_cell"),
                     Value.object(
-                        Map.of("element", Value.object(Map.of("kind", Value.string("block"), "id", Value.string("mymod:fusion_torus"))))
+                        Map.of(
+                            "element",
+                            Value.object(
+                                Map.of("kind", Value.string("block"), "id", Value.string("mymod:fusion_torus"))
+                            )
+                        )
                     ),
                     null,
                     null
@@ -481,11 +540,11 @@ class ApiExamplesTest {
             null
         );
 
-        CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(), Map.of()), documentContext());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), documentContext());
         assertNull(result.blueprint(), "the §6.5 document as written does not lower to a blueprint");
         assertTrue(
-            result.findings().findings().stream().anyMatch(finding -> finding.code().equals(Codes.documentField.code())),
+            result.findings().findings().stream()
+                    .anyMatch(finding -> finding.code().equals(Codes.documentField.code())),
             () -> result.findings().findings().toString()
         );
         assertTrue(

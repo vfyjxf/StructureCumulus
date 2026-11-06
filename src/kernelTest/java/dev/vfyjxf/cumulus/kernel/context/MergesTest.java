@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.kernel.context;
 
+import dev.vfyjxf.cumulus.kernel.core.Merge;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import org.junit.jupiter.api.Test;
@@ -24,9 +25,9 @@ class MergesTest {
                 }
             }
         }
-        for (boolean a : new boolean[] {true, false}) {
-            for (boolean b : new boolean[] {true, false}) {
-                for (boolean c : new boolean[] {true, false}) {
+        for (boolean a : new boolean[]{true, false}) {
+            for (boolean b : new boolean[]{true, false}) {
+                for (boolean c : new boolean[]{true, false}) {
                     assertBooleanAssociative(Merges.and(), a, b, c);
                     assertBooleanAssociative(Merges.or(), a, b, c);
                 }
@@ -66,16 +67,11 @@ class MergesTest {
         );
     }
 
-    private static void assertLongAssociative(dev.vfyjxf.cumulus.kernel.core.Merge<Long> merge, long a, long b, long c) {
+    private static void assertLongAssociative(Merge<Long> merge, long a, long b, long c) {
         assertEquals(merge.combine(merge.combine(a, b), c), merge.combine(a, merge.combine(b, c)));
     }
 
-    private static void assertBooleanAssociative(
-        dev.vfyjxf.cumulus.kernel.core.Merge<Boolean> merge,
-        boolean a,
-        boolean b,
-        boolean c
-    ) {
+    private static void assertBooleanAssociative(Merge<Boolean> merge, boolean a, boolean b, boolean c) {
         assertEquals(merge.combine(merge.combine(a, b), c), merge.combine(a, merge.combine(b, c)));
     }
 }
