@@ -351,6 +351,10 @@ public final class MatchEngine {
                 outcome
             );
         }
+        if (session.cancelled()) {
+            session.findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
+            return undecided(phase, UndecidedReason.cancelled, session);
+        }
         Finding invalid = validateBindings(request, phase, outcome.bindings());
         if (invalid != null) {
             session.findings.add(invalid);
@@ -364,7 +368,11 @@ public final class MatchEngine {
             session.findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
         }
-        List<Finding> conflicts = conflicts(phase, derived.rows(), claims.rows());
+        List<Finding> conflicts = conflicts(phase, derived.rows(), claims.rows(), request.cancel());
+        if (conflicts == null) {
+            session.findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
+            return undecided(phase, UndecidedReason.cancelled, session);
+        }
         if (!conflicts.isEmpty()) {
             session.findings.addAll(conflicts);
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
@@ -477,7 +485,16 @@ public final class MatchEngine {
                         admitted.outcome()
                     );
                 }
-                List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows());
+                List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows(), request.cancel());
+                if (retryConflicts == null) {
+                    findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
+                    return new MatchResult.Undecided(
+                        phase,
+                        UndecidedReason.cancelled,
+                        FindingBundle.of(findings),
+                        admitted.outcome()
+                    );
+                }
                 if (!retryConflicts.isEmpty()) {
                     findings.addAll(retryConflicts);
                     return new MatchResult.Failed(phase, FindingBundle.of(findings));
@@ -769,10 +786,19 @@ public final class MatchEngine {
         return FindingBundle.of(missing);
     }
 
-    private static List<Finding> conflicts(Phase phase, List<ClaimRow> requested, List<ClaimRow> held) {
+    private static @Nullable List<Finding> conflicts(
+        Phase phase,
+        List<ClaimRow> requested,
+        List<ClaimRow> held,
+        CancelToken cancel
+    ) {
         Map<String, Conflict> byPair = new LinkedHashMap<>();
+        long pairs = 0;
         for (ClaimRow row : requested) {
             for (ClaimRow incumbent : held) {
+                if (++pairs % 4096 == 0 && cancel.isCancelled()) {
+                    return null;
+                }
                 if (!ClaimMatrix.conflicts(row, incumbent)) {
                     continue;
                 }
@@ -929,9 +955,16 @@ public final class MatchEngine {
         }
 
         private boolean chargeScope(ReadScope scope, WorldView view) {
-            int sections = sectionsOf(scope.cells(), view).size();
+            int sections = 0;
+            CuboidSet scopeWorld = request.siting().toWorld(scope.cells());
+            if (scopeWorld != null) {
+                sections += sectionsOf(scopeWorld, view).size();
+            }
             for (var window : scope.windows()) {
-                sections += sectionsOf(window.cells().asSet(), view).size();
+                Cuboid windowWorld = request.siting().toWorld(window.cells());
+                if (windowWorld != null) {
+                    sections += sectionsOf(windowWorld.asSet(), view).size();
+                }
             }
             long cells = scope.cells().volume();
             for (var window : scope.windows()) {

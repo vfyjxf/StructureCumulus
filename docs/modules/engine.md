@@ -141,6 +141,7 @@ check(request):
       if a binding carries a nested subject or a non-root frame -> Failed(SC-CLM-0004)
       if no claimable bay                              -> ledgerAvailable=false, revision=0
       else if request.claims() == null/!available      -> Undecided(ledgerUnavailable)
+      else if cancelled                                -> Undecided(cancelled)
       else derive rows; matrix against claims.rows()
            conflict -> Failed(SC-CLM-0001)
            else     -> Admitted(revision = claims.revision, ledgerAvailable = true)
@@ -182,7 +183,8 @@ settle(request, admitted, ledger, attempt):
                                                 admitted.ledgerRevision()))
       if RevisionMoved:
           fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
-              matrix(rows, fresh.rows()) conflict -> Failed(SC-CLM-0001); retry once at fresh.revision()
+              matrix(rows, fresh.rows()) cancelled -> Undecided(cancelled);
+                                        conflict  -> Failed(SC-CLM-0001); retry once at fresh.revision()
           moved twice                                 -> Undecided(ledgerMoved)
       if Conflict                                     -> Failed(SC-CLM-0001) with incumbents
       revision = settled.revision()                   // unchanged when the content matched (D-60)
@@ -226,7 +228,8 @@ A derive pass publishes one revision. A `match` key produced by a deriver is rej
 owner, budget, claims, cancellation, cachedContext)`. It carries no stage, no policy, no ticket, no
 record, no pin budget. `instance` is allocated by the host before the check; `check` does not mint it.
 `claims` is the frozen ledger view the host read; `check` never reads a live ledger. `cancel` is
-checked at unit boundaries; a long extension checks its own token. `cachedContext` is optional
+checked at unit boundaries and every 4096 pairs inside the conflict matrix scan; a long extension
+checks its own token. `cachedContext` is optional
 host-owned state (§7.7); `null` is the default. `CancelToken.never()` is the default factory.
 
 ### 7.2 Outcome
@@ -290,7 +293,8 @@ before attributing rows to one structure; the engine never does that filtering.
 Charges: a section computation charges the slice volume plus one section per section run; a check
 charges its declared cells' volume plus the sections they touch, and a window charges its inflated
 volume plus its sections; an aggregate charges its region's volume plus the sections it touches,
-once, before `compute`. Charges happen before the unit runs; a
+once, before `compute`. Sections are counted in the world frame after the siting maps the cells; a
+scope the siting cannot map touches no section. Charges happen before the unit runs; a
 refusal returns `Undecided(budgetExhausted)`. The budget is the request's; the engine does not reset
 it. A `Partial` section is charged as one section; its refused cells are not a second read. For a
 fixed tuple the result value, finding order and spend are identical; `Plan` order is fixed at build;
