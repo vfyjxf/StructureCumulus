@@ -18,4 +18,7 @@ JUnit Platform. On a normal machine, prefer:
 ./gradlew spotlessApply   # the project formatter owns import order and line width
 ```
 
+The commands that constitute a green build are listed in
+[design/06-verification.md](../docs/design/06-verification.md) §1.1, "Green build".
+
 These scripts are development aids, not part of the kernel source set.
