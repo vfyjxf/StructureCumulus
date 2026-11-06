@@ -134,10 +134,7 @@ public final class OrientationAuditGameTest {
                 }
             }
             helper.assertTrue(
-                captured.report()
-                        .entries()
-                        .stream()
-                        .noneMatch(entry -> entry.code().equals(AdapterCodes.orientation)),
+                captured.report().entries().stream().noneMatch(entry -> entry.code().equals(AdapterCodes.orientation)),
                 "an upright siting reports no SC-MC-0004"
             );
             helper.assertTrue(

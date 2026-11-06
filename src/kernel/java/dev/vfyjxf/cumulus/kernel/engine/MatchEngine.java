@@ -358,7 +358,8 @@ public final class MatchEngine {
         }
         ClaimPlanner.Derived derived;
         try {
-            derived = ClaimPlanner.derive(request.blueprint(), request.siting(), request.instance(), outcome.bindings());
+            derived = ClaimPlanner
+                    .derive(request.blueprint(), request.siting(), request.instance(), outcome.bindings());
         } catch (IllegalArgumentException rejected) {
             session.findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
@@ -446,9 +447,8 @@ public final class MatchEngine {
             }
             revision = 0;
         } else {
-            ClaimVerdict verdict = ledger.settle(
-                new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision())
-            );
+            ClaimVerdict verdict = ledger
+                    .settle(new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision()));
             if (verdict instanceof ClaimVerdict.RevisionMoved) {
                 long retryRevision;
                 if (derived.rows().isEmpty()) {
@@ -474,8 +474,7 @@ public final class MatchEngine {
                     }
                     retryRevision = fresh.revision();
                 }
-                verdict = ledger
-                        .settle(new SettleRequest(request.instance(), derived.rows(), retryRevision));
+                verdict = ledger.settle(new SettleRequest(request.instance(), derived.rows(), retryRevision));
             }
             if (verdict instanceof ClaimVerdict.RevisionMoved moved) {
                 findings.add(

@@ -466,10 +466,7 @@ public final class CaptureAdversarialGameTest {
                     helper.fail("depth one must still capture the child");
                     return;
                 }
-                helper.assertTrue(
-                    child.nested(LatticePoint.origin) == null,
-                    "the depth ceiling builds no grandchild"
-                );
+                helper.assertTrue(child.nested(LatticePoint.origin) == null, "the depth ceiling builds no grandchild");
                 helper.assertValueEqual(
                     1,
                     child.occupants(child.bounds(), OccupantFilter.ofKind(OccupantKind.nested)).size(),

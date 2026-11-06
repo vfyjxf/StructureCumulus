@@ -350,7 +350,8 @@ class AdapterExpectationsTest {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static Reply test(Expectation<?> expectation, WorldView view, OccupantSnapshot subject) {
-        ExpectationContext context = ExpectationContext.of(new TestFocus(view, subject.ref().anchor()), subject, List.of(subject));
+        ExpectationContext context = ExpectationContext
+                .of(new TestFocus(view, subject.ref().anchor()), subject, List.of(subject));
         return ((Expectation) expectation).test(context);
     }
 
@@ -533,7 +534,12 @@ class AdapterExpectationsTest {
     private static SnapshotLevel.CapturedEntity entity(LatticePoint cell, EntityType<?> entityType) {
         var location = Objects.requireNonNull(BuiltInRegistries.ENTITY_TYPE.getKey(entityType), "entity type id");
         NamespacedId type = NamespacedId.of(location.getNamespace(), location.getPath());
-        return new SnapshotLevel.CapturedEntity(UUID.nameUUIDFromBytes(new byte[]{1}), type, Cuboid.of(cell), entityType);
+        return new SnapshotLevel.CapturedEntity(
+            UUID.nameUUIDFromBytes(new byte[]{1}),
+            type,
+            Cuboid.of(cell),
+            entityType
+        );
     }
 
     private static SnapshotLevel.CapturedEntity zombie() {
@@ -545,7 +551,8 @@ class AdapterExpectationsTest {
     }
 
     private static OccupantSnapshot entitySubject(SnapshotLevel.CapturedEntity captured) {
-        return OccupantDescriptors.entity(snapshot, 0, entityCell, captured.type(), captured.id(), Cuboid.of(entityCell));
+        return OccupantDescriptors
+                .entity(snapshot, 0, entityCell, captured.type(), captured.id(), Cuboid.of(entityCell));
     }
 
     private static OccupantSnapshot occupant(LatticePoint cell) {

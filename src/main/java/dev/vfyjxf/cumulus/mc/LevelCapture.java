@@ -367,7 +367,12 @@ public final class LevelCapture implements WorldCapture {
                     continue;
                 }
                 capturedEntities.add(
-                    new SnapshotLevel.CapturedEntity(candidate.id(), candidate.type(), footprint, candidate.entity().getType())
+                    new SnapshotLevel.CapturedEntity(
+                        candidate.id(),
+                        candidate.type(),
+                        footprint,
+                        candidate.entity().getType()
+                    )
                 );
             }
             return new SnapshotLevel(

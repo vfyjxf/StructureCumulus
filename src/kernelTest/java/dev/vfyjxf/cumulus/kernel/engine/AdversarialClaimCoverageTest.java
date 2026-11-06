@@ -78,7 +78,13 @@ class AdversarialClaimCoverageTest {
                                 for (LatticePoint leftCell : cells) {
                                     for (LatticePoint rightCell : cells) {
                                         ClaimRow left = row(leftCell, leftSharing, leftInstance, leftSiting, "left");
-                                        ClaimRow right = row(rightCell, rightSharing, rightInstance, rightSiting, "right");
+                                        ClaimRow right = row(
+                                            rightCell,
+                                            rightSharing,
+                                            rightInstance,
+                                            rightSiting,
+                                            "right"
+                                        );
                                         boolean expected = leftCell.equals(rightCell)
                                                 && !leftInstance.equals(rightInstance)
                                                 && (leftSharing.blocks() || rightSharing.blocks());
@@ -101,7 +107,13 @@ class AdversarialClaimCoverageTest {
     @Test
     void claimRowOrderIncludesSitingAndKeepsSitingDistinctRows() {
         ClaimRow first = row(origin, Sharing.shared, instance, identity, "bay");
-        ClaimRow second = row(origin, Sharing.shared, instance, MagicFixtures.identity(LatticePoint.of(5, 0, 5)), "bay");
+        ClaimRow second = row(
+            origin,
+            Sharing.shared,
+            instance,
+            MagicFixtures.identity(LatticePoint.of(5, 0, 5)),
+            "bay"
+        );
 
         assertTrue(first.compareTo(second) < 0, "siting is part of the total order");
         assertNotEquals(first, second, "different sitings are different rows");
@@ -272,8 +284,12 @@ class AdversarialClaimCoverageTest {
         OccupantSnapshot block = TestWorld.block(TestWorld.stone, origin);
         OccupantSnapshot second = TestWorld.block(TestWorld.stone, LatticePoint.of(0, 1, 0));
 
-        ClaimPlanner.Derived derived = ClaimPlanner
-                .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(block, second, block))));
+        ClaimPlanner.Derived derived = ClaimPlanner.derive(
+            blueprint,
+            identity,
+            instance,
+            List.of(new BayBinding(boundBay, List.of(block, second, block)))
+        );
         assertEquals(2, derived.rows().size(), "two distinct footprints yield two rows and duplicates do not add rows");
 
         OccupantSnapshot nested = nestedOccupant(origin, 0);
@@ -315,7 +331,8 @@ class AdversarialClaimCoverageTest {
             () -> assertEquals(1, derived.rows().size(), "an air subject contributes no claimed cell"),
             () -> assertThrows(
                 IllegalArgumentException.class,
-                () -> ClaimPlanner.derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(air)))),
+                () -> ClaimPlanner
+                        .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(air)))),
                 "an exclusive Bound footprint with only air subjects must be SC-CLM-0005"
             )
         );

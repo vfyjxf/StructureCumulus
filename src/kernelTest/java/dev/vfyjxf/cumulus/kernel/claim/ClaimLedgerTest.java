@@ -32,7 +32,13 @@ class ClaimLedgerTest {
     }
 
     private static ClaimRow row(InstanceId instance, Sharing sharing, Siting at, int x, String bay) {
-        return new ClaimRow(LatticeKey.of(LatticePoint.of(x, 0, 0)), sharing, at, NamespacedId.of("test", bay), instance);
+        return new ClaimRow(
+            LatticeKey.of(LatticePoint.of(x, 0, 0)),
+            sharing,
+            at,
+            NamespacedId.of("test", bay),
+            instance
+        );
     }
 
     private static ClaimVerdict settle(ClaimLedger ledger, InstanceId instance, long expected, ClaimRow... rows) {
@@ -153,7 +159,10 @@ class ClaimLedgerTest {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
         settle(ledger, first, 0, row(first, Sharing.exclusive, 4, "bay"));
 
-        assertInstanceOf(ClaimVerdict.Settled.class, settle(ledger, first, 1, row(first, Sharing.exclusive, 4, "other")));
+        assertInstanceOf(
+            ClaimVerdict.Settled.class,
+            settle(ledger, first, 1, row(first, Sharing.exclusive, 4, "other"))
+        );
         assertInstanceOf(
             ClaimVerdict.Settled.class,
             settle(ledger, second, 2, row(second, Sharing.exclusive, peerSiting, 5, "bay"))
@@ -219,13 +228,7 @@ class ClaimLedgerTest {
     @Test
     void aSameSitingSettleReplacesTheIncumbentRows() {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
-        settle(
-            ledger,
-            first,
-            0,
-            row(first, Sharing.exclusive, 30, "left"),
-            row(first, Sharing.exclusive, 31, "right")
-        );
+        settle(ledger, first, 0, row(first, Sharing.exclusive, 30, "left"), row(first, Sharing.exclusive, 31, "right"));
 
         ClaimRow replacement = row(second, Sharing.exclusive, 30, "left");
         ClaimVerdict verdict = settle(ledger, second, 1, replacement);
@@ -238,13 +241,7 @@ class ClaimLedgerTest {
     @Test
     void aSameSitingSettleKeepsADistantInstance() {
         ClaimLedger ledger = ClaimLedger.inMemory(world);
-        settle(
-            ledger,
-            first,
-            0,
-            row(first, Sharing.exclusive, 32, "left"),
-            row(first, Sharing.exclusive, 33, "right")
-        );
+        settle(ledger, first, 0, row(first, Sharing.exclusive, 32, "left"), row(first, Sharing.exclusive, 33, "right"));
         InstanceId peer = new InstanceId(world, 3);
         ClaimRow peerRow = row(peer, Sharing.exclusive, peerSiting, 60, "peer");
         settle(ledger, peer, 1, peerRow);

@@ -561,11 +561,7 @@ class LevelSnapshotTest {
         assertTrue(Objects.requireNonNull(view.get(childCell, HostTypes.blockState), "root air").isAir());
     }
 
-    private static SnapshotLevel hostSnapshot(
-        Cuboid bounds,
-        BlockState state,
-        @Nullable EntityType<?> entityType
-    ) {
+    private static SnapshotLevel hostSnapshot(Cuboid bounds, BlockState state, @Nullable EntityType<?> entityType) {
         return hostSnapshot(LatticePoint.origin, bounds, state, entityType, LatticePoint.origin);
     }
 
@@ -601,15 +597,7 @@ class LevelSnapshotTest {
                         entityType
                     )
                 );
-        return new SnapshotLevel(
-            origin,
-            bounds,
-            -64,
-            384,
-            Map.of(key, states),
-            Map.of(key, fluids),
-            entities
-        );
+        return new SnapshotLevel(origin, bounds, -64, 384, Map.of(key, states), Map.of(key, fluids), entities);
     }
 
     private static OccupantSnapshot entity(SnapshotId snapshot, LatticePoint anchor, String type, Cuboid footprint) {

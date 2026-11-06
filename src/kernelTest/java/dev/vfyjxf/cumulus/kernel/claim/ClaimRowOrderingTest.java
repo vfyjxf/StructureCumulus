@@ -30,7 +30,13 @@ class ClaimRowOrderingTest {
     @Test
     void compareToUsesEveryRecordFieldIncludingSitingAndSharing() {
         ClaimRow base = row(Sharing.exclusive, instance, baseSiting, bay);
-        ClaimRow cellVariant = row(Sharing.exclusive, instance, baseSiting, bay, LatticeKey.of(LatticePoint.of(1, 0, 0)));
+        ClaimRow cellVariant = row(
+            Sharing.exclusive,
+            instance,
+            baseSiting,
+            bay,
+            LatticeKey.of(LatticePoint.of(1, 0, 0))
+        );
         ClaimRow instanceVariant = row(Sharing.exclusive, otherInstance, baseSiting, bay);
         ClaimRow bayVariant = row(Sharing.exclusive, instance, baseSiting, NamespacedId.of("z_bay"));
         ClaimRow originVariant = row(
@@ -137,7 +143,13 @@ class ClaimRowOrderingTest {
         return row(sharing, instance, siting, bay, cell);
     }
 
-    private static ClaimRow row(Sharing sharing, InstanceId instance, Siting siting, NamespacedId bay, LatticeKey cell) {
+    private static ClaimRow row(
+        Sharing sharing,
+        InstanceId instance,
+        Siting siting,
+        NamespacedId bay,
+        LatticeKey cell
+    ) {
         return new ClaimRow(cell, sharing, siting, bay, instance);
     }
 

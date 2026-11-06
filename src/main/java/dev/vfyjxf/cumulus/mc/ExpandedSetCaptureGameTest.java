@@ -279,9 +279,7 @@ public final class ExpandedSetCaptureGameTest {
                     helper.assertTrue(lease.view().nested(lattice(anchor)) != null, "the exact budget cut " + anchor);
                 }
                 helper.assertTrue(
-                    exactResult.report()
-                            .entries()
-                            .stream()
+                    exactResult.report().entries().stream()
                             .noneMatch(entry -> entry.notes().stream().anyMatch(note -> note.equals("reason: budget"))),
                     "the exact budget cuts nothing for budget"
                 );

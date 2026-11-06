@@ -856,8 +856,8 @@ public final class DocumentCompiler {
                 error(
                     findings,
                     Codes.documentDeclared,
-                    "computation " + spec.output() + " declares inputs " + spec.inputs()
-                            + " but its factory declares " + created.inputs(),
+                    "computation " + spec.output() + " declares inputs " + spec.inputs() + " but its factory declares "
+                            + created.inputs(),
                     spec.source(),
                     null
                 );

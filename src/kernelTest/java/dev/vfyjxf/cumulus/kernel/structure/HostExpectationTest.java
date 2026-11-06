@@ -152,7 +152,10 @@ class HostExpectationTest {
         OccupantSnapshot subject = frameOneOccupant();
         Expectation<OccupantSnapshot> expectation = Expectations
                 .host(blockState, (value, pos) -> true, propertyMismatch, hostNotCaptured, "expected lit");
-        Reply.Unreadable unreadable = assertInstanceOf(Reply.Unreadable.class, expectation.test(context(view, subject)));
+        Reply.Unreadable unreadable = assertInstanceOf(
+            Reply.Unreadable.class,
+            expectation.test(context(view, subject))
+        );
         Finding finding = Objects.requireNonNull(unreadable.findings().primary(), "finding");
         assertEquals(hostNotCaptured, finding.code());
         assertEquals(0, view.reads, "a foreign frame never reaches the cell");

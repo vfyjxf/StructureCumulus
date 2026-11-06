@@ -439,9 +439,7 @@ public final class NestedCaptureGameTest {
             BlockPos cell = helper.absolutePos(new BlockPos(level % 4, 1, level / 4));
             helper.setBlock(new BlockPos(level % 4, 1, level / 4), Blocks.STONE);
             chain.add(cell);
-            BlockPos next = level == 16
-                    ? cell
-                    : helper.absolutePos(new BlockPos((level + 1) % 4, 1, (level + 1) / 4));
+            BlockPos next = level == 16 ? cell : helper.absolutePos(new BlockPos((level + 1) % 4, 1, (level + 1) / 4));
             lookup.blocks.put(cell, extent("test:chain_" + level, next, 1, 1, 1, next));
         }
         Cuboid bounds = cellAround(chain.get(0));
@@ -483,9 +481,9 @@ public final class NestedCaptureGameTest {
         );
         BlockPos deepest = chain.get(16);
         helper.assertTrue(
-            entry.notes()
-                    .stream()
-                    .anyMatch(note -> note.contains("anchor: (" + deepest.getX() + "," + deepest.getY() + "," + deepest.getZ() + ")")),
+            entry.notes().stream().anyMatch(
+                note -> note.contains("anchor: (" + deepest.getX() + "," + deepest.getY() + "," + deepest.getZ() + ")")
+            ),
             "the cut sits at the deepest anchor"
         );
         helper.succeed();
@@ -508,7 +506,8 @@ public final class NestedCaptureGameTest {
         FakeLookup lookup = new FakeLookup();
         lookup.blocks.put(worldFirst, extent("test:sibling_first", worldFirstChild, 1, 1, 1, worldFirstChild));
         lookup.blocks.put(worldSecond, extent("test:sibling_second", worldSecondChild, 1, 1, 1, worldSecondChild));
-        lookup.blocks.put(worldFirstChild, extent("test:sibling_grand_first", worldFirstChild, 1, 1, 1, worldFirstChild));
+        lookup.blocks
+                .put(worldFirstChild, extent("test:sibling_grand_first", worldFirstChild, 1, 1, 1, worldFirstChild));
         lookup.blocks.put(
             worldSecondChild,
             extent("test:sibling_grand_second", worldSecondChild, 1, 1, 1, worldSecondChild)
@@ -530,7 +529,8 @@ public final class NestedCaptureGameTest {
         }
         try (SnapshotLease lease = captured.lease()) {
             WorldView view = lease.view();
-            WorldView firstChild = view.nested(LatticePoint.of(worldFirst.getX(), worldFirst.getY(), worldFirst.getZ()));
+            WorldView firstChild = view
+                    .nested(LatticePoint.of(worldFirst.getX(), worldFirst.getY(), worldFirst.getZ()));
             WorldView secondChild = view
                     .nested(LatticePoint.of(worldSecond.getX(), worldSecond.getY(), worldSecond.getZ()));
             if (firstChild == null || secondChild == null) {
@@ -554,9 +554,7 @@ public final class NestedCaptureGameTest {
         }
         helper.assertValueEqual(2, captured.report().size(), "two budget cuts");
         helper.assertTrue(
-            captured.report()
-                    .entries()
-                    .stream()
+            captured.report().entries().stream()
                     .allMatch(entry -> entry.notes().stream().anyMatch(note -> note.equals("reason: budget"))),
             "every cut names the budget"
         );
@@ -624,7 +622,8 @@ public final class NestedCaptureGameTest {
             return;
         }
         try (SnapshotLease lease = captured.lease()) {
-            WorldView child = lease.view().nested(LatticePoint.of(worldBase.getX(), worldBase.getY(), worldBase.getZ()));
+            WorldView child = lease.view()
+                    .nested(LatticePoint.of(worldBase.getX(), worldBase.getY(), worldBase.getZ()));
             if (child == null) {
                 helper.fail("the first child is missing");
                 return;
@@ -673,10 +672,8 @@ public final class NestedCaptureGameTest {
             extent("test:order_third", new BlockPos(2, 2, 0), 1, 1, 1, helper.absolutePos(new BlockPos(2, 2, 0)))
         );
         lookup.blocks.put(worldFirstChild, extent("test:order_grand_first", worldFirstChild, 1, 1, 1, worldFirstChild));
-        lookup.blocks.put(
-            worldSecondChild,
-            extent("test:order_grand_second", worldSecondChild, 1, 1, 1, worldSecondChild)
-        );
+        lookup.blocks
+                .put(worldSecondChild, extent("test:order_grand_second", worldSecondChild, 1, 1, 1, worldSecondChild));
         Cuboid bounds = Cuboid.of(
             worldFirst.getX(),
             worldFirst.getY(),
@@ -699,7 +696,8 @@ public final class NestedCaptureGameTest {
         for (CaptureResult.Captured run : runs) {
             try (SnapshotLease lease = run.lease()) {
                 WorldView view = lease.view();
-                WorldView firstChild = view.nested(LatticePoint.of(worldFirst.getX(), worldFirst.getY(), worldFirst.getZ()));
+                WorldView firstChild = view
+                        .nested(LatticePoint.of(worldFirst.getX(), worldFirst.getY(), worldFirst.getZ()));
                 WorldView secondChild = view
                         .nested(LatticePoint.of(worldSecond.getX(), worldSecond.getY(), worldSecond.getZ()));
                 if (firstChild == null || secondChild == null) {
