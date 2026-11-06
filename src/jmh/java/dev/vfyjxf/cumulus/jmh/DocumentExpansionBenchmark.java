@@ -146,6 +146,7 @@ public class DocumentExpansionBenchmark {
             id("root"),
             cell(),
             false,
+            false,
             Value.object(),
             List.of(
                 new BaySpec(
@@ -175,6 +176,7 @@ public class DocumentExpansionBenchmark {
         return new BlueprintSpec(
             id,
             cell(),
+            false,
             false,
             Value.object(),
             List.of(),
