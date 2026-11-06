@@ -102,7 +102,7 @@ public final class CuboidSet implements Comparable<CuboidSet> {
     public @Nullable CuboidSet translate(int dx, int dy, int dz);
     public boolean contentEquals(CuboidSet other);
     @Override public int compareTo(CuboidSet other);           // bounds, volume, first differing cell; empty last
-    private CuboidSet() {}
+    private CuboidSet(java.util.List<Cuboid> decomposition) {}
 }
 
 public record SectionKey(World world, int frame, int x, int y, int z)
@@ -170,6 +170,7 @@ public record Siting(LatticePoint origin, Placement placement) {
     public @Nullable CuboidSet toWorld(CuboidSet local);
     public @Nullable LatticePoint toLocal(LatticePoint world);
     public @Nullable Cuboid toLocal(Cuboid world);
+    public @Nullable CuboidSet toLocal(CuboidSet world);
 }
 
 public enum LocusFrame {

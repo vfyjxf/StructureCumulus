@@ -550,7 +550,8 @@ The kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value cod
   code and description; an absent value is `Unreadable` with the supplied absent code, never a
   mismatch; no `ReadScope` entry; the meta carries the supplied mismatch code.
 - Lease gate: `isCurrent` false after the host invalidates; `check` returns `Dropped`.
-- `EntityWindow.of` inflation and lattice clamp; `maxEntitySpan` rejection.
+- `EntityWindow.of`: an empty declared box answers `null`; the inflation clamps to the lattice on
+  both sides.
 - `SnapshotPolicy`: `traits` is a set of ids; a non-empty set stays non-empty; duplicate ids collapse
   to one entry; `maxDepth` is the host-allowed child ceiling and `minimal()` passes the default 16.
 - Capture report: `empty()` is the compatibility answer and every two-argument constructor equals its
