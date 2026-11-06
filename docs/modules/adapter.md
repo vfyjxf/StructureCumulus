@@ -918,7 +918,7 @@ passing `SC-MC-0010` as the absent code (§3.2).
 The adapter registers its codes in its own code catalog through `Catalogs.Builder.codes`
 (`AdapterCodes` holds the ten codes and their entries), so each carries the canonical severity
 above and an explanation, and `/cumulus explain` resolves it. The catalog is the host's, not
-`Codes.all`: `Codes.all` has 65 entries, and a capture entry's code is never a kernel registry
+`Codes.all`: `Codes.all` has 66 entries, and a capture entry's code is never a kernel registry
 entry. `CaptureReports` is the only report site: it reads the code's `CodeEntry` (or answers `error`
 when the host registered none), relays the entry as a finding, and applies the kernel's trust guard —
 a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (`world` §4.1, §4.10).

@@ -8,7 +8,11 @@ either documented in adapter.md §15 or listed in tools/spec-uncovered.txt with 
 list can only shrink. Examples inside a module file are excluded by reading only the block after
 '## 3. Signatures'.
 The producer table in `finding.md` §6 is compared with `Codes.java`, and every registered code must
-have at least one reference in the kernel or adapter sources (D-69).
+have at least one reference in the kernel or adapter sources (D-69). Production forms are resolved
+both ways (D-04/X03-D04): `Codes.<field>`, `AdapterCodes.<field>`, `FindingCode.of(Family.x, n)`,
+per-family `code(n)` helpers and `SC-` literals in `src/main` (including `SC-MC-*`) must name a
+registered or catalogued code that the docs mention; the `CodesTest` mirror and every
+"`Codes.all` has N entries" claim are checked against the registry.
 """
 from __future__ import annotations
 
@@ -25,6 +29,7 @@ MODULES = {
 ADAPTER_ROOT = ROOT / "src" / "main" / "java"
 UNCOVERED = ROOT / "tools" / "spec-uncovered.txt"
 ADAPTER_SECTION = "## 15. Signatures"
+OWNERS = set(MODULES) | {"adapter"}
 
 TYPE_RE = re.compile(
     r"(?m)^[ \t]{0,12}(?:public\s+)?(?:sealed\s+)?(?:static\s+)?(?:final\s+)?(?:record|class|interface|enum)\s+([A-Z][A-Za-z0-9_]*)"
@@ -42,7 +47,7 @@ TOP_LEVEL_RE = re.compile(
 
 KERNEL_SOURCES = ROOT / "src" / "kernel" / "java"
 ADAPTER_SOURCES = ROOT / "src" / "main" / "java"
-PRODUCER_ROW_RE = re.compile(r"^\|\s*`(SC-[A-Z]{2,6}-\d{4})`\s*\|\s*(\S+)\s*\|\s*(\S+)\s*\|")
+PRODUCER_ROW_RE = re.compile(r"^\|\s*`(SC-[A-Z]{2,6}-\d{4})`\s*\|\s*(\S+)\s*\|\s*(\S+)\s*\|(.*?)\|\s*(\S+)\s*\|")
 ENTRY_RE = re.compile(
     r"public static final CodeEntry (\w+) = entry\(\s*FindingCode\.Family\.(\w+),\s*(\d+),\s*Severity\.(\w+)"
 )
@@ -51,6 +56,13 @@ CODE_HELPER_RE = re.compile(
     r"private static FindingCode code\(int \w+\)\s*\{\s*return FindingCode\.of\(FindingCode\.Family\.(\w+), \w+\);",
     re.S,
 )
+CODES_FIELD_RE = re.compile(r"\bCodes\.(\w+)")
+ADAPTER_FIELD_RE = re.compile(r"\bAdapterCodes\.(\w+)")
+ADAPTER_CODE_RE = re.compile(r"static final FindingCode (\w+) = code\((\d+)\);")
+ADAPTER_ENTRY_RE = re.compile(r"static final CodeEntry (\w+) = entry\(")
+OF_FAMILY_RE = re.compile(r"FindingCode\.of\(\s*(?:FindingCode\.)?Family\.(\w+)\s*,\s*(\d+)\s*\)")
+HELPER_CALL_RE = re.compile(r"\bcode\((\d+)\)")
+COUNT_CLAIM_RE = re.compile(r"`Codes\.all` has (\d+) entries")
 
 
 def docs_block(module: str) -> str:
@@ -173,16 +185,16 @@ def family_tags() -> dict[str, str]:
     return dict(FAMILY_TAG_RE.findall(text))
 
 
-def producer_table_rows() -> dict[str, tuple[str, str]]:
-    """finding.md §6 rows as code -> (severity, label); SC-MC-* rows are adapter-only."""
+def producer_table_rows() -> dict[str, tuple[str, str, str]]:
+    """finding.md §6 rows as code -> (severity, label, owner); SC-MC-* rows are adapter-only."""
     text = (ROOT / "docs" / "modules" / "finding.md").read_text()
     start = text.find("## 6. Code producers")
     end = text.find("## 7.", start)
-    rows: dict[str, tuple[str, str]] = {}
+    rows: dict[str, tuple[str, str, str]] = {}
     for line in text[start:end].splitlines():
         match = PRODUCER_ROW_RE.match(line)
         if match and not match.group(1).startswith("SC-MC-"):
-            rows[match.group(1)] = (match.group(2), match.group(3))
+            rows[match.group(1)] = (match.group(2), match.group(3), match.group(5))
     return rows
 
 
@@ -206,23 +218,31 @@ def check_producer_table() -> int:
         elif row[1] not in ("P", "\u2013", "T"):
             print(f"producer table: {code} label {row[1]} is neither P, \u2013 nor T")
             problems += 1
+        elif row[2] not in OWNERS:
+            print(f"producer table: {code} owner {row[2]} names no module")
+            problems += 1
     return problems
+
+
+def production_sources() -> list[tuple[Path, str]]:
+    """Kernel and adapter sources that may produce a finding code; tests are not producers."""
+    out: list[tuple[Path, str]] = []
+    for root in (KERNEL_SOURCES, ADAPTER_SOURCES):
+        for path in sorted(root.rglob("*.java")):
+            if path.name == "Codes.java" or path.name.endswith("GameTest.java"):
+                continue
+            out.append((path, path.read_text()))
+    return out
 
 
 def count_unproduced_codes() -> int:
     """A registered code with no reference outside Codes.java and the GameTests is dead."""
-    corpus: list[str] = []
-    helpers: dict[str, str] = {}
-    for root in (KERNEL_SOURCES, ADAPTER_SOURCES):
-        for path in root.rglob("*.java"):
-            if path.name == "Codes.java" or path.name.endswith("GameTest.java"):
-                continue
-            text = path.read_text()
-            corpus.append(text)
-            helper = CODE_HELPER_RE.search(text)
-            if helper:
-                helpers.setdefault(helper.group(1), text)
-    blob = "\n".join(corpus)
+    blob = "\n".join(text for _, text in production_sources())
+    helper_texts: dict[str, str] = {}
+    for _, text in production_sources():
+        helper = CODE_HELPER_RE.search(text)
+        if helper:
+            helper_texts.setdefault(helper.group(1), text)
     tags = family_tags()
     problems = 0
     for field, family, number, _ in registry_entries():
@@ -231,11 +251,110 @@ def count_unproduced_codes() -> int:
             f"Codes.{field}" in blob
             or f'"{code}' in blob
             or f"Family.{family}, {number})" in blob
-            or f"code({number})" in helpers.get(family, "")
+            or f"code({number})" in helper_texts.get(family, "")
         )
         if not referenced:
             print(f"unproduced code: {code} ({field}) has no emit site")
             problems += 1
+    return problems
+
+
+def adapter_catalog() -> dict[str, str]:
+    """AdapterCodes' own codes as field -> SC-MC-NNNN."""
+    text = (ADAPTER_SOURCES / "dev" / "vfyjxf" / "cumulus" / "mc" / "AdapterCodes.java").read_text()
+    tags = family_tags()
+    return {field: f"SC-{tags['mc']}-{int(number):04d}"
+            for field, number in ADAPTER_CODE_RE.findall(text)}
+
+
+def check_produced_codes(doc_codes: set[str]) -> int:
+    """Every resolved production form names a known code that the docs mention."""
+    tags = family_tags()
+    registry = {f"SC-{tags[family]}-{number:04d}" for _, family, number, _ in registry_entries()}
+    field_codes = {field: f"SC-{tags[family]}-{number:04d}"
+                   for field, family, number, _ in registry_entries()}
+    catalog = adapter_catalog()
+    catalog_entry_fields = set()
+    adapter_path = ADAPTER_SOURCES / "dev" / "vfyjxf" / "cumulus" / "mc" / "AdapterCodes.java"
+    catalog_entry_fields.update(ADAPTER_ENTRY_RE.findall(adapter_path.read_text()))
+    problems = 0
+    for path, text in production_sources():
+        where = path.relative_to(ROOT)
+        produced: set[str] = {f"{family}-{number}" for family, number in CODE_RE.findall(text)}
+        for field in CODES_FIELD_RE.findall(text):
+            if field in field_codes:
+                produced.add(field_codes[field][3:])
+        for field in ADAPTER_FIELD_RE.findall(text):
+            if field in catalog:
+                produced.add(catalog[field][3:])
+        for family, number in OF_FAMILY_RE.findall(text):
+            tag = tags.get(family)
+            if tag:
+                produced.add(f"{tag}-{int(number):04d}")
+        helper = CODE_HELPER_RE.search(text)
+        if helper:
+            tag = tags[helper.group(1)]
+            produced.update(f"{tag}-{int(number):04d}" for number in HELPER_CALL_RE.findall(text))
+        for short in sorted(produced):
+            code = f"SC-{short}"
+            if short.startswith("MC-"):
+                if code not in catalog.values():
+                    print(f"produced code: {code} in {where} is not declared in AdapterCodes")
+                    problems += 1
+            elif code not in registry:
+                print(f"produced code: {code} in {where} is not in Codes.all")
+                problems += 1
+            if code not in doc_codes:
+                print(f"produced code: {code} in {where} is absent from the docs")
+                problems += 1
+    return problems
+
+
+def check_producer_mirror() -> int:
+    """The CodesTest mirror must agree with the registry and the finding.md §6 table."""
+    text = (ROOT / "src" / "kernelTest" / "java" / "dev" / "vfyjxf" / "cumulus" / "kernel"
+            / "finding" / "CodesTest.java").read_text()
+    start = text.find('producers = """') + len('producers = """')
+    mirror: dict[str, tuple[str, str, str]] = {}
+    for line in text[start:text.find('"""', start)].splitlines():
+        parts = line.split()
+        if len(parts) == 4:
+            mirror[parts[0]] = (parts[1], "\u2013" if parts[2] == "DASH" else parts[2], parts[3])
+    tags = family_tags()
+    registry = {f"SC-{tags[family]}-{number:04d}": severity.upper()
+                for _, family, number, severity in registry_entries()}
+    table = producer_table_rows()
+    problems = 0
+    for code in sorted(set(mirror) | set(registry)):
+        row, entry = mirror.get(code), registry.get(code)
+        if entry is None:
+            print(f"producer mirror: {code} is in CodesTest but not in Codes.all")
+            problems += 1
+        elif row is None:
+            print(f"producer mirror: {code} is in Codes.all but not in CodesTest")
+            problems += 1
+        elif row[0] != entry:
+            print(f"producer mirror: {code} severity {row[0]} in CodesTest, {entry} in Codes.all")
+            problems += 1
+        elif row[1] != table.get(code, ("", "", ""))[1]:
+            print(f"producer mirror: {code} label {row[1]} differs from finding.md §6")
+            problems += 1
+        elif row[2] != table.get(code, ("", "", ""))[2]:
+            print(f"producer mirror: {code} owner {row[2]} differs from finding.md §6")
+            problems += 1
+    return problems
+
+
+def check_code_count_claims() -> int:
+    """Every documented `Codes.all` count equals the registry size."""
+    expected = len(registry_entries())
+    problems = 0
+    for path in sorted((ROOT / "docs").rglob("*.md")):
+        for match in COUNT_CLAIM_RE.finditer(path.read_text()):
+            if int(match.group(1)) != expected:
+                print(f"code count: {path.relative_to(ROOT)} claims {match.group(1)} "
+                      f"entries, Codes.all has {expected}")
+                problems += 1
     return problems
 
 
@@ -264,9 +383,12 @@ def main() -> int:
         for match in CODE_RE.finditer(path.read_text()):
             doc_codes.add(f"SC-{match.group(1)}-{match.group(2)}")
     code_codes = set()
-    for path in (ROOT / "src" / "kernel" / "java").rglob("*.java"):
-        for match in CODE_RE.finditer(path.read_text()):
-            code_codes.add(f"SC-{match.group(1)}-{match.group(2)}")
+    for root in (ROOT / "src" / "kernel" / "java", ROOT / "src" / "main" / "java"):
+        for path in root.rglob("*.java"):
+            if path.name.endswith("GameTest.java"):
+                continue
+            for match in CODE_RE.finditer(path.read_text()):
+                code_codes.add(f"SC-{match.group(1)}-{match.group(2)}")
     unknown = sorted(code_codes - doc_codes)
     if unknown:
         print(f"codes in code but not in docs: {', '.join(unknown)}")
@@ -296,6 +418,9 @@ def main() -> int:
 
     problems += check_producer_table()
     problems += count_unproduced_codes()
+    problems += check_produced_codes(doc_codes)
+    problems += check_producer_mirror()
+    problems += check_code_count_claims()
 
     if problems:
         return 1

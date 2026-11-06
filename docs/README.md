@@ -121,7 +121,7 @@ Then the module files, in dependency order:
   `javac --release 21` and JSpecify only. The tree registers 382 kernel JUnit 5 tests (48 test
   containers), 411 adapter unit tests (43 containers) and 126 `@GameTest` methods; a full
   `./gradlew check` and `runGameTestServer` both pass at this revision (382 kernel tests, 411 adapter
-  tests, 126/126 GameTests, 0 failures, 0 skipped). `Codes.all` has 65 entries
+  tests, 126/126 GameTests, 0 failures, 0 skipped). `Codes.all` has 66 entries
   and the decision record has 40 decisions (D-40; D-29 superseded).
 
 ## The one rule
