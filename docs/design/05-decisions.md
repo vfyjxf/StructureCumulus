@@ -1723,6 +1723,24 @@ are documented in place; the kernel tests stay scenario tests, not law tests.
 server per class run through `HostServer`; commenting out the entity-kind gates in `LevelCapture`
 turns the read-policy law red, and the kernel and adapter suites stay green over the aligned doubles.
 
+### D-77 — Game tests live in their own source set
+
+The 23 `*GameTest` classes and `structure/empty.nbt` move to `src/gametest`, registered with the mod the
+same way `src/uitest` is. Production artifacts contain no `*GameTest*.class` and no test resource, and a
+check asserts it. The orphan `capturegametest.empty.nbt` is deleted.
+
+**Why a source set and not a jar exclusion.** Excluding from the jar hides the code but leaves it in
+`src/main`, where it keeps compiling against production dependencies and keeps inviting more.
+
+**What stays the same.** Packages do not change, so package-private members stay reachable;
+`runGameTestServer` keeps working. Whether only that run loads the extra source set depends on the
+build plugin; if it cannot be expressed, client and server runs load it too — the same as today, minus
+the shipped jar.
+
+**Status:** implemented — `verifyGameTestIsolation` gates the jar, and every run that loads the
+`structurecumulus` mod carries the source set, because ModDevGradle composes source sets per mod, not
+per run.
+
 ### D-79 — A rollback releases what the set wrote; it never restores the previous occupant
 
 When a structure set fails partway it releases the members it already settled and invalidates their
