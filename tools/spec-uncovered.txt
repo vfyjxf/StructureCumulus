@@ -6,6 +6,7 @@
 dev.vfyjxf.cumulus.Constants  # not API: mod constants
 dev.vfyjxf.cumulus.StructureCumulus  # not API: mod bootstrap entry
 dev.vfyjxf.cumulus.data.lang.LangEntry  # not API: language data
+dev.vfyjxf.cumulus.mc.CommandBoundaryGameTest  # plan 36: moves to src/gametest, then out of this gate
 dev.vfyjxf.cumulus.mc.CaptureAdversarialGameTest  # plan 36: moves to src/gametest, then out of this gate
 dev.vfyjxf.cumulus.mc.CaptureAuditGameTest  # plan 36: moves to src/gametest, then out of this gate
 dev.vfyjxf.cumulus.mc.CaptureGameTest  # plan 36: moves to src/gametest, then out of this gate

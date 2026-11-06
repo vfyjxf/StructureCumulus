@@ -76,7 +76,8 @@ public final class PluginLoader {
                 if (dependency.optional() || !skipped.contains(dependency.pluginId())) {
                     continue;
                 }
-                String reason = "dependency " + dependency.pluginId() + " (" + dependency.constraint() + ") was skipped";
+                String reason = "dependency " + dependency.pluginId() + " (" + dependency.constraint()
+                        + ") was skipped";
                 failures.add(
                     new LoadingFailure<>(
                         plugin,

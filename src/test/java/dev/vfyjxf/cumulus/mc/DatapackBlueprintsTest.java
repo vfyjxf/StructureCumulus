@@ -1,9 +1,11 @@
 package dev.vfyjxf.cumulus.mc;
 
+import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
+import dev.vfyjxf.cumulus.mc.plugin.LogCapture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackLocationInfo;
@@ -13,7 +15,6 @@ import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.resources.IoSupplier;
 import net.minecraft.server.packs.resources.MultiPackResourceManager;
-import dev.vfyjxf.cumulus.mc.plugin.LogCapture;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.jspecify.annotations.Nullable;
@@ -191,7 +192,7 @@ class DatapackBlueprintsTest {
         try (MultiPackResourceManager resources = manager(
             Map.of("test:cumulus/structure/broken.json", "{\"schemaVersion\": 1,")
         )) {
-            try (LogCapture capture = LogCapture.attach(dev.vfyjxf.cumulus.StructureCumulus.logger.getName())) {
+            try (LogCapture capture = LogCapture.attach(StructureCumulus.logger.getName())) {
                 DatapackBlueprints.scan(resources);
                 assertTrue(
                     capture.messages().stream().anyMatch(line -> line.contains("--> test:broken:1:")),

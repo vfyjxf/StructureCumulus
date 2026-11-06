@@ -109,16 +109,13 @@ public final class CaptureGameTest {
             SnapshotPolicy.minimal()
         );
         AtomicReference<RuntimeException> thrown = new AtomicReference<>();
-        Thread offThread = new Thread(
-            () -> {
-                try {
-                    capture.capture(request);
-                } catch (RuntimeException failure) {
-                    thrown.set(failure);
-                }
-            },
-            "off-thread capture"
-        );
+        Thread offThread = new Thread(() -> {
+            try {
+                capture.capture(request);
+            } catch (RuntimeException failure) {
+                thrown.set(failure);
+            }
+        }, "off-thread capture");
         offThread.start();
         try {
             offThread.join();

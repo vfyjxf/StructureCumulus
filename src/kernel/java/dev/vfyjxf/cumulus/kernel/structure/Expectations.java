@@ -813,8 +813,7 @@ public final class Expectations {
         ExpectationMeta meta,
         ReadScope reads,
         Function<ExpectationContext<T>, Reply> body
-    ) implements
-                Expectation<T> {
+    ) implements Expectation<T> {
 
         private Custom {
             Objects.requireNonNull(subject, "subject");

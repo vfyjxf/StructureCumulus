@@ -140,8 +140,8 @@ class StructureValidationTest {
             ctx -> Reply.match()
         );
         Check<?> check = Check.of(id("custom"), bay, Focuses.occupant(LatticePoint.origin), declared);
-        Blueprint blueprint = Blueprint.builder(id("custom_reads")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(check).build();
+        Blueprint blueprint = Blueprint.builder(id("custom_reads")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
+                .build();
 
         assertEquals(Set.of(inventory.id()), blueprint.reads().traits());
     }
@@ -150,14 +150,11 @@ class StructureValidationTest {
     void aThreeArgumentCustomReadsNothing() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
-        Expectation<OccupantSnapshot> silent = Expectations.custom(
-            OccupantSnapshot.class,
-            ExpectationMeta.anonymous(),
-            ctx -> Reply.match()
-        );
+        Expectation<OccupantSnapshot> silent = Expectations
+                .custom(OccupantSnapshot.class, ExpectationMeta.anonymous(), ctx -> Reply.match());
         Check<?> check = Check.of(id("custom"), bay, Focuses.occupant(LatticePoint.origin), silent);
-        Blueprint blueprint = Blueprint.builder(id("silent_reads")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1))
-                .check(check).build();
+        Blueprint blueprint = Blueprint.builder(id("silent_reads")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
+                .build();
 
         assertTrue(blueprint.reads().traits().isEmpty());
     }

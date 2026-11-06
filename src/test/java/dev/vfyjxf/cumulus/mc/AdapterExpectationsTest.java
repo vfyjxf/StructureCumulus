@@ -320,8 +320,9 @@ class AdapterExpectationsTest {
     void aBareBlockIdIsRejected() {
         List<Finding> findings = compileExpect("{\"kind\":\"state\",\"block\":\"stone\"}");
         assertTrue(
-            findings.stream().anyMatch(finding ->
-                finding.code().equals(Codes.factoryBad.code()) && finding.message().contains("minecraft:stone")
+            findings.stream().anyMatch(
+                finding -> finding.code().equals(Codes.factoryBad.code())
+                        && finding.message().contains("minecraft:stone")
             ),
             () -> findings.toString()
         );

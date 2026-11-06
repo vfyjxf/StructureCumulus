@@ -168,7 +168,7 @@ public final class DeterminismDump {
             }
         }
         view.put(TestWorld.block(id("plate"), plateCell));
-        for (Cuboid box : hollowCells.boxes()) {
+        for (Cuboid box : hollowCells.decomposition()) {
             for (int x = box.min().x(); x < box.max().x(); x++) {
                 for (int y = box.min().y(); y < box.max().y(); y++) {
                     for (int z = box.min().z(); z < box.max().z(); z++) {

@@ -55,7 +55,8 @@ public final class AnnotationPluginLookup<T extends ModPlugin> implements Plugin
         return result;
     }
 
-    @Nullable T instantiate(String className) {
+    @Nullable
+    T instantiate(String className) {
         try {
             Class<?> clazz = Class.forName(className);
             if (!pluginClass.isAssignableFrom(clazz)) {

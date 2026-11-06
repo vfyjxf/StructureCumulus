@@ -110,10 +110,8 @@ class CommandSupportTest {
             ReadScope.none().withTraits(Set.of(inventory)),
             ctx -> Reply.match()
         );
-        SnapshotPolicy policy = CommandSupport.policy(
-            declared.reads(),
-            Siting.of(LatticePoint.origin, Orientation.identity)
-        );
+        SnapshotPolicy policy = CommandSupport
+                .policy(declared.reads(), Siting.of(LatticePoint.origin, Orientation.identity));
         assertTrue(policy.traits().contains(inventory), "a declared trait reaches the capture policy");
     }
 
