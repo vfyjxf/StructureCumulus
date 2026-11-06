@@ -471,7 +471,7 @@ class ApiExamplesTest {
     }
 
     @Test
-    void theEnvelopeDocumentAsWrittenDoesNotLower() {
+    void theEnvelopeDocumentAsWrittenLowers() {
         CuboidSet ringCells = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5))
                 .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 5, 2, 5)));
         BlueprintSpec root = new BlueprintSpec(
@@ -524,8 +524,8 @@ class ApiExamplesTest {
                     sc("port"),
                     sc("bay"),
                     Value.object(),
-                    sc("any_occupant"),
-                    Value.object(),
+                    sc("each_cell"),
+                    Value.object(Map.of("element", Value.object(Map.of("kind", Value.string("any_occupant"))))),
                     null,
                     null
                 )
@@ -541,17 +541,11 @@ class ApiExamplesTest {
         );
 
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), documentContext());
-        assertNull(result.blueprint(), "the §6.5 document as written does not lower to a blueprint");
-        assertTrue(
-            result.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.documentField.code())),
-            () -> result.findings().findings().toString()
-        );
-        assertTrue(
-            result.findings().findings().stream()
-                    .anyMatch(finding -> finding.message().contains("focus and expectation subject differ")),
-            () -> result.findings().findings().toString()
-        );
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        Blueprint reactor = result.blueprint();
+        assertNotNull(reactor, "the §6.5 document as written lowers to a blueprint");
+        assertEquals(3, reactor.bays().size(), "ring, port and the reserved envelope bay");
+        assertEquals(3, reactor.checks().size(), "ring, port and the reserved envelope check");
     }
 
     private static CompilerContext documentContext() {
