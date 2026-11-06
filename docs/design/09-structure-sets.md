@@ -440,7 +440,8 @@ If a settle fails:
   does not stop the remaining rollbacks;
 - do not auto-retry.
 
-`release(owner, siting)` is coarse by contract (D-38) and advances the ledger revision. The host-side
+`release(instance)` is coarse by contract (D-38, keyed by the instance since D-45) and advances the
+ledger revision. The host-side
 invalidation is `StructureEvent.Broken` through the bound manager: a formed structure's context is
 removed even when its release fails. `rolledBack` names only the attempts whose release answered
 `Settled`; the host owns any further invalidation policy (`06-verification.md` §3.3).
