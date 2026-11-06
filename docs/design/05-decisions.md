@@ -1148,7 +1148,7 @@ exception flag to `ClaimMatrix`: the matrix compares instances and must stay a p
 **Consequence:** `InMemoryClaimLedger.settle` excludes the replacing rows before `conflicts`;
 `claim` §4.5 states the rule; the three same-siting GameTests pass again.
 
-### D-49 — A context key is identified by (id, type), not by its whole record
+### D-51 — A context key is identified by (id, type), not by its whole record
 
 `ContextKey` carries five components, but only two of them name the slot: `id` and `type`. `merge` and
 `whenAbsent` describe how the slot is filled; `retention` says when it is readable. Two keys with the
