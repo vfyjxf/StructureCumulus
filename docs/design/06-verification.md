@@ -66,8 +66,8 @@ closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `StructureEven
 invalidation, and one set budget shared by presence and every member attempt (§3.3). The manager round
 (D-40 with D-44/D-45) then makes claims session-scoped and instance-keyed, and D-47 moves block
 observation into the funnel. The current
-suites total 562 kernel tests (68 containers), 442 adapter unit tests (46 containers) and 140
-`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (562 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
+suites total 569 kernel tests (68 containers), 442 adapter unit tests (46 containers) and 140
+`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (569 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
 `Codes.all` has 66 entries and the decision record has 81 decisions (D-82; D-78 withdrawn). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
@@ -600,7 +600,7 @@ latency for one operation, and the numbers are compared by a person looking at t
 
 ## 8. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 140 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (562 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 140 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (569 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
