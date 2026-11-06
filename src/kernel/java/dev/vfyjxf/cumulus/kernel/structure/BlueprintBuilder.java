@@ -404,6 +404,12 @@ public final class BlueprintBuilder {
         List<SectionComputation<?>> sections = new ArrayList<>();
         List<AggregateComputation<?>> aggregateList = new ArrayList<>();
         for (Computation<?> computation : computations) {
+            if (computation instanceof SectionComputation<?> && computation instanceof AggregateComputation<?>) {
+                fail(
+                    "SC-BPT-0007",
+                    "computation " + computation.id() + " is both a section and an aggregate computation"
+                );
+            }
             if (computation instanceof SectionComputation<?> section) {
                 sections.add(section);
             } else if (computation instanceof AggregateComputation<?> aggregate) {

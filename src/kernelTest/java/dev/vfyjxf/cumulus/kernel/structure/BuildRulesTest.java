@@ -590,6 +590,50 @@ class BuildRulesTest {
     }
 
     @Test
+    void bothSectionAndAggregate() {
+        Check<?> check = anyCellCheck(id("cells"), anyCellBay());
+        ContextKey<Long> merged = ContextKeys.of(id("merged"), Long.class, Retention.instance, Merges.sum());
+
+        class Hybrid implements SectionComputation<Long>, AggregateComputation<Long> {
+
+            @Override
+            public ContextKey<Long> output() {
+                return merged;
+            }
+
+            @Override
+            public Set<ContextKey<?>> inputs() {
+                return Set.of();
+            }
+
+            @Override
+            public CuboidSet region() {
+                return CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+            }
+
+            @Override
+            public Outcome<Long> compute(SectionContext ctx) {
+                return Outcome.found(0L);
+            }
+
+            @Override
+            public Outcome<Long> compute(AggregateContext ctx) {
+                return Outcome.found(0L);
+            }
+        }
+        BlueprintRejected rejected = assertThrows(
+            BlueprintRejected.class,
+            () -> Blueprint.builder(id("hybrid")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
+                    .computation(new Hybrid()).build()
+        );
+        assertEquals(Codes.planInvalid, rejected.code());
+        assertTrue(
+            Objects.requireNonNull(rejected.getMessage(), "message").contains("both a section and an aggregate"),
+            rejected.getMessage()
+        );
+    }
+
+    @Test
     void derivationRulesAreBpt0008() {
         assertThrows(
             IllegalArgumentException.class,
