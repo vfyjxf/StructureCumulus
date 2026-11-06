@@ -744,7 +744,7 @@ public final class MatchEngine {
                     Locus.local(bay.cells())
                 );
             }
-            CuboidSet bound = CuboidSet.empty();
+            List<Cuboid> boundCells = new ArrayList<>(binding.subjects().size());
             for (OccupantSnapshot subject : binding.subjects()) {
                 if (!subject.ref().snapshot().equals(request.lease().id()) || subject.ref().frame() != 0) {
                     return code(
@@ -771,9 +771,10 @@ public final class MatchEngine {
                     );
                 }
                 if (!subject.isAir()) {
-                    bound = bound.union(subject.footprint().asSet());
+                    boundCells.add(subject.footprint());
                 }
             }
+            CuboidSet bound = CuboidSet.of(boundCells);
             if (bay.coverage() == Coverage.oneSubject && !bound.contentEquals(bayWorld)) {
                 return code(
                     Codes.bindingInvalid,
@@ -834,18 +835,19 @@ public final class MatchEngine {
                 }
                 Contest contest = new Contest(row.bay(), incumbent.instance(), incumbent.bay());
                 Conflict conflict = byPair
-                        .computeIfAbsent(contest, ignored -> new Conflict(row, incumbent, CuboidSet.empty()));
-                conflict.cells = conflict.cells.union(Cuboid.of(row.cell().point()));
+                        .computeIfAbsent(contest, ignored -> new Conflict(row, incumbent, new ArrayList<>()));
+                conflict.cells.add(Cuboid.of(row.cell().point()));
             }
         }
         List<Finding> findings = new ArrayList<>();
         for (Conflict conflict : byPair.values()) {
-            Locus locus = Locus.world(conflict.cells);
+            CuboidSet contestedCells = CuboidSet.of(conflict.cells);
+            Locus locus = Locus.world(contestedCells);
             findings.add(
                 Finding.builder(Codes.claimConflict).phase(phase)
                         .message(
                             conflict.incumbent.instance() + ":" + conflict.incumbent.bay() + " already holds "
-                                    + conflict.cells.volume() + " cell(s) of " + conflict.requested.bay()
+                                    + contestedCells.volume() + " cell(s) of " + conflict.requested.bay()
                         ).label(Label.primary(locus, "contested cells"))
                         .note("this bay asks " + conflict.requested.sharing(), locus)
                         .note("the incumbent holds " + conflict.incumbent.sharing(), null).build()
@@ -860,9 +862,9 @@ public final class MatchEngine {
     private static final class Conflict {
         private final ClaimRow requested;
         private final ClaimRow incumbent;
-        private CuboidSet cells;
+        private final List<Cuboid> cells;
 
-        private Conflict(ClaimRow requested, ClaimRow incumbent, CuboidSet cells) {
+        private Conflict(ClaimRow requested, ClaimRow incumbent, List<Cuboid> cells) {
             this.requested = requested;
             this.incumbent = incumbent;
             this.cells = cells;
