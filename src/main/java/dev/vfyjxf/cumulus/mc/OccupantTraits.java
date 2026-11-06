@@ -38,7 +38,7 @@ public final class OccupantTraits {
 
     public static final TraitKey<IFluidHandler> fluid = new TraitKey<>(id("fluid"), IFluidHandler.class);
 
-    private static final FindingCode unreadableTrait = FindingCode.of(FindingCode.Family.mc, 2);
+    private static final FindingCode unreadableTrait = AdapterCodes.unreadableTrait;
 
     static List<TraitSlot> block(
         SnapshotPolicy policy,

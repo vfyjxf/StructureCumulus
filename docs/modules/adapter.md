@@ -155,6 +155,9 @@ refusal, M2d adds nested frames, and M5e adds the capture report and, with it, t
 The rules below are implemented.
 
 - One server-thread call. `ServerChunkCache.getChunkNow`; the capture never calls `Level.getChunk`.
+  `LevelCapture.capture` entered from another thread is rejected with an `IllegalStateException`
+  naming the server thread, before any chunk is touched. Snapshot reads are exempt: a lease's view
+  is an immutable snapshot and may be read from any thread.
   This covers the capture's own reads: a capability provider is host code and is handed the live
   `Level`, so a provider that reads a neighbour may cause a load — the vanilla double chest does,
   through `ChestBlock.getContainer`. That read is the provider's, not the capture's.
@@ -449,7 +452,8 @@ the loader's resolved order. `registrar.catalogs()` freezes the snapshot every c
 is no runtime contribution and no second assembly.
 
 Failures use the loader's existing policy, not a new one. A plugin that throws while registering —
-including the `SC-SPI-0003` the registrar raises when a contribution would replace an id that is
+a `RuntimeException` or a `LinkageError` from a class it cannot resolve, including the
+`SC-SPI-0003` the registrar raises when a contribution would replace an id that is
 already registered — is a fatal failure named by its plugin id, and a plugin that depends on it
 through a non-optional constraint is skipped with the same fatal/warning split a missing dependency
 produces; warnings log, fatals throw `PluginLoadingException` out of `ServerState.open`. The

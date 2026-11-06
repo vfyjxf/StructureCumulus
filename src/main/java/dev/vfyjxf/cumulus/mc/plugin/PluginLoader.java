@@ -190,8 +190,12 @@ public final class PluginLoader {
             }
             try {
                 plugin.register(registrar);
-            } catch (RuntimeException failure) {
-                registrar.fail(plugin.pluginId(), failure);
+            } catch (RuntimeException | LinkageError failure) {
+                // the registrar attributes a RuntimeException, so a LinkageError rides wrapped, its cause intact
+                RuntimeException attributed = failure instanceof RuntimeException runtime
+                        ? runtime
+                        : new IllegalStateException("register failed: " + failure, failure);
+                registrar.fail(plugin.pluginId(), attributed);
                 failures.add(new LoadingFailure<>(plugin, FailureType.fatal, "register failed: " + failure));
                 broken.add(plugin.pluginId());
             }

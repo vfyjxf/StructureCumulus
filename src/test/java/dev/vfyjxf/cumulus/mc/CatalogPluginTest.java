@@ -33,6 +33,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -103,6 +104,23 @@ class CatalogPluginTest {
         assertFalse(dependent.registered, "a dependent of the broken plugin is skipped");
         assertEquals(1, registrar.failures().size());
         assertEquals(broken.pluginId(), registrar.failures().get(0).pluginId());
+    }
+
+    @Test
+    void aLinkageErrorInRegisterIsAFatalFailureNamingItself() {
+        MissingClassPlugin broken = new MissingClassPlugin();
+        CatalogRegistrar registrar = CatalogRegistrar.builtin();
+        PluginLoadingException exception = assertThrows(
+            PluginLoadingException.class,
+            () -> PluginLoader.register(logger, "catalog", lookup(broken), registrar)
+        );
+        assertTrue(
+            exception.failures().stream().anyMatch(failure -> failure.pluginId().equals(broken.pluginId())),
+            () -> exception.failures().toString()
+        );
+        assertEquals(1, registrar.failures().size());
+        assertEquals(broken.pluginId(), registrar.failures().get(0).pluginId());
+        assertInstanceOf(NoClassDefFoundError.class, registrar.failures().get(0).cause().getCause());
     }
 
     @Test
@@ -222,6 +240,19 @@ class CatalogPluginTest {
         @Override
         public void register(CatalogRegistrar registrar) {
             throw new IllegalStateException("the reactor exploded");
+        }
+    }
+
+    private static final class MissingClassPlugin implements ModPlugin {
+
+        @Override
+        public NamespacedId pluginId() {
+            return NamespacedId.of("test", "missing_class");
+        }
+
+        @Override
+        public void register(CatalogRegistrar registrar) {
+            throw new NoClassDefFoundError("the optional mod is absent");
         }
     }
 

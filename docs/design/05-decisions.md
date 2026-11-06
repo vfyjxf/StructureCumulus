@@ -1313,7 +1313,8 @@ trait plugins in the same host.
 Built-in ids cannot be replaced; a duplicate id with a different value is `SC-SPI-0003`, thrown while the
 catalog is built.
 
-**Failures.** A plugin that throws while registering is a fatal load failure named by its id, and every
+**Failures.** A plugin that throws while registering — a `RuntimeException` or a `LinkageError`
+from a class it cannot resolve — is a fatal load failure named by its id, and every
 plugin that depends on it is skipped — the loader's existing classes, not a new one.
 
 > Numbering note: D-46 is still a proposal carried by

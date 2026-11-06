@@ -44,6 +44,7 @@ import org.jspecify.annotations.NullMarked;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** M2a GameTests: capture, the first check, and an entity over a block. */
 @NullMarked
@@ -89,6 +90,52 @@ public final class CaptureGameTest {
                 "cell status"
             );
         }
+        helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void aWrongThreadCaptureIsRejected(GameTestHelper helper) {
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        LevelCapture capture = new LevelCapture(helper.getLevel());
+        CaptureRequest request = new CaptureRequest(
+            Cuboid.of(
+                origin.getX(),
+                origin.getY(),
+                origin.getZ(),
+                origin.getX() + 1,
+                origin.getY() + 1,
+                origin.getZ() + 1
+            ),
+            SnapshotPolicy.minimal()
+        );
+        AtomicReference<RuntimeException> thrown = new AtomicReference<>();
+        Thread offThread = new Thread(
+            () -> {
+                try {
+                    capture.capture(request);
+                } catch (RuntimeException failure) {
+                    thrown.set(failure);
+                }
+            },
+            "off-thread capture"
+        );
+        offThread.start();
+        try {
+            offThread.join();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            helper.fail("the off-thread capture was interrupted");
+            return;
+        }
+        RuntimeException rejection = thrown.get();
+        if (!(rejection instanceof IllegalStateException rejected)) {
+            helper.fail("an off-thread capture must be rejected with ISE, got: " + rejection);
+            return;
+        }
+        helper.assertTrue(
+            Objects.requireNonNull(rejected.getMessage()).contains("server thread"),
+            "the rejection names the server thread: " + rejected.getMessage()
+        );
         helper.succeed();
     }
 
