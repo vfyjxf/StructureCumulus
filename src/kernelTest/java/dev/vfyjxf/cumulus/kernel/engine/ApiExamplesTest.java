@@ -590,7 +590,7 @@ class ApiExamplesTest {
     @Test
     void theEnvelopeDocumentAsWrittenLowers() {
         CuboidSet ringCells = CuboidSet.of(Cuboid.of(0, 0, 0, 5, 2, 5))
-                .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 5, 2, 5)));
+                .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 4, 2, 4)));
         BlueprintSpec root = new BlueprintSpec(
             NamespacedId.of("mymod", "fusion"),
             Cuboid.of(0, 0, 0, 5, 5, 5),

@@ -355,7 +355,7 @@ expressed:
   "bounds": [0, 0, 0, 5, 5, 5],
   "envelope": true,
   "bays": [
-    {"id": "ring", "boxes": [[0,0,0,5,2,5]], "minus": [[1,0,1,4,2,4]],
+    {"id": "ring", "boxes": [[0,0,0,5,2,5]], "minus": [[1,0,1,3,2,3]],
      "coverage": "every_cell", "footprint": "bound", "sharing": "exclusive"},
     {"id": "port", "box": [2,2,2,3,3,3], "coverage": "every_cell",
      "footprint": "none", "sharing": "shared"}
