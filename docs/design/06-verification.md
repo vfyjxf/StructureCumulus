@@ -66,7 +66,7 @@ closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `StructureEven
 invalidation, and one set budget shared by presence and every member attempt (§3.3). The current
 suites total 382 kernel tests (48 containers), 411 adapter unit tests (43 containers) and 126
 `@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0). `tools/spec-check.py` is clean.
-`Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Model C, body identity,
+`Codes.all` has 66 entries and the decision record has 40 decisions (D-40). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
