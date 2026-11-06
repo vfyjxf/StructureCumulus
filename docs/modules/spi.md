@@ -51,6 +51,7 @@ public interface Catalogs {
 public record Host(DocumentSource documents, @Nullable ClaimLedger ledger,
                    StructureManager structures, java.util.Map<NamespacedId, Class<?>> types) {
     public Host { /* immutable; contexts non-null; types sorted */ }
+    public ContextStore contexts();
     public static Host empty();
 }
 

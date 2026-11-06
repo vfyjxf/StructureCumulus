@@ -61,10 +61,14 @@ public interface ContextStore {
 
 public record StructureSpec(OwnerId owner, Siting siting, NamespacedId structure) {}
 public record StructureInstance(InstanceId id, StructureSpec spec, StructureContext context,
-                                CuboidSet bounds) {}
+                                CuboidSet bounds) {
+    public OwnerId owner();
+    public Siting siting();
+}
 public interface StructureAttempt extends ContextStore {
     InstanceId id();
     StructureSpec spec();
+    boolean isOpen();
     StructureInstance commit(CuboidSet bounds);
     void abort();
 }

@@ -102,9 +102,9 @@ public record OccupantSnapshot(OccupantRef ref, OccupantDescriptor descriptor, C
     public boolean has(TraitKey<?> key);
 }
 
-public record OccupantFilter(java.util.function.Predicate<NamespacedId> type,
-                             java.util.function.Predicate<OccupantKind> kind,
-                             java.util.function.Predicate<NamespacedId> trait) {
+public record OccupantFilter(@Nullable java.util.function.Predicate<NamespacedId> type,
+                             @Nullable java.util.function.Predicate<OccupantKind> kind,
+                             @Nullable java.util.function.Predicate<NamespacedId> trait) {
     public static OccupantFilter any();
     public static OccupantFilter ofType(NamespacedId type);
     public static OccupantFilter ofKind(OccupantKind kind);

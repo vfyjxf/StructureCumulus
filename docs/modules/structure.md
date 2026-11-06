@@ -77,6 +77,8 @@ public record Check<T>(NamespacedId id, Bay bay, Focus<T> focus, Expectation<T> 
     public Check { /* id non-null; bay non-null; focus.subject() == expectation.subject() */ }
     public static <T> Check<T> of(NamespacedId id, Bay bay, Focus<T> focus,
                                   Expectation<T> expectation);
+    public static <T> Check<T> of(NamespacedId id, Bay bay, Focus<T> focus,
+                                  Expectation<T> expectation, @Nullable String description);
     public ReadScope reads();
     public CheckResult run(FocusContext ctx);
 }

@@ -84,11 +84,13 @@ public record SettleRequest(InstanceId instance, java.util.List<ClaimRow> rows,
 }
 
 public interface ClaimLedger {
+    static ClaimLedger inMemory(World world);
     World world();
     long revision();
     ClaimVerdict settle(SettleRequest request);
     ClaimVerdict release(InstanceId instance);
     ClaimView read(Cuboid box);
+    void retire();
 }
 
 public final class ClaimMatrix {

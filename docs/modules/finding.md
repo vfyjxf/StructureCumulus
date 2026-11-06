@@ -94,7 +94,7 @@ public record Finding(FindingCode code, Severity severity, String message,
         public Builder secondary(Locus locus, String message);
         public Builder context(Locus locus, String message);
         public Builder note(String message);
-        public Builder note(String message, Locus locus);
+        public Builder note(String message, @Nullable Locus locus);
         public Builder suggest(String message, Applicability applicability,
                                @Nullable NamespacedId remedy);
         public Finding build();

@@ -170,6 +170,8 @@ dependencies {
     kernelTestImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     kernelTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     kernelTestCompileOnly 'org.jspecify:jspecify:1.0.1'
+    // Reading @Nullable reflectively needs the annotation on the runtime classpath too.
+    kernelTestRuntimeOnly 'org.jspecify:jspecify:1.0.1'
 
     // JSpecify is what the sources annotate with. The test set declares its own copy rather than
     // inheriting compileOnly, so the annotation is present on the classpath that reads it.
@@ -207,6 +209,8 @@ tasks.register('kernelTest', Test) {
     description = 'Runs the kernel tests, which carry no Minecraft.'
     testClassesDirs = sourceSets.kernelTest.output.classesDirs
     classpath = sourceSets.kernelTest.runtimeClasspath
+    // SpecIndexTest reads docs/modules as its comparison input, so those files gate up-to-dateness.
+    inputs.files(fileTree('docs/modules') { include '*.md' })
     useJUnitPlatform()
     testLogging {
         exceptionFormat = 'full'

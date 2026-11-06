@@ -39,6 +39,9 @@ public record MatchRequest(Blueprint blueprint, Siting siting, SnapshotLease lea
                            InstanceId instance, OwnerId owner, Budget budget,
                            @Nullable ClaimView claims, CancelToken cancel,
                            @Nullable CachedContext cachedContext) {
+    public MatchRequest(Blueprint blueprint, Siting siting, SnapshotLease lease,
+                        InstanceId instance, OwnerId owner, Budget budget,
+                        @Nullable ClaimView claims, CancelToken cancel);
     public static MatchRequest of(Blueprint blueprint, Siting siting, SnapshotLease lease,
                                   InstanceId instance, OwnerId owner, Budget budget,
                                   @Nullable ClaimView claims);                  // cachedContext = null
@@ -88,7 +91,7 @@ public sealed interface MatchResult {
 public final class MatchEngine {
     public static MatchResult check(MatchRequest request);
     public static MatchResult settle(MatchRequest request, MatchResult.Admitted admitted,
-                                     @Nullable ClaimLedger ledger, ContextStore contexts);
+                                     @Nullable ClaimLedger ledger, StructureAttempt attempt);
     public static StructureContext derive(MatchResult.Formed formed,
                                           java.util.List<DerivationSpec> derivations,
                                           Catalog<Deriver<?>> derivers, ContextStore contexts);
@@ -96,7 +99,7 @@ public final class MatchEngine {
 }
 
 public final class ClaimPlanner {
-    public static Derived derive(Blueprint blueprint, Siting siting, OwnerId owner,
+    public static Derived derive(Blueprint blueprint, Siting siting, InstanceId instance,
                                  java.util.List<BayBinding> bindings);
     public record Derived(java.util.List<ClaimRow> rows, CuboidSet footprint) { }
     private ClaimPlanner() {}

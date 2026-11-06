@@ -50,7 +50,7 @@ public record NamespacedId(String namespace, String path) implements Comparable<
     public static final String defaultNamespace = "structurecumulus";
     public static NamespacedId of(String namespace, String path);
     public static NamespacedId of(String path);
-    public static @Nullable NamespacedId parse(String text);
+    public static @Nullable NamespacedId parse(@Nullable String text);
     public String text();
     @Override public int compareTo(NamespacedId other);
 }
@@ -151,7 +151,7 @@ public record FindingCode(Family family, int number) implements Comparable<Findi
     }
     public static FindingCode of(Family family, int number);       // 1..9999
     public static FindingCode of(String text);                     // parse or IAE
-    public static @Nullable FindingCode parse(String text);
+    public static @Nullable FindingCode parse(@Nullable String text);
     public String text();                                          // "SC-EXP-0001"
     @Override public int compareTo(FindingCode other);
 }
