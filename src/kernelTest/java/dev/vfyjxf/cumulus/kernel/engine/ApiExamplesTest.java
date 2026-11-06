@@ -67,7 +67,6 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -346,7 +345,7 @@ class ApiExamplesTest {
     }
 
     @Test
-    void theDocumentCampfireAsWrittenDoesNotLower() {
+    void theDocumentCampfireLowersToTheAuthorsBlueprint() {
         BlueprintSpec root = new BlueprintSpec(
             NamespacedId.of("mymod", "campfire"),
             Cuboid.of(0, 0, 0, 3, 3, 3),
@@ -356,8 +355,8 @@ class ApiExamplesTest {
             List.of(
                 new BaySpec(
                     sc("shell"),
-                    CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 3, 3, 3)))
-                            .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 3, 1, 3))),
+                    CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)))
+                            .subtract(CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2))),
                     Coverage.everyCell,
                     Footprint.box(),
                     Sharing.exclusive,
@@ -366,7 +365,7 @@ class ApiExamplesTest {
                 ),
                 new BaySpec(
                     sc("hollow"),
-                    CuboidSet.of(Cuboid.of(1, 1, 1, 3, 3, 3)),
+                    CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)),
                     Coverage.everyCell,
                     Footprint.box(),
                     Sharing.exclusive,
@@ -375,7 +374,7 @@ class ApiExamplesTest {
                 ),
                 new BaySpec(
                     sc("fire"),
-                    CuboidSet.of(Cuboid.of(1, 0, 1, 3, 1, 3)),
+                    CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2)),
                     Coverage.everyCell,
                     Footprint.box(),
                     Sharing.exclusive,
@@ -430,7 +429,7 @@ class ApiExamplesTest {
                     NamespacedId.of("mymod", "air_cells"),
                     sc("air"),
                     Value.object(),
-                    CuboidSet.of(Cuboid.of(1, 1, 1, 3, 3, 3)),
+                    CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2)),
                     null,
                     NamespacedId.of("mymod", "air_cells"),
                     Set.of(),
@@ -456,18 +455,51 @@ class ApiExamplesTest {
         );
 
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), documentContext());
-        assertNull(result.blueprint(), "the §5 document as written does not lower to a blueprint");
-        assertTrue(
-            result.findings().findings().stream()
-                    .anyMatch(finding -> finding.code().equals(Codes.coverageInvalid.code())),
-            () -> result.findings().findings().toString()
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        assertNotNull(result.blueprint(), "the §5 document lowers to a blueprint");
+
+        CuboidSet hollowCells = CuboidSet.of(Cuboid.of(1, 1, 1, 2, 2, 2));
+        CuboidSet fireCells = CuboidSet.of(Cuboid.of(1, 0, 1, 2, 1, 2));
+        Bay shell = Bay.of(
+            sc("shell"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(hollowCells).subtract(fireCells),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
         );
-        assertTrue(
-            result.findings().findings().stream().anyMatch(
-                finding -> finding.message().contains("EVERY_CELL bay structurecumulus:fire has undecided cells")
-            ),
-            () -> result.findings().findings().toString()
-        );
+        Bay hollow = Bay.of(sc("hollow"), hollowCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay fire = Bay.of(sc("fire"), fireCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        ContextKey<Long> airCells = ContextKeys
+                .of(NamespacedId.of("mymod", "air_cells"), Long.class, Retention.instance, Merges.sum());
+        Blueprint javaCampfire = Blueprint.builder(NamespacedId.of("mymod", "campfire"))
+                .bounds(Cuboid.of(0, 0, 0, 3, 3, 3))
+                .check(
+                    Check.of(
+                        sc("shell_bricks"),
+                        shell,
+                        Focuses.bay(),
+                        Expectations.eachCell(Expectations.block(mc("stone_bricks")))
+                    )
+                ).check(Check.of(sc("hollow_air"), hollow, Focuses.bay(), Expectations.eachCell(Expectations.air())))
+                .check(
+                    Check.of(
+                        sc("fire"),
+                        fire,
+                        Focuses.occupant(LatticePoint.of(1, 0, 1)),
+                        Expectations.block(mc("campfire"))
+                    )
+                ).computation(Computations.air(airCells, hollowCells))
+                .anchor(new AnchorSpec(sc("front"), "facing", "north"))
+                .orientation(
+                    OrientationPolicy.builder(sc("front"))
+                            .allow(
+                                Orientation.identity,
+                                Orientation.of(Turn.clockwise, Tilt.level, Flip.none),
+                                Orientation.of(Turn.half, Tilt.level, Flip.none),
+                                Orientation.of(Turn.counterclockwise, Tilt.level, Flip.none)
+                            ).uprightOnly().build()
+                ).build();
+        assertEquals(javaCampfire, result.blueprint(), "the §5 document lowers to the author's blueprint");
     }
 
     @Test
