@@ -1295,6 +1295,27 @@ degrades by skipping, and a skipped plugin surfaces as unknown kinds at document
 **Why not extend the failure record (A).** A record that can hold "an instance or a class name" changes
 a public shape for one message that the log already carries.
 
+### D-72 — A mod contributes catalog entries through the plugin entry point it already has
+
+`ModPlugin` gains one default method, `register(CatalogRegistrar)`. A plugin that contributes document
+kinds overrides it; every plugin that does not inherits a no-op, so trait providers and other existing
+plugins are untouched. Discovery, ordering, duplicate detection and failure attribution stay with
+`PluginLookup` and `PluginLoader`.
+
+The host calls `register` once per loaded plugin, in the loader's resolved order, while it assembles
+`Catalogs` and before any document is compiled. The catalogs are then a frozen snapshot.
+
+**Why a default method and not a new interface.** One entry point means one discovery path, one order,
+one failure model. A second plugin interface would re-implement all three and behave differently from
+trait plugins in the same host.
+
+**What a plugin may add.** Expectation, focus, computation and deriver factories, plus code entries.
+Built-in ids cannot be replaced; a duplicate id with a different value is `SC-SPI-0003`, thrown while the
+catalog is built.
+
+**Failures.** A plugin that throws while registering is a fatal load failure named by its id, and every
+plugin that depends on it is skipped — the loader's existing classes, not a new one.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
