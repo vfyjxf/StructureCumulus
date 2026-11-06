@@ -70,7 +70,7 @@ public record ClaimView(java.util.List<ClaimRow> rows, long revision, boolean av
 
 public sealed interface ClaimVerdict {
     record Settled(long revision, java.util.List<ClaimRow> rows) implements ClaimVerdict {
-        public Settled { /* canonical rows; revision >= 1 when rows are present */ }
+        public Settled { /* this key's canonical rows; revision >= 1 when rows are present */ }
     }
     record Conflict(java.util.List<ClaimRow> incumbents) implements ClaimVerdict {
         public Conflict { /* non-empty; canonical order */ }
@@ -150,15 +150,19 @@ them when it derives the settled rows (`SC-CLM-0001`).
 ### 4.5 Ledger behaviour
 
 - `read(box)` is total: an unavailable store answers `ClaimView.unavailable()` (no rows, revision 0,
-  `available == false`), never an empty available view. An empty result is a fact.
+  `available == false`), never an empty available view. An empty result is a fact. Its rows and its
+  revision come from one ledger state: a reader never holds a revision that predates the rows it
+  reads.
 - `settle(request)` is one compare-and-set over all rows of the request's instance, and the request
   carries at least one row (D-60). If `request.expectedRevision() != revision()`, it answers
-  `RevisionMoved` and writes nothing — even when the content would have matched, because the caller's
-  view is stale and it must re-read. It then drops the rows this settle replaces (next bullet) and,
-  if a request row still conflicts with a remaining incumbent, answers `Conflict` with those
-  incumbents and writes nothing. Otherwise it compares the resulting content with the current rows:
-  identical content answers `Settled(revision, rows)` and writes nothing; different content writes
-  the replacement and answers `Settled(newRevision, rows)`, bumping the revision by one.
+  `RevisionMoved(expected, actual)` — `actual` is the revision at the refusal — and writes nothing,
+  even when the content would have matched, because the caller's view is stale and it must re-read.
+  It then drops the rows this settle replaces (next bullet) and, if a request row still conflicts
+  with a remaining incumbent, answers `Conflict` with those incumbents and writes nothing. Otherwise
+  it compares the resulting content with the current rows: identical content answers
+  `Settled(revision, rows)` and writes nothing; different content writes the replacement and answers
+  `Settled(newRevision, rows)`, bumping the revision by one. In both answers `rows` is the request's
+  canonical rows — the rows the instance's key now holds — never another key's rows.
 - A siting holds one instance (D-48): the rows `settle` replaces are the request instance's own rows
   and every row of another instance whose siting equals one of the request's sitings. They are
   dropped before `ClaimMatrix.conflicts` runs and are never reported as conflicts. Exclusion,
@@ -186,6 +190,10 @@ them when it derives the settled rows (`SC-CLM-0001`).
   monotonic; the revision is the content version, not a write counter: it changes exactly when the
   rows a reader can see change (D-60). A settle that changes nothing and a release of an absent key
   both keep it, so a `Formed` may carry the same ledger revision as the attempt before it.
+- The three operations on one handle are linearizable when the handle is confined to one thread; the
+  server thread is the intended confinement, and a host that shares a handle across threads locks
+  it. A ledger that cannot read or write throws an unchecked exception; it never answers a
+  fabricated verdict, and no partial write is observable.
 
 ### 4.6 Conflict findings
 
