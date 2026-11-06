@@ -357,7 +357,7 @@ snapshot with no captured host values. It adds no kernel type and no GameTest.
 
 ### 3.5 Structure-set command and host GameTests (S5, extended by S6)
 
-Three adapter GameTest classes (nine methods) in `src/main/java/.../mc` drive the set layer over a real
+Three adapter GameTest classes (nine methods) in `src/gametest/java/.../mc` drive the set layer over a real
 `LevelCapture`, the real in-memory ledger and `StructureManager`, and the server dispatcher. They add no kernel
 type, no code and no decision.
 
