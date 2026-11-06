@@ -1333,6 +1333,18 @@ sentence and has nothing to look up.
 **Why not delete it (C) or strip the prefix (B).** Deleting loses the citation; stripping leaves a code
 that no line mentions, which the "unproduced codes are deleted" rule forbids.
 
+> Numbering note: D-72…D-81 are still proposals carried by
+> `Data/StructureCumulus/plan-2026-11-01/`; each enters this file when its code lands.
+
+### D-82 — Gates run on the development machine until the repository has a remote
+
+No CI workflow is added. `06-verification.md` lists the exact commands that constitute a green build:
+`./gradlew check`, `./gradlew kernelTest test`, `./gradlew runGameTestServer`, `python3
+tools/spec-check.py` and, when a change touches the kernel's hot paths, `./gradlew jmh`.
+
+When a remote exists, a workflow runs that same list; the document is the source of truth so the
+workflow cannot drift from it.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
