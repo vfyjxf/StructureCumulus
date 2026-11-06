@@ -44,7 +44,7 @@ Until the repository has a remote, the gates run on the development machine (D-8
 When a remote exists, a workflow runs that same list; this document stays the source of truth so the
 workflow cannot drift from it.
 
-Current evidence (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): M1, M2a, M2b, M2c, M2d and
+Current evidence (2026-11-06, this tree): M1, M2a, M2b, M2c, M2d and
 M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
 `explain`, `claims`), capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase
 capture (P1, `56c632c`), the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright
@@ -63,10 +63,12 @@ and `SC-MC-0006`…`0010`; H4 adds the counts below and the host-data stress gro
 T1–T3 trait-provider slice (D-34) then replaces the provider shape and the trait values. S5 adds the
 production set command and its one capture, the check-only host path and the set GameTests (§3.5). S6
 closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `StructureEvent.Broken` rollback
-invalidation, and one set budget shared by presence and every member attempt (§3.3). The current
-suites total 382 kernel tests (48 containers), 411 adapter unit tests (43 containers) and 126
-`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0). `tools/spec-check.py` is clean.
-`Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Model C, body identity,
+invalidation, and one set budget shared by presence and every member attempt (§3.3). The manager round
+(D-40 with D-44/D-45) then makes claims session-scoped and instance-keyed, and D-47 moves block
+observation into the funnel. The current
+suites total 541 kernel tests (65 containers), 440 adapter unit tests (46 containers) and 140
+`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (541 kernel / 65 containers, 440 adapter / 46 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
+`Codes.all` has 66 entries and the decision record has 80 decisions (D-82; D-78 withdrawn). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -86,11 +88,12 @@ the adversarial round adds `AdversarialManagerTest` (41), `AdversarialClaimCover
 real-level GameTest classes below (§3.5). The host-data round adds
 `HostExpectationTest` (7 kernel tests), `McAnchorsTest` (7), `SnapshotLevelTest` (7),
 `LevelSnapshotTest` (17), `AdapterExpectationsTest` (12) and the H4 `HostDataScenarioTest` (4, §3.4).
-Their focused runs are green: `compileKernelTestJava`, `compileTestJava`, `kernelTest` selections and
-`test` selections; no full-suite result is claimed for any of them.
+Each batch landed with focused runs (`compileKernelTestJava`, `compileTestJava`, `kernelTest` and
+`test` selections); the full-suite result above covers them on the current tree.
 
-**What remains.** Two items only: the performance/cost pass over the block-entity-lazy and entity
-sweep, and fresh visual review screenshots. There is no regeneration milestone. The former
+**What remains.** Two items only: acting on the measured kernel-side cost debts and the live-level
+review items (`07` §7), and fresh visual review screenshots. There is no regeneration milestone. The
+former
 siting-aware `property` gap is now the typed host snapshot (D-33): a value check reads the captured
 snapshot, so the kernel needs no property descriptor and the adapter projects nothing. A state that
 cannot express the pose is still `SC-MC-0004` in the capture report; a missing value is
@@ -122,20 +125,20 @@ The published jar carries neither dev composition: `verifyHarnessIsolation` pins
 
 ## 2. Requirement → module → test
 
-| Requirement | Modules | Test |
-| --- | --- | --- |
-| F-01 occupants are not blocks | world, structure | entity pen; nested |
-| F-02 purity | all | purity gate |
-| F-03 typed context | context, structure | furnace capacity, iron count |
-| F-04 anchor/no controller | structure, space | anchor read; orientation policy |
-| F-05 atomic bay/door | structure, claim | door scenario |
-| F-06 claims | claim, engine | hatch, door, pipe |
-| F-07 check/settle split | engine, spi | "check writes nothing"; settle conflict |
-| F-08 data + code one IR | document | campfire/furnace parity |
-| F-09 findings | finding | golden human text; bundle order |
-| F-10 catalogs | spi, structure | builtin + addon factory |
-| F-11 remedy values | remedy | provider order/cap |
-| F-12 determinism/budget/cancel | core, engine | budget, duplicate run, cancel |
+| Requirement | Modules | Test | Status |
+| --- | --- | --- | --- |
+| F-01 occupants are not blocks | world, structure | entity pen; nested | implemented |
+| F-02 purity | all | purity gate | implemented |
+| F-03 typed context | context, structure | furnace capacity, iron count | implemented |
+| F-04 anchor/no controller | structure, space | anchor read; orientation policy | implemented |
+| F-05 atomic bay/door | structure, claim | door scenario | implemented |
+| F-06 claims | claim, engine | hatch, door, pipe | implemented |
+| F-07 check/settle split | engine, spi | "check writes nothing"; settle conflict | implemented |
+| F-08 data + code one IR | document | campfire/furnace parity | implemented |
+| F-09 findings | finding | golden human text; bundle order | implemented |
+| F-10 catalogs | spi, structure | builtin + addon factory | implemented |
+| F-11 remedy values | remedy | provider order/cap | implemented |
+| F-12 determinism/budget/cancel | core, engine | budget, duplicate run, cancel | implemented |
 
 ## 3. Scenario tests
 
@@ -212,7 +215,7 @@ suite, and each gap below is asserted rather than hidden.
 | Class | Shape it drives | Tests |
 | --- | --- | --- |
 | `Ae2CpuScenarioTest` | AE2 crafting CPU: 2×2×2 solid, missing storage cell, outside block, lattice edge, exclusive conflict | 5 |
-| `AstralAltarScenarioTest` | Astral Altar tier II (54 cells) and tier III (72 cells) grown in place | 4 |
+| `AstralAltarScenarioTest` | Astral Altar tier II (54 cells) and tier III (72 cells) grown in place | 3 |
 | `BloodAltarScenarioTest` | Blood Altar tier prefixes, any-rune slots, footprint variants, a NOTAIR probe and the empty/non-fluid classification | 6 |
 | `ContextInstanceScenarioTest` | a context-focus check over already-published instance values | 1 |
 | `DoorCoverageScenarioTest` | two-cell door coverage and a three-cell `everyCell` bay | 2 |
@@ -288,12 +291,12 @@ non-air occupant and is admitted; `BloodAltarScenarioTest.waterInANotAirSlotIsAd
 both explicit leaves. The kernel classifies by the vanilla block type; a waterlogged block is not a
 fluid occupant at this layer. `anyOccupant` is unchanged.
 
-**Release granularity and unload (D-38).** `ClaimLedger.release(owner, siting)` deletes every row of
+**Release granularity and unload (D-38, D-45).** `ClaimLedger.release(instance)` deletes every row of
 the instance; there is no per-bay or per-row release. A shared cell's two rows are still one
-lifecycle object. Removal (`Broken`/`Invalidated`), a piston partial/destroy and a structure-set
-rollback releases the whole instance; a piston full move translates the rows then releases the old
-rows in one compare-and-set. A world unload drops the manager instances, the drafts and the claim
-ledger together (D-44), so no row outlives its instance.
+lifecycle object. Removal (`Broken`/`Invalidated`), a piston move — a move is a removal (D-45); the
+adapter invalidates the instance and releases its rows, and a rebuild is a fresh settle — and a
+structure-set rollback all release the whole instance. A world unload drops the manager instances,
+the drafts and the claim ledger together (D-44), so no row outlives its instance.
 `StructureLifecycleAdversarialGameTest` asserts that split; `ClaimLedgerTest` characterizes the
 whole-instance removal and the duplicate-row collapse.
 
@@ -394,19 +397,20 @@ type, no new code and no decision.
 | adapter | `StructureLifecycleAdversarialGameTest` | overlapping break, explosion, placement, same-siting settle replacement, piston full move/partial/destroy/conflict, level unload keeps claims, rejected move | 12 |
 | adapter | `StructureSetAdversarialGameTest` | check-only leaves no state, re-settle replacement, shared budget stop, duplicate placement, six-satellite set | 5 |
 
-**Corrected lifecycle (D-38/D-40).** The lifecycle wording is now:
+**Corrected lifecycle (D-38/D-40, D-44/D-45).** The lifecycle wording is now:
 
-- `Broken`/`Invalidated` release the whole `(owner, siting)` claim key; a piston partial/destroyed
-  result is an invalidation and releases the old rows; a piston full move translates the rows to the
-  new siting and releases the old key; a rejected move does not leave translated rows behind.
-  `StructureLifecycleAdversarialGameTest.pistonFullMoveTranslatesClaimsAndKeepsTheInstanceContext`,
-  `pistonPartialMoveInvalidatesAndReleasesTheOldClaims`,
-  `pistonDestroyedPartInvalidatesAndReleasesTheOldClaims`,
-  `pistonMoveClaimConflictInvalidatesAndKeepsTheIncumbent`,
-  `rejectedPistonMoveInvalidatesTheStaleInstanceAndReleasesItsClaims`,
-  `rejectedMoveRegressionInvalidatesAndReleasesTheWholeClaimKey`.
-- A level unload dispatches `Unloaded(world)` and drops only that world's in-memory manager instances
-  and drafts; persisted claim rows stay. `StructureLifecycleAdversarialGameTest.levelUnloadDropsInstancesAndKeepsTheClaimRows`.
+- `Broken`/`Invalidated` release the whole instance's rows (D-45: the key is the instance); a piston
+  move is a removal, not a translation — the funnel observes the moving write as ordinary block
+  writes, the instance is invalidated and its rows released, and a rebuild is a fresh settle. A claim
+  row whose instance the manager does not know survives a moving write untouched.
+  `StructureLifecycleAdversarialGameTest.movingWriteBreaksTheStructureAndReleasesEveryClaimRow`,
+  `movingWriteKeepsAnUnformedIncumbentClaimRow`,
+  `pushIntoAnOccupiedCellInvalidatesBothInstances`,
+  `breakOverlappingStructuresReleasesEveryClaimOnce`,
+  `breakReleasesClaimRowsOutsideTheBoundsToo`.
+- A level unload dispatches `Unloaded(world)`, drops that world's in-memory manager instances and
+  drafts, and retires the level's ledger, so its claim rows go with them (D-44).
+  `StructureLifecycleAdversarialGameTest.levelUnloadDropsInstancesAndTheirClaimRows`.
 - `StructureManager` keys are `(world, owner, siting)`: the same tuple in two worlds coexists;
   `find(World, owner, siting)` is the unambiguous lookup and the two-argument `find` throws on an
   ambiguous tuple. `Loaded(World, List)` replaces only that world, validates world membership and
@@ -435,10 +439,11 @@ The expanded wave adds six suites (56 tests) over the N=10..100 shapes: kernel
 `ExpandedManagerTest` (12), `ExpandedManagerFuzzTest` (5), `ExpandedClaimMatrixTest` (12); adapter
 `ExpandedLifecycleTest` (14), `ExpandedSetTest` (9), `ExpandedInstanceFuzzTest` (4). It drives
 N=100 overlapping instances, 80/100-row claim matrices, 64-member sets, 32-member rollback and
-repeated re-settle. The wave's one production fix (P1b) is the rejected-`Moved` path in
-`WatchEvents`: a manager-rejected piston move dispatches `Invalidated` and releases the stale claim
-key instead of retaining the stale instance and rows; regression
-`rejectedMoveRegressionInvalidatesAndReleasesTheWholeClaimKey`. Total GameTests are 126/126.
+repeated re-settle. The wave's one production fix (P1b) removed the stale-row leak on a piston move: the moving write is
+observed by the funnel, the instance is broken or invalidated and every row of its key is released
+(D-45), instead of leaving the stale instance and claims behind; the coverage now lives in
+`movingWriteBreaksTheStructureAndReleasesEveryClaimRow` and
+`movingWriteKeepsAnUnformedIncumbentClaimRow` (§3.6). Total GameTests are 140/140.
 
 | Suite | Class | What it drives | Tests |
 | --- | --- | --- | --- |
@@ -568,8 +573,8 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
     run before any check, any error returns before the first settle, and a failed check stops the
     remaining checks)
 23. Can a rolled-back structure keep claim rows, or can one structure's view leak a foreign owner's
-    rows? (host: release removes every `(owner, siting)` row for the released structure by contract
-    (D-38), and `claimsOf` filters by `(owner, siting, bay)`; §3.3)
+    rows? (host: release removes every row of the released instance by contract
+    (D-45), and `claimsOf` filters by instance and the blueprint's own bays; §3.3)
 24. Can a satellite link be considered aligned under a root rotation without composing both sitings?
     (host: the plan is `rootSiting.compose(relativeSiting)`, and both endpoints are mapped through
     their own sitings; §3.3)
@@ -595,7 +600,7 @@ latency for one operation, and the numbers are compared by a person looking at t
 
 ## 8. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 126 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 140 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (541 kernel / 65 containers, 440 adapter / 46 containers, 140/140 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
@@ -614,18 +619,19 @@ latency for one operation, and the numbers are compared by a person looking at t
   and the direct value identity, `OccupantTraitsTest` for the three direct capability keys and the
   absent NBT traits, `NestedExtentTest` for
   the capability declaration, the typed holder ids, the per-holder lookup and its duplicate
-  rejection, and the capability provider delegation, `SavedClaimsTest` for claim persistence, `StructureManagerTest` for the manager,
+  rejection, and the capability provider delegation, `StructureManagerTest` for the manager,
   `OrientationMappingTest` for the orientation mapping, `DeterminismTest` for canonical bytes, the
   parse/write fixed point and equal compile runs, `ServerStateDocumentSourceTest`/
   `CommandSupportTest`/`CommandRouterTest` for the M4 sources and command plumbing, `LevelWatchTest`
   for the mark counter's refcounts and lazy fingerprints, `CaptureReportsTest` for the report
-  site, and the batch-2 persistence/policy units `EntityWindowPolicyTest` (D4 fixed host mapping),
-  `SavedClaimsLifecycleTest` (CAS, conflict, whole-key release, duplicate-row collapse), and the
+  site, the batch-2 policy unit `EntityWindowPolicyTest` (D4 fixed host mapping), the kernel's
+  `ClaimLedgerTest` (CAS, conflict, whole-instance release, duplicate-row collapse; claims are
+  session-scoped and in-memory since D-44), and the
   structure-set units `StructureSetPlanTest`, `StructureSetHostTest` (including S5's
   two check-only cases), `DatapackStructureSetTest`, the six-class SS4 stress suite (§3.3),
   `HostDataScenarioTest` (§3.4) and the S5 GameTest group (§3.5).
-  **What remains:** the
-  performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+  **What remains:** acting on the measured kernel-side cost debts and the live-level review items
+  (`07` §7), and fresh visual review screenshots.
   There is no regeneration milestone.
 - The scheduler, dirty index and per-tick window diff; host-side, out of v1.
 - Rendering of overlays; the kernel produces data only.

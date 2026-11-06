@@ -297,9 +297,9 @@ incumbent rows and nothing else. The engine renders the finding through its one 
 builder — the check prediction over the frozen `ClaimView`, the settle refusal over the verdict's
 incumbents and the moved-revision re-read all call it — so both entries produce one wording.
 
-A ledger is free to answer `Formed.claims()` with its whole row set rather than only the replacement
-rows. A host that runs several structures must therefore filter the set by `(instance, siting, bay)`
-before attributing rows to one structure; the engine never does that filtering.
+`Formed.claims()` holds this key's canonical rows — the planner's derived rows, which are exactly
+what the settle wrote. A host attributes rows to one structure by reading that instance's rows; it
+never filters a whole-ledger set.
 
 ### 7.6 Budget and determinism
 
@@ -396,7 +396,7 @@ A structure set is not an engine concept. The engine still runs one `check` and 
 blueprint, each with its own `MatchRequest`, budget, instance and frozen `ClaimView`. The host places
 the root, composes each satellite's absolute siting, reads presence through the lease, validates the
 link cells, then sequences root-first independent attempts; a failed check stops before any settle,
-and a failed settle rolls the already-settled claims back with `release(owner, siting)` in reverse
+and a failed settle rolls the already-settled claims back with `release(instance)` in reverse
 order (design 09 §10, `adapter` §13). The engine owns none of that order, no presence read, no link
 geometry and no multi-structure transaction. Rollback releases claims only; a `Formed` context stays
 published and the host must invalidate it.

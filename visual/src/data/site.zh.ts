@@ -56,7 +56,7 @@ export const ZH_REMOVED: Record<string, string> = {
   CapabilityLookup: '一个 per-holder registry 取代聚合的 block/entity lookup；新增 subject kind 只需加 holder 和 provider，不改查找接口。',
   SavedContexts: 'context 绑定到 StructureInstance；begin/commit 是唯一的创建路径，manager 是 in-memory 的，库不持久化任何东西。',
   'NOTAIR = no fluid': 'NOTAIR 精确等于 not(air())：water 和 lava 是 non-air，因而通过。empty() 和 nonFluid() 是独立的 opt-in leaf（D-39）。',
-  'Per-bay claim release': '一个 siting 就是一个 instance；release 删除整个 (owner, siting) key，没有单独的行被释放（D-38）。',
+  'Per-bay claim release': '一个 instance 就是一个键；release 删除该 instance 的全部 rows，没有单独的行被释放（D-38/D-45）。',
   'Claimable by default': 'focus 必须 opt in；当 bay 会 claim 时，build 拒绝不能 claim 的 subject-binding focus（SC-BPT-0005，D-37）。',
 };
 
@@ -95,19 +95,19 @@ export const ZH_GROUPS: Record<string, string> = {
 };
 
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
-  Compile: { label: '编译', note: 'gradlew check 在 70857d7 + D-40 tree 通过' },
+  Compile: { label: '编译', note: 'gradlew check 在 D-82 tree 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 40 个容器；adapter 280 / 35 个容器；GameTests 74/74' },
-  'Spec index': { label: '规范索引', note: 'spec-check.py · 65 codes' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 65 个容器；adapter 440 / 46 个容器；GameTests 140/140' },
+  'Spec index': { label: '规范索引', note: 'spec-check.py · 66 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 280 · GameTests 74/74' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 440 · GameTests 140/140' },
   codes: { label: '代码', note: '13 个 kernel family · 一张 Codes 表' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
-  decisions: { label: '决策', note: 'D-40 · ruling，不是偏好' },
+  decisions: { label: '决策', note: 'D-82 · ruling，不是偏好' },
 };
 
 export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
@@ -145,7 +145,7 @@ export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
   },
   'D-38': {
     title: 'whole-key release',
-    text: 'ClaimLedger.release(owner, siting) 删除该 key 的全部 rows，是唯一的 release API；一个 siting 就是一个 instance，所以没有 per-bay 或 per-row release。WatchEvents 在 Broken/Invalidated 时释放该 key，在完整 Moved 时平移它；冲突则变成 Invalidated。失败的 release 是 SC-SET-0007。',
+    text: 'ClaimLedger.release(instance) 删除该 instance 的全部 rows，是唯一的 release API（D-45），因此没有 per-bay 或 per-row release。observation funnel 对被移动的结构 break 或 invalidate 并释放其 rows——move 是移除，不是平移。失败的 release 是 SC-SET-0007。',
   },
   'D-39': {
     title: 'empty 与 non-fluid',
@@ -153,6 +153,6 @@ export const ZH_LAYERS: Record<string, { title: string; text: string }> = {
   },
   'D-40': {
     title: 'structure manager',
-    text: 'StructureManager 拥有 StructureSpec/Instance/Attempt/Event：begin/commit/abort、bounds lookup、Broken/Moved/Loaded/Unloaded/Invalidated，每个 (owner, siting) 一个 formed instance。context 绑定到 instance，manager 是 in-memory 的；WatchEvents 派发 adapter 生命周期。',
+    text: 'StructureManager 拥有 StructureSpec/Instance/Attempt/Event：begin/commit/abort、bounds lookup、Broken/Invalidated/Loaded/Unloaded，每个 (world, owner, siting) 一个 formed instance。context 绑定到 instance，manager 是 in-memory 的；adapter 派发生命周期。',
   },
 };

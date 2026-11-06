@@ -38,12 +38,12 @@ const FALSIFIERS = [
   { claim: 'An envelope-only blueprint gets one derived bay and check', gate: 'anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck', detail: 'D-30; an empty set is a no-op' },
   { claim: 'A capability trait is the live capability object', gate: 'chestInventoryIsTheLiveCapability', detail: 'GameTest: IItemHandler, no copy' },
   { claim: 'A subject-binding focus that cannot claim is rejected at build', gate: 'nestedAnySubjectBoundBodyFailsBuild', detail: 'D-37: SC-BPT-0005 when the bay footprint claims' },
-  { claim: 'Claim release deletes the whole (owner, siting) key', gate: 'releaseRemovesTheWholeOwnerSitingKey', detail: 'D-38: no per-bay or per-row release; duplicate rows collapse' },
+  { claim: 'Claim release deletes the whole instance key', gate: 'releaseTakesTheWholeInstanceAndBumpsOnlyWhenItRemovesRows', detail: 'D-38/D-45: no per-bay or per-row release; duplicate rows collapse' },
   { claim: 'Water in a NOTAIR slot is admitted', gate: 'waterInANotAirSlotIsAdmitted', detail: 'D-39: NOTAIR is exactly not(air()); water is non-air' },
   { claim: 'empty and nonFluid classify air, water, lava and stone', gate: 'emptyAndNonFluidClassifyAirWaterLavaAndStone', detail: 'D-39: empty = air or fluid block; nonFluid = everything else' },
   { claim: 'A committed attempt becomes a bounds-bearing instance', gate: 'beginPublishesCommitsAndFindsByCell', detail: 'D-40: begin reserves, settle publishes, commit(bounds) forms; findAt returns it' },
   { claim: 'Abort drops the draft and releases the siting', gate: 'abortDropsTheDraftAndReleasesTheSiting', detail: 'D-40: one-shot commit/abort; the aborted serial is not reused' },
-  { claim: 'Moved keeps the id and context and rejects a collision', gate: 'movedKeepsIdAndContextAndRejectsACollision', detail: 'D-40: only the siting and bounds change' },
+  { claim: 'A moving write breaks the structure and releases every row', gate: 'movingWriteBreaksTheStructureAndReleasesEveryClaimRow', detail: 'D-45: a move is a removal, not a translation; a rebuild is a fresh settle' },
   { claim: 'Broken and Invalidated are idempotent', gate: 'brokenAndInvalidatedAreIdempotent', detail: 'D-40: an unknown id is a no-op' },
   { claim: 'Unloaded clears one world and Loaded raises the serial', gate: 'unloadedRemovesOnlyThatWorldAndLoadedRaisesTheSerial', detail: 'D-40: per-world registry; Loaded is the only bulk replace' },
   { claim: 'A block placement dispatches Invalidated through WatchEvents', gate: 'blockPlaceDispatchesInvalidated', detail: 'D-40: the adapter detects and dispatches; D-38 releases the claim rows' },
@@ -71,12 +71,12 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
   anEnvelopeOnlyBlueprintGetsTheLastBayAndCheck: { claim: '只有 envelope 的 blueprint 得到一个推导 bay 和 check', detail: 'D-30；空集合是 no-op' },
   chestInventoryIsTheLiveCapability: { claim: 'capability trait 就是 live capability 对象', detail: 'GameTest：IItemHandler，不做拷贝' },
   nestedAnySubjectBoundBodyFailsBuild: { claim: '绑定 subject 但不能 claim 的 focus 在 build 时被拒绝', detail: 'D-37：bay footprint 会 claim 时报告 SC-BPT-0005' },
-  releaseRemovesTheWholeOwnerSitingKey: { claim: 'claim release 删除整个 (owner, siting) key', detail: 'D-38：没有 per-bay 或 per-row release；重复行会折叠' },
+  releaseTakesTheWholeInstanceAndBumpsOnlyWhenItRemovesRows: { claim: 'claim release 删除整个 instance 键', detail: 'D-38/D-45：没有 per-bay 或 per-row release；重复行会折叠' },
   waterInANotAirSlotIsAdmitted: { claim: 'NOTAIR slot 中的 water 会被接纳', detail: 'D-39：NOTAIR 精确等于 not(air())；water 是 non-air' },
   emptyAndNonFluidClassifyAirWaterLavaAndStone: { claim: 'empty 和 nonFluid 会分类 air、water、lava、stone', detail: 'D-39：empty = air 或 fluid block；nonFluid = 其余' },
   beginPublishesCommitsAndFindsByCell: { claim: 'commit 后的 attempt 变成带 bounds 的 instance', detail: 'D-40：begin 预留、settle 发布、commit(bounds) 形成；findAt 能找到' },
   abortDropsTheDraftAndReleasesTheSiting: { claim: 'abort 丢弃 draft 并释放 siting', detail: 'D-40：commit/abort 只能调用一次；aborted serial 不复用' },
-  movedKeepsIdAndContextAndRejectsACollision: { claim: 'Moved 保留 id 和 context，并拒绝 collision', detail: 'D-40：只有 siting 和 bounds 改变' },
+  movingWriteBreaksTheStructureAndReleasesEveryClaimRow: { claim: 'moving write 会 break 结构并释放其全部 rows', detail: 'D-45：move 是移除不是平移；重建是一次新的 settle' },
   brokenAndInvalidatedAreIdempotent: { claim: 'Broken 和 Invalidated 是幂等的', detail: 'D-40：未知 id 是 no-op' },
   unloadedRemovesOnlyThatWorldAndLoadedRaisesTheSerial: { claim: 'Unloaded 只清一个 world，Loaded 抬高 serial', detail: 'D-40：per-world registry；Loaded 是唯一的批量替换' },
   blockPlaceDispatchesInvalidated: { claim: 'block place 通过 WatchEvents 派发 Invalidated', detail: 'D-40：adapter 负责侦测和派发；D-38 释放 claim rows' },
@@ -86,7 +86,7 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
-  269 tests / 269 successful / 0 failed
+  541 tests / 541 successful / 0 failed
 $ python3 tools/spec-check.py
   spec-check: ok
 $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
@@ -133,13 +133,13 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、269 个 kernel 测试（40 个 container）、280 个 adapter 单元测试（35 个 container）、74 个 GameTests、65 个 code、40 条决策（D-40）。adapter 已实现到 H1–H4、T1–T3、N1–N5 和 S5/S6：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次不带 orientation 的 union capture、内置 set_demo）、set 收束（D-35）、nested-extent lookup（D-36）、claimability（D-37）、whole-key release（D-38）、empty/nonFluid（D-39）和 host 驱动的 StructureManager（D-40：begin/commit/abort、context 绑定 instance、in-memory、WatchEvents 派发）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在 <code>70857d7</code> + D-40 tree 都是绿的（74/74）。剩下 performance/cost pass 和新的 review screenshots。</> : <>Six gates, 269 kernel tests in 40 containers, 280 adapter unit tests in 35 containers, 74 GameTests, 65 codes and 40 decisions (D-40). The adapter is implemented through H1–H4, T1–T3, N1–N5 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one unsited union capture, the built-in set_demo), the set close-out (D-35), the nested-extent lookup (D-36), claimability (D-37), whole-key release (D-38), empty/nonFluid (D-39) and the host-driven StructureManager (D-40: begin/commit/abort, instance-bound context, in-memory, WatchEvents dispatch). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green at <code>70857d7</code> + the D-40 tree (74/74). Pending only a performance/cost pass and fresh review screenshots.</>}
+        note={zh ? <>六道 gate、541 个 kernel 测试（65 个 container）、440 个 adapter 单元测试（46 个 container）、140 个 GameTests、66 个 code、80 条决策（D-82）。adapter 已实现到 H1–H4、T1–T3、N1–N7 和 S5/S6：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次不带 orientation 的 union capture、内置 set_demo）、set 收束（D-35）、nested-extent lookup（D-36，被 design 13 的 capability/attachment 拆分取代）、claimability（D-37）、instance 键的 whole-key release（D-38/D-45）、empty/nonFluid（D-39）、host 驱动的 StructureManager（D-40：begin/commit/abort、context 绑定 instance、in-memory）和会话级 claims（D-44）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在当前 D-82 tree 都是绿的（140/140）。剩下按已测成本债行动（07 §7）和新的 review screenshots。</> : <>Six gates, 541 kernel tests in 65 containers, 440 adapter unit tests in 46 containers, 140 GameTests, 66 codes and 80 decisions (D-82). The adapter is implemented through H1–H4, T1–T3, N1–N7 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one unsited union capture, the built-in set_demo), the set close-out (D-35), the nested-extent lookup (D-36, superseded by design 13's capability/attachment split), claimability (D-37), the instance-keyed whole-key release (D-38/D-45), empty/nonFluid (D-39), the host-driven StructureManager (D-40: begin/commit/abort, instance-bound context, in-memory) and the session-scoped claims (D-44). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green on the current D-82 tree (140/140). Pending only the measured cost debts (07 §7) and fresh review screenshots.</>}
       />
 
       <Reveal>
         <div className="proof-top">
           <div className="proof-gates">
-            <div className="eyebrow">{zh ? '当前 gate 报告 / 2026.10.29' : 'Current gate report / 2026.10.29'}</div>
+            <div className="eyebrow">{zh ? '当前 gate 报告 / 2026.11.06' : 'Current gate report / 2026.11.06'}</div>
             <div className="gate-grid" style={{ marginTop: 12 }}>
               {GATES.map((gate) => {
                 const copy = zh ? ZH_GATES[gate.label] : gate;
@@ -162,7 +162,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '40 个 JUnit container · adapter 280 / 35 个 container · GameTests 74/74' : '40 JUnit containers · adapter 280 / 35 containers · GameTests 74/74'}
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '65 个 JUnit container · adapter 440 / 46 个 container · GameTests 140/140' : '65 JUnit containers · adapter 440 / 46 containers · GameTests 140/140'}
               </div>
             </div>
           </div>
@@ -175,9 +175,9 @@ export function Proof() {
               </div>
             ))}
             <div style={{ height: 8 }} />
-            <div className="warn">check: ./gradlew check is green at 70857d7 + the D-40 tree; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 74/74 (through N5 and S6).</div>
+            <div className="warn">check: ./gradlew check is green on the D-82 tree; the transcript above is the direct javac/JUnit harness. GameTests: runGameTestServer 140/140 (through N7).</div>
             <div style={{ height: 14 }} />
-            <div className="cmd">{zh ? '下一个攻击点：performance/cost pass，以及新的 review screenshots。' : 'Next attack: a performance/cost pass and fresh review screenshots.'}</div>
+            <div className="cmd">{zh ? '下一个攻击点：已测成本债（07 §7），以及新的 review screenshots。' : 'Next attack: the measured cost debts (07 §7) and fresh review screenshots.'}</div>
           </div>
         </div>
       </Reveal>

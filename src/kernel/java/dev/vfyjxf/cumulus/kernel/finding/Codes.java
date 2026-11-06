@@ -30,9 +30,9 @@ public final class Codes {
         FindingCode.Family.occ,
         1,
         Severity.error,
-        "The cell could not be read from the snapshot.",
-        "The view has no readable occupant for the requested cell. Check the capture bounds, "
-                + "the depth and host permission."
+        "A focus could not bind the subject it needs.",
+        "The bay was readable but held no subject, held more than one where exactly one is required, "
+                + "or lacked a required part. Check the bay cells and the occupant type."
     );
 
     public static final CodeEntry footprintClipped = entry(
@@ -47,9 +47,10 @@ public final class Codes {
         FindingCode.Family.occ,
         3,
         Severity.error,
-        "A nested view was cut by depth or a cap.",
-        "The nested view stopped before the checked cells were available. Check the capture "
-                + "depth and element ceiling."
+        "A nested view was cut.",
+        "The nested view stopped before the checked cells were available, by depth, an element cap, "
+                + "a cycle or an unloaded chunk. Check the capture depth, the element ceiling and the "
+                + "chunks around the nested source."
     );
 
     public static final CodeEntry unreadableRead = entry(
@@ -89,8 +90,9 @@ public final class Codes {
         FindingCode.Family.exp,
         4,
         Severity.error,
-        "A factory kind is unknown.",
-        "The compiler was asked for a factory that is not registered. Check the factory id and " + "the catalog."
+        "A factory declaration has no kind.",
+        "A focus or expectation declaration names no kind. Add the kind; a kind that is not "
+                + "registered is SC-DOC-0003."
     );
 
     public static final CodeEntry factoryBad = entry(
@@ -141,16 +143,19 @@ public final class Codes {
         FindingCode.Family.clm,
         4,
         Severity.error,
-        "A settle binding is invalid.",
-        "A row names a foreign snapshot, frame, owner, siting or bay. Check the planner input " + "before settling."
+        "A claim binding is invalid.",
+        "A binding names a nested or non-root subject, a bay this blueprint does not declare, a "
+                + "ONE_SUBJECT bay whose bound footprint is not its cells, or a bay has no binding. Check "
+                + "the focus that bound the subjects."
     );
 
     public static final CodeEntry boundEmpty = entry(
         FindingCode.Family.clm,
         5,
         Severity.error,
-        "An exclusive bound footprint is empty.",
-        "An exclusive bay bound to live subjects owns no cell. Check the bound focus and the " + "subjects it returned."
+        "An exclusive bay owns no cell.",
+        "An exclusive bay's resolved footprint is empty at settle, usually a Bound footprint whose "
+                + "subjects are absent or air. Check the bound focus and the subjects it returned."
     );
 
     public static final CodeEntry blueprintInvalid = entry(
@@ -394,8 +399,9 @@ public final class Codes {
         FindingCode.Family.ctx,
         5,
         Severity.error,
-        "A deriver failed.",
-        "The deriver threw or returned no value. Check its inputs and implementation."
+        "A deriver produced no usable value.",
+        "The deriver returned no value, a value of the wrong type, a different output or a "
+                + "non-INSTANCE key. A deriver that throws is SC-SPI-0001."
     );
 
     public static final CodeEntry foldRefused = entry(

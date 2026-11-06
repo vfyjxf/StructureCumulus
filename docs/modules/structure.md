@@ -448,7 +448,7 @@ Combinators evaluate every child (diagnostics matter more than a short-circuit) 
 - `any_of`: any `Match` → `Match`; else any `Unreadable` → `Unreadable`; else any `Mismatch` →
   `Mismatch`; else `Abstain`.
 - `not`: `Match` ↔ `Mismatch(SC-EXP-0002)`; `Unreadable` and `Abstain` unchanged.
-- `sequence`: same verdict as `all_of`; findings in child order.
+- `sequence`: same verdict and findings as `all_of`; the bundle orders them.
 - Thresholds count `MATCH`/`MISMATCH`/`UNREADABLE`/`ABSTAIN`:
   `atLeast(k)` matches iff `m ≥ k`, mismatches iff `m+u+a < k`, else unreadable if `u > 0`, else
   abstains; `atMost(k)` matches iff `m+u+a ≤ k`, mismatches iff `m > k`, else unreadable if `u > 0`,

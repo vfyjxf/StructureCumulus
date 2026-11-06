@@ -42,9 +42,10 @@ values. S5 of the structure-set close-out adds the production `set check`/`set s
 one union capture and the check-only host path (`09-structure-sets.md` §16). S6 closes the set layer:
 `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
 budget shared by presence and every member attempt. The tree registers
-**382 kernel tests in 48 containers, 411 adapter unit tests in 43 containers and 126 `@GameTest`
-methods**; `Codes.all` has 65 entries and the decision record has 40 decisions (D-40). Pending only:
-the performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+**541 kernel tests in 65 containers, 440 adapter unit tests in 46 containers and 140 `@GameTest`
+methods**; `Codes.all` has 66 entries and the decision record has 80 decisions (D-82; D-29 and D-36
+superseded, D-78 withdrawn). Pending only: acting on the measured kernel-side cost debts and the
+live-level review items (§7), and fresh visual review screenshots.
 No regeneration milestone exists or is planned: the code is corrected against this set in place.
 
 ## 2. The order

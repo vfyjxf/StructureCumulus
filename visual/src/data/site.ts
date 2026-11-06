@@ -65,7 +65,7 @@ export const REMOVED = [
   { term: 'CapabilityLookup', replacement: 'NestedExtentLookup', why: 'One per-holder registry replaces the aggregate block/entity lookup; a new subject kind adds a holder and a provider, not an interface method.' },
   { term: 'SavedContexts', replacement: 'StructureManager', why: 'A context is bound to its StructureInstance; begin/commit is the only creation path, the manager is in-memory and the library persists nothing.' },
   { term: 'NOTAIR = no fluid', replacement: 'not(air())', why: 'NOTAIR is exactly not(air()): water and lava are non-air and pass. empty() and nonFluid() are separate opt-in leaves (D-39).' },
-  { term: 'Per-bay claim release', replacement: 'Whole-key release', why: 'One siting is one instance; release deletes the whole (owner, siting) key and no row is released alone (D-38).' },
+  { term: 'Per-bay claim release', replacement: 'Whole-key release', why: 'One instance is one key; release deletes every row of the instance and no row is released alone (D-38/D-45).' },
   { term: 'Claimable by default', replacement: 'bindsClaimableSubject', why: 'A focus opts in; the build rejects a subject-binding focus that cannot claim when the bay claims (SC-BPT-0005, D-37).' },
 ];
 
@@ -99,10 +99,10 @@ export const DOCS = [
 ];
 
 export const HERO_STATS = [
-  { value: '269', label: 'tests', note: 'kernel JUnit 5 · adapter 280 · GameTests 74/74' },
-  { value: '65', label: 'codes', note: '13 kernel families · one Codes table' },
+  { value: '541', label: 'tests', note: 'kernel JUnit 5 · adapter 440 · GameTests 140/140' },
+  { value: '66', label: 'codes', note: '13 kernel families · one Codes table' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
-  { value: '40', label: 'decisions', note: 'D-40 · rulings, not preferences' },
+  { value: '80', label: 'decisions', note: 'D-82 · rulings, not preferences' },
 ];
 
 export const LAYERS = [
@@ -114,16 +114,16 @@ export const LAYERS = [
   { id: 'D-35', title: 'Set close-out', text: 'SC-SET-0008 rejects a satellite on the root siting (compiler, StructureSet.place, host check); presence and every attempt share one set budget; rollback invalidates formed contexts through the StructureManager Broken event (D-40). The real-level StructureSetHostGameTest covers the same-siting rejection and a one-cell shared budget.' },
   { id: 'D-36', title: 'Nested-extent lookup', text: 'NestedExtentHolder/Provider/Lookup replace the aggregate nested lookup: NestedExtentHolders.block/entity, one CapabilityNestedExtentProvider over NestedExtentAccesses, and the standard NestedExtentProviders. The old mc.NestedExtentLookup and CapabilityLookup are deleted.' },
   { id: 'D-37', title: 'Claimable subjects', text: 'Focus.bindsClaimableSubject() defaults false; when a bay claims, BlueprintBuilder rejects a subject-binding focus that cannot back a claim (SC-BPT-0005). The runtime SC-CLM-0004 check remains the authority.' },
-  { id: 'D-38', title: 'Whole-key release', text: 'ClaimLedger.release(owner, siting) deletes every row of that key and is the only release API; one siting is one instance, so there is no per-bay or per-row release. WatchEvents releases the key on Broken/Invalidated and translates it on a full Moved; a conflict becomes Invalidated. A failed release is SC-SET-0007.' },
+  { id: 'D-38', title: 'Whole-key release', text: 'ClaimLedger.release(instance) deletes every row of that instance and is the only release API (D-45), so there is no per-bay or per-row release. The observation funnel breaks or invalidates a moved structure and releases its rows — a move is a removal, not a translation. A failed release is SC-SET-0007.' },
   { id: 'D-39', title: 'Empty and non-fluid', text: 'Expectations.empty() matches air or a vanilla fluid block; nonFluid() matches everything else (air is non-fluid). NOTAIR stays exactly not(air()), so water and lava pass while air fails. No new code.' },
-  { id: 'D-40', title: 'Structure manager', text: 'StructureManager owns StructureSpec/Instance/Attempt/Event: begin/commit/abort, bounds lookup, Broken/Moved/Loaded/Unloaded/Invalidated, one formed instance per (owner, siting). The context is bound to the instance and the manager is in-memory; WatchEvents dispatches the adapter lifecycle.' },
+  { id: 'D-40', title: 'Structure manager', text: 'StructureManager owns StructureSpec/Instance/Attempt/Event: begin/commit/abort, bounds lookup, Broken/Invalidated/Loaded/Unloaded, one formed instance per (world, owner, siting). The context is bound to the instance and the manager is in-memory; the adapter dispatches the lifecycle.' },
 ];
 
 export const GATES = [
-  { label: 'Compile', value: 'PASS', note: 'gradlew check green at 70857d7 + the D-40 tree' },
+  { label: 'Compile', value: 'PASS', note: 'gradlew check green on the D-82 tree' },
   { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
-  { label: 'Tests', value: '269/269', note: 'kernel JUnit 5 · 40 containers; adapter 280 · 35 containers; GameTests 74/74' },
-  { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 65 codes' },
+  { label: 'Tests', value: '541/541', note: 'kernel JUnit 5 · 65 containers; adapter 440 · 46 containers; GameTests 140/140' },
+  { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 66 codes' },
   { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
   { label: 'Determinism', value: 'PASS', note: 'DeterminismTest · canonical bytes, fixed point, compile runs' },
 ];
