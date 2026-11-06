@@ -18,6 +18,22 @@ Gradle is the shipping build (`./gradlew check`, including Spotless and the kern
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
 
+### 1.1 Green build
+
+Until the repository has a remote, the gates run on the development machine (D-82,
+`05-decisions.md`). A green build is exactly this list:
+
+| Command | Expected result |
+| --- | --- |
+| `./gradlew check` | exit 0 — every source set compiles (Error Prone and NullAway included), Spotless and the PMD gates pass, `kernelPurity` finds no host names, and the kernel and adapter unit suites are green |
+| `./gradlew kernelTest test` | exit 0 — the kernel suite and the adapter unit suite pass, no failure and no skipped test |
+| `./gradlew runGameTestServer` | the game-test server run completes with every registered `@GameTest` method green |
+| `python3 tools/spec-check.py` | prints `spec-check: ok` — every documented public type and `SC-` code has a producer, no extra public type, and the producer table matches `Codes.all` row for row |
+| `./gradlew jmh` | the JMH benchmarks run outside `check` and report throughput and latency; run it when a change touches the kernel's hot paths |
+
+When a remote exists, a workflow runs that same list; this document stays the source of truth so the
+workflow cannot drift from it.
+
 Current evidence (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): M1, M2a, M2b, M2c, M2d and
 M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
 `explain`, `claims`), capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase
