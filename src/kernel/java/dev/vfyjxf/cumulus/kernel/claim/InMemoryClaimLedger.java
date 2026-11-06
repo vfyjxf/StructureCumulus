@@ -7,8 +7,8 @@ import dev.vfyjxf.cumulus.kernel.space.Siting;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -47,12 +47,8 @@ final class InMemoryClaimLedger implements ClaimLedger {
         if (conflict != null) {
             return conflict;
         }
-        List<ClaimRow> replacement = new ArrayList<>(new LinkedHashSet<>(request.rows()));
-        replacement.sort(ClaimRow::compareTo);
-        List<ClaimRow> next = new ArrayList<>(incumbents.size() + replacement.size());
-        next.addAll(incumbents);
-        next.addAll(replacement);
-        next.sort(ClaimRow::compareTo);
+        List<ClaimRow> replacement = canonical(request.rows());
+        List<ClaimRow> next = mergeSorted(incumbents, replacement);
         if (next.equals(rows)) {
             return new ClaimVerdict.Settled(revision, replacement);
         }
@@ -60,6 +56,41 @@ final class InMemoryClaimLedger implements ClaimLedger {
         rows.addAll(next);
         revision++;
         return new ClaimVerdict.Settled(revision, replacement);
+    }
+
+    /** The sorted unique request rows, deduped after sorting instead of hashing every record. */
+    private static List<ClaimRow> canonical(List<ClaimRow> request) {
+        List<ClaimRow> sorted = new ArrayList<>(request);
+        sorted.sort(ClaimRow::compareTo);
+        int write = 0;
+        for (int read = 1; read < sorted.size(); read++) {
+            if (!sorted.get(write).equals(sorted.get(read))) {
+                write++;
+                sorted.set(write, sorted.get(read));
+            }
+        }
+        return write + 1 == sorted.size() ? sorted : new ArrayList<>(sorted.subList(0, write + 1));
+    }
+
+    /** Two sorted lists merged; ties keep the incumbent first, like a stable sort of both. */
+    private static List<ClaimRow> mergeSorted(List<ClaimRow> incumbents, List<ClaimRow> replacement) {
+        List<ClaimRow> merged = new ArrayList<>(incumbents.size() + replacement.size());
+        int left = 0;
+        int right = 0;
+        while (left < incumbents.size() && right < replacement.size()) {
+            if (incumbents.get(left).compareTo(replacement.get(right)) <= 0) {
+                merged.add(incumbents.get(left++));
+            } else {
+                merged.add(replacement.get(right++));
+            }
+        }
+        while (left < incumbents.size()) {
+            merged.add(incumbents.get(left++));
+        }
+        while (right < replacement.size()) {
+            merged.add(replacement.get(right++));
+        }
+        return merged;
     }
 
     /** The rows this settle leaves in place: not its own, not at a siting it takes over. */
@@ -108,26 +139,26 @@ final class InMemoryClaimLedger implements ClaimLedger {
     }
 
     private @Nullable ClaimVerdict conflicts(SettleRequest request, List<ClaimRow> incumbents) {
-        Map<String, Set<ClaimRow>> contested = new LinkedHashMap<>();
+        Map<Long, List<ClaimRow>> byCell = new HashMap<>(incumbents.size() * 2);
+        for (ClaimRow incumbent : incumbents) {
+            byCell.computeIfAbsent(incumbent.cell().packed(), ignored -> new ArrayList<>()).add(incumbent);
+        }
+        Set<ClaimRow> contested = new LinkedHashSet<>();
         for (ClaimRow requested : request.rows()) {
-            for (ClaimRow incumbent : incumbents) {
-                if (!ClaimMatrix.conflicts(requested, incumbent)) {
-                    continue;
+            List<ClaimRow> atCell = byCell.get(requested.cell().packed());
+            if (atCell == null) {
+                continue;
+            }
+            for (ClaimRow incumbent : atCell) {
+                if (ClaimMatrix.conflicts(requested, incumbent)) {
+                    contested.add(incumbent);
                 }
-                contested.computeIfAbsent(
-                    requested.bay().text() + "|" + incumbent.instance() + "|" + incumbent.bay().text(),
-                    ignored -> new LinkedHashSet<>()
-                ).add(incumbent);
             }
         }
         if (contested.isEmpty()) {
             return null;
         }
-        Set<ClaimRow> allIncumbents = new LinkedHashSet<>();
-        for (Set<ClaimRow> group : contested.values()) {
-            allIncumbents.addAll(group);
-        }
-        return new ClaimVerdict.Conflict(new ArrayList<>(allIncumbents));
+        return new ClaimVerdict.Conflict(new ArrayList<>(contested));
     }
 
 }

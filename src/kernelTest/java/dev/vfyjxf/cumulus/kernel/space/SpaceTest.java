@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import java.util.SplittableRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,6 +32,28 @@ class SpaceTest {
             assertEquals(point, point.key().point());
         }
         assertThrows(IllegalArgumentException.class, () -> LatticePoint.of(LatticePoint.maxXz + 1, 0, 0));
+    }
+
+    @Test
+    void keyOrderMatchesTheDecodedPointOrderOnRandomPairs() {
+        SplittableRandom random = new SplittableRandom(20261106);
+        for (int i = 0; i < 10_000; i++) {
+            LatticeKey left = point(random).key();
+            LatticeKey right = point(random).key();
+            assertEquals(
+                Integer.signum(left.point().compareTo(right.point())),
+                Integer.signum(left.compareTo(right)),
+                "packed order agrees with decoded order for " + left.point() + " and " + right.point()
+            );
+        }
+    }
+
+    private static LatticePoint point(SplittableRandom random) {
+        return LatticePoint.of(
+            random.nextInt(LatticePoint.minXz, LatticePoint.maxXz + 1),
+            random.nextInt(LatticePoint.minY, LatticePoint.maxY + 1),
+            random.nextInt(LatticePoint.minXz, LatticePoint.maxXz + 1)
+        );
     }
 
     @Test

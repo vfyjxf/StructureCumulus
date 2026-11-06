@@ -69,6 +69,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -743,7 +744,7 @@ public final class MatchEngine {
                     Locus.local(bay.cells())
                 );
             }
-            CuboidSet bound = CuboidSet.empty();
+            List<Cuboid> boundCells = new ArrayList<>(binding.subjects().size());
             for (OccupantSnapshot subject : binding.subjects()) {
                 if (!subject.ref().snapshot().equals(request.lease().id()) || subject.ref().frame() != 0) {
                     return code(
@@ -770,9 +771,10 @@ public final class MatchEngine {
                     );
                 }
                 if (!subject.isAir()) {
-                    bound = bound.union(subject.footprint().asSet());
+                    boundCells.add(subject.footprint());
                 }
             }
+            CuboidSet bound = CuboidSet.of(boundCells);
             if (bay.coverage() == Coverage.oneSubject && !bound.contentEquals(bayWorld)) {
                 return code(
                     Codes.bindingInvalid,
@@ -814,30 +816,38 @@ public final class MatchEngine {
         List<ClaimRow> held,
         CancelToken cancel
     ) {
-        Map<String, Conflict> byPair = new LinkedHashMap<>();
-        long pairs = 0;
+        Map<Long, List<ClaimRow>> heldByCell = new HashMap<>(held.size() * 2);
+        for (ClaimRow incumbent : held) {
+            heldByCell.computeIfAbsent(incumbent.cell().packed(), ignored -> new ArrayList<>()).add(incumbent);
+        }
+        Map<Contest, Conflict> byPair = new LinkedHashMap<>();
         for (ClaimRow row : requested) {
-            for (ClaimRow incumbent : held) {
-                if (++pairs % 4096 == 0 && cancel.isCancelled()) {
-                    return null;
-                }
+            if (cancel.isCancelled()) {
+                return null;
+            }
+            List<ClaimRow> atCell = heldByCell.get(row.cell().packed());
+            if (atCell == null) {
+                continue;
+            }
+            for (ClaimRow incumbent : atCell) {
                 if (!ClaimMatrix.conflicts(row, incumbent)) {
                     continue;
                 }
-                String pair = row.bay() + "|" + incumbent.instance() + "|" + incumbent.bay();
+                Contest contest = new Contest(row.bay(), incumbent.instance(), incumbent.bay());
                 Conflict conflict = byPair
-                        .computeIfAbsent(pair, ignored -> new Conflict(row, incumbent, CuboidSet.empty()));
-                conflict.cells = conflict.cells.union(Cuboid.of(row.cell().point()));
+                        .computeIfAbsent(contest, ignored -> new Conflict(row, incumbent, new ArrayList<>()));
+                conflict.cells.add(Cuboid.of(row.cell().point()));
             }
         }
         List<Finding> findings = new ArrayList<>();
         for (Conflict conflict : byPair.values()) {
-            Locus locus = Locus.world(conflict.cells);
+            CuboidSet contestedCells = CuboidSet.of(conflict.cells);
+            Locus locus = Locus.world(contestedCells);
             findings.add(
                 Finding.builder(Codes.claimConflict).phase(phase)
                         .message(
                             conflict.incumbent.instance() + ":" + conflict.incumbent.bay() + " already holds "
-                                    + conflict.cells.volume() + " cell(s) of " + conflict.requested.bay()
+                                    + contestedCells.volume() + " cell(s) of " + conflict.requested.bay()
                         ).label(Label.primary(locus, "contested cells"))
                         .note("this bay asks " + conflict.requested.sharing(), locus)
                         .note("the incumbent holds " + conflict.incumbent.sharing(), null).build()
@@ -846,12 +856,15 @@ public final class MatchEngine {
         return findings;
     }
 
+    /** One finding group: the requesting bay against one incumbent bay of one instance. */
+    private record Contest(NamespacedId requestedBay, InstanceId incumbentInstance, NamespacedId incumbentBay) {}
+
     private static final class Conflict {
         private final ClaimRow requested;
         private final ClaimRow incumbent;
-        private CuboidSet cells;
+        private final List<Cuboid> cells;
 
-        private Conflict(ClaimRow requested, ClaimRow incumbent, CuboidSet cells) {
+        private Conflict(ClaimRow requested, ClaimRow incumbent, List<Cuboid> cells) {
             this.requested = requested;
             this.incumbent = incumbent;
             this.cells = cells;

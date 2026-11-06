@@ -12,6 +12,7 @@ import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -115,6 +117,47 @@ class ClaimStressScenarioTest {
             assertEquals(Phase.settle, settle.get(i).phase());
             assertEquals(atPhase(preCheck.get(i), Phase.settle), settle.get(i), "one builder, one wording");
         }
+    }
+
+    @Test
+    void aScatteredContestRendersOneLocusOverEveryCell() {
+        ClaimLedger ledger = MagicFixtures.ledger();
+        CuboidSet cells = CuboidSet.of(Cuboid.of(LatticePoint.of(2, 0, 2)), Cuboid.of(LatticePoint.of(-2, 0, -2)));
+        Bay bay = MagicFixtures.bay(
+            MagicFixtures.id("claim/scattered_bay"),
+            cells,
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
+        );
+        Blueprint blueprint = Blueprint.builder(MagicFixtures.id("claim/scattered"))
+                .bounds(Cuboid.of(-2, 0, -2, 3, 1, 3))
+                .check(
+                    Check.of(
+                        MagicFixtures.id("claim/scattered_check"),
+                        bay,
+                        Focuses.bay(),
+                        Expectations.eachCell(Expectations.anyOccupant())
+                    )
+                ).build();
+        assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(blueprint, siting, airView(), ledger));
+        Siting turned = MagicFixtures.turn(LatticePoint.origin, Turn.half);
+        MatchResult.Failed refused = assertInstanceOf(
+            MatchResult.Failed.class,
+            MagicFixtures.check(
+                blueprint,
+                turned,
+                airView(),
+                ledger.read(MagicFixtures.worldBounds(blueprint, turned)),
+                MagicFixtures.rival,
+                MagicFixtures.rivalInstance
+            )
+        );
+        List<Finding> conflicts = conflictFindings(refused);
+        assertEquals(1, conflicts.size(), "one contest groups both scattered cells");
+        Locus locus = Objects.requireNonNull(conflicts.get(0).primaryLabel(), "primary").locus();
+        assertEquals(2, locus.cells().volume(), "the locus spans both contested cells");
+        assertEquals(2, locus.cells().boxCount(), "the scattered cells stay two boxes");
     }
 
     @Test

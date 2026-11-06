@@ -40,7 +40,7 @@ public final class ClaimPlanner {
             subjectsByBay.put(binding.bay().id(), binding.subjects());
         }
         List<ClaimRow> rows = new ArrayList<>();
-        CuboidSet allOwned = CuboidSet.empty();
+        List<Cuboid> ownedBoxes = new ArrayList<>();
         for (Bay bay : blueprint.bays()) {
             List<OccupantSnapshot> subjects = subjectsByBay.getOrDefault(bay.id(), List.of());
             CuboidSet owned = switch (bay.footprint()) {
@@ -59,13 +59,13 @@ public final class ClaimPlanner {
                     yield world;
                 }
                 case Footprint.Bound ignored -> {
-                    CuboidSet union = CuboidSet.empty();
+                    List<Cuboid> boundCells = new ArrayList<>(subjects.size());
                     for (OccupantSnapshot subject : subjects) {
                         if (!subject.isAir()) {
-                            union = union.union(subject.footprint().asSet());
+                            boundCells.add(subject.footprint());
                         }
                     }
-                    yield union;
+                    yield CuboidSet.of(boundCells);
                 }
                 case Footprint.None ignored -> CuboidSet.empty();
             };
@@ -73,6 +73,7 @@ public final class ClaimPlanner {
                 throw new PlanRejected(Codes.boundEmpty, "exclusive bay " + bay.id() + " owns no cell");
             }
             for (Cuboid box : owned.decomposition()) {
+                ownedBoxes.add(box);
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {
                         for (int z = box.min().z(); z < box.max().z(); z++) {
@@ -82,8 +83,8 @@ public final class ClaimPlanner {
                     }
                 }
             }
-            allOwned = allOwned.union(owned);
         }
+        CuboidSet allOwned = CuboidSet.of(ownedBoxes);
         rows.sort(ClaimRow::compareTo);
         for (int i = 1; i < rows.size(); i++) {
             ClaimRow left = rows.get(i - 1);
