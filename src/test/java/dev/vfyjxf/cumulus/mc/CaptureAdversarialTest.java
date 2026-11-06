@@ -355,7 +355,7 @@ class CaptureAdversarialTest {
     void anAllAirSectionStillReadsAir() {
         LatticePoint cell = LatticePoint.of(0, 0, 0);
         SectionKey key = SectionKey.of(world, 0, cell, 16);
-        SnapshotLevel host = host(LatticePoint.origin, cellBounds, Map.of());
+        SnapshotLevel host = host(LatticePoint.origin, cellBounds, Map.of(cell, Blocks.AIR.defaultBlockState()));
         LevelSnapshot view = view(cellBounds, Map.of(key, new SectionSlot.Air(0)), host);
 
         assertTrue(Objects.requireNonNull(view.get(cell, HostTypes.blockState), "air").isAir());
