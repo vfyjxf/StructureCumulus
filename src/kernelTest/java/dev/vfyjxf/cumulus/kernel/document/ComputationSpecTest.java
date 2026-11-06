@@ -15,12 +15,14 @@ class ComputationSpecTest {
 
     @Test
     void aKeySetIteratesInCanonicalOrder() {
-        Set<NamespacedId> ids = new HashSet<>(List.of(
-            NamespacedId.of("test", "delta"),
-            NamespacedId.of("test", "alpha"),
-            NamespacedId.of("other", "zulu"),
-            NamespacedId.of("test", "charlie")
-        ));
+        Set<NamespacedId> ids = new HashSet<>(
+            List.of(
+                NamespacedId.of("test", "delta"),
+                NamespacedId.of("test", "alpha"),
+                NamespacedId.of("other", "zulu"),
+                NamespacedId.of("test", "charlie")
+            )
+        );
         ComputationSpec first = spec(ids);
         ComputationSpec second = spec(ids);
         List<NamespacedId> expected = List.of(
@@ -36,7 +38,14 @@ class ComputationSpecTest {
     private static ComputationSpec spec(Set<NamespacedId> inputs) {
         NamespacedId id = NamespacedId.of("test", "out");
         return new ComputationSpec(
-            id, NamespacedId.of("test", "kind"), Value.object(Map.of()), null, null, id, inputs, null
+            id,
+            NamespacedId.of("test", "kind"),
+            Value.object(Map.of()),
+            null,
+            null,
+            id,
+            inputs,
+            null
         );
     }
 }

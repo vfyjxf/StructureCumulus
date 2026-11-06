@@ -8,9 +8,8 @@ import java.util.Objects;
 /** The only key factory. */
 public final class ContextKeys {
 
-    private static final Comparator<ContextKey<?>> ORDER =
-            Comparator.<ContextKey<?>, NamespacedId>comparing(ContextKey::id)
-                    .thenComparing(key -> key.type().getName());
+    private static final Comparator<ContextKey<?>> ORDER = Comparator
+            .<ContextKey<?>, NamespacedId>comparing(ContextKey::id).thenComparing(key -> key.type().getName());
 
     /** The only order a {@link ContextKey} set may be iterated in. */
     public static Comparator<ContextKey<?>> order() {

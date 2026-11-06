@@ -115,7 +115,8 @@ class DeriveReplacementTest {
         };
         Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers"))
                 .put(id("capacity_deriver"), capacityDeriver).build();
-        List<DerivationSpec> specs = List.of(new DerivationSpec(id("capacity_deriver"), Value.object(), capacity.id(), 0));
+        List<DerivationSpec> specs = List
+                .of(new DerivationSpec(id("capacity_deriver"), Value.object(), capacity.id(), 0));
 
         StructureContext context = MatchEngine.derive(formed(instance, 1), specs, derivers, store);
         assertEquals(5L, context.get(volume), "a settle value survives a derive that does not declare it");
@@ -163,10 +164,8 @@ class DeriveReplacementTest {
                 return Outcome.found(9L);
             }
         };
-        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers"))
-                .put(id("silent"), silent)
-                .put(id("reader"), reader)
-                .build();
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("silent"), silent)
+                .put(id("reader"), reader).build();
         List<DerivationSpec> specs = List.of(
             new DerivationSpec(id("silent"), Value.object(), shared.id(), 0),
             new DerivationSpec(id("reader"), Value.object(), shared.id(), 1)

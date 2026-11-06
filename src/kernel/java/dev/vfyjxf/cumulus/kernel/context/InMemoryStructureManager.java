@@ -244,13 +244,7 @@ final class InMemoryStructureManager implements StructureManager {
                 throw new IllegalArgumentException("only INSTANCE values are published: " + key.id());
             }
         }
-        return new StructureContext(
-            base.instance(),
-            base.revision() + 1,
-            values,
-            findings,
-            base.spend().plus(spend)
-        );
+        return new StructureContext(base.instance(), base.revision() + 1, values, findings, base.spend().plus(spend));
     }
 
     private record SitingKey(World world, OwnerId owner, Siting siting) {}
