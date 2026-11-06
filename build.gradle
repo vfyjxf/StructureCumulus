@@ -357,8 +357,8 @@ tasks.named('check') {
 }
 
 tasks.named('check') {
-    dependsOn 'kernelTest', 'kernelPurity', 'determinismCheck', 'compileUitestJava', 'verifyRunIsolation',
-        'verifyHarnessIsolation', 'specCheck'
+    dependsOn 'kernelTest', 'kernelPurity', 'determinismCheck', 'compileUitestJava', 'compileGametestJava',
+        'verifyRunIsolation', 'verifyHarnessIsolation', 'verifyGameTestIsolation', 'specCheck'
 }
 
 // The harness runs are the only compositions that load structurecumulusuitest, and the harness is a
@@ -479,6 +479,27 @@ tasks.register('verifyHarnessIsolation') {
             throw new GradleException('the production jar/runtime carries harness code: ' + offenders)
         }
         logger.lifecycle('harness isolation verified: no scenario classes or cloudlib-uitest jar on the production side')
+    }
+}
+
+// The published jar stays game-test-free: no GameTest class and no GameTest structure template in it.
+tasks.register('verifyGameTestIsolation') {
+    group = 'verification'
+    description = 'Verifies the production jar carries no GameTest class and no GameTest structure template.'
+    inputs.files(productionJar)
+    doLast {
+        def offenders = []
+        new java.util.zip.ZipFile(productionJar.get().asFile).withCloseable { zip ->
+            zip.entries().each { entry ->
+                if (entry.name ==~ /.*GameTest.*\.class/ || entry.name.endsWith('structure/empty.nbt')) {
+                    offenders.add(entry.name)
+                }
+            }
+        }
+        if (!offenders.isEmpty()) {
+            throw new GradleException('the production jar carries GameTest code or data: ' + offenders)
+        }
+        logger.lifecycle('gametest isolation verified: no GameTest class or template in the production jar')
     }
 }
 
