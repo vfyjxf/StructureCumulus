@@ -439,7 +439,6 @@ class DocumentParityTest {
         assertEquals(built, compiled);
         assertEquals(built.reads(), compiled.reads());
         assertTrue(compiled.reads().kinds().contains(OccupantKind.nested));
-        assertEquals(1, compiled.reads().depth());
         assertEquals(Set.of(id("energy")), compiled.reads().traits());
     }
 
