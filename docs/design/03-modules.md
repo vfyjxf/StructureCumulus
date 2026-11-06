@@ -120,10 +120,13 @@ src/kernelTest/java  kernel tests                   JUnit 5, no Minecraft
 src/main/java        dev.vfyjxf.cumulus.**          mod entry + mc adapter
 src/main/resources   metadata + data
 src/test/java        adapter tests
+src/gametest/java    @GameTest classes in dev.vfyjxf.cumulus.mc (D-77)
+src/gametest/resources  the GameTest structure templates
 ```
 
 `kernel` has no Minecraft on its compile classpath. `main` depends on `kernel`. The kernel has no
-`@Mod`, no loader metadata and no service file.
+`@Mod`, no loader metadata and no service file. `gametest` folds into the `structurecumulus` mod for
+every run and stays out of the published jar; `verifyGameTestIsolation` asserts the jar half (D-77).
 
 The test layering follows the same split (D-76). Kernel scenarios run in `kernelTest` over the
 `TestWorld` double — fast, no Minecraft. The host laws run in `src/test` against a real server level

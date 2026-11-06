@@ -116,7 +116,9 @@ Then the module files, in dependency order:
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` follows these files and is corrected to them; `src/main/java` is the
-  mod entry and the adapter. The adapter is the only place allowed to name Minecraft.
+  mod entry and the adapter. The adapter is the only place allowed to name Minecraft. The `@GameTest`
+  classes and their GameTest structure templates live in `src/gametest`, folded into the mod for
+  every run and kept out of the published jar (D-77).
 - Verification (2026-10-29, expanded wave): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 382 kernel JUnit 5 tests (48 test
   containers), 411 adapter unit tests (43 containers) and 126 `@GameTest` methods; a full
