@@ -25,6 +25,10 @@ table defines who may emit each finding code.
 10. [design/09-structure-sets.md](design/09-structure-sets.md) — root/satellite structure sets and links.
 11. [design/10-host-data.md](design/10-host-data.md) — host data capture and MC-specific checks.
 12. [design/11-trait-providers.md](design/11-trait-providers.md) — generic per-holder trait providers.
+13. [design/12-structure-instances.md](design/12-structure-instances.md) — the host-driven structure
+    manager: instances, drafts, events.
+14. [design/13-nested-extent-access.md](design/13-nested-extent-access.md) — the capability and
+    attachment sources of a nested extent.
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -49,13 +53,17 @@ Then the module files, in dependency order:
 
 - Design revision: **v1.2**, 2026-10-27, plus the [08 context-cache](design/08-context-cache.md),
   [09 structure-set](design/09-structure-sets.md), [10 host-data](design/10-host-data.md) and
-  [11 trait-providers](design/11-trait-providers.md) extension documents. The v1.1 round specified
+  [11 trait-providers](design/11-trait-providers.md) extension documents, and the later
+  [12 structure-instances](design/12-structure-instances.md) and
+  [13 nested-extent-access](design/13-nested-extent-access.md) documents. The v1.1 round specified
   Model C (body identity, the narrowest-read refusal, four-state traits) and the nested capability;
   v1.2 records them as implemented, and its M5a/M5d/M5e slices close the adapter round. 08/09
   specify the host-owned cached-context port (D-31) and the root/satellite set layer (D-32); 10
   specifies the typed host snapshot (D-33), implemented as H1–H4 and superseding the descriptor
   projection (D-29); 11 specifies the generic per-holder trait providers and direct capability
-  values (D-34), implemented as T1–T3.
+  values (D-34), implemented as T1–T3; 12 replaces the detached context map with the host-driven
+  `StructureManager` (D-40, with D-44's session-scoped claims and D-45's instance key); 13 splits the
+  nested-extent sources into capability and attachment, superseding D-36's capability-only seam.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -107,22 +115,23 @@ Then the module files, in dependency order:
   union capture and check-only host path, the built-in `set_root`/`set_wing`/`set_demo` documents and
   the real-level set GameTests (`design/06-verification.md` §3.5). S6 closes the set layer: the
   `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
-  budget shared by presence and every member attempt (D-35). The tree registers 382
-  kernel tests in 48 containers, 411 adapter unit tests in 43 containers and 126 `@GameTest` methods;
-  a full `./gradlew check` and `runGameTestServer` on the expanded wave are both green (382
-  kernel tests, 411 adapter tests, 126/126 GameTests). Pending only: the
-  performance/cost pass (block-entity-lazy and entity sweep) and fresh visual review screenshots.
+  budget shared by presence and every member attempt (D-35). The tree registers 541
+  kernel tests in 65 containers, 440 adapter unit tests in 46 containers and 140 `@GameTest` methods;
+  a full `./gradlew check` and `runGameTestServer` on this tree are both green (541
+  kernel tests, 440 adapter tests, 140/140 GameTests). Pending only: acting on the measured
+  kernel-side cost debts and the live-level review items (`07` §7), and fresh visual review
+  screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
 - Code status: `src/kernel/java` follows these files and is corrected to them; `src/main/java` is the
   mod entry and the adapter. The adapter is the only place allowed to name Minecraft.
-- Verification (2026-10-29, expanded wave): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 382 kernel JUnit 5 tests (48 test
-  containers), 411 adapter unit tests (43 containers) and 126 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (382 kernel tests, 411 adapter
-  tests, 126/126 GameTests, 0 failures, 0 skipped). `Codes.all` has 66 entries
-  and the decision record has 40 decisions (D-40; D-29 superseded).
+- Verification (2026-11-06): the kernel compiles with
+  `javac --release 21` and JSpecify only. The tree registers 541 kernel JUnit 5 tests (65 test
+  containers), 440 adapter unit tests (46 containers) and 140 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (541 kernel tests, 440 adapter
+  tests, 140/140 GameTests, 0 failures, 0 skipped). `Codes.all` has 66 entries
+  and the decision record has 80 decisions (D-82; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 

@@ -832,7 +832,7 @@ is defensively re-checked; the set's total reads never exceed `budget.cells()`; 
 rollback invalidates the `StructureContext` of every formed attempt via `StructureEvent.Broken`
 (`rolledBack` still lists only the successful releases); a failed release does not skip the
 invalidation. The record set is now 35 decisions (D-35). **Status (S6):** implemented; the focused
-kernel/adapter tests are green; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0).
+kernel/adapter tests are green; `./gradlew check` and `runGameTestServer` are green on this tree (541 kernel / 65 containers, 440 adapter / 46 containers, 140/140 GameTests; check exit 0).
 
 ### D-36 — Nested-extent lookup is generic per holder
 
@@ -867,6 +867,11 @@ registry keeps one lookup, one provider shape and one registration path, and mir
 only the providers they need; a provider `RuntimeException` still becomes the existing capture
 warning at the `LevelCapture` call site. The record set is now 36 decisions (D-36). **Status (N1):**
 implemented; the nested unit and GameTests, the full `check` and `runGameTestServer` are green.
+**Superseded by design 13 (N6):** the capability-only `NestedExtentAccess` is replaced by the
+capability/attachment split — `CapabilityNestedExtentAccess<H, C>` passes the capability's own
+context and `AttachmentNestedExtentProvider<H, T>` adds the attachment source — while the holder
+tokens, the holder-keyed lookup and the standard block/entity declarations survive
+(`13-nested-extent-access.md`).
 
 ### D-37 — A focus declares whether its subjects can back a claim
 
@@ -968,7 +973,7 @@ and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` t
 `StructureAttempt`.
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
 `AdversarialManagerTest`, `StructureLifecycleGameTest` and
-`StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0).
+`StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on this tree (541 kernel / 65 containers, 440 adapter / 46 containers, 140/140 GameTests; check exit 0).
 
 ### D-41 — The snapshot carries values; a live handle is a contract, not a guard
 
