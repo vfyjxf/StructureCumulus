@@ -125,6 +125,13 @@ src/test/java        adapter tests
 `kernel` has no Minecraft on its compile classpath. `main` depends on `kernel`. The kernel has no
 `@Mod`, no loader metadata and no service file.
 
+The test layering follows the same split (D-76). Kernel scenarios run in `kernelTest` over the
+`TestWorld` double — fast, no Minecraft. The host laws run in `src/test` against a real server level
+booted by the existing JUnit-with-Minecraft runner (`HostLawsTest`): the double exists to make kernel
+scenarios fast, and only the booted host can prove host behaviour. The double answers the read policy
+and the ledger like the host does, so scenarios are not staged against a lie, but no law test ever
+runs against it.
+
 ## 5. Naming rules that generate names
 
 - One concept, one noun; the glossary in `02-model.md` is the authority.

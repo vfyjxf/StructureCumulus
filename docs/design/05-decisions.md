@@ -1283,6 +1283,26 @@ are not benchmarked at all; a change that touches them is reviewed by reading th
 (`06-verification.md` §7); the CI half is deferred until the repository has a remote, so no workflow
 file is kept yet.
 
+### D-76 — Host laws run on a real server, in the test source set that already has one
+
+The behaviours a host must satisfy — capture honours the read policy, an unreadable cell stays
+unreadable rather than reading as air, a nested body is present when it was captured, a settlement
+answers with this key's rows and a conflict answers with the incumbent rows and its finding — are
+asserted in `src/test` against a server level booted by the existing JUnit-with-Minecraft runner. No
+new source set, no dependency from `test` on `kernelTest` output.
+
+**Why not share the suite with `TestWorld`.** Sharing would need a test-to-test dependency and would
+still compare a double with a host. The double exists to make kernel scenarios fast; the laws exist to
+prove the shipped host, and the shipped host is the one that can boot.
+
+**What happens to `TestWorld`.** Its `View` gains the read-policy filter and the src/test support
+ledger returns the requested rows (the shipped ledger already answers so). Its remaining differences
+are documented in place; the kernel tests stay scenario tests, not law tests.
+
+**Status:** implemented — `HostLawsTest` (6 laws, `06-verification.md` §3.8) boots one real dedicated
+server per class run through `HostServer`; commenting out the entity-kind gates in `LevelCapture`
+turns the read-policy law red, and the kernel and adapter suites stay green over the aligned doubles.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
 
