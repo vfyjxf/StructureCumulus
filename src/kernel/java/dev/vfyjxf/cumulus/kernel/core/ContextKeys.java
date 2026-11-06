@@ -8,12 +8,12 @@ import java.util.Objects;
 /** The only key factory. */
 public final class ContextKeys {
 
-    private static final Comparator<ContextKey<?>> ORDER = Comparator
+    private static final Comparator<ContextKey<?>> keyOrder = Comparator
             .<ContextKey<?>, NamespacedId>comparing(ContextKey::id).thenComparing(key -> key.type().getName());
 
     /** The only order a {@link ContextKey} set may be iterated in. */
     public static Comparator<ContextKey<?>> order() {
-        return ORDER;
+        return keyOrder;
     }
 
     public static <T> ContextKey<T> of(NamespacedId id, Class<T> type, Retention retention) {
