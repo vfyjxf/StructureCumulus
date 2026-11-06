@@ -1016,6 +1016,78 @@ class JsonDocumentTest {
     }
 
     @Test
+    void theWriterRefusesADefinitionWithArguments() {
+        Document document = read(richDocument);
+        BlueprintSpec unit = document.definitions().get(NamespacedId.of("test", "unit"));
+        assertNotNull(unit);
+        BlueprintSpec amended = new BlueprintSpec(
+            unit.id(),
+            unit.bounds(),
+            unit.envelope(),
+            unit.envelopeEntities(),
+            Value.object(Map.of("k", Value.number(1))),
+            unit.bays(),
+            unit.seams(),
+            unit.checks(),
+            unit.computations(),
+            unit.keys(),
+            unit.derivations(),
+            unit.anchors(),
+            unit.orientation(),
+            unit.placements(),
+            unit.extensions(),
+            unit.source()
+        );
+        Document carrying = new Document(
+            document.schemaVersion(),
+            document.root(),
+            Map.of(unit.id(), amended),
+            document.extensions()
+        );
+        IllegalStateException rejected = assertThrows(
+            IllegalStateException.class,
+            () -> new JsonWriter().write(carrying)
+        );
+        assertTrue(Objects.requireNonNull(rejected.getMessage()).contains("a definition may not declare arguments"));
+    }
+
+    @Test
+    void theWriterRefusesADefinitionWithExtensions() {
+        Document document = read(richDocument);
+        BlueprintSpec unit = document.definitions().get(NamespacedId.of("test", "unit"));
+        assertNotNull(unit);
+        BlueprintSpec amended = new BlueprintSpec(
+            unit.id(),
+            unit.bounds(),
+            unit.envelope(),
+            unit.envelopeEntities(),
+            unit.arguments(),
+            unit.bays(),
+            unit.seams(),
+            unit.checks(),
+            unit.computations(),
+            unit.keys(),
+            unit.derivations(),
+            unit.anchors(),
+            unit.orientation(),
+            unit.placements(),
+            Map.of("test:vendor", Value.object(Map.of("v", Value.number(1)))),
+            unit.source()
+        );
+        Document carrying = new Document(
+            document.schemaVersion(),
+            document.root(),
+            Map.of(unit.id(), amended),
+            document.extensions()
+        );
+        IllegalStateException rejected = assertThrows(
+            IllegalStateException.class,
+            () -> new JsonWriter().write(carrying)
+        );
+        assertTrue(Objects.requireNonNull(rejected.getMessage()).contains("a definition may not declare extensions"));
+    }
+
+    @Test
     void definitionsAndExtensionsAreOrdered() {
         String first = """
                 {"schemaVersion":1,"id":"test:order","bounds":[0,0,0,1,1,1],

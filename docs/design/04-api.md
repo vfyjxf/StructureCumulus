@@ -214,11 +214,11 @@ so the two frontends cannot disagree on it.
   "id": "mymod:campfire",
   "bounds": [0, 0, 0, 3, 3, 3],
   "bays": [
-    {"id": "shell", "boxes": [[0,0,0,3,3,3]], "minus": [[1,1,1,2,2,2], [1,0,1,2,1,2]],
+    {"id": "shell", "boxes": [[0,0,0,3,3,3]], "minus": [[1,1,1,1,1,1], [1,0,1,1,1,1]],
      "coverage": "every_cell", "footprint": "box", "sharing": "exclusive"},
-    {"id": "hollow", "box": [1,1,1,2,2,2], "coverage": "every_cell",
+    {"id": "hollow", "box": [1,1,1,1,1,1], "coverage": "every_cell",
      "footprint": "box", "sharing": "exclusive"},
-    {"id": "fire", "box": [1,0,1,2,1,2], "coverage": "every_cell",
+    {"id": "fire", "box": [1,0,1,1,1,1], "coverage": "every_cell",
      "footprint": "box", "sharing": "exclusive"}
   ],
   "checks": [
@@ -230,7 +230,7 @@ so the two frontends cannot disagree on it.
      "expect": {"kind": "block", "id": "minecraft:campfire"}}
   ],
   "computations": [
-    {"kind": "air", "region": [[1,1,1,2,2,2]], "output": "mymod:air_cells"}
+    {"kind": "air", "region": [[1,1,1,1,1,1]], "output": "mymod:air_cells"}
   ],
   "keys": [
     {"id": "mymod:air_cells", "type": "long", "retention": "instance", "merge": "sum"}

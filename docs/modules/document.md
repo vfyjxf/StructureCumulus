@@ -456,7 +456,8 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 
 - One schema version. A reader that sees anything else emits `SC-DOC-0001`; it never guesses.
 - A definition is geometry: bays, seams and placements only. Every check, computation, key and
-  derivation is written once in the root.
+  derivation is written once in the root. The writer refuses a definition that carries `arguments`
+  or `extensions` instead of emitting it.
 - `envelope` is a root boolean. A definition cannot declare it, and an absent member is off; the
   schema version does not move for it. `envelopeEntities` follows the same rule and only modifies
   what an `envelope` root would judge: a root declaring it without `envelope` is `SC-DOC-0002`, and
