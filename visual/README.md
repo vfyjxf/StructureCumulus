@@ -78,7 +78,7 @@ network request.
 
 ## What is inside
 
-541 kernel tests in 65 containers, 440 adapter unit tests in 46 containers, 140 GameTests, 66 codes,
+562 kernel tests in 68 containers, 442 adapter unit tests in 46 containers, 140 GameTests, 66 codes,
 81 decisions and 11 ranked kernel packages. One complete document and a Java builder excerpt build
 the same campfire blueprint.
 
@@ -106,7 +106,7 @@ npm run data
 ```
 
 The generated counts are 66 codes (13 kernel families, including `SET` with `SC-SET-0008` and `BPT`
-with `SC-BPT-0005`), 81 decisions (D-82) and 541 kernel tests in 65 containers.
+with `SC-BPT-0005`), 81 decisions (D-82) and 562 kernel tests in 68 containers.
 `campfire.ts` is the curated worked example (3×3×3, 27 cells, 27 claims, spend 28 reads / 4 sections,
 derive capacity 10). The numbers match the JUnit scenario.
 

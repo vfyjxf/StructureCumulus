@@ -12,6 +12,7 @@ export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/claim/ClaimRowOrderingTest.java", "package": "claim", "className": "ClaimRowOrderingTest", "count": 2},
   {"file": "dev/vfyjxf/cumulus/kernel/claim/ClaimTest.java", "package": "claim", "className": "ClaimTest", "count": 5},
   {"file": "dev/vfyjxf/cumulus/kernel/context/ContextTest.java", "package": "context", "className": "ContextTest", "count": 5},
+  {"file": "dev/vfyjxf/cumulus/kernel/context/MergesTest.java", "package": "context", "className": "MergesTest", "count": 3},
   {"file": "dev/vfyjxf/cumulus/kernel/context/StructureManagerTest.java", "package": "context", "className": "StructureManagerTest", "count": 8},
   {"file": "dev/vfyjxf/cumulus/kernel/core/CoreTest.java", "package": "core", "className": "CoreTest", "count": 16},
   {"file": "dev/vfyjxf/cumulus/kernel/document/ComputationSpecTest.java", "package": "document", "className": "ComputationSpecTest", "count": 1},
@@ -24,6 +25,7 @@ export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AdversarialManagerTest.java", "package": "engine", "className": "AdversarialManagerTest", "count": 39},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/Ae2CpuScenarioTest.java", "package": "engine", "className": "Ae2CpuScenarioTest", "count": 5},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AggregateContextTest.java", "package": "engine", "className": "AggregateContextTest", "count": 7},
+  {"file": "dev/vfyjxf/cumulus/kernel/engine/ApiExamplesTest.java", "package": "engine", "className": "ApiExamplesTest", "count": 8},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AstralAltarScenarioTest.java", "package": "engine", "className": "AstralAltarScenarioTest", "count": 3},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/BloodAltarScenarioTest.java", "package": "engine", "className": "BloodAltarScenarioTest", "count": 6},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/CachedContextTest.java", "package": "engine", "className": "CachedContextTest", "count": 11},
@@ -34,6 +36,7 @@ export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/engine/ContextInstanceScenarioTest.java", "package": "engine", "className": "ContextInstanceScenarioTest", "count": 1},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/ContributionCompletenessTest.java", "package": "engine", "className": "ContributionCompletenessTest", "count": 5},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/DeriveReplacementTest.java", "package": "engine", "className": "DeriveReplacementTest", "count": 4},
+  {"file": "dev/vfyjxf/cumulus/kernel/engine/DeriveScenarioTest.java", "package": "engine", "className": "DeriveScenarioTest", "count": 10},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/DoorCoverageScenarioTest.java", "package": "engine", "className": "DoorCoverageScenarioTest", "count": 2},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/EntityFocusScenarioTest.java", "package": "engine", "className": "EntityFocusScenarioTest", "count": 3},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/EntityWindowScenarioTest.java", "package": "engine", "className": "EntityWindowScenarioTest", "count": 2},
@@ -75,10 +78,10 @@ export const testClasses: TestClass[] = [
 
 export const TEST_GROUPS = [
   {"name": "claim", "count": 28},
-  {"name": "context", "count": 13},
+  {"name": "context", "count": 16},
   {"name": "core", "count": 16},
   {"name": "document", "count": 50},
-  {"name": "engine", "count": 276},
+  {"name": "engine", "count": 294},
   {"name": "finding", "count": 37},
   {"name": "kernel", "count": 2},
   {"name": "space", "count": 27},
@@ -87,4 +90,4 @@ export const TEST_GROUPS = [
   {"name": "world", "count": 21},
 ];
 
-export const TEST_COUNT = 541;
+export const TEST_COUNT = 562;

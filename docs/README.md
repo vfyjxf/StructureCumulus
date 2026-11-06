@@ -115,10 +115,10 @@ Then the module files, in dependency order:
   union capture and check-only host path, the built-in `set_root`/`set_wing`/`set_demo` documents and
   the real-level set GameTests (`design/06-verification.md` §3.5). S6 closes the set layer: the
   `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
-  budget shared by presence and every member attempt (D-35). The tree registers 541
-  kernel tests in 65 containers, 440 adapter unit tests in 46 containers and 140 `@GameTest` methods;
-  a full `./gradlew check` and `runGameTestServer` on this tree are both green (541
-  kernel tests, 440 adapter tests, 140/140 GameTests). Pending only: acting on the measured
+  budget shared by presence and every member attempt (D-35). The tree registers 562
+  kernel tests in 68 containers, 442 adapter unit tests in 46 containers and 140 `@GameTest` methods;
+  a full `./gradlew check` and `runGameTestServer` on this tree are both green (562
+  kernel tests, 442 adapter tests, 140/140 GameTests). Pending only: acting on the measured
   kernel-side cost debts and the live-level review items (`07` §7), and fresh visual review
   screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
@@ -129,9 +129,9 @@ Then the module files, in dependency order:
   classes and their GameTest structure templates live in `src/gametest`, folded into the mod for
   every run and kept out of the published jar (D-77).
 - Verification (2026-11-06): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 541 kernel JUnit 5 tests (65 test
-  containers), 440 adapter unit tests (46 containers) and 140 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (541 kernel tests, 440 adapter
+  `javac --release 21` and JSpecify only. The tree registers 562 kernel JUnit 5 tests (68 test
+  containers), 442 adapter unit tests (46 containers) and 140 `@GameTest` methods; a full
+  `./gradlew check` and `runGameTestServer` both pass at this revision (562 kernel tests, 442 adapter
   tests, 140/140 GameTests, 0 failures, 0 skipped). `Codes.all` has 66 entries
   and the decision record has 81 decisions (D-82; D-29 and D-36 superseded, D-78 withdrawn).
 

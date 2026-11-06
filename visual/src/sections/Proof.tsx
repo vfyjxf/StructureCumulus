@@ -86,7 +86,7 @@ const FALSIFIER_ZH: Record<string, { claim: string; detail: string }> = {
 const TERMINAL = `$ tools/build-kernel.sh
   ✓ javac --release 21 -Werror
 $ tools/test-kernel.sh
-  541 tests / 541 successful / 0 failed
+  562 tests / 562 successful / 0 failed
 $ python3 tools/spec-check.py
   spec-check: ok
 $ grep -rn "net.minecraft\\|net.neoforged\\|com.mojang" src/kernel/java
@@ -133,7 +133,7 @@ export function Proof() {
         no="07"
         kicker={zh ? '证据 / review 收束' : 'Proof / the review closes'}
         title={zh ? <>设计只有能<em>跑</em>，才算真的。</> : <>A design is only real if it can <em>run.</em></>}
-        note={zh ? <>六道 gate、541 个 kernel 测试（65 个 container）、440 个 adapter 单元测试（46 个 container）、140 个 GameTests、66 个 code、80 条决策（D-82）。adapter 已实现到 H1–H4、T1–T3、N1–N7 和 S5/S6：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次不带 orientation 的 union capture、内置 set_demo）、set 收束（D-35）、nested-extent lookup（D-36，被 design 13 的 capability/attachment 拆分取代）、claimability（D-37）、instance 键的 whole-key release（D-38/D-45）、empty/nonFluid（D-39）、host 驱动的 StructureManager（D-40：begin/commit/abort、context 绑定 instance、in-memory）和会话级 claims（D-44）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在当前 D-82 tree 都是绿的（140/140）。剩下按已测成本债行动（07 §7）和新的 review screenshots。</> : <>Six gates, 541 kernel tests in 65 containers, 440 adapter unit tests in 46 containers, 140 GameTests, 66 codes and 81 decisions (D-82). The adapter is implemented through H1–H4, T1–T3, N1–N7 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one unsited union capture, the built-in set_demo), the set close-out (D-35), the nested-extent lookup (D-36, superseded by design 13's capability/attachment split), claimability (D-37), the instance-keyed whole-key release (D-38/D-45), empty/nonFluid (D-39), the host-driven StructureManager (D-40: begin/commit/abort, instance-bound context, in-memory) and the session-scoped claims (D-44). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green on the current D-82 tree (140/140). Pending only the measured cost debts (07 §7) and fresh review screenshots.</>}
+        note={zh ? <>六道 gate、562 个 kernel 测试（68 个 container）、442 个 adapter 单元测试（46 个 container）、140 个 GameTests、66 个 code、80 条决策（D-82）。adapter 已实现到 H1–H4、T1–T3、N1–N7 和 S5/S6：类型化 host 快照（D-33 取代 D-29）、推导 envelope（D-30）、cached context（D-31）、结构集合（D-32：<code>/cumulus set check|settle</code>、一次不带 orientation 的 union capture、内置 set_demo）、set 收束（D-35）、nested-extent lookup（D-36，被 design 13 的 capability/attachment 拆分取代）、claimability（D-37）、instance 键的 whole-key release（D-38/D-45）、empty/nonFluid（D-39）、host 驱动的 StructureManager（D-40：begin/commit/abort、context 绑定 instance、in-memory）和会话级 claims（D-44）。完整 <code>./gradlew check</code> 和 <code>runGameTestServer</code> 在当前 D-82 tree 都是绿的（140/140）。剩下按已测成本债行动（07 §7）和新的 review screenshots。</> : <>Six gates, 562 kernel tests in 68 containers, 442 adapter unit tests in 46 containers, 140 GameTests, 66 codes and 81 decisions (D-82). The adapter is implemented through H1–H4, T1–T3, N1–N7 and the S5/S6 set close-out: the typed host snapshot (D-33 supersedes D-29), the derived envelope (D-30), cached context (D-31), structure sets (D-32: <code>/cumulus set check|settle</code>, one unsited union capture, the built-in set_demo), the set close-out (D-35), the nested-extent lookup (D-36, superseded by design 13's capability/attachment split), claimability (D-37), the instance-keyed whole-key release (D-38/D-45), empty/nonFluid (D-39), the host-driven StructureManager (D-40: begin/commit/abort, instance-bound context, in-memory) and the session-scoped claims (D-44). A full <code>./gradlew check</code> and <code>runGameTestServer</code> are green on the current D-82 tree (140/140). Pending only the measured cost debts (07 §7) and fresh review screenshots.</>}
       />
 
       <Reveal>
@@ -162,7 +162,7 @@ export function Proof() {
                 </div>
               ))}
               <div className="mono muted" style={{ marginTop: 9 }}>
-                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '65 个 JUnit container · adapter 440 / 46 个 container · GameTests 140/140' : '65 JUnit containers · adapter 440 / 46 containers · GameTests 140/140'}
+                {TEST_COUNT} {zh ? '个测试' : 'tests'} / {testClassCount} {zh ? '个 class' : 'classes'} · {zh ? '68 个 JUnit container · adapter 442 / 46 个 container · GameTests 140/140' : '68 JUnit containers · adapter 442 / 46 containers · GameTests 140/140'}
               </div>
             </div>
           </div>

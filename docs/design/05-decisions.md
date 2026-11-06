@@ -832,7 +832,7 @@ is defensively re-checked; the set's total reads never exceed `budget.cells()`; 
 rollback invalidates the `StructureContext` of every formed attempt via `StructureEvent.Broken`
 (`rolledBack` still lists only the successful releases); a failed release does not skip the
 invalidation. The record set is now 35 decisions (D-35). **Status (S6):** implemented; the focused
-kernel/adapter tests are green; `./gradlew check` and `runGameTestServer` are green on this tree (541 kernel / 65 containers, 440 adapter / 46 containers, 140/140 GameTests; check exit 0).
+kernel/adapter tests are green; `./gradlew check` and `runGameTestServer` are green on this tree (562 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0).
 
 ### D-36 — Nested-extent lookup is generic per holder
 
@@ -973,7 +973,7 @@ and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` t
 `StructureAttempt`.
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
 `AdversarialManagerTest`, `StructureLifecycleGameTest` and
-`StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on this tree (541 kernel / 65 containers, 440 adapter / 46 containers, 140/140 GameTests; check exit 0).
+`StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on this tree (562 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0).
 
 ### D-41 — The snapshot carries values; a live handle is a contract, not a guard
 
