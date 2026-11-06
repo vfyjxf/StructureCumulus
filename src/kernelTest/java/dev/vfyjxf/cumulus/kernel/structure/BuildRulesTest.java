@@ -408,6 +408,79 @@ class BuildRulesTest {
     }
 
     @Test
+    void sameIdOtherTypeInput() {
+        Check<?> check = anyCellCheck(id("cells"), anyCellBay());
+        ContextKey<Long> writes = ContextKeys.of(id("value"), Long.class, Retention.instance);
+        ContextKey<String> reads = ContextKeys.of(id("value"), String.class, Retention.instance);
+        AggregateComputation<String> reader = new AggregateComputation<>() {
+            @Override
+            public NamespacedId id() {
+                return BuildRulesTest.id("reader");
+            }
+
+            @Override
+            public ContextKey<String> output() {
+                return ContextKeys.of(BuildRulesTest.id("total"), String.class, Retention.instance);
+            }
+
+            @Override
+            public Set<ContextKey<?>> inputs() {
+                return Set.of(reads);
+            }
+
+            @Override
+            public CuboidSet region() {
+                return CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+            }
+
+            @Override
+            public Outcome<String> compute(AggregateContext context) {
+                return Outcome.missing();
+            }
+        };
+        BlueprintRejected rejected = assertThrows(
+            BlueprintRejected.class,
+            () -> Blueprint.builder(id("typed_input")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
+                    .computation(aggregate(id("writer"), writes, Set.of())).computation(reader).build()
+        );
+        assertEquals(Codes.planInvalid, rejected.code());
+        assertTrue(
+            Objects.requireNonNull(rejected.getMessage(), "message")
+                    .contains("reads " + id("value") + " as java.lang.String, but its producer writes java.lang.Long"),
+            rejected.getMessage()
+        );
+
+        Expectation<String> requiresText = Expectations.custom(
+            String.class,
+            new ExpectationMeta(
+                id("requires_text"),
+                0,
+                Set.of(ContextKeys.of(id("value"), String.class, Retention.match)),
+                Codes.expected.code()
+            ),
+            ctx -> Reply.match()
+        );
+        Bay anySubject = Bay.of(
+            id("subject_bay"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+            Coverage.anySubject,
+            Footprint.none(),
+            Sharing.shared
+        );
+        Check<?> requiring = Check.of(id("requiring"), anySubject, stringFocus(), requiresText);
+        BlueprintRejected unproduced = assertThrows(
+            BlueprintRejected.class,
+            () -> Blueprint.builder(id("typed_requirement")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(requiring)
+                    .computation(aggregate(id("writer"), writes, Set.of())).build()
+        );
+        assertEquals(Codes.checkReadsDerivation, unproduced.code());
+        assertTrue(
+            Objects.requireNonNull(unproduced.getMessage(), "message").contains("requires " + id("value")),
+            unproduced.getMessage()
+        );
+    }
+
+    @Test
     void sectionComputationRulesAreBpt0007() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         Check<?> check = anyCellCheck(id("cells"), anyCellBay());
@@ -742,6 +815,25 @@ class BuildRulesTest {
             @Override
             public Class<OccupantSnapshot> subject() {
                 return OccupantSnapshot.class;
+            }
+
+            @Override
+            public CuboidSet staticCells(CuboidSet bayCells) {
+                return CuboidSet.empty();
+            }
+        };
+    }
+
+    private static Focus<String> stringFocus() {
+        return new Focus<>() {
+            @Override
+            public FocusResult<String> take(FocusContext ctx) {
+                throw new AssertionError("build never runs a focus");
+            }
+
+            @Override
+            public Class<String> subject() {
+                return String.class;
             }
 
             @Override
