@@ -83,7 +83,7 @@ class SettleAtomicityTest {
     }
 
     @Test
-    void aZeroRowSettleClearsTheKey() {
+    void anEmptyPlanReleasesTheInstance() {
         Blueprint box = boxBlueprint("atomicity/box");
         Blueprint none = noneBlueprint("atomicity/none");
         TestWorld.View view = filledView();
@@ -112,9 +112,9 @@ class SettleAtomicityTest {
             )
         );
         assertTrue(formed.claims().rows().isEmpty());
-        assertTrue(TestWorld.rows(ledger).isEmpty(), "the zero-row settle clears the key");
-        assertEquals(2L, ledger.revision(), "the zero-row settle bumps the revision");
-        assertEquals(2L, formed.ledgerRevision(), "Formed carries the bumped revision");
+        assertTrue(TestWorld.rows(ledger).isEmpty(), "the empty plan releases the instance's key");
+        assertEquals(2L, ledger.revision(), "the release of a held key bumps the revision");
+        assertEquals(2L, formed.ledgerRevision(), "Formed carries the release revision");
     }
 
     @Test
@@ -135,8 +135,14 @@ class SettleAtomicityTest {
                 TestAttempt.of(request)
             )
         );
-        MatchRequest rivalRequest = MagicFixtures
-                .request(blueprint, rivalSiting, view, ledger.read(rivalBounds), MagicFixtures.rival, MagicFixtures.rivalInstance);
+        MatchRequest rivalRequest = MagicFixtures.request(
+            blueprint,
+            rivalSiting,
+            view,
+            ledger.read(rivalBounds),
+            MagicFixtures.rival,
+            MagicFixtures.rivalInstance
+        );
         assertInstanceOf(
             MatchResult.Formed.class,
             MatchEngine.settle(
@@ -231,8 +237,13 @@ class SettleAtomicityTest {
     }
 
     private static Blueprint boxBlueprint(String path) {
-        Bay bay = MagicFixtures
-                .bay(MagicFixtures.id(path + "_bay"), CuboidSet.of(bounds), Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay bay = MagicFixtures.bay(
+            MagicFixtures.id(path + "_bay"),
+            CuboidSet.of(bounds),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
+        );
         return Blueprint.builder(MagicFixtures.id(path)).bounds(bounds)
                 .check(
                     Check.of(
@@ -245,8 +256,13 @@ class SettleAtomicityTest {
     }
 
     private static Blueprint noneBlueprint(String path) {
-        Bay bay = MagicFixtures
-                .bay(MagicFixtures.id(path + "_bay"), CuboidSet.of(bounds), Coverage.everyCell, Footprint.none(), Sharing.shared);
+        Bay bay = MagicFixtures.bay(
+            MagicFixtures.id(path + "_bay"),
+            CuboidSet.of(bounds),
+            Coverage.everyCell,
+            Footprint.none(),
+            Sharing.shared
+        );
         return Blueprint.builder(MagicFixtures.id(path)).bounds(bounds)
                 .check(
                     Check.of(

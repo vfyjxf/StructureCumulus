@@ -352,6 +352,10 @@ public final class MatchEngine {
                 outcome
             );
         }
+        if (session.cancelled()) {
+            session.findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
+            return undecided(phase, UndecidedReason.cancelled, session);
+        }
         Finding invalid = validateBindings(request, phase, outcome.bindings());
         if (invalid != null) {
             session.findings.add(invalid);
@@ -359,12 +363,17 @@ public final class MatchEngine {
         }
         ClaimPlanner.Derived derived;
         try {
-            derived = ClaimPlanner.derive(request.blueprint(), request.siting(), request.instance(), outcome.bindings());
+            derived = ClaimPlanner
+                    .derive(request.blueprint(), request.siting(), request.instance(), outcome.bindings());
         } catch (IllegalArgumentException rejected) {
             session.findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
         }
-        List<Finding> conflicts = conflicts(phase, derived.rows(), claims.rows());
+        List<Finding> conflicts = conflicts(phase, derived.rows(), claims.rows(), request.cancel());
+        if (conflicts == null) {
+            session.findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
+            return undecided(phase, UndecidedReason.cancelled, session);
+        }
         if (!conflicts.isEmpty()) {
             session.findings.addAll(conflicts);
             return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
@@ -433,50 +442,65 @@ public final class MatchEngine {
             return new MatchResult.Failed(phase, FindingBundle.of(findings));
         }
         long revision;
-        if (ledger == null) {
-            if (!derived.rows().isEmpty()) {
-                findings.add(
-                    code(Codes.ledgerUnavailable, phase, "no ledger is installed; the claims cannot be written", null)
-                );
-                return new MatchResult.Undecided(
-                    phase,
-                    UndecidedReason.ledgerUnavailable,
-                    FindingBundle.of(findings),
-                    admitted.outcome()
-                );
-            }
-            revision = 0;
-        } else {
-            ClaimVerdict verdict = ledger.settle(
-                new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision())
-            );
-            if (verdict instanceof ClaimVerdict.RevisionMoved) {
-                long retryRevision;
-                if (derived.rows().isEmpty()) {
-                    retryRevision = ledger.revision();
-                } else {
-                    Cuboid readBox = derived.footprint().bounds();
-                    ClaimView fresh = readBox == null ? ClaimView.unavailable() : ledger.read(readBox);
-                    if (!fresh.available()) {
-                        findings.add(
-                            code(Codes.ledgerUnavailable, phase, "the ledger moved and cannot answer the re-read", null)
-                        );
-                        return new MatchResult.Undecided(
-                            phase,
-                            UndecidedReason.ledgerUnavailable,
-                            FindingBundle.of(findings),
-                            admitted.outcome()
-                        );
-                    }
-                    List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows());
-                    if (!retryConflicts.isEmpty()) {
-                        findings.addAll(retryConflicts);
-                        return new MatchResult.Failed(phase, FindingBundle.of(findings));
-                    }
-                    retryRevision = fresh.revision();
+        if (derived.rows().isEmpty()) {
+            // an empty plan owns nothing: dropping the key is a release, never a settle (D-60)
+            if (ledger == null) {
+                revision = 0;
+            } else {
+                ClaimVerdict verdict = ledger.release(request.instance());
+                if (!(verdict instanceof ClaimVerdict.Settled released)) {
+                    findings.add(code(Codes.ledgerUnavailable, phase, "release answered " + verdict, null));
+                    return new MatchResult.Undecided(
+                        phase,
+                        UndecidedReason.ledgerUnavailable,
+                        FindingBundle.of(findings),
+                        admitted.outcome()
+                    );
                 }
-                verdict = ledger
-                        .settle(new SettleRequest(request.instance(), derived.rows(), retryRevision));
+                revision = released.revision();
+            }
+        } else if (ledger == null) {
+            findings.add(
+                code(Codes.ledgerUnavailable, phase, "no ledger is installed; the claims cannot be written", null)
+            );
+            return new MatchResult.Undecided(
+                phase,
+                UndecidedReason.ledgerUnavailable,
+                FindingBundle.of(findings),
+                admitted.outcome()
+            );
+        } else {
+            ClaimVerdict verdict = ledger
+                    .settle(new SettleRequest(request.instance(), derived.rows(), admitted.ledgerRevision()));
+            if (verdict instanceof ClaimVerdict.RevisionMoved) {
+                Cuboid readBox = derived.footprint().bounds();
+                ClaimView fresh = readBox == null ? ClaimView.unavailable() : ledger.read(readBox);
+                if (!fresh.available()) {
+                    findings.add(
+                        code(Codes.ledgerUnavailable, phase, "the ledger moved and cannot answer the re-read", null)
+                    );
+                    return new MatchResult.Undecided(
+                        phase,
+                        UndecidedReason.ledgerUnavailable,
+                        FindingBundle.of(findings),
+                        admitted.outcome()
+                    );
+                }
+                List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows(), request.cancel());
+                if (retryConflicts == null) {
+                    findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
+                    return new MatchResult.Undecided(
+                        phase,
+                        UndecidedReason.cancelled,
+                        FindingBundle.of(findings),
+                        admitted.outcome()
+                    );
+                }
+                if (!retryConflicts.isEmpty()) {
+                    findings.addAll(retryConflicts);
+                    return new MatchResult.Failed(phase, FindingBundle.of(findings));
+                }
+                verdict = ledger.settle(new SettleRequest(request.instance(), derived.rows(), fresh.revision()));
             }
             if (verdict instanceof ClaimVerdict.RevisionMoved moved) {
                 findings.add(
@@ -769,10 +793,19 @@ public final class MatchEngine {
         return FindingBundle.of(missing);
     }
 
-    private static List<Finding> conflicts(Phase phase, List<ClaimRow> requested, List<ClaimRow> held) {
+    private static @Nullable List<Finding> conflicts(
+        Phase phase,
+        List<ClaimRow> requested,
+        List<ClaimRow> held,
+        CancelToken cancel
+    ) {
         Map<String, Conflict> byPair = new LinkedHashMap<>();
+        long pairs = 0;
         for (ClaimRow row : requested) {
             for (ClaimRow incumbent : held) {
+                if (++pairs % 4096 == 0 && cancel.isCancelled()) {
+                    return null;
+                }
                 if (!ClaimMatrix.conflicts(row, incumbent)) {
                     continue;
                 }
@@ -859,7 +892,9 @@ public final class MatchEngine {
         String message = rejected.getMessage() == null ? "claim planning failed" : rejected.getMessage();
         CodeEntry entry = message.contains("SC-SPC-0001")
                 ? Codes.locusUnmapped
-                : message.contains("SC-CLM-0005") ? Codes.boundEmpty : Codes.bindingInvalid;
+                : message.contains("SC-CLM-0001")
+                        ? Codes.claimConflict
+                        : message.contains("SC-CLM-0005") ? Codes.boundEmpty : Codes.bindingInvalid;
         return code(entry, phase, message, locus);
     }
 
@@ -927,9 +962,16 @@ public final class MatchEngine {
         }
 
         private boolean chargeScope(ReadScope scope, WorldView view) {
-            int sections = sectionsOf(scope.cells(), view).size();
+            int sections = 0;
+            CuboidSet scopeWorld = request.siting().toWorld(scope.cells());
+            if (scopeWorld != null) {
+                sections += sectionsOf(scopeWorld, view).size();
+            }
             for (var window : scope.windows()) {
-                sections += sectionsOf(window.cells().asSet(), view).size();
+                Cuboid windowWorld = request.siting().toWorld(window.cells());
+                if (windowWorld != null) {
+                    sections += sectionsOf(windowWorld.asSet(), view).size();
+                }
             }
             long cells = scope.cells().volume();
             for (var window : scope.windows()) {
@@ -950,17 +992,28 @@ public final class MatchEngine {
 
         private void contribute(ContextKey<?> key, SectionKey section, Object value) {
             if (!key.type().isInstance(value)) {
+                CuboidSet region = computationRegion(key, section);
                 findings.add(
                     code(
                         Codes.designDefect,
                         Phase.check,
                         "a section of " + key.id() + " produced " + value.getClass().getName(),
-                        Locus.local(computationRegion(key, section))
+                        Locus.local(region)
                     )
                 );
+                missing(key, region, true);
                 return;
             }
             contributions.computeIfAbsent(key, ignored -> new TreeMap<>()).put(section, value);
+        }
+
+        private CuboidSet computationRegion(ContextKey<?> key) {
+            for (Computation<?> computation : request.blueprint().computations()) {
+                if (computation.output().equals(key)) {
+                    return computation.region();
+                }
+            }
+            return request.blueprint().bayCells();
         }
 
         private CuboidSet computationRegion(ContextKey<?> key, SectionKey section) {
@@ -1019,9 +1072,28 @@ public final class MatchEngine {
                 findings.add(code(Codes.designDefect, phase, "a contributed key has no merge: " + key.id(), null));
                 return;
             }
+            CuboidSet region = computationRegion(key);
             Object combined = null;
-            for (Object part : parts.values()) {
-                combined = combined == null ? part : merge.combine(combined, part);
+            try {
+                for (Object part : parts.values()) {
+                    combined = combined == null ? part : merge.combine(combined, part);
+                }
+            } catch (RuntimeException failure) {
+                findings.add(extensionFailure(phase, key.id(), failure, Locus.local(region)));
+                missing(key, region, true);
+                return;
+            }
+            if (combined != null && !key.type().isInstance(combined)) {
+                findings.add(
+                    code(
+                        Codes.designDefect,
+                        phase,
+                        "merging " + key.id() + " produced " + combined.getClass().getName(),
+                        Locus.local(region)
+                    )
+                );
+                missing(key, region, true);
+                return;
             }
             values.put(key, combined);
         }

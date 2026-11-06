@@ -263,7 +263,8 @@ class StructureLifecycleAdversarialTest {
         for (ClaimRow row : old.rows()) {
             LatticePoint next = row.cell().point().offset(10, 0, 0);
             assertNotNull(next);
-            translated.add(new ClaimRow(LatticeKey.of(next), row.sharing(), movedOrigin, row.bay(), translatedInstance));
+            translated
+                    .add(new ClaimRow(LatticeKey.of(next), row.sharing(), movedOrigin, row.bay(), translatedInstance));
         }
         settle(ledger, translatedInstance, translated);
         assertEquals(2, ledger.revision(), "the translated settle bumps once");
@@ -276,10 +277,20 @@ class StructureLifecycleAdversarialTest {
         assertEquals(movedOrigin, ledger.read(movedBox).rows().get(0).siting());
         assertEquals(2, ledger.read(wideBox).rows().size(), "the translation never duplicates a row");
 
-        ClaimVerdict stale = ledger.settle(new SettleRequest(translatedInstance, List.of(), 1L));
-        assertTrue(stale instanceof ClaimVerdict.RevisionMoved moved);
-        assertEquals(1L, ((ClaimVerdict.RevisionMoved) stale).expected());
-        assertEquals(3L, ((ClaimVerdict.RevisionMoved) stale).actual());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new SettleRequest(translatedInstance, List.of(), 1L),
+            "an empty settle is rejected at construction; dropping a key is a release"
+        );
+
+        ClaimVerdict stale = ledger.settle(
+            new SettleRequest(
+                translatedInstance,
+                List.of(row(translatedInstance, movedOrigin, LatticePoint.of(10, 0, 0), Sharing.exclusive)),
+                1L
+            )
+        );
+        assertEquals(new ClaimVerdict.RevisionMoved(1L, 3L), stale, "a stale non-empty settle is refused");
         assertEquals(3, ledger.revision(), "a stale settle writes nothing");
         assertEquals(2, ledger.read(wideBox).rows().size());
     }

@@ -51,6 +51,7 @@ public interface Catalogs {
 public record Host(DocumentSource documents, @Nullable ClaimLedger ledger,
                    StructureManager structures, java.util.Map<NamespacedId, Class<?>> types) {
     public Host { /* immutable; contexts non-null; types sorted */ }
+    public ContextStore contexts();
     public static Host empty();
 }
 
@@ -185,8 +186,8 @@ found a duplicate/different entry; `Catalogs.Builder.build`). A document naming 
   `Formed` through an attempt.
 - The attempt is the only publish target: a closed attempt, a foreign instance id and a mismatched
   spec are each `Undecided(designDefect)` with an unmoved ledger.
-- A zero-row settle with a ledger clears the key and bumps the revision; `Formed` then carries the
-  bumped revision.
+- An empty derived plan with a ledger releases the instance's key instead of settling; `Formed` then
+  carries the release's revision (D-60).
 - Facade: each operation's absent/error path; `explain` null vs fallback; `solve` cap/order.
 - Two kernels over two catalogs do not share state; a late builder mutation does not change a built
   kernel.

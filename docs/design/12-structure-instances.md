@@ -205,11 +205,13 @@ no instance id survives the session.
   `contexts().remove`. Rollback in `StructureSetHost` is `StructureEvent.Broken` through that bound
   manager, not `ContextStore.remove`. The manager has `find(World, owner, siting)`; the two-argument
   `find` throws when the tuple is present in more than one world.
-- Set-host rollback restores snapshotted old claim rows but cannot recreate a prior
-  `StructureInstance`/context already replaced by an earlier commit in the same run. Member commits
-  run only after every settle succeeds, so a settle failure keeps the old set; a commit-phase failure
-  is reachable only through a host-contract violation (draft committed into another manager, or a
-  manager rejecting a valid commit). That is a documented limitation, not atomic replace.
+- Set-host rollback releases only what the run settled; it never restores the previous occupant of a
+  member's siting (D-79) — the takeover release already dropped its rows, and a settle failure leaves
+  it as a stale manager entry the host replaces by settling again. Member commits run only after
+  every settle succeeds; a commit-phase failure is reachable only through a host-contract violation
+  (draft committed into another manager, or a manager rejecting a valid commit) and rolls the
+  committed prefix back the same release-only way. That is a documented limitation, not atomic
+  replace.
 - `StructureEvent.Loaded(World, List<StructureInstance>)` replaces one world's instances; the old
   world-less `Loaded(List)` shape is not supported.
 - `SavedContexts`, `SavedContextsLifecycleTest`, `allocateSerial` and `ContextStore.inMemory()`'s

@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.context.ContextStore;
 import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
+import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
@@ -82,6 +83,50 @@ class GateBudgetScenarioTest {
         assertEquals(UndecidedReason.budgetExhausted, undecided.reason());
         assertTrue(MagicFixtures.hasCode(undecided, Codes.budgetExhausted), "the budget gate is SC-ENG-0001");
         assertNoWrites(ledger, attempt.store());
+    }
+
+    @Test
+    void checkChargesSectionsInTheWorldFrame() {
+        for (int[] row : new int[][]{{0, 1}, {1, 2}, {8, 2}}) {
+            int origin = row[0];
+            int expectedSections = row[1];
+            Siting shifted = MagicFixtures.identity(LatticePoint.of(origin, 0, 0));
+            TestWorld.View view = MagicFixtures.view();
+            for (int x = 0; x < 16; x++) {
+                MagicFixtures.air(view, shifted, LatticePoint.of(x, 0, 0));
+            }
+            MatchRequest request = MatchRequest.of(
+                rowBlueprint(),
+                shifted,
+                new TestWorld.Lease(view),
+                MagicFixtures.instance,
+                MagicFixtures.owner,
+                Budget.unbounded(),
+                new ClaimView(List.of(), 0, true)
+            );
+            MatchResult.Admitted admitted = assertInstanceOf(
+                MatchResult.Admitted.class,
+                MatchEngine.check(request),
+                "origin " + origin + " admits"
+            );
+            assertEquals(
+                new Spend(16, expectedSections),
+                admitted.outcome().spend(),
+                "origin " + origin + " charges the world sections"
+            );
+        }
+    }
+
+    private static Blueprint rowBlueprint() {
+        Bay bay = MagicFixtures.bay(
+            MagicFixtures.id("gate/row"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 16, 1, 1)),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.shared
+        );
+        return Blueprint.builder(MagicFixtures.id("gate/row_structure")).bounds(Cuboid.of(0, 0, 0, 16, 1, 1))
+                .check(MagicFixtures.eachCell(MagicFixtures.id("gate/row_check"), bay, Expectations.air())).build();
     }
 
     private static void assertNoWrites(ClaimLedger ledger, ContextStore contexts) {

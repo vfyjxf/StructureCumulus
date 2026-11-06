@@ -102,9 +102,9 @@ public record OccupantSnapshot(OccupantRef ref, OccupantDescriptor descriptor, C
     public boolean has(TraitKey<?> key);
 }
 
-public record OccupantFilter(java.util.function.Predicate<NamespacedId> type,
-                             java.util.function.Predicate<OccupantKind> kind,
-                             java.util.function.Predicate<NamespacedId> trait) {
+public record OccupantFilter(@Nullable java.util.function.Predicate<NamespacedId> type,
+                             @Nullable java.util.function.Predicate<OccupantKind> kind,
+                             @Nullable java.util.function.Predicate<NamespacedId> trait) {
     public static OccupantFilter any();
     public static OccupantFilter ofType(NamespacedId type);
     public static OccupantFilter ofKind(OccupantKind kind);
@@ -353,8 +353,10 @@ it.
 elements (root plus every child frame); `maxDepth` bounds the nested frames below the root; `kinds`
 and `traits` say what must be resolved; `windows` names the world-frame entity windows the host must
 include. The host derives the policy from `Blueprint.reads()` (`structure` §4.5), mapping the local
-windows through the siting. A required trait that cannot be resolved is a `TraitSlot.Refused` on the
-occupant, never a fabricated default and never a refusal of the whole cell.
+windows through the siting. `kinds` iterates in `OccupantKind` order, and `traits` — like
+`ComputationSpec.inputs` in the document module — in id order; the constructor keeps the sorted set,
+never a hash-ordered copy (D-75). A required trait that cannot be resolved is a `TraitSlot.Refused` on
+the occupant, never a fabricated default and never a refusal of the whole cell.
 
 A trait that was never asked for has no slot. That is "unasked", not `Absent`: a consumer that needs
 the trait reports an unreadable trait, never a mismatch. The same rule holds for a `Refused` slot.

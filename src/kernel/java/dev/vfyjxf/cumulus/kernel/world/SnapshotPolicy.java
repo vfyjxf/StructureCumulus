@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.kernel.world;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -23,12 +24,12 @@ public record SnapshotPolicy(
         Objects.requireNonNull(kinds, "kinds");
         Objects.requireNonNull(traits, "traits");
         Objects.requireNonNull(windows, "windows");
-        kinds = Set.copyOf(new TreeSet<>(kinds));
+        kinds = Collections.unmodifiableSortedSet(new TreeSet<>(kinds));
         TreeSet<NamespacedId> traitIds = new TreeSet<>();
         for (NamespacedId trait : traits) {
             traitIds.add(Objects.requireNonNull(trait, "trait"));
         }
-        traits = Set.copyOf(traitIds);
+        traits = Collections.unmodifiableSortedSet(traitIds);
         windows = List.copyOf(windows);
     }
 

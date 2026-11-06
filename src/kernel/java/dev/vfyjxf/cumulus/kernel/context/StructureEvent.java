@@ -2,8 +2,6 @@ package dev.vfyjxf.cumulus.kernel.context;
 
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.World;
-import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
-import dev.vfyjxf.cumulus.kernel.space.Siting;
 import org.jspecify.annotations.NullMarked;
 
 import java.util.List;

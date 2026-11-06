@@ -39,6 +39,9 @@ public record MatchRequest(Blueprint blueprint, Siting siting, SnapshotLease lea
                            InstanceId instance, OwnerId owner, Budget budget,
                            @Nullable ClaimView claims, CancelToken cancel,
                            @Nullable CachedContext cachedContext) {
+    public MatchRequest(Blueprint blueprint, Siting siting, SnapshotLease lease,
+                        InstanceId instance, OwnerId owner, Budget budget,
+                        @Nullable ClaimView claims, CancelToken cancel);
     public static MatchRequest of(Blueprint blueprint, Siting siting, SnapshotLease lease,
                                   InstanceId instance, OwnerId owner, Budget budget,
                                   @Nullable ClaimView claims);                  // cachedContext = null
@@ -88,7 +91,7 @@ public sealed interface MatchResult {
 public final class MatchEngine {
     public static MatchResult check(MatchRequest request);
     public static MatchResult settle(MatchRequest request, MatchResult.Admitted admitted,
-                                     @Nullable ClaimLedger ledger, ContextStore contexts);
+                                     @Nullable ClaimLedger ledger, StructureAttempt attempt);
     public static StructureContext derive(MatchResult.Formed formed,
                                           java.util.List<DerivationSpec> derivations,
                                           Catalog<Deriver<?>> derivers, ContextStore contexts);
@@ -96,7 +99,7 @@ public final class MatchEngine {
 }
 
 public final class ClaimPlanner {
-    public static Derived derive(Blueprint blueprint, Siting siting, OwnerId owner,
+    public static Derived derive(Blueprint blueprint, Siting siting, InstanceId instance,
                                  java.util.List<BayBinding> bindings);
     public record Derived(java.util.List<ClaimRow> rows, CuboidSet footprint) { }
     private ClaimPlanner() {}
@@ -138,6 +141,7 @@ check(request):
       if a binding carries a nested subject or a non-root frame -> Failed(SC-CLM-0004)
       if no claimable bay                              -> ledgerAvailable=false, revision=0
       else if request.claims() == null/!available      -> Undecided(ledgerUnavailable)
+      else if cancelled                                -> Undecided(cancelled)
       else derive rows; matrix against claims.rows()
            conflict -> Failed(SC-CLM-0001)
            else     -> Admitted(revision = claims.revision, ledgerAvailable = true)
@@ -167,19 +171,23 @@ settle(request, admitted, ledger, attempt):
       failure -> Failed(plannerFailure)
 
   // ---- the one fallible write ----
-  if ledger == null:
-      if !derived.rows().isEmpty()                    -> Undecided(ledgerUnavailable)
-      else: revision = 0                              // no ledger and zero rows: Formed
+  if derived.rows().isEmpty():
+      // an empty plan owns nothing: dropping the key is a release, never a settle (D-60)
+      if ledger == null: revision = 0               // no ledger and no rows: Formed
+      else: verdict = ledger.release(request.instance())
+            !Settled                                -> Undecided(ledgerUnavailable)
+            revision = verdict.revision()           // unchanged when the key was already absent
+  else if ledger == null                            -> Undecided(ledgerUnavailable)
   else:
       verdict = ledger.settle(new SettleRequest(request.instance(), derived.rows(),
                                                 admitted.ledgerRevision()))
       if RevisionMoved:
-          empty row set: retry once at ledger.revision(); there is no matrix to run
-          non-empty: fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
-              matrix(rows, fresh.rows()) conflict -> Failed(SC-CLM-0001); retry once at fresh.revision()
+          fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
+              matrix(rows, fresh.rows()) cancelled -> Undecided(cancelled);
+                                        conflict  -> Failed(SC-CLM-0001); retry once at fresh.revision()
           moved twice                                 -> Undecided(ledgerMoved)
       if Conflict                                     -> Failed(SC-CLM-0001) with incumbents
-      revision = settled.revision()
+      revision = settled.revision()                   // unchanged when the content matched (D-60)
 
   // ---- after the write: total, no throw point ----
   context = attempt.publish(instance, instanceValues, findings, spend)
@@ -223,7 +231,8 @@ value an earlier pass left behind. A `match` key produced by a deriver is reject
 owner, budget, claims, cancellation, cachedContext)`. It carries no stage, no policy, no ticket, no
 record, no pin budget. `instance` is allocated by the host before the check; `check` does not mint it.
 `claims` is the frozen ledger view the host read; `check` never reads a live ledger. `cancel` is
-checked at unit boundaries; a long extension checks its own token. `cachedContext` is optional
+checked at unit boundaries and every 4096 pairs inside the conflict matrix scan; a long extension
+checks its own token. `cachedContext` is optional
 host-owned state (§7.7); `null` is the default. `CancelToken.never()` is the default factory.
 
 ### 7.2 Outcome
@@ -237,9 +246,11 @@ review defect, never a silent widening. `spend` is the sum of every charge.
 
 ### 7.3 Result
 
-`Admitted` is not a structure: no claims, no `ClaimSet`, no `Formed`. `Formed` exists only after a
-`Settled` (or an empty-row registration that needed no ledger) and carries the claims, the context
-revision and the ledger revision. Every publish — settle or derive — stores a whole replacement
+`Admitted` is not a structure: no claims, no `ClaimSet`, no `Formed`. `Formed` exists only after the
+ledger answered — a `Settled` (a settle whose content matched counts, and keeps the revision), a
+`release` of the instance's key when the derived plan owns nothing (D-60), or no ledger and no rows
+at all — and carries the claims, the context revision and the ledger revision; the ledger revision
+may equal the one the check read. Every publish — settle or derive — stores a whole replacement
 table in a new `StructureContext`, so the context revision names an immutable snapshot, not a
 mutation of the previous one. `Failed` has at least one `error` finding. `Undecided` carries a
 reason and, when available, a partial outcome. `Dropped` means the snapshot was no longer current;
@@ -263,7 +274,8 @@ footprints; a subject from a nested frame (`frame != 0`) or of kind `OccupantKin
 for a claimable bay. A nested structure is checkable but never claimable: a nested focus returns no
 subject, and a check that binds a nested body through `Focuses.occupant` fails at claim prediction
 with `SC-CLM-0004` before an `Admitted` exists. Rows are one per cell per bay; a cell may carry two
-rows only when both bays are `shared` (the blueprint refuses an exclusive overlap). `rows` is sorted
+rows only when both bays are `shared` — the build refuses the overlap it can compute, and `derive`
+refuses the settled one a `Bound` pair hides until then (D-57). `rows` is sorted
 by `(cell, owner, bay, siting origin, placement orientation, placement offset, sharing)`.
 
 `check` rejects a nested or non-root binding while folding the verdict; it never returns an
@@ -273,7 +285,9 @@ footprint lies inside the bay's world cells; for `oneSubject` the union equals t
 `exclusive + Bound` at least one non-air subject exists. A failure is
 `Failed(SC-CLM-0004)`/`SC-CLM-0005` and nothing is written. `ClaimPlanner.derive` throws
 `IllegalArgumentException` carrying `SC-CLM-0004` if a nested or non-root subject reaches it; that is
-a proof failure, because check and settle already validated the bindings.
+a proof failure, because check and settle already validated the bindings. It also throws
+`SC-CLM-0001` when two bays of one instance own one cell with an exclusive side; `plannerFailure`
+maps that to the conflict code, and check and settle answer `Failed` with nothing written.
 
 A ledger is free to answer `Formed.claims()` with its whole row set rather than only the replacement
 rows. A host that runs several structures must therefore filter the set by `(owner, siting, bay)`
@@ -284,7 +298,8 @@ before attributing rows to one structure; the engine never does that filtering.
 Charges: a section computation charges the slice volume plus one section per section run; a check
 charges its declared cells' volume plus the sections they touch, and a window charges its inflated
 volume plus its sections; an aggregate charges its region's volume plus the sections it touches,
-once, before `compute`. Charges happen before the unit runs; a
+once, before `compute`. Sections are counted in the world frame after the siting maps the cells; a
+scope the siting cannot map touches no section. Charges happen before the unit runs; a
 refusal returns `Undecided(budgetExhausted)`. The budget is the request's; the engine does not reset
 it. A `Partial` section is charged as one section; its refused cells are not a second read. For a
 fixed tuple the result value, finding order and spend are identical; `Plan` order is fixed at build;
@@ -341,7 +356,10 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
 - Pipe corner: eight asserted, four owned; neighbour does not conflict.
 - Entity pen: window read, subject footprint, `anySubject + Bound`.
 - Absence: a refused section makes the key absent; a read is `Unreadable`, never a short sum; a
-  partial section makes `count`/`air` `Missing` and reports the refusal, while `volume` stays total.
+  partial section makes `count`/`air` `Missing` and reports the refusal, while `volume` stays total;
+  a wrong-typed contribution, a throwing `merge.combine` and a wrong-typed merged value each mark the
+  key absent with their finding (`SC-ENG-0004`, `SC-SPI-0001`); an attempt that never reads the
+  broken key still forms and carries the finding.
 - Nested: a nested focus yields no subject; a nested body bound through an occupant focus is
   `Failed(SC-CLM-0004)` before rows; a child-frame subject is rejected the same way.
 - Budget: a too-small budget is `Undecided`; no claims.

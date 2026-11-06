@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -78,7 +79,13 @@ class AdversarialClaimCoverageTest {
                                 for (LatticePoint leftCell : cells) {
                                     for (LatticePoint rightCell : cells) {
                                         ClaimRow left = row(leftCell, leftSharing, leftInstance, leftSiting, "left");
-                                        ClaimRow right = row(rightCell, rightSharing, rightInstance, rightSiting, "right");
+                                        ClaimRow right = row(
+                                            rightCell,
+                                            rightSharing,
+                                            rightInstance,
+                                            rightSiting,
+                                            "right"
+                                        );
                                         boolean expected = leftCell.equals(rightCell)
                                                 && !leftInstance.equals(rightInstance)
                                                 && (leftSharing.blocks() || rightSharing.blocks());
@@ -101,7 +108,13 @@ class AdversarialClaimCoverageTest {
     @Test
     void claimRowOrderIncludesSitingAndKeepsSitingDistinctRows() {
         ClaimRow first = row(origin, Sharing.shared, instance, identity, "bay");
-        ClaimRow second = row(origin, Sharing.shared, instance, MagicFixtures.identity(LatticePoint.of(5, 0, 5)), "bay");
+        ClaimRow second = row(
+            origin,
+            Sharing.shared,
+            instance,
+            MagicFixtures.identity(LatticePoint.of(5, 0, 5)),
+            "bay"
+        );
 
         assertTrue(first.compareTo(second) < 0, "siting is part of the total order");
         assertNotEquals(first, second, "different sitings are different rows");
@@ -143,7 +156,8 @@ class AdversarialClaimCoverageTest {
             IllegalArgumentException.class,
             () -> new SettleRequest(instance, List.of(row(origin, Sharing.shared, rivalInstance, identity, "x")), 0)
         );
-        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instance, List.of(), -1));
+        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instance, List.of(), 0));
+        assertThrows(IllegalArgumentException.class, () -> new SettleRequest(instance, List.of(earlierCell), -1));
     }
 
     @Test
@@ -272,8 +286,12 @@ class AdversarialClaimCoverageTest {
         OccupantSnapshot block = TestWorld.block(TestWorld.stone, origin);
         OccupantSnapshot second = TestWorld.block(TestWorld.stone, LatticePoint.of(0, 1, 0));
 
-        ClaimPlanner.Derived derived = ClaimPlanner
-                .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(block, second, block))));
+        ClaimPlanner.Derived derived = ClaimPlanner.derive(
+            blueprint,
+            identity,
+            instance,
+            List.of(new BayBinding(boundBay, List.of(block, second, block)))
+        );
         assertEquals(2, derived.rows().size(), "two distinct footprints yield two rows and duplicates do not add rows");
 
         OccupantSnapshot nested = nestedOccupant(origin, 0);
@@ -315,7 +333,8 @@ class AdversarialClaimCoverageTest {
             () -> assertEquals(1, derived.rows().size(), "an air subject contributes no claimed cell"),
             () -> assertThrows(
                 IllegalArgumentException.class,
-                () -> ClaimPlanner.derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(air)))),
+                () -> ClaimPlanner
+                        .derive(blueprint, identity, instance, List.of(new BayBinding(boundBay, List.of(air)))),
                 "an exclusive Bound footprint with only air subjects must be SC-CLM-0005"
             )
         );
@@ -455,7 +474,8 @@ class AdversarialClaimCoverageTest {
         );
         assertTrue(formed.claims().rows().isEmpty(), "Footprint.None claims nothing");
         assertTrue(TestWorld.rows(ledger).isEmpty(), "a None footprint writes no ledger row");
-        assertEquals(1, ledger.revision(), "a None-only settlement clears the key and bumps the revision");
+        assertEquals(0, ledger.revision(), "an empty plan releases the key; an absent key does not bump");
+        assertEquals(0, formed.ledgerRevision(), "Formed carries the unchanged revision");
 
         Bay exclusiveNone = MagicFixtures
                 .bay(id("none_exclusive"), oneCell, Coverage.everyCell, Footprint.none(), Sharing.exclusive);
@@ -544,6 +564,225 @@ class AdversarialClaimCoverageTest {
                     .build();
         });
         assertTrue(Objects.requireNonNull(rejected.getMessage(), "message").contains("SC-BPT-0002"));
+    }
+
+    @Test
+    void aDeclaredFootprintOverAnotherBayFailsBuild() {
+        Bay box = MagicFixtures.bay(id("p1_box"), oneCell, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
+        Bay declared = MagicFixtures.bay(
+            id("p1_declared"),
+            CuboidSet.of(Cuboid.of(1, 0, 0, 2, 1, 1)),
+            Coverage.everyCell,
+            Footprint.declared(oneCell),
+            Sharing.shared
+        );
+        BlueprintBuilder builder = Blueprint.builder(id("p1")).bounds(Cuboid.of(0, 0, 0, 2, 1, 1))
+                .check(Check.of(id("p1_box_check"), box, Focuses.occupant(origin), Expectations.anyOccupant())).check(
+                    Check.of(
+                        id("p1_declared_check"),
+                        declared,
+                        Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                        Expectations.anyOccupant()
+                    )
+                );
+        IllegalArgumentException rejected = assertThrows(IllegalArgumentException.class, builder::build);
+        assertTrue(Objects.requireNonNull(rejected.getMessage(), "message").contains("SC-BPT-0002"));
+    }
+
+    @Test
+    void twoDeclaredFootprintsOverOneCellFailBuild() {
+        CuboidSet leftOwned = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1), Cuboid.of(2, 0, 0, 3, 1, 1));
+        CuboidSet rightOwned = CuboidSet.of(Cuboid.of(1, 0, 0, 3, 1, 1));
+        for (Sharing leftSharing : List.of(Sharing.exclusive, Sharing.shared)) {
+            for (Sharing rightSharing : List.of(Sharing.exclusive, Sharing.shared)) {
+                String where = leftSharing + "/" + rightSharing;
+                Bay left = MagicFixtures.bay(
+                    id("two_declared_left"),
+                    oneCell,
+                    Coverage.everyCell,
+                    Footprint.declared(leftOwned),
+                    leftSharing
+                );
+                Bay right = MagicFixtures.bay(
+                    id("two_declared_right"),
+                    CuboidSet.of(Cuboid.of(1, 0, 0, 2, 1, 1)),
+                    Coverage.everyCell,
+                    Footprint.declared(rightOwned),
+                    rightSharing
+                );
+                BlueprintBuilder builder = Blueprint.builder(id("two_declared_" + where.replace('/', '_'))).bounds(
+                    Cuboid.of(0, 0, 0, 3, 1, 1)
+                ).check(
+                    Check.of(id("two_declared_left_check"), left, Focuses.occupant(origin), Expectations.anyOccupant())
+                ).check(
+                    Check.of(
+                        id("two_declared_right_check"),
+                        right,
+                        Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                        Expectations.anyOccupant()
+                    )
+                );
+                if (leftSharing == Sharing.exclusive || rightSharing == Sharing.exclusive) {
+                    IllegalArgumentException rejected = assertThrows(
+                        IllegalArgumentException.class,
+                        builder::build,
+                        where + " owns cell 2 on both sides"
+                    );
+                    assertTrue(Objects.requireNonNull(rejected.getMessage(), "message").contains("SC-BPT-0002"));
+                } else {
+                    assertNotNull(builder.build(), where + " shared/shared overlaps without an exclusive side");
+                }
+            }
+        }
+    }
+
+    @Test
+    void cellsMayOverlapWhenOwnedSetsDoNot() {
+        CuboidSet inner = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
+        CuboidSet span = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
+        Bay box = MagicFixtures.bay(id("relax_box"), inner, Coverage.everyCell, Footprint.box(), Sharing.shared);
+        Bay declared = MagicFixtures.bay(
+            id("relax_declared"),
+            span,
+            Coverage.everyCell,
+            Footprint.declared(span.subtract(inner)),
+            Sharing.exclusive
+        );
+        Blueprint declaredBlueprint = blueprint(
+            "relax_declared_cells",
+            Cuboid.of(0, 0, 0, 3, 1, 1),
+            Check.of(id("relax_box_0"), box, Focuses.occupant(origin), Expectations.anyOccupant()),
+            Check.of(id("relax_box_1"), box, Focuses.occupant(LatticePoint.of(1, 0, 0)), Expectations.anyOccupant()),
+            Check.of(id("relax_declared_0"), declared, Focuses.occupant(origin), Expectations.anyOccupant()),
+            Check.of(
+                id("relax_declared_1"),
+                declared,
+                Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                Expectations.anyOccupant()
+            ),
+            Check.of(
+                id("relax_declared_2"),
+                declared,
+                Focuses.occupant(LatticePoint.of(2, 0, 0)),
+                Expectations.anyOccupant()
+            )
+        );
+        assertNotNull(declaredBlueprint, "bay cells may overlap when the owned sets do not");
+
+        Bay bound = MagicFixtures.bay(
+            id("relax_bound"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1)),
+            Coverage.everyCell,
+            Footprint.bound(),
+            Sharing.exclusive
+        );
+        assertNotNull(
+            blueprint(
+                "relax_bound_cells",
+                Cuboid.of(0, 0, 0, 2, 1, 1),
+                Check.of(id("relax_bound_0"), bound, Focuses.occupant(origin), Expectations.anyOccupant()),
+                Check.of(
+                    id("relax_bound_1"),
+                    bound,
+                    Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                    Expectations.anyOccupant()
+                )
+            ),
+            "a Bound bay's cells are not its owned set at build"
+        );
+    }
+
+    @Test
+    void anExclusiveEmptyDeclaredFootprintFailsBuild() {
+        Bay declared = MagicFixtures.bay(
+            id("empty_declared"),
+            oneCell,
+            Coverage.everyCell,
+            Footprint.declared(CuboidSet.empty()),
+            Sharing.exclusive
+        );
+        IllegalArgumentException rejected = assertThrows(
+            IllegalArgumentException.class,
+            () -> blueprint(
+                "empty_declared",
+                boundingBox(oneCell),
+                Check.of(id("empty_declared_check"), declared, Focuses.occupant(origin), Expectations.anyOccupant())
+            )
+        );
+        assertTrue(Objects.requireNonNull(rejected.getMessage(), "message").contains("SC-BPT-0005"));
+    }
+
+    @Test
+    void twoBoundBaysThatOverlapAtSettleAreRejected() {
+        Bay left = MagicFixtures
+                .bay(id("settled_left"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Bay right = MagicFixtures
+                .bay(id("settled_right"), oneCell, Coverage.everyCell, Footprint.bound(), Sharing.shared);
+        Blueprint blueprint = blueprint(
+            "settled_overlap",
+            boundingBox(oneCell),
+            Check.of(id("settled_left_check"), left, Focuses.occupant(origin), Expectations.anyOccupant()),
+            Check.of(id("settled_right_check"), right, Focuses.occupant(origin), Expectations.anyOccupant())
+        );
+        OccupantSnapshot block = TestWorld.block(TestWorld.stone, origin);
+        IllegalArgumentException rejected = assertThrows(
+            IllegalArgumentException.class,
+            () -> ClaimPlanner.derive(
+                blueprint,
+                identity,
+                instance,
+                List.of(new BayBinding(left, List.of(block)), new BayBinding(right, List.of(block)))
+            )
+        );
+        assertTrue(Objects.requireNonNull(rejected.getMessage(), "message").contains("SC-CLM-0001"));
+
+        TestWorld.View view = MagicFixtures.view().put(block);
+        MatchResult.Failed checked = assertInstanceOf(
+            MatchResult.Failed.class,
+            MagicFixtures.check(blueprint, identity, view, new ClaimView(List.of(), 0, true))
+        );
+        assertTrue(MagicFixtures.hasCode(checked, Codes.claimConflict), "check answers SC-CLM-0001");
+
+        ClaimLedger ledger = MagicFixtures.ledger();
+        MatchResult.Failed settled = assertInstanceOf(
+            MatchResult.Failed.class,
+            MagicFixtures.settle(blueprint, identity, view, ledger)
+        );
+        assertTrue(MagicFixtures.hasCode(settled, Codes.claimConflict), "settle answers SC-CLM-0001");
+        assertTrue(TestWorld.rows(ledger).isEmpty(), "nothing is written");
+    }
+
+    @Test
+    void aBoundBayMayCoverAnotherBaysCellsWhenItOwnsNothingThere() {
+        CuboidSet inner = CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1));
+        CuboidSet span = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 1, 1));
+        Bay box = MagicFixtures.bay(id("cover_box"), inner, Coverage.everyCell, Footprint.box(), Sharing.shared);
+        Bay bound = MagicFixtures
+                .bay(id("cover_bound"), span, Coverage.everyCell, Footprint.bound(), Sharing.exclusive);
+        Blueprint blueprint = blueprint(
+            "bound_cover",
+            Cuboid.of(0, 0, 0, 3, 1, 1),
+            Check.of(id("cover_box_0"), box, Focuses.occupant(origin), Expectations.anyOccupant()),
+            Check.of(id("cover_box_1"), box, Focuses.occupant(LatticePoint.of(1, 0, 0)), Expectations.anyOccupant()),
+            Check.of(id("cover_bound_0"), bound, Focuses.occupant(origin), Expectations.anyOccupant()),
+            Check.of(
+                id("cover_bound_1"),
+                bound,
+                Focuses.occupant(LatticePoint.of(1, 0, 0)),
+                Expectations.anyOccupant()
+            ),
+            Check.of(id("cover_bound_2"), bound, Focuses.occupant(LatticePoint.of(2, 0, 0)), Expectations.anyOccupant())
+        );
+        TestWorld.View view = MagicFixtures.view().air(origin).air(LatticePoint.of(1, 0, 0))
+                .put(TestWorld.block(TestWorld.stone, LatticePoint.of(2, 0, 0)));
+        ClaimLedger ledger = MagicFixtures.ledger();
+
+        MatchResult.Formed formed = assertInstanceOf(
+            MatchResult.Formed.class,
+            MagicFixtures.settle(blueprint, identity, view, ledger)
+        );
+        assertEquals(3, formed.claims().rows().size(), "the box owns 0 and 1, the bound bay owns only 2");
+        assertEquals(3, TestWorld.rows(ledger).size());
     }
 
     private static NamespacedId id(String path) {

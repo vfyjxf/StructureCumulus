@@ -91,7 +91,8 @@ For a fixed `(blueprint, snapshotId, siting, owner, budget, claims revision, cat
 result value, the finding order and the spend are identical across runs and JVMs, for a check that
 honours the purity contract (D-41). A check that dereferences a live host value accepts that its
 verdict may differ between runs. All ordered collections are built in a defined order; ties are
-broken by declaration index, never by hash.
+broken by declaration index, never by hash. The `determinismCheck` gate proves the promise across
+three separate JVM processes against one golden file (D-75).
 
 ## Law 12 — The design is normative
 

@@ -3,8 +3,8 @@ package dev.vfyjxf.cumulus.kernel.engine;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
-import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
@@ -84,6 +84,18 @@ public final class ClaimPlanner {
             allOwned = allOwned.union(owned);
         }
         rows.sort(ClaimRow::compareTo);
+        for (int i = 1; i < rows.size(); i++) {
+            ClaimRow left = rows.get(i - 1);
+            ClaimRow right = rows.get(i);
+            if (!left.cell().equals(right.cell()) || left.bay().equals(right.bay())) {
+                continue;
+            }
+            if (left.sharing() == Sharing.exclusive || right.sharing() == Sharing.exclusive) {
+                throw new IllegalArgumentException(
+                    "SC-CLM-0001: bays " + left.bay() + " and " + right.bay() + " both own " + left.cell()
+                );
+            }
+        }
         return new Derived(rows, allOwned);
     }
 

@@ -224,11 +224,7 @@ public final class TraitCaptureGameTest {
         Cuboid bounds = Cuboid
                 .of(world.getX(), world.getY(), world.getZ(), world.getX() + 1, world.getY() + 2, world.getZ() + 1);
 
-        CaptureResult.Captured captured = capture(
-            new LevelCapture(helper.getLevel()),
-            bounds,
-            entityPolicy(Set.of())
-        );
+        CaptureResult.Captured captured = capture(new LevelCapture(helper.getLevel()), bounds, entityPolicy(Set.of()));
         try (SnapshotLease lease = captured.lease()) {
             WorldView view = lease.view();
             LatticePoint entityCell = Objects.requireNonNull(point(world).offset(0, 1, 0), "entity cell");

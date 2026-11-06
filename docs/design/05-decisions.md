@@ -1021,7 +1021,8 @@ destructive one. A host that forms a set settles every member first, commits the
 back with that compensation.
 
 **Rejected.** Folding `commit` into `settle`: the set host needs the prepare/commit gap for its own
-rollback (`StructureSetHost` settles every member, then commits, then restores claims). A single
+rollback (`StructureSetHost` settles every member, then commits; a failure releases, it never
+restores, D-79). A single
 `form(instanceId, rows, values)` port: it moves the same ordering decision into the host without
 adding atomicity, and the two stores have different lifetimes — the ledger is per-world and
 persisted, the context is per-instance and in memory. A `Prepared` handle that forces commit-or-
@@ -1194,8 +1195,120 @@ change yesterday's snapshot under its holder.
 **Why not a `removed` parameter.** Two ways to say "delete these keys" for one caller, and every host
 implementation would have to support both. Replacement makes the argument the whole truth.
 
+### D-57 — A blueprint is refused only for conflicts it cannot outgrow
+
+The build refuses two bays of one blueprint whose owned cell sets are known at build time and
+intersect with an exclusive side. `Box` owns its cells and `Declared` owns the set written in the
+document; both transform rigidly with the siting, so the overlap holds in every world, every origin
+and every orientation. `Bound` is excluded: its owned set is the union of the subjects read at
+settle and may be smaller than its bay, so a static answer would refuse blueprints that resolve
+cleanly.
+
+The remaining cases are decided where the cells exist:
+
+- a `Bound` overlap is refused by the planner, which scans its sorted rows and rejects a cell held
+  by two bays when either side is exclusive;
+- two instances never share a key, so their conflicts stay the ledger's job.
+
+Replacing the old rule changes three cases. The old rule compared bay cells, not owned cells, so it
+refused a `Declared` bay whose checked cells overlapped another bay while its owned cells did not,
+and it treated a `Bound` bay's cells as if they were owned. It also ignored `Declared` against
+`Declared`, which the owned-set rule now refuses.
+
+### D-59 — A contributed key is complete or absent
+
+A section contribution whose value does not match the key's type marks the key absent. The engine
+still reports the defect and never folds the remaining sections. A `merge.combine` that throws, or a
+merged value of the wrong type, marks the key absent the same way. No partial sum is published.
+
+Whether the attempt forms is a separate question: a check that requires an absent key answers
+`Unreadable`, so the attempt is `Undecided`; an attempt that never reads the key may still form and
+carries the error finding. That matches the engine's existing error semantics — `budgetExhausted` and
+`foldRefused` are errors too, and they produce `Undecided`, not `Failed`.
+
+**Why keep the finding.** The defect is in extension code, and the finding is the only channel that
+tells the author. Bare absence would read as "the computation chose not to produce a value".
+
+**Why not `Failed`.** A broken computation that no check reads does not make the structure wrong;
+failing every attempt would turn one extension bug into a global outage.
+
+### D-60 — Dropping a key is a release; a settle that changes nothing is not a write
+
+When the planner derives no rows, the engine releases the instance's key instead of settling an empty
+request. `SettleRequest` therefore rejects an empty row list in its constructor: "own nothing" is a
+release, not a degenerate settle, and no host has to implement that edge case.
+
+`settle` compares the resulting ledger content with the current content and writes only when they
+differ. A settle that changes nothing answers `Settled(revision, rows)` with the revision unchanged.
+`release` already behaved this way.
+
+Revision therefore means "the content version", not "the number of writes": it changes exactly when
+the rows a reader can see change. CAS stays first — a stale `expectedRevision` is refused even when
+the content happens to match, because the caller's view is stale and it must re-read.
+
+**Why release and not an empty settle.** An empty request makes correctness depend on every host
+implementing "empty means clear" the same way; a host that reads it as "nothing to do" keeps stale
+rows forever. `release` already means "drop this instance's rows" and is implemented once.
+
+**Why idempotence is safe.** No production path branches on "the revision changed"; only tests count
+bumps. A host that still bumps on a no-op stays correct — it only invalidates readers it need not.
+
+**Supersedes:** the zero-row half of D-42's write rule — exactly one compare-and-set per settle still
+holds for every settle that happens, but a settle whose plan owns nothing no longer happens; it is a
+`release`.
+
 > Numbering note: D-46 is still a proposal carried by
 > `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
+
+### D-74 — The adapter joins the signature gate in batches, with a shrinking list
+
+`spec-check` reads `src/main/java` as a second source root and compares the adapter's public types
+with the `## 15. Signatures` section in `adapter.md`. Coverage arrives in batches: a type is either
+documented in that section or listed in `tools/spec-uncovered.txt` with a reason. The gate fails
+when a documented type drifts, when a public type is in neither place, and when a listed type no
+longer exists — so the list can only shrink.
+
+**Why not all at once.** The adapter has roughly ninety public types; writing their signatures takes
+longer than the gate itself, and a half-written section would produce failures nobody asked for.
+
+**Why a list and not a comment.** A comment rots silently. A file the gate reads forces every new
+public adapter type to be a decision, and every batch to remove entries.
+
+### D-75 — Determinism is proven across processes, and the order dependence is removed at the source
+
+Two `Set.copyOf` sites decide the iteration order of a public collection: `SnapshotPolicy.kinds`,
+`SnapshotPolicy.traits` and `ComputationSpec.inputs`. They become ordered immutable sets, so the order
+is defined rather than inherited from identity hashes.
+
+On top of that, a gate renders one fixed scenario to a canonical text, runs it in three separate JVM
+processes, and compares every run with a golden file. The same scenario in one process proves nothing:
+identity hashes repeat within a process, so any hash-order dependence passes.
+
+**Why both.** The source fix makes the output correct; the gate makes it stay correct. The gate alone
+would pin today's accidental order in a file; the fix alone would regress the first time someone adds a
+`Set.copyOf`.
+
+### D-79 — A rollback releases what the set wrote; it never restores the previous occupant
+
+When a structure set fails partway it releases the members it already settled and invalidates their
+contexts. The previous instance at the same owner and siting — taken over before the members settled —
+is not restored. Its rows, its context and its identity are stale from the moment the replacement was
+attempted: the blueprint may have changed under it, and after a reload there is no instance at all.
+
+The host re-forms it the same way any structure comes back: by settling again.
+
+**Why not restore.** Restoring means snapshotting every row of the previous instance before the
+takeover — including rows outside the new member's bounds — and replaying them through a write path
+that exists for that one purpose. That is a second source of truth for occupancy, and it is exactly
+where the lost-rows defect came from: the snapshot was taken over the member's bounds while the release
+removed the whole instance.
+
+**Law 6 stays absolute.** With the replay gone, `engine.settle` remains the only writer and every row
+it writes comes from the planner. D-78 is withdrawn.
+
+> Numbering note: D-78 was a proposal (`37-law-6-host-may-replay.md`) whose plan was withdrawn before
+> landing; it never entered this file, so the withdrawal above closes a proposal, not a recorded
+> decision.
 
 ## 3. Consequences a reviewer should attack
 

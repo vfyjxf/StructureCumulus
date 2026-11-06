@@ -94,7 +94,7 @@ public record Finding(FindingCode code, Severity severity, String message,
         public Builder secondary(Locus locus, String message);
         public Builder context(Locus locus, String message);
         public Builder note(String message);
-        public Builder note(String message, Locus locus);
+        public Builder note(String message, @Nullable Locus locus);
         public Builder suggest(String message, Applicability applicability,
                                @Nullable NamespacedId remedy);
         public Finding build();
@@ -367,12 +367,12 @@ The engine collects a bundle; it never renders. `FindingBundle` is the only aggr
 | `SC-CTX-0007` | ERROR | ✓ | a required key is absent | `Focuses.context` |
 | `SC-ENG-0001` | ERROR | – | the budget ran out | `engine.check` |
 | `SC-ENG-0002` | WARNING | – | the snapshot is no longer current | `engine.check`/`settle` |
-| `SC-ENG-0004` | ERROR | – | an internal plan invariant failed | `engine.check` |
+| `SC-ENG-0004` | ERROR | – | an internal plan invariant failed | `engine.check`/`contribute`/`fold` |
 | `SC-ENG-0005` | WARNING | – | the attempt was cancelled | `engine.check` |
 | `SC-DIA-0001` | WARNING | – | the bundle was truncated | `FindingBundle` |
 | `SC-RMD-0001` | ERROR | ✓ | a remedy provider threw | `StructureKernel.solve` guard |
 | `SC-RMD-0002` | ERROR | ✓ | a provider returned a malformed remedy | `StructureKernel.solve` |
-| `SC-SPI-0001` | ERROR | ✓ | an extension threw or returned a malformed finding | `engine` guard |
+| `SC-SPI-0001` | ERROR | ✓ | an extension threw or returned a malformed finding | `engine` guard/`fold` |
 | `SC-SPI-0003` | ERROR | – | a catalog build found a duplicate/different entry | `Catalogs.Builder.build` |
 | `SC-SET-0001` | ERROR | – | a required satellite is absent | host presence |
 | `SC-SET-0002` | ERROR | – | a satellite link distance is invalid | compiler/host link |

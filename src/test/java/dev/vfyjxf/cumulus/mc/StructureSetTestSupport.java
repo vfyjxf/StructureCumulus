@@ -625,7 +625,8 @@ final class StructureSetTestSupport {
         public ClaimVerdict settle(SettleRequest request) {
             settleCalls++;
             Siting requestSiting = request.rows().isEmpty() ? null : request.rows().get(0).siting();
-            if (requestSiting != null && requestSiting.equals(movingSiting)
+            if (requestSiting != null
+                    && requestSiting.equals(movingSiting)
                     && !sitings.containsKey(request.instance())) {
                 return new ClaimVerdict.RevisionMoved(request.expectedRevision(), revision + 1);
             }

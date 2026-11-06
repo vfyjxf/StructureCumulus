@@ -70,24 +70,27 @@ public record ClaimView(java.util.List<ClaimRow> rows, long revision, boolean av
 
 public sealed interface ClaimVerdict {
     record Settled(long revision, java.util.List<ClaimRow> rows) implements ClaimVerdict {
-        public Settled { /* canonical rows; revision >= 1 */ }
+        public Settled { /* canonical rows; revision >= 1 when rows are present */ }
     }
     record Conflict(java.util.List<ClaimRow> incumbents, FindingBundle findings)
             implements ClaimVerdict { }
     record RevisionMoved(long expected, long actual) implements ClaimVerdict { }
 }
 
-public record SettleRequest(OwnerId owner, Siting siting, java.util.List<ClaimRow> rows,
+public record SettleRequest(InstanceId instance, java.util.List<ClaimRow> rows,
                             long expectedRevision) {
-    public SettleRequest { /* rows owner/siting match; canonical */ }
+    public SettleRequest { /* at least one row, every row of this instance; canonical;
+                              expected >= 0 — "own nothing" is a release, not a settle (D-60) */ }
 }
 
 public interface ClaimLedger {
+    static ClaimLedger inMemory(World world);
     World world();
     long revision();
     ClaimVerdict settle(SettleRequest request);
-    ClaimVerdict release(OwnerId owner, Siting siting);
+    ClaimVerdict release(InstanceId instance);
     ClaimView read(Cuboid box);
+    void retire();
 }
 
 public final class ClaimMatrix {
@@ -120,8 +123,10 @@ order on `Sharing`; the matrix is the only rule and the adapter has no second pr
 
 `ClaimRow` order is `(cell, instance, bay, siting origin, placement orientation, placement offset, sharing)`, implemented once in `compareTo`; `ClaimSet` and
 `ClaimVerdict` sort by it. A row is identified by the full record; two bays of one instance may hold
-the same cell only when both are `shared` (the blueprint refuses an exclusive overlap), and the two
-rows stay distinct by `bay`. A settlement replaces every row of one instance in one compare-and-set;
+the same cell only when both are `shared`. An exclusive overlap is refused twice: at build for the
+owned sets the blueprint already knows (`Box`, `Declared` — D-57), and by the planner where the rows
+are derived for the ones only the world answers (`Bound`, `SC-CLM-0001`). The two rows stay distinct
+by `bay`. A settlement replaces every row of one instance in one compare-and-set;
 it never merges per row or per bay.
 
 ### 4.4 Footprint
@@ -137,24 +142,30 @@ Claims protect what a structure occupies or declares, never what it merely reads
 empty cavity is protected; `Declared` is ground the author writes down; `None` is an observation
 that owns nothing. `Footprint` does not decide whether a `Match` is complete; that is `Coverage` in
 `structure`. A nested body or a non-root subject is never part of a `Bound` footprint; the engine
-rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
+rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5). Two `Bound` bays of one
+blueprint that own the same cell with an exclusive side are not a build fact: the planner refuses
+them when it derives the settled rows (`SC-CLM-0001`).
 
 ### 4.5 Ledger behaviour
 
 - `read(box)` is total: an unavailable store answers `ClaimView.unavailable()` (no rows, revision 0,
   `available == false`), never an empty available view. An empty result is a fact.
-- `settle(request)` is one compare-and-set over all rows of the request's instance. If
-  `request.expectedRevision() != revision()`, it answers `RevisionMoved` and writes nothing. It then
-  drops the rows this settle replaces (next bullet) and, if a request row still conflicts with a
-  remaining incumbent, answers `Conflict` with those incumbents and writes nothing. Otherwise it
-  writes the replacement and answers `Settled(newRevision, rows)`, bumping the revision by one.
+- `settle(request)` is one compare-and-set over all rows of the request's instance, and the request
+  carries at least one row (D-60). If `request.expectedRevision() != revision()`, it answers
+  `RevisionMoved` and writes nothing — even when the content would have matched, because the caller's
+  view is stale and it must re-read. It then drops the rows this settle replaces (next bullet) and,
+  if a request row still conflicts with a remaining incumbent, answers `Conflict` with those
+  incumbents and writes nothing. Otherwise it compares the resulting content with the current rows:
+  identical content answers `Settled(revision, rows)` and writes nothing; different content writes
+  the replacement and answers `Settled(newRevision, rows)`, bumping the revision by one.
 - A siting holds one instance (D-48): the rows `settle` replaces are the request instance's own rows
   and every row of another instance whose siting equals one of the request's sitings. They are
   dropped before `ClaimMatrix.conflicts` runs and are never reported as conflicts. Exclusion,
   conflict check and write stay inside the one compare-and-set, so a failed settle leaves those
   incumbents in place. The ledger derives the replacement from the request's rows; no host passes a
   replacement list.
-- `release(instance)` deletes every row of that instance and bumps the revision by one. An absent
+- `release(instance)` deletes every row of that instance and bumps the revision by one; dropping a
+  key is this operation, including an instance whose next plan owns nothing (D-60). An absent
   instance is a no-op and does **not** bump. It is safe to call on every instance removal and move; it
   is idempotent after the first. A world unload drops the ledger with the world's structure state, so
   its rows never outlive their instances (D-44). The whole-instance granularity is the contract: there
@@ -167,9 +178,10 @@ rejects it with `SC-CLM-0004` before rows are derived (`engine` §7.5).
   (`IllegalArgumentException`) because the planner is the only source. A ledger may additionally
   refuse a row whose `sharing`/`bay` is inconsistent; that is `Conflict`/`SC-CLM-0004`, not an
   exception.
-- `revision()` is the ledger-wide CAS base, independent of a box. Revisions are positive and
-  monotonic; a replacement at one siting always changes the revision, even when the row set is
-  identical.
+- `revision()` is the ledger-wide CAS base, independent of a box. Revisions are non-negative and
+  monotonic; the revision is the content version, not a write counter: it changes exactly when the
+  rows a reader can see change (D-60). A settle that changes nothing and a release of an absent key
+  both keep it, so a `Formed` may carry the same ledger revision as the attempt before it.
 
 ### 4.6 Conflict findings
 
@@ -183,7 +195,8 @@ re-reading; an owner is resolved through the structure manager, never stored on 
 
 - `compile`: `Sharing`/`Footprint` are bay declaration values; no ledger.
 - `check`: the request carries a frozen `ClaimView`; the engine derives a prediction and compares.
-- `settle`: the engine derives rows, then the ledger CAS; `Conflict`/`RevisionMoved` are results.
+- `settle`: the engine derives rows, then the ledger CAS; an empty derivation is a `release`, not a
+  CAS (D-60). `Conflict`/`RevisionMoved` are results.
 - `release`: host lifecycle only (removal and move; a world unload keeps claim rows).
 
 ## 6. Codes
@@ -198,8 +211,9 @@ Producer: `engine.check`. `SC-CLM-0003` (ERROR): the revision moved twice. Produ
 ## 7. Tests
 
 - Matrix: all four sharing pairs; same owner/siting excluded; different cells; symmetry.
-- Ledger: CAS success/failure; replacement of the whole key; release absent/present; revision bumps;
-  unavailable read; conflict leaves bytes untouched; canonical order.
+- Ledger: CAS success/failure; replacement of the whole key; release absent/present; the revision
+  bumps on a content change only — a no-op settle keeps it and a stale settle is refused even when
+  the content matches; unavailable read; conflict leaves bytes untouched; canonical order.
 - Footprint resolution: pipe corner (`Bound` owns four of eight), door (`Bound` equals bay),
   cavity (`Box` owns air), `Declared` outside the bay, `None`.
 - `ClaimSet`/`ClaimView` ordering and immutability.

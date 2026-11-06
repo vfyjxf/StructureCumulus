@@ -254,8 +254,11 @@ public final class BlueprintBuilder {
                     }
                 }
             }
-            if (bay.sharing() == Sharing.exclusive && bay.footprint() instanceof Footprint.None) {
-                fail("SC-BPT-0005", "EXCLUSIVE bay " + bay.id() + " owns nothing");
+            if (bay.sharing() == Sharing.exclusive) {
+                CuboidSet owned = ownedBound(bay);
+                if (owned != null && owned.isEmpty()) {
+                    fail("SC-BPT-0005", "EXCLUSIVE bay " + bay.id() + " owns nothing");
+                }
             }
         }
 
@@ -264,7 +267,12 @@ public final class BlueprintBuilder {
             for (int j = i + 1; j < bayList.size(); j++) {
                 Bay left = bayList.get(i);
                 Bay right = bayList.get(j);
-                if (left.cells().intersects(right.cells())
+                CuboidSet leftOwned = ownedBound(left);
+                CuboidSet rightOwned = ownedBound(right);
+                if (leftOwned == null || rightOwned == null) {
+                    continue;
+                }
+                if (leftOwned.intersects(rightOwned)
                         && (left.sharing() == Sharing.exclusive || right.sharing() == Sharing.exclusive)) {
                     fail("SC-BPT-0002", "bays " + left.id() + " and " + right.id() + " overlap with an exclusive side");
                 }
@@ -449,6 +457,15 @@ public final class BlueprintBuilder {
             }
         }
         return null;
+    }
+
+    private static @Nullable CuboidSet ownedBound(Bay bay) {
+        return switch (bay.footprint()) {
+            case Footprint.Box ignored -> bay.cells();
+            case Footprint.Declared declared -> declared.cells();
+            case Footprint.Bound ignored -> null; // the owned set exists only at settle
+            case Footprint.None ignored -> CuboidSet.empty();
+        };
     }
 
     private static void fail(String code, String message) {

@@ -29,6 +29,6 @@ public record ComputationSpec(
         Objects.requireNonNull(args, "args");
         Objects.requireNonNull(output, "output");
         Objects.requireNonNull(inputs, "inputs");
-        inputs = Collections.unmodifiableSet(new TreeSet<>(inputs));
+        inputs = Collections.unmodifiableSortedSet(new TreeSet<>(inputs));
     }
 }

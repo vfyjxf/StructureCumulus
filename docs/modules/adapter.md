@@ -903,6 +903,10 @@ structure's own findings (including warnings); `rollbackFailures` stays separate
 `claims` filters `Formed.claims()` by `(owner, siting, bay)`, so a ledger-wide `ClaimSet` never leaks
 another structure's rows into a per-structure view. Rollback removes the context of every formed
 attempt, including the failed-release root; `rolledBack` still names only the successful releases.
+Before the settle pass the host takes over each member's siting — the formed instance at the same
+owner and siting is released through the ledger — and a rollback never restores it (D-79): the
+release covers only what this run settled, the previous instance's rows stay gone, and the host
+re-forms the siting by settling again.
 
 ### 13.5 The set command and its one capture (S5)
 
@@ -953,11 +957,11 @@ and `StructureSetHost` remain a library entry point a host may drive without the
 is independent and a later satellite's CAS retry sees the earlier rows through the ledger. Rollback
 releases claims and removes the kernel context of every formed attempt through
 `StructureEvent.Broken` on the bound `StructureManager`; `rolledBack` still names only the successful
-releases, and a failed release or `Broken` dispatch is a `SC-SET-0007` rollback failure (D-35). Rollback cannot recreate a previous `StructureInstance` that an
-earlier commit in the same run already replaced: member commits are deferred until every settle
-succeeds, so a settle failure keeps the previous set, while a commit-phase failure (only reachable via
-a host-contract violation) removes the committed prefix and restores old claim rows but not the old
-manager instance. A set has one shared budget: presence charges `(1, 0)` per
+releases, and a failed release or `Broken` dispatch is a `SC-SET-0007` rollback failure (D-35). Rollback never restores the previous occupant of a member's siting
+(D-79): the takeover release already dropped its rows, member commits are deferred until every settle
+succeeds, and a settle failure leaves the previous instance as a stale manager entry that the host
+replaces only by settling again, while a commit-phase failure (only reachable via
+a host-contract violation) rolls the committed prefix back the same release-only way. A set has one shared budget: presence charges `(1, 0)` per
 read and each attempt receives the remainder, so the set's total reads stay within the run budget
 (09 §7.3). Same-siting is rejected (`SC-SET-0008`) in the compiler, in `StructureSet.place` and by
 the host's defensive check. The SS4 stress suite
@@ -972,3 +976,114 @@ No client overlay renderer, no network payload, no schematic importer, no GUI, n
 round. No built-in nested source provider and no adapter-owned nested source registry. The overlay
 model is data; a later adapter may render it. The document reader/writer is the only text format;
 capture/import tools are host tools, not kernel modules.
+
+## 15. Signatures
+
+The adapter's public types join the spec gate in batches (D-74). A type is either documented here or
+listed in `tools/spec-uncovered.txt` with a reason; the gate fails when a documented signature
+drifts, when a public type is in neither place, and when a listed type no longer exists — so the list
+only shrinks. Batch 1 covers the set host, the snapshot pair, the host tokens and the document
+family. The block compares against `src/main/java` through `AdapterIndexTest` (member-level) and
+`tools/spec-check.py` (name-level).
+
+```java
+package dev.vfyjxf.cumulus.mc;
+
+public final class StructureSetHost {
+    public StructureSetHost(StructureKernel kernel);
+    public StructureSetHost(StructureKernel kernel, StructureManager structures);
+    public StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner, Budget budget,
+                                  java.util.function.Function<StructureSpec, StructureAttempt> drafts);
+    public StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner, Budget budget,
+                                  StructureManager structures,
+                                  java.util.function.Function<StructureSpec, StructureAttempt> drafts);
+    public StructureSetResult check(StructureSet set, SnapshotLease lease, OwnerId owner, Budget budget,
+                                    java.util.function.Function<StructureSpec, StructureAttempt> drafts);
+    public StructureSetResult check(StructureSet set, SnapshotLease lease, OwnerId owner, Budget budget,
+                                    StructureManager structures,
+                                    java.util.function.Function<StructureSpec, StructureAttempt> drafts);
+}
+
+public final class LevelSnapshot implements WorldView {
+    public LevelSnapshot(SnapshotId snapshot, Cuboid bounds, java.util.Map<SectionKey, SectionSlot> sections);
+    public LevelSnapshot(SnapshotId snapshot, Cuboid bounds, java.util.Map<SectionKey, SectionSlot> sections,
+                         java.util.List<OccupantSnapshot> entities);
+    public LevelSnapshot(SnapshotId snapshot, Cuboid bounds, java.util.Map<SectionKey, SectionSlot> sections,
+                         java.util.List<OccupantSnapshot> entities, SnapshotPolicy policy);
+    @Override public SnapshotId snapshotId();
+    @Override public int frame();
+    @Override public int depth();
+    @Override public LatticePoint origin();
+    @Override public @Nullable WorldView parent();
+    @Override public int cellSize();
+    @Override public Cuboid bounds();
+    @Override public SnapshotPolicy policy();
+    @Override public SectionKey sectionOf(LatticePoint cell);
+    @Override public SectionSlot slot(SectionKey key);
+    @Override public CellRead read(LatticePoint cell);
+    @Override public @Nullable OccupantSnapshot occupant(OccupantRef ref);
+    @Override public java.util.List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
+    @Override public @Nullable WorldView nested(LatticePoint cell);
+    @Override public <H> @Nullable H get(LatticePoint pos, HostType<H> type);
+    @Override public long contentDigest(SectionKey key);
+}
+
+final class SnapshotLevel implements BlockGetter {
+    static final int sectionSize = 16;
+    SnapshotLevel(LatticePoint origin, Cuboid bounds, int minBuildHeight, int height,
+                  java.util.Map<Long, PalettedContainer<BlockState>> sections,
+                  java.util.Map<Long, FluidState[]> fluids,
+                  java.util.Map<BlockPos, BlockEntity> blockEntities,
+                  java.util.List<CapturedEntity> entities);
+    LatticePoint origin();
+    Cuboid bounds();
+    @Override public int getHeight();
+    @Override public int getMinBuildHeight();
+    @Override public @Nullable BlockEntity getBlockEntity(BlockPos pos);
+    @Override public BlockState getBlockState(BlockPos pos);
+    @Override public FluidState getFluidState(BlockPos pos);
+    <H> @Nullable H get(LatticePoint pos, HostType<H> type);
+    long contentDigest(Cuboid cells);
+    static long worldSectionKey(int worldX, int worldY, int worldZ);
+    static int fluidIndex(int worldX, int worldY, int worldZ);
+    record CapturedEntity(java.util.UUID id, NamespacedId type, Cuboid footprint, EntityType<?> entityType) { }
+}
+
+public final class HostTypes {
+    public static final HostType<BlockState> blockState;
+    public static final HostType<FluidState> fluidState;
+    public static final HostType<EntityType<?>> entityType;
+    public static final HostType<BlockEntity> blockEntity;
+    private HostTypes() {}
+}
+
+public final class LevelCapture implements WorldCapture {
+    public LevelCapture(ServerLevel level);
+    public LevelCapture(ServerLevel level, TraitLookup traitLookup, TraitCaptureContext traitCapture);
+    public LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup);
+    LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup, TraitLookup traitLookup);
+    LevelCapture(ServerLevel level, NestedExtentLookup nestedLookup, TraitLookup traitLookup,
+                 TraitCaptureContext traitCapture);
+    ServerLevel level();
+    @Override public CaptureResult capture(CaptureRequest request);
+    public CaptureResult capture(CaptureRequest request, @Nullable Orientation orientation);
+    @Override public long currentRevision();
+    void close();
+    @Nullable WatchHandle watchHandle();
+}
+
+public sealed interface JsonDocument {
+    record Blueprint(Document document) implements JsonDocument { }
+    record StructureSet(StructureSetDocument document) implements JsonDocument { }
+    static @Nullable JsonDocument read(NamespacedId source, String text, java.util.List<Finding> errors);
+}
+
+public final class JsonReader implements DocumentReader {
+    @Override public @Nullable Document read(NamespacedId source, String text, java.util.List<Finding> errors);
+    static Finding parseFailure(NamespacedId source, String text, RuntimeException failure);
+}
+
+public final class JsonWriter implements DocumentWriter {
+    @Override public String write(Document document);
+}
+```

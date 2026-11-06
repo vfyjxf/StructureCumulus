@@ -118,11 +118,12 @@ not a scheduling unit and not declared by a blueprint.
    snapshot; the subjects' footprints lie inside the bay (equal for `oneSubject`); an `exclusive`
    `Bound` bay bound at least one non-air cell.
 4. Derive rows with `ClaimPlanner`; the caller supplied none.
-5. `ClaimLedger.settle(SettleRequest)` once, at the revision the check read, even when the row set is
-   empty — an empty set clears the key.
-6. `RevisionMoved` → re-read the same box, re-run the matrix, retry once at the new revision; an
-   empty row set retries without a matrix. `Conflict` → `Failed` with the incumbent rows. Moved twice
-   → `Undecided(ledgerMoved)`.
+5. An empty derived row set owns nothing: the engine releases the instance's key instead of settling
+   (D-60), and a missing ledger is only an error when rows exist. Otherwise
+   `ClaimLedger.settle(SettleRequest)` runs once, at the revision the check read; a settle whose
+   content matches the current rows writes nothing and keeps the revision.
+6. `RevisionMoved` → re-read the same box, re-run the matrix, retry once at the new revision.
+   `Conflict` → `Failed` with the incumbent rows. Moved twice → `Undecided(ledgerMoved)`.
 7. `Settled` → publish the `instance` values into the attempt at `revision + 1`, then return `Formed`
    carrying the `ClaimSet`, `contextRevision` and `ledgerRevision`. Nothing after the compare-and-set
    can fail: a `ClaimLedger.settle` that throws is a host contract violation and its row state is

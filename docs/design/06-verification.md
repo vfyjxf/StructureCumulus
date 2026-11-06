@@ -10,13 +10,23 @@
 | **Compile** | `javac --release 21` over `src/kernel/java` with JSpecify only | every public signature in the module files exists and compiles |
 | **Purity** | `kernelPurity` text scan + no Minecraft on the kernel classpath | no `net.minecraft`, `net.neoforged`, `com.mojang` under `kernel.**` |
 | **Tests** | JUnit 5 over `src/kernelTest/java` | every test in §3 passes; no `@Disabled` |
-| **Spec index** | `tools/spec-check.py` | every documented public type and `SC-` code has a producer; no extra public type |
+| **Spec index** | `tools/spec-check.py` (name level, kernel + adapter) and `SpecIndexTest` / `AdapterIndexTest` (member level) | every documented public type and `SC-` code has a producer; no extra public type; every documented member matches the code and vice versa — the kernel wholesale, the adapter in batches whose uncovered list (`tools/spec-uncovered.txt`) only shrinks (D-74) |
 | **No stubs** | grep | no `TODO`, `FIXME`, `UnsupportedOperationException`, empty public method body |
-| **Determinism** | golden test | two runs over one tuple produce equal values, orders and spend |
+| **Determinism** | `determinismCheck` (three JVM processes vs `tools/golden/determinism.txt`) | one fixed scenario renders the same canonical text in three separate JVMs, equal to the golden file |
 
 Gradle is the shipping build (`./gradlew check`, including Spotless and the kernel gates). A
 regeneration session without the wrapper cache must still run `javac` and the JUnit launcher directly
 and record the commands.
+
+The **Determinism** gate is `determinismCheck` (D-75): `DeterminismDump` in `kernelTest` renders one
+fixed bay + checks + computation + three derivations + anchor scenario through check, settle to an
+in-memory ledger and derive, and prints canonical `blueprint`/`finding`/`claim`/`context`/`frame`
+lines. The digest line folds the iteration order of `SnapshotPolicy.kinds`/`traits` and
+`ComputationSpec.inputs`. The task runs the dump in three separate JVM processes under different
+`-XX:hashCode` modes — the hash salt repeats inside one process, so a same-process comparison cannot
+catch a hash-order leak — and every run must equal `tools/golden/determinism.txt`; `-PupdateGolden`
+rewrites the golden from the first run, `-PskipDeterminism` skips the gate. Reintroducing a
+`Set.copyOf` at either site fails the gate in at least one process.
 
 Current evidence (2026-10-28, HEAD `dcd5de4` plus the H4 working tree): M1, M2a, M2b, M2c, M2d and
 M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
@@ -71,8 +81,16 @@ cannot express the pose is still `SC-MC-0004` in the capture report; a missing v
 `SC-MC-0010`, never a mismatch. The snapshot adds no kernel type beyond `HostType` and
 `WorldView.get`, so the spec index is unaffected.
 
-**Spec index.** `tools/spec-check.py` reports every documented type present in code and every code
-in code documented; it is green. There is no documented-but-not-in-code list and no suppression.
+**Spec index.** Two layers. `tools/spec-check.py` (wired into `./gradlew check` as `specCheck`) is
+the name-level gate: every documented type present in code, every code type documented, every code
+`SC-` code produced, and — for the adapter — every public top-level type either documented in
+`adapter.md` §15 or listed with a reason in `tools/spec-uncovered.txt`, where the gate fails on a
+stale or doubly-registered line so the list only shrinks (D-74). The member-level gate runs in
+`kernelTest`: `SpecIndexTest` compares every kernel module's `## 3. Signatures` block with the
+compiled kernel through reflection (arity, parameter and return type names, `@Nullable` positions),
+and `AdapterIndexTest` compares the documented adapter batch with the sources under
+`src/main/java`. The kernel side has no list and no suppression; the adapter list is batch debt, not
+suppression, and batch 1 (set host, snapshot pair, host tokens, document family) is documented.
 
 ## 2. Requirement → module → test
 

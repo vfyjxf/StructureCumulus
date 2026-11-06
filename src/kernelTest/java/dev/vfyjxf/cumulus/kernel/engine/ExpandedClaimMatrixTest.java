@@ -106,12 +106,8 @@ class ExpandedClaimMatrixTest {
         ClaimVerdict.Settled backwardSettled = new ClaimVerdict.Settled(1, List.of(second, first));
 
         ClaimLedger ledger = MagicFixtures.ledger();
-        assertTrue(
-            ledger.settle(new SettleRequest(instance, List.of(first), 0)) instanceof ClaimVerdict.Settled
-        );
-        assertTrue(
-            ledger.settle(new SettleRequest(otherInstance, List.of(second), 1)) instanceof ClaimVerdict.Settled
-        );
+        assertTrue(ledger.settle(new SettleRequest(instance, List.of(first), 0)) instanceof ClaimVerdict.Settled);
+        assertTrue(ledger.settle(new SettleRequest(otherInstance, List.of(second), 1)) instanceof ClaimVerdict.Settled);
         ClaimSet ledgerSet = new ClaimSet(TestWorld.rows(ledger), ledger.revision());
         assertEquals(2, ledgerSet.rows().size(), "the ledger can hold both tied rows");
         ClaimSet ledgerReversed = new ClaimSet(
@@ -413,8 +409,7 @@ class ExpandedClaimMatrixTest {
             Siting each = MagicFixtures.turn(LatticePoint.of(i * 10, 0, 0), Turn.none);
             sitings.add(each);
             ClaimRow row = row(LatticePoint.of(i, 0, 0), Sharing.shared, eachInstance, each, "ledger_bay_" + i);
-            ClaimVerdict verdict = ledger
-                    .settle(new SettleRequest(eachInstance, List.of(row), ledger.revision()));
+            ClaimVerdict verdict = ledger.settle(new SettleRequest(eachInstance, List.of(row), ledger.revision()));
             assertTrue(verdict instanceof ClaimVerdict.Settled);
             assertEquals(i + 1, ((ClaimVerdict.Settled) verdict).revision());
         }
@@ -425,8 +420,7 @@ class ExpandedClaimMatrixTest {
             row(LatticePoint.of(0, 0, 0), Sharing.shared, instances.get(0), sitings.get(0), "ledger_bay_0"),
             row(LatticePoint.of(1, 0, 0), Sharing.shared, instances.get(0), sitings.get(0), "ledger_bay_1")
         );
-        ClaimVerdict replaced = ledger
-                .settle(new SettleRequest(instances.get(0), replacement, ledger.revision()));
+        ClaimVerdict replaced = ledger.settle(new SettleRequest(instances.get(0), replacement, ledger.revision()));
         assertTrue(replaced instanceof ClaimVerdict.Settled);
         assertEquals(31, ledger.read(Cuboid.of(0, 0, 0, 30, 1, 1)).rows().size(), "the whole instance is replaced");
         assertEquals(31, ledger.revision());

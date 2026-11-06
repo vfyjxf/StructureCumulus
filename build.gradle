@@ -170,6 +170,8 @@ dependencies {
     kernelTestImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     kernelTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     kernelTestCompileOnly 'org.jspecify:jspecify:1.0.1'
+    // Reading @Nullable reflectively needs the annotation on the runtime classpath too.
+    kernelTestRuntimeOnly 'org.jspecify:jspecify:1.0.1'
 
     // JSpecify is what the sources annotate with. The test set declares its own copy rather than
     // inheriting compileOnly, so the annotation is present on the classpath that reads it.
@@ -207,11 +209,85 @@ tasks.register('kernelTest', Test) {
     description = 'Runs the kernel tests, which carry no Minecraft.'
     testClassesDirs = sourceSets.kernelTest.output.classesDirs
     classpath = sourceSets.kernelTest.runtimeClasspath
+    // SpecIndexTest reads docs/modules as its comparison input, so those files gate up-to-dateness.
+    inputs.files(fileTree('docs/modules') { include '*.md' })
     useJUnitPlatform()
     testLogging {
         exceptionFormat = 'full'
         events 'failed'
         showStackTraces = true
+    }
+}
+
+// The determinism gate: one fixed scenario rendered by three separate JVMs, each compared with
+// tools/golden/determinism.txt. A hash-order leak needs separate processes to show; within one JVM
+// the hash salt repeats, so a same-process comparison can never fail. Each run pins a different
+// -XX:hashCode mode so the three processes salt any accidental Set.copyOf order differently.
+def determinismGolden = file('tools/golden/determinism.txt')
+def determinismSkip = providers.gradleProperty('skipDeterminism')
+def determinismUpdate = providers.gradleProperty('updateGolden')
+def determinismModes = ['0', '1', '5']
+def determinismRuns = determinismModes.collect { mode -> layout.buildDirectory.file("determinism/run-${mode}.txt") }
+determinismModes.each { mode ->
+    tasks.register("determinismJvm${mode}", JavaExec) {
+        group = 'verification'
+        description = "Renders the fixed determinism scenario in its own JVM (hashCode mode ${mode})."
+        mainClass = 'dev.vfyjxf.cumulus.kernel.engine.DeterminismDump'
+        classpath = sourceSets.kernelTest.runtimeClasspath
+        jvmArgs '-XX:+UnlockExperimentalVMOptions', "-XX:hashCode=${mode}"
+        def runFile = determinismRuns[determinismModes.indexOf(mode)]
+        args runFile.get().asFile.absolutePath
+        outputs.file runFile
+        outputs.upToDateWhen { false }
+        onlyIf { !determinismSkip.isPresent() }
+    }
+}
+tasks.register('determinismCheck') {
+    group = 'verification'
+    description = 'Compares the three determinism dumps with tools/golden/determinism.txt.'
+    dependsOn determinismModes.collect { mode -> tasks.named("determinismJvm${mode}") }
+    if (!determinismUpdate.isPresent()) {
+        inputs.file determinismGolden
+    }
+    onlyIf { !determinismSkip.isPresent() }
+    doLast {
+        def texts = determinismRuns.collect { provider ->
+            def text = provider.get().asFile.getText('UTF-8')
+            text.endsWith('\n') ? text : text + '\n'
+        }
+        if (determinismUpdate.isPresent()) {
+            determinismGolden.parentFile.mkdirs()
+            determinismGolden.setText(texts[0], 'UTF-8')
+            logger.lifecycle('determinism golden updated from the first JVM run')
+            return
+        }
+        if (!determinismGolden.exists()) {
+            throw new GradleException(
+                'tools/golden/determinism.txt is missing; regenerate it with ./gradlew determinismCheck -PupdateGolden'
+            )
+        }
+        def expected = determinismGolden.getText('UTF-8')
+        def expectedLines = expected.readLines()
+        def problems = []
+        determinismModes.eachWithIndex { mode, index ->
+            if (texts[index] != expected) {
+                problems << "JVM ${index + 1} (-XX:hashCode=${mode}) differs from tools/golden/determinism.txt:"
+                def gotLines = texts[index].readLines()
+                int shown = 0
+                for (int line = 0; line < Math.max(expectedLines.size(), gotLines.size()) && shown < 8; line++) {
+                    def want = line < expectedLines.size() ? expectedLines[line] : '<missing>'
+                    def have = line < gotLines.size() ? gotLines[line] : '<missing>'
+                    if (want != have) {
+                        problems << "  line ${line + 1}: expected [${want}] got [${have}]"
+                        shown++
+                    }
+                }
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new GradleException("determinismCheck failed:\n${problems.join('\n')}")
+        }
+        logger.lifecycle('determinism verified: three JVM runs match the golden file')
     }
 }
 
@@ -235,8 +311,21 @@ tasks.register('kernelPurity') {
     }
 }
 
+tasks.register('specCheck', Exec) {
+    group = 'verification'
+    description = 'Runs the name-level spec gate over the kernel modules and the adapter batches.'
+    commandLine 'python3', 'tools/spec-check.py'
+    inputs.files(
+        fileTree('docs') { include '**/*.md' },
+        fileTree('src/main/java') { include '**/*.java' },
+        fileTree('src/kernel/java') { include '**/*.java' },
+        'tools/spec-check.py',
+        'tools/spec-uncovered.txt')
+}
+
 tasks.named('check') {
-    dependsOn 'kernelTest', 'kernelPurity', 'compileUitestJava', 'verifyRunIsolation', 'verifyHarnessIsolation'
+    dependsOn 'kernelTest', 'kernelPurity', 'determinismCheck', 'compileUitestJava', 'verifyRunIsolation',
+        'verifyHarnessIsolation', 'specCheck'
 }
 
 // The harness runs are the only compositions that load structurecumulusuitest, and the harness is a
