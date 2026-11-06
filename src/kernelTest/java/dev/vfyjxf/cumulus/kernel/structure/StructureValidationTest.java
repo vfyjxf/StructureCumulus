@@ -79,15 +79,23 @@ class StructureValidationTest {
         ContextKey<Long> a = ContextKeys.of(id("a"), Long.class, Retention.instance, (l, r) -> l);
         Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
         Check<?> check = Check.of(id("cells"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
-        assertThrows(
+        IllegalArgumentException duplicate = assertThrows(
             IllegalArgumentException.class,
             () -> Blueprint.builder(id("dup")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
                     .computation(Computations.volume(a, cells)).computation(Computations.volume(a, cells)).build()
         );
-        assertThrows(
+        assertTrue(
+            Objects.requireNonNull(duplicate.getMessage(), "message").startsWith("SC-BPT-0007"),
+            duplicate.getMessage()
+        );
+        IllegalArgumentException emptyRegion = assertThrows(
             IllegalArgumentException.class,
             () -> Blueprint.builder(id("empty")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(check)
                     .computation(Computations.volume(a, CuboidSet.empty())).build()
+        );
+        assertTrue(
+            Objects.requireNonNull(emptyRegion.getMessage(), "message").startsWith("SC-BPT-0007"),
+            emptyRegion.getMessage()
         );
     }
 

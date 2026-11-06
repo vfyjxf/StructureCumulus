@@ -5,6 +5,7 @@ import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
+import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
@@ -135,7 +136,14 @@ class NestedCoverageScenarioTest {
             public FocusResult<OccupantSnapshot> take(FocusContext ctx) {
                 OccupantSnapshot occupant = ctx.occupantAt(cell);
                 if (occupant == null || occupant.isAir()) {
-                    return new FocusResult.Unavailable<>(FindingBundle.empty());
+                    return new FocusResult.Unavailable<>(
+                        FindingBundle.of(
+                            List.of(
+                                Finding.builder(Codes.unreadableCell).phase(ctx.phase())
+                                        .message("no nested occupant at " + cell).build()
+                            )
+                        )
+                    );
                 }
                 return new FocusResult.Taken<>(occupant, List.of(occupant), FindingBundle.empty());
             }
