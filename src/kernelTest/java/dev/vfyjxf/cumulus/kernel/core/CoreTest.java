@@ -57,11 +57,12 @@ class CoreTest {
         assertEquals(List.of(NamespacedId.of("a"), NamespacedId.of("b")), catalog.ids());
         assertEquals("a", catalog.require(NamespacedId.of("a")));
         assertNull(catalog.get(NamespacedId.of("c")));
-        assertThrows(
+        IllegalArgumentException duplicate = assertThrows(
             IllegalArgumentException.class,
             () -> Catalog.<String>builder(NamespacedId.of("test")).put(NamespacedId.of("a"), "a")
                     .put(NamespacedId.of("a"), "b")
         );
+        assertTrue(Objects.requireNonNull(duplicate.getMessage(), "message").startsWith("SC-SPI-0003: "));
         assertThrows(UnsupportedOperationException.class, () -> catalog.asMap().put(NamespacedId.of("c"), "c"));
     }
 
