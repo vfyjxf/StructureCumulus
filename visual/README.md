@@ -78,8 +78,8 @@ network request.
 
 ## What is inside
 
-269 kernel tests in 40 containers, 280 adapter unit tests in 35 containers, 74 GameTests, 65 codes,
-40 decisions and 11 ranked kernel packages. One complete document and a Java builder excerpt build
+541 kernel tests in 65 containers, 440 adapter unit tests in 46 containers, 140 GameTests, 66 codes,
+80 decisions and 11 ranked kernel packages. One complete document and a Java builder excerpt build
 the same campfire blueprint.
 
 | Chapter | What you can do |
@@ -90,8 +90,8 @@ the same campfire blueprint.
 | **03 / Workbench** | Inspect the campfire shell/hollow/fire, switch bays, explode/assemble, step `COMPILE → CHECK → SETTLE` (the settle publishes into a `StructureAttempt`, `commit(bounds)` forms the `StructureInstance`), then the derive aftermath, toggle JSON/Java, and move the siting through origin and quarter turns; the `property` leaf reads the typed snapshot. |
 | **04 / Ledger** | Move two owners' bays, change `EXCLUSIVE`/`SHARED`, settle, race the revision, and see the conflict matrix and rows; the set card records host orchestration (D-32), the S5 command and its unsited union capture (no orientation audit), S6's same-siting rejection and shared budget (D-35), D-38's whole-key release and D-40's manager rollback through `Broken`, including the real-level same-siting and one-cell-budget cases. |
 | **05 / Fold** | Refuse a section, change `sum`/`max`, toggle `whenAbsent`, and see the key become absent and a derive skip; the cached-context card records the host port (D-31). |
-| **06 / Codes** | Search/filter all 65 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail; the side panel lists the adapter-only `SC-MC-0006`…`0010` codes. |
-| **07 / Proof** | Read the gate report, 30 falsifiers (including D-37 claimability, D-38 whole-key release, D-39 water/NOTAIR and D-40's manager lifecycle plus `WatchEvents` claims), the 40 decisions, the current D-30…D-40 rulings, the regeneration protocol and the document index. |
+| **06 / Codes** | Search/filter all 66 codes, inspect a code's producer, and play with the finding-bundle caps and truncation tail; the side panel lists the adapter-only `SC-MC-0006`…`0010` codes. |
+| **07 / Proof** | Read the gate report, 30 falsifiers (including D-37 claimability, D-38 whole-key release, D-39 water/NOTAIR and D-40's manager lifecycle plus `WatchEvents` claims), the 80 decisions, the current D-30…D-40 rulings, the regeneration protocol and the document index. |
 
 Press <kbd>⌘K</kbd> / <kbd>Ctrl K</kbd> for the index. Use **EN / 中文** in the top bar to switch languages. The **NIGHT** switch flips the same
 information to a dark instrument palette. The layout is responsive down to 390 px.
@@ -105,8 +105,8 @@ cd visual
 npm run data
 ```
 
-The generated counts are 65 codes (13 kernel families, including `SET` with `SC-SET-0008` and `BPT`
-with `SC-BPT-0005`), 40 decisions (D-40) and 269 kernel tests in 40 containers.
+The generated counts are 66 codes (13 kernel families, including `SET` with `SC-SET-0008` and `BPT`
+with `SC-BPT-0005`), 80 decisions (D-82) and 541 kernel tests in 65 containers.
 `campfire.ts` is the curated worked example (3×3×3, 27 cells, 27 claims, spend 28 reads / 4 sections,
 derive capacity 10). The numbers match the JUnit scenario.
 
