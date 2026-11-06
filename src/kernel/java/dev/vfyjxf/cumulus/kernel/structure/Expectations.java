@@ -525,7 +525,8 @@ public final class Expectations {
 
         @Override
         public Reply test(ExpectationContext<T> ctx) {
-            List<Finding> findings = new ArrayList<>();
+            List<Finding> refutations = new ArrayList<>();
+            List<Finding> unknowns = new ArrayList<>();
             boolean matched = false;
             boolean mismatched = false;
             boolean unreadable = false;
@@ -536,11 +537,11 @@ public final class Expectations {
                     case Reply.Match ignored -> matched = true;
                     case Reply.Mismatch mismatch -> {
                         mismatched = true;
-                        findings.addAll(mismatch.findings().findings());
+                        refutations.addAll(mismatch.findings().findings());
                     }
                     case Reply.Unreadable unknown -> {
                         unreadable = true;
-                        findings.addAll(unknown.findings().findings());
+                        unknowns.addAll(unknown.findings().findings());
                     }
                     case Reply.Abstain ignored -> abstained = true;
                 }
@@ -550,18 +551,20 @@ public final class Expectations {
                     return Reply.match();
                 }
                 if (unreadable) {
-                    return Reply.unreadable(FindingBundle.of(findings));
+                    return Reply.unreadable(FindingBundle.of(unknowns));
                 }
                 if (mismatched) {
-                    return Reply.mismatch(FindingBundle.of(findings));
+                    return Reply.mismatch(FindingBundle.of(refutations));
                 }
                 return Reply.abstain();
             }
             if (mismatched) {
-                return Reply.mismatch(FindingBundle.of(findings));
+                List<Finding> merged = new ArrayList<>(refutations);
+                merged.addAll(unknowns);
+                return Reply.mismatch(FindingBundle.of(merged));
             }
             if (unreadable) {
-                return Reply.unreadable(FindingBundle.of(findings));
+                return Reply.unreadable(FindingBundle.of(unknowns));
             }
             if (abstained) {
                 return Reply.abstain();
@@ -665,7 +668,8 @@ public final class Expectations {
 
         @Override
         public Reply test(ExpectationContext<T> ctx) {
-            List<Finding> findings = new ArrayList<>();
+            List<Finding> refutations = new ArrayList<>();
+            List<Finding> unknowns = new ArrayList<>();
             int matches = 0;
             int unreadable = 0;
             int abstained = 0;
@@ -673,10 +677,10 @@ public final class Expectations {
                 Reply reply = child.test(ctx);
                 switch (reply) {
                     case Reply.Match ignored -> matches++;
-                    case Reply.Mismatch mismatch -> findings.addAll(mismatch.findings().findings());
+                    case Reply.Mismatch mismatch -> refutations.addAll(mismatch.findings().findings());
                     case Reply.Unreadable unknown -> {
                         unreadable++;
-                        findings.addAll(unknown.findings().findings());
+                        unknowns.addAll(unknown.findings().findings());
                     }
                     case Reply.Abstain ignored -> abstained++;
                 }
@@ -687,12 +691,14 @@ public final class Expectations {
                 case exactly -> matches > count || matches + unreadable + abstained < count;
             };
             if (fail) {
-                findings.add(
+                List<Finding> merged = new ArrayList<>(refutations);
+                merged.addAll(unknowns);
+                merged.add(
                     Finding.builder(code(3), Severity.error).phase(ctx.phase())
                             .message("threshold " + mode + "(" + count + ") cannot be met")
                             .label(Label.primary(ctx.locus(), "the threshold failed")).build()
                 );
-                return Reply.mismatch(FindingBundle.of(findings));
+                return Reply.mismatch(FindingBundle.of(merged));
             }
             boolean canStill = switch (mode) {
                 case atLeast -> matches >= count;
@@ -703,7 +709,7 @@ public final class Expectations {
                 return Reply.match();
             }
             if (unreadable > 0) {
-                return Reply.unreadable(FindingBundle.of(findings));
+                return Reply.unreadable(FindingBundle.of(unknowns));
             }
             return Reply.abstain();
         }
