@@ -519,7 +519,12 @@ public final class MatchEngine {
                 );
             }
             if (verdict instanceof ClaimVerdict.Conflict conflict) {
-                List<Finding> settleConflicts = conflicts(phase, derived.rows(), conflict.incumbents(), request.cancel());
+                List<Finding> settleConflicts = conflicts(
+                    phase,
+                    derived.rows(),
+                    conflict.incumbents(),
+                    request.cancel()
+                );
                 if (settleConflicts == null) {
                     findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
                     return new MatchResult.Undecided(
