@@ -17,6 +17,9 @@ public record SnapshotPolicy(
     List<EntityWindow> windows
 ) {
 
+    /** The nested-level ceiling the framework passes when the host does not choose a smaller one. */
+    public static final int defaultMaxDepth = 16;
+
     public SnapshotPolicy {
         if (maxElements < 0 || maxDepth < 0) {
             throw new IllegalArgumentException("non-negative policy");
@@ -34,6 +37,6 @@ public record SnapshotPolicy(
     }
 
     public static SnapshotPolicy minimal() {
-        return new SnapshotPolicy(1_000_000, 0, Set.of(), Set.of(), List.of());
+        return new SnapshotPolicy(1_000_000, defaultMaxDepth, Set.of(), Set.of(), List.of());
     }
 }

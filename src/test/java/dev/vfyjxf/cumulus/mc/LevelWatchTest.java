@@ -3,7 +3,6 @@ package dev.vfyjxf.cumulus.mc;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import org.junit.jupiter.api.Test;
 
@@ -78,22 +77,6 @@ class LevelWatchTest {
     }
 
     @Test
-    void blockEntityFingerprintCopiesItsNbtAndComparesByValue() {
-        CompoundTag tag = new CompoundTag();
-        tag.putInt("count", 1);
-        LevelWatch.BlockEntityFingerprint fingerprint = new LevelWatch.BlockEntityFingerprint(type, tag);
-
-        tag.putInt("count", 2);
-
-        assertEquals(1, fingerprint.nbt().getInt("count"), "the snapshot owns a copy");
-        CompoundTag same = new CompoundTag();
-        same.putInt("count", 1);
-        assertEquals(fingerprint, new LevelWatch.BlockEntityFingerprint(type, same));
-        same.putInt("count", 3);
-        assertNotEquals(fingerprint, new LevelWatch.BlockEntityFingerprint(type, same));
-    }
-
-    @Test
     void entityFingerprintIsAValue() {
         UUID entity = UUID.randomUUID();
         LatticePoint anchor = LatticePoint.of(1, 2, 3);
@@ -111,6 +94,5 @@ class LevelWatchTest {
         assertTrue(region.chunks().isEmpty());
         assertTrue(region.bounds().isEmpty());
         assertTrue(region.entities().isEmpty());
-        assertTrue(region.blockEntities().isEmpty());
     }
 }

@@ -4,19 +4,12 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.core.SectionPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.chunk.LevelChunk;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -34,8 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * The per-level mark registry: refcounted watched chunks and the lazy entity and block-entity
- * fingerprints of each capture. Server thread only.
+ * The per-level mark registry: refcounted watched chunks and the lazy entity fingerprints of each
+ * capture. Server thread only.
  */
 @NullMarked
 final class LevelWatch {
@@ -163,11 +156,6 @@ final class LevelWatch {
         chunks.clear();
     }
 
-    static NamespacedId blockEntityType(BlockEntity entity) {
-        var location = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(entity.getType());
-        return NamespacedId.of(location.getNamespace(), location.getPath());
-    }
-
     /** One capture's watch: the chunks and bounds it read plus the fingerprints it captured. */
     static final class WatchHandle {
 
@@ -176,7 +164,6 @@ final class LevelWatch {
         private final Set<Long> chunks;
         private final List<Cuboid> bounds;
         private final Map<UUID, EntityFingerprint> entities;
-        private final Map<BlockPos, BlockEntityFingerprint> blockEntities;
         private final AtomicLong marks = new AtomicLong();
         private final AtomicBoolean registered = new AtomicBoolean(true);
         private final long epochAtCapture;
@@ -187,7 +174,6 @@ final class LevelWatch {
             this.chunks = Set.copyOf(region.chunks());
             this.bounds = List.copyOf(region.bounds());
             this.entities = Map.copyOf(region.entities());
-            this.blockEntities = Map.copyOf(region.blockEntities());
             this.epochAtCapture = epochAtCapture;
         }
 
@@ -195,7 +181,7 @@ final class LevelWatch {
             if (!registered.get() || marks.get() != 0 || owner.epoch.get() != epochAtCapture) {
                 return false;
             }
-            return entitiesUnchanged() && blockEntitiesUnchanged();
+            return entitiesUnchanged();
         }
 
         void mark() {
@@ -287,35 +273,6 @@ final class LevelWatch {
             }
             return true;
         }
-
-        private boolean blockEntitiesUnchanged() {
-            if (blockEntities.isEmpty()) {
-                return true;
-            }
-            ServerChunkCache chunkSource = level.getChunkSource();
-            for (Map.Entry<BlockPos, BlockEntityFingerprint> entry : blockEntities.entrySet()) {
-                BlockPos pos = entry.getKey();
-                LevelChunk chunk = chunkSource.getChunkNow(
-                    SectionPos.blockToSectionCoord(pos.getX()),
-                    SectionPos.blockToSectionCoord(pos.getZ())
-                );
-                if (chunk == null) {
-                    return false;
-                }
-                BlockEntity live = chunk.getBlockEntity(pos);
-                if (live == null || live.isRemoved()) {
-                    return false;
-                }
-                BlockEntityFingerprint recorded = entry.getValue();
-                if (!recorded.type().equals(blockEntityType(live))) {
-                    return false;
-                }
-                if (!recorded.nbt().equals(live.saveWithoutMetadata(level.registryAccess()))) {
-                    return false;
-                }
-            }
-            return true;
-        }
     }
 
     /** One capture's collected watch data; frames merge only when the frame is built, never when cut. */
@@ -324,7 +281,6 @@ final class LevelWatch {
         private final Set<Long> chunks = new LinkedHashSet<>();
         private final List<Cuboid> bounds = new ArrayList<>();
         private final Map<UUID, EntityFingerprint> entities = new LinkedHashMap<>();
-        private final Map<BlockPos, BlockEntityFingerprint> blockEntities = new LinkedHashMap<>();
 
         void frame(Cuboid localBounds, LatticePoint origin) {
             Cuboid world = localBounds.translate(origin.x(), origin.y(), origin.z());
@@ -347,18 +303,10 @@ final class LevelWatch {
             entities.putIfAbsent(id, new EntityFingerprint(id, type, anchor, footprint));
         }
 
-        void blockEntity(BlockPos pos, BlockEntity entity, HolderLookup.Provider registries) {
-            blockEntities.putIfAbsent(
-                pos,
-                new BlockEntityFingerprint(blockEntityType(entity), entity.saveWithoutMetadata(registries))
-            );
-        }
-
         void merge(WatchRegion other) {
             chunks.addAll(other.chunks);
             bounds.addAll(other.bounds);
             other.entities.forEach(entities::putIfAbsent);
-            other.blockEntities.forEach(blockEntities::putIfAbsent);
         }
 
         Set<Long> chunks() {
@@ -372,10 +320,6 @@ final class LevelWatch {
         Map<UUID, EntityFingerprint> entities() {
             return entities;
         }
-
-        Map<BlockPos, BlockEntityFingerprint> blockEntities() {
-            return blockEntities;
-        }
     }
 
     record EntityFingerprint(UUID id, NamespacedId type, LatticePoint anchor, Cuboid footprint) {
@@ -384,14 +328,6 @@ final class LevelWatch {
             Objects.requireNonNull(type, "type");
             Objects.requireNonNull(anchor, "anchor");
             Objects.requireNonNull(footprint, "footprint");
-        }
-    }
-
-    record BlockEntityFingerprint(NamespacedId type, CompoundTag nbt) {
-        BlockEntityFingerprint {
-            Objects.requireNonNull(type, "type");
-            Objects.requireNonNull(nbt, "nbt");
-            nbt = nbt.copy();
         }
     }
 }

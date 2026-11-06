@@ -21,14 +21,11 @@ import dev.vfyjxf.cumulus.kernel.world.SectionSlot;
 import dev.vfyjxf.cumulus.kernel.world.SectionSnapshot;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.kernel.world.WorldView;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RotatedPillarBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.material.FluidState;
@@ -477,8 +474,7 @@ class LevelSnapshotTest {
         BlockState water = Blocks.WATER.defaultBlockState();
         OccupantSnapshot block = occupant(snapshot, anchor, "water");
         SectionSnapshot section = SectionSnapshot.of(key, Map.of(anchor, block), 7L);
-        BlockEntity chest = BlockEntityType.CHEST.create(new BlockPos(0, 0, 0), Blocks.CHEST.defaultBlockState());
-        SnapshotLevel host = hostSnapshot(bounds, water, chest, EntityType.CHICKEN);
+        SnapshotLevel host = hostSnapshot(bounds, water, EntityType.CHICKEN);
         FrameData data = new FrameData(
             snapshot,
             0,
@@ -496,13 +492,11 @@ class LevelSnapshotTest {
         assertSame(water, view.get(anchor, HostTypes.blockState));
         assertSame(water, view.get(block.ref(), HostTypes.blockState));
         assertEquals(water.getFluidState(), view.get(anchor, HostTypes.fluidState));
-        assertSame(chest, view.get(anchor, HostTypes.blockEntity));
         assertSame(EntityType.CHICKEN, view.get(anchor, HostTypes.entityType));
         assertNull(view.get(anchor, HostType.of(NamespacedId.of("test", "unknown"))));
         assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockState), "outside the snapshot is null");
         assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.fluidState), "outside the snapshot is null");
         assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.entityType));
-        assertNull(view.get(LatticePoint.of(2, 0, 0), HostTypes.blockEntity));
     }
 
     @Test
@@ -513,7 +507,6 @@ class LevelSnapshotTest {
         assertNull(view.get(LatticePoint.origin, HostTypes.blockState));
         assertNull(view.get(LatticePoint.origin, HostTypes.fluidState));
         assertNull(view.get(LatticePoint.origin, HostTypes.entityType));
-        assertNull(view.get(LatticePoint.origin, HostTypes.blockEntity));
     }
 
     @Test
@@ -544,7 +537,7 @@ class LevelSnapshotTest {
             List.of(),
             List.of(),
             Map.of(),
-            hostSnapshot(childOrigin, bounds, log, null, null, childCell)
+            hostSnapshot(childOrigin, bounds, log, null, childCell)
         );
         FrameData rootData = new FrameData(
             snapshot,
@@ -556,7 +549,7 @@ class LevelSnapshotTest {
             List.of(),
             List.of(nested),
             Map.of(anchor, childData),
-            hostSnapshot(LatticePoint.origin, bounds, stone, null, null, anchor)
+            hostSnapshot(LatticePoint.origin, bounds, stone, null, anchor)
         );
         SnapshotPolicy policy = new SnapshotPolicy(64, 1, Set.of(OccupantKind.nested), Set.of(), List.of());
         LevelSnapshot view = new LevelSnapshot(snapshot, policy, rootData);
@@ -568,20 +561,14 @@ class LevelSnapshotTest {
         assertTrue(Objects.requireNonNull(view.get(childCell, HostTypes.blockState), "root air").isAir());
     }
 
-    private static SnapshotLevel hostSnapshot(
-        Cuboid bounds,
-        BlockState state,
-        @Nullable BlockEntity blockEntity,
-        @Nullable EntityType<?> entityType
-    ) {
-        return hostSnapshot(LatticePoint.origin, bounds, state, blockEntity, entityType, LatticePoint.origin);
+    private static SnapshotLevel hostSnapshot(Cuboid bounds, BlockState state, @Nullable EntityType<?> entityType) {
+        return hostSnapshot(LatticePoint.origin, bounds, state, entityType, LatticePoint.origin);
     }
 
     private static SnapshotLevel hostSnapshot(
         LatticePoint origin,
         Cuboid bounds,
         BlockState state,
-        @Nullable BlockEntity blockEntity,
         @Nullable EntityType<?> entityType,
         LatticePoint cell
     ) {
@@ -600,9 +587,6 @@ class LevelSnapshotTest {
         Arrays.fill(fluids, Fluids.EMPTY.defaultFluidState());
         fluids[SnapshotLevel.fluidIndex(worldX, worldY, worldZ)] = state.getFluidState();
         long key = SnapshotLevel.worldSectionKey(worldX, worldY, worldZ);
-        Map<BlockPos, BlockEntity> blockEntities = blockEntity == null
-                ? Map.of()
-                : Map.of(new BlockPos(cell.x(), cell.y(), cell.z()), blockEntity);
         List<SnapshotLevel.CapturedEntity> entities = entityType == null
                 ? List.of()
                 : List.of(
@@ -613,16 +597,7 @@ class LevelSnapshotTest {
                         entityType
                     )
                 );
-        return new SnapshotLevel(
-            origin,
-            bounds,
-            -64,
-            384,
-            Map.of(key, states),
-            Map.of(key, fluids),
-            blockEntities,
-            entities
-        );
+        return new SnapshotLevel(origin, bounds, -64, 384, Map.of(key, states), Map.of(key, fluids), entities);
     }
 
     private static OccupantSnapshot entity(SnapshotId snapshot, LatticePoint anchor, String type, Cuboid footprint) {

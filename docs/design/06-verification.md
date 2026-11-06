@@ -422,6 +422,36 @@ key instead of retaining the stale instance and rows; regression
 | adapter | `ExpandedSetTest` | 64-member set, exact shared budget, 32-member rollback, release failure, failed/successful re-settle, competing owners and repeated sitings | 9 |
 | adapter | `ExpandedInstanceFuzzTest` | random claim/context/lifecycle scripts across worlds, exclusive conflicts, moves, unload/load and claim invariants | 4 |
 
+### 3.8 Host laws on a real server (D-76)
+
+The behaviours a host must satisfy are asserted in `src/test` against a real server level, never
+against the `TestWorld` double. `HostLawsTest` boots one dedicated server per class run — a flat,
+offline, monster-free overworld in a throwaway directory, driven through the same chain as
+`net.minecraft.server.Main` by the `HostServer` support class — and every case runs on the server
+thread over its own loaded region, which it clears before it ends. Nested-extent sources use the
+same fake-provider seam the nested GameTests use (`NestedExtentLookup.builder()`); everything else —
+block writes, entity joins, the per-level claim ledger, lease retirement through the observation
+funnel — is the shipped host. The suite needs no new source set and no dependency from `test` on
+`kernelTest` output.
+
+| Law | Asserted by |
+| --- | --- |
+| Capture honours the read policy: without the `entity` kind no entity body is captured, with it the body carries the live entity type, and blocks answer to no kind gate | `aPolicyWithoutTheEntityKindLeavesEntitiesOutOfTheSnapshot` |
+| A refused cell reads `Unreadable` and answers no host value — never air (D-80) | `aRefusedCellReadsUnreadableAndAnswersNullNeverAir` |
+| A captured nested body opens its child frame and stays in the parent's occupants; a cut body opens no child, stays in the parent and carries one `SC-MC-0003` entry naming the reason (D-65) | `aCapturedNestedBodyHasAChildAndACutBodyCarriesAFinding` |
+| `Settled.rows` equals the requested rows of that key, and another key's rows never leak into an answer (`claim` §4.5) | `settleAnswersWithThisKeysRows` |
+| A conflicting settle answers `Conflict` with the incumbent rows only — the finding is the engine's (D-53) — and writes nothing (`claim` §4.6) | `aConflictCarriesItsIncumbentsAndWritesNothing` |
+| One real write inside the capture retires the lease (`isCurrent()` false) | `aWriteInsideTheCaptureRetiresTheLease` |
+
+The read-policy law is pinned by mutation: commenting out the entity-kind gates in `LevelCapture`
+turns it red. The conflict law asserts data only (D-53); the finding half is covered by the booted
+host's check path (`CheckClaimsGameTest`: a real `check` over the shipped ledger answers
+`SC-CLM-0001`) and by the kernel-level equivalence of the two engine entries
+(`theSettleConflictRendersLikeThePreCheck`). The doubles answer like the host — `kernelTest`'s `TestWorld.View` filters occupants by
+the capture policy's kinds (blocks unconditionally, bodies by their kind), and the src/test support
+ledger answers settle with the requested rows — but they stay scenario doubles; no law test runs
+against a double.
+
 ## 4. Module tests
 
 | Module | Must test |
@@ -508,7 +538,26 @@ The reviewer's job is to find a concrete structure or snapshot that breaks a cla
     (host: the plan is `rootSiting.compose(relativeSiting)`, and both endpoints are mapped through
     their own sitings; §3.3)
 
-## 7. What is not verified in this round
+## 7. Performance
+
+The kernel's cost is a JMH number, produced on a development machine and in CI (D-73). There is no
+counting layer, no complexity bookkeeping and no threshold: a benchmark reports throughput and
+latency for one operation, and the numbers are compared by a person looking at two runs.
+
+- Run: `./gradlew jmh`. The `src/jmh` source set runs with `@Fork(2)`, `@Warmup(3)` and
+  `@Measurement(5)` in both `Throughput` and `AverageTime` modes; `-PjmhArgs` forwards options to
+  `org.openjdk.jmh.Main`, for example `-PjmhArgs="ClaimPlanning -rf json -rff bench.json -foe true"`
+  (JMH creates only the result file, never its directory).
+- CI is deferred until the repository has a remote; when one exists it runs the same `./gradlew jmh`
+  and publishes the JSON result as a build artifact, and no workflow file is kept until then.
+  `check` only compiles the source set: a shared runner's numbers are for comparison, not for
+  gating, so no benchmark ever runs inside `check`.
+- A number worth keeping is copied to `Data/StructureCumulus/bench/<date>-<benchmark>.json`;
+  `07-regeneration.md` §7 records only the most recent conclusion.
+- Capture against a live level and anything that needs a server tick is not benchmarked at all; a
+  change that touches them is reviewed by reading the code.
+
+## 8. What is not verified in this round
 
 - The rest of the NeoForge adapter and its GameTests. The tree registers 126 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on the expanded wave (382 kernel / 48 containers, 411 adapter / 43 containers, 126/126 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles

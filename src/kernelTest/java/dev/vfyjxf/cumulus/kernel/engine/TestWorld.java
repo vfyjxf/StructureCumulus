@@ -65,6 +65,13 @@ final class TestWorld {
         private final Map<LatticePoint, OccupantSnapshot> occupants = new LinkedHashMap<>();
         private final Map<LatticePoint, ReadRefusal> refused = new LinkedHashMap<>();
         private final Set<SectionKey> refusedSections = new LinkedHashSet<>();
+        private SnapshotPolicy policy = new SnapshotPolicy(
+            1_000_000,
+            SnapshotPolicy.defaultMaxDepth,
+            Set.of(OccupantKind.entity, OccupantKind.nested),
+            Set.of(),
+            List.of()
+        );
         private int sectionSize = 16;
         private Cuboid bounds = Cuboid.of(
             LatticePoint.minXz,
@@ -77,6 +84,11 @@ final class TestWorld {
 
         View put(OccupantSnapshot occupant) {
             occupants.put(occupant.ref().anchor(), occupant);
+            return this;
+        }
+
+        View policy(SnapshotPolicy policy) {
+            this.policy = policy;
             return this;
         }
 
@@ -147,7 +159,7 @@ final class TestWorld {
 
         @Override
         public SnapshotPolicy policy() {
-            return SnapshotPolicy.minimal();
+            return policy;
         }
 
         @Override
@@ -166,7 +178,7 @@ final class TestWorld {
             Map<LatticePoint, OccupantSnapshot> slice = new LinkedHashMap<>();
             Map<LatticePoint, ReadRefusal> unreadable = new TreeMap<>();
             for (Map.Entry<LatticePoint, OccupantSnapshot> entry : occupants.entrySet()) {
-                if (sectionOf(entry.getKey()).equals(key) && !entry.getValue().isAir()) {
+                if (sectionOf(entry.getKey()).equals(key) && !entry.getValue().isAir() && visible(entry.getValue())) {
                     slice.put(entry.getKey(), entry.getValue());
                 }
             }
@@ -215,14 +227,14 @@ final class TestWorld {
                 return null;
             }
             OccupantSnapshot candidate = occupants.get(ref.anchor());
-            return candidate != null && candidate.ref().equals(ref) ? candidate : null;
+            return candidate != null && candidate.ref().equals(ref) && visible(candidate) ? candidate : null;
         }
 
         @Override
         public List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter) {
             List<OccupantSnapshot> result = new ArrayList<>();
             for (OccupantSnapshot occupant : occupants.values()) {
-                if (refused.containsKey(occupant.ref().anchor())) {
+                if (refused.containsKey(occupant.ref().anchor()) || !visible(occupant)) {
                     continue;
                 }
                 if (occupant.footprint().intersects(box) && filter.matches(occupant)) {
@@ -236,6 +248,14 @@ final class TestWorld {
         @Override
         public @Nullable WorldView nested(LatticePoint cell) {
             return null;
+        }
+
+        // blocks are captured unconditionally on the real host; only bodies answer to the policy
+        private boolean visible(OccupantSnapshot occupant) {
+            OccupantKind kind = occupant.descriptor().kind();
+            return kind.equals(OccupantKind.block)
+                    || kind.equals(OccupantKind.blockEntity)
+                    || policy.kinds().contains(kind);
         }
 
         @Override

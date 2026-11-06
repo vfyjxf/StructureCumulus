@@ -440,7 +440,10 @@ cell is visible through the read. There is no partial child: a child either exis
 answered (readable or refused) or is cut entirely. **Status (v1.2):** implemented in
 `f3e0338`/`d6aefc2`. **Amendment (M5e):** the cut reason now travels as one `SC-MC-0003` entry in
 the capture report (D-28), a WARNING; `SC-OCC-0003` remains the check's finding, so the capture entry
-explains the cut and the check finding judges it.
+explains the cut and the check finding judges it. **Superseded by D-65:** nested expansion is now
+automatic, breadth-first and capped — the author no longer declares a depth, the frame at the
+ceiling keeps and reports the bodies it discovers, and the cut rules this decision sketched are
+owned by D-65's wording.
 
 **Why:** a refused child is a second structure that checks could walk and pass; the honest fact is
 that the child is not available. Keeping the body and returning `null` preserves the parent-frame
@@ -686,7 +689,8 @@ and stress evidence. D-29's definition-frame descriptor projection therefore has
 The replacement contract:
 
 - one world snapshot per frame: copied `PalettedContainer<BlockState>` sections, per-section
-  `FluidState` arrays, detached block entities and captured entities; no live `Level` is retained;
+  `FluidState` arrays and captured entities; no live `Level` is retained and no block entity is
+  copied (D-61);
 - `HostType<H>` is an id token, never a `Class<?>`; the adapter owns the constants (`HostTypes`);
 - `WorldView.get(pos, type)` is the only host read: default `null`, total, no exception;
   `get(ref, type)` reads the ref's anchor; a capture overrides it and answers from its snapshot;
@@ -973,8 +977,9 @@ The capture freezes the values the framework owns and states one contract where 
 includes writing through a host value. Determinism is promised for a check that reads only captured
 values; a check that dereferences a live host value accepts that its verdict may differ between runs.
 
-**The values.** Captured cells are frozen: `BlockState`, `FluidState`, the detached block-entity copy
-and the occupant walk are copies. The three capability traits carry the live NeoForge capability
+**The values.** Captured cells are frozen: `BlockState`, `FluidState` and the occupant walk are
+copies. A block entity has no copy at all — its data reaches a check through a trait whose value is
+the live handle (D-61). The three capability traits carry the live NeoForge capability
 (D-34); the framework neither copies nor wraps them, and does not police how they are used. An entity
 cell carries the captured `EntityType`, never the live `Entity`: the host read is
 `HostTypes.entityType`, and any other entity state is a captured trait.
@@ -1117,8 +1122,9 @@ released, and the player settles it again at its new position.
 
 **The instance side is indexed.** A per-level `Map<chunk, Set<InstanceId>>` is maintained by the
 manager wrapper, so the hook's first three checks are constant-time and a write that touches no
-formed structure costs one hash lookup. A block-entity `setChanged` feeds only the capture watch: a
-content change never invalidates the instance itself (D-41).
+formed structure costs one hash lookup. A block-entity `setChanged` fed only the capture watch, never
+the instance side (D-41); D-61 removes that feed together with the block-entity fingerprint it
+guarded.
 
 **Costs.** Mixin becomes a load-bearing dependency of the adapter; the hook sits on a hot path and may
 only do a hash lookup before returning; the injection points must be re-verified on every Minecraft
@@ -1210,6 +1216,65 @@ identity-hash dependency disappear.
 
 **One canonical order.** `ContextKeys.order()` sorts by `(id, type.getName())` and is the only order a
 `ContextKey` set may be iterated in; the comparators that re-implemented it are replaced by it.
+
+
+### D-52 — A ref read answers the occupant, not its cell
+
+`WorldView.get(ref, type)` answers for the occupant `ref` names. A ref without a body names a cell:
+the default reads `ref.anchor()`. A ref with a body names one body: the default answers `null`, and a
+host that stores values per body overrides `get(ref, type)` to answer by body. A ref from another
+snapshot or frame answers `null`, exactly like `occupant(ref)`.
+
+**Why.** `OccupantRef` has carried `body` since the entity-collapse fix, and `occupant(ref)` already
+rejects a foreign frame and a foreign body. `get` was the one read entry that ignored both: two
+entities over one cell made `get(cow.ref(), entity)` answer the chicken. Widening the key is enough;
+no new port is needed.
+
+**Fail closed.** A default that falls back to the anchor cell would answer a different body's value
+silently — the defect it removes. `null` is the honest "not captured", and `world.md` §4.11 already
+says a missing value means "not in this snapshot", never a substitute.
+
+**Rejected: `HostType` gains a scope (cell or body).** One dispatch flag on every host token would
+select between two code paths, while the ref already carries the discriminator (`body`).
+
+**Rejected: hosts answer bodies through `get(LatticePoint, type)`.** A cell does not name a body; the
+occupant chosen for a cell is a heuristic, not the identity the ref carries.
+
+**Consequence:** the kernel default guards snapshot, frame and body; `Expectations.host` reads the
+subject's ref; `SnapshotLevel` indexes entity types by body and answers the ref form, `LevelSnapshot`
+routes a no-body ref to its cell; `world` §4.4/§4.11 and `10-host-data` §3/§4 state the rule.
+
+
+### D-53 — A conflict is data; the engine writes its finding
+
+`ClaimVerdict.Conflict` carries the incumbent rows and nothing else. The ledger detects a conflict and
+answers which rows contest the request; it does not choose a code, a phase, a locus or a sentence.
+
+The engine already builds that finding for its pre-settle check (`MatchEngine.conflicts`), from the
+requested rows and the held rows. The ledger's copy was a second implementation of the same text, and
+a host implementing `ClaimLedger` had to reproduce it a third time.
+
+**A ledger is a store, not a reporter.** With the finding removed, `InMemoryClaimLedger` loses its
+dependency on `Finding`, `Codes`, `Phase`, `Label` and `Locus`, and the port can be implemented from
+the claim types alone.
+
+**Rejected: keeping the findings as an optimisation** (the ledger already has both row sets, so
+building the finding there is "free"): it makes the wording part of every implementation instead of
+one place, and the engine has to run the same builder anyway for its pre-check.
+
+**Rejected: a middle `ConflictFacts` type**: it would be a second representation of the same two row
+lists, with one consumer.
+
+**Consequence:** the settle verdict renders through the same builder as the check prediction and the
+`RevisionMoved` re-read, so both entries produce one wording; the D-76 host law keeps its data half
+only — a conflicting settle answers the incumbent rows and writes nothing — and the finding half is
+covered by the booted host's check path (`CheckClaimsGameTest`: a real `check` over the shipped
+ledger answers `SC-CLM-0001`) and by the kernel-level equivalence of the two engine entries
+(`theSettleConflictRendersLikeThePreCheck`); `claim` §1/§4.5/§4.6, `engine` §7.5, `finding` §6 and
+`06-verification.md` §3.8 state the rule. **Status:** implemented
+with the tests that pin it: `aConflictCarriesNoFinding`, `aConflictKeepsEveryIncumbent`,
+`aConflictWithNoIncumbentIsRejected` (kernel claim) and `theSettleConflictRendersLikeThePreCheck`
+(kernel engine).
 
 
 ### D-54 — The command boundary is gated, guarded and self-cleaning
@@ -1345,6 +1410,34 @@ bumps. A host that still bumps on a no-op stays correct — it only invalidates 
 holds for every settle that happens, but a settle whose plan owns nothing no longer happens; it is a
 `release`.
 
+
+### D-61 — Block entities are read live through traits; the snapshot keeps neither a copy nor a fingerprint
+
+A capture copies no `BlockEntity` and records no fingerprint of one. The block entity host read goes
+with the copy: nothing in production read it, and a snapshot that hands out a detached world object
+is what D-41 forbids. Block entity data reaches a check the way every other capability does — a trait
+resolved at capture, whose value is the live handle (D-34).
+
+Watching contents would contradict that contract. A live handle answers "as of the moment you read";
+an NBT fingerprint answers "did this change since capture". Keeping both means an attempt can be
+dropped for a change the live read already saw, and the fingerprint costs a full NBT serialization
+per block entity on every capture and every freshness check.
+
+What the freshness check still covers: the watched chunks (block changes and unloads), the entity
+fingerprints and the level epoch. A block entity that changes or disappears without a block change no
+longer invalidates the snapshot; the captured handle keeps answering its own state.
+
+**Consequence:** `HostTypes.blockEntity`, `copyBlockEntity` and the `BlockEntityFingerprint` watch
+are gone; `isCurrent()` marks, epoch and entity fingerprints only. D-47's `BlockEntity#setChanged`
+hook is cancelled by this decision — the feed existed only to invalidate on contents, so the mixin,
+`CumulusHooks.blockEntityChanged` and the eager-mark test go with it, while D-47's
+`LevelChunk#setBlockState` funnel stands. `world` §4.7 and `adapter` §3/§4 state the rule;
+`10-host-data` drops the copy step, the host token and the fingerprint from its contract.
+**Status:** implemented with the tests that pin it: no `BlockEntity` or `CompoundTag` field on
+`SnapshotLevel`, a content change or removal without a block change keeps the lease current, and the
+`inventory` trait still reads the changed contents.
+
+
 ### D-62 — An expectation declares its read scope when it is built
 
 `Expectations.custom` gains a four-argument form carrying the expectation's `ReadScope`; the
@@ -1368,6 +1461,40 @@ read call.
 makes "I read nothing" the default rather than an omission.
 
 
+### D-65 — Nested capture is automatic, breadth-first and capped
+
+A blueprint says whether it reads nested bodies, never how deep. The capture expands them by level:
+every body discovered in the frames of level N is captured before any frame of level N+1. Expansion
+stops at a fixed ceiling of 16 levels, at the capture's element budget, at a cycle, or when a body
+does not fit its parent frame.
+
+A body that is discovered but not captured stays in its parent's occupant list with its footprint, and
+the capture reports `SC-MC-0003` at that anchor. "There is something here, I did not expand it" is a
+fact the author can act on; silence is not.
+
+**Why no declared depth.** The number is unguessable for the author and unverifiable for the
+framework: an opaque expectation can go arbitrarily deep. A ceiling plus a budget bounds the same cost
+without asking a human to estimate it.
+
+**Why breadth-first.** With a budget, depth-first spends everything on the first chain and leaves its
+siblings uncaptured. Level order gives every sibling the same chance, and the cut set stops depending
+on which body happened to be visited first.
+
+**Why 16.** A structure nested sixteen deep is already pathological; the ceiling exists to make
+recursion terminate, not to shape normal content.
+
+**Consequence:** `ReadScope` loses `depth`/`withDepth`; a nested focus declares only the `nested`
+kind. `SnapshotPolicy.maxDepth` stays as the host-allowed ceiling, `minimal()` and the command policy
+pass `SnapshotPolicy.defaultMaxDepth` (16). `LevelCapture` captures each frame alone (`collect`) and
+a level-order driver expands and assembles the frames bottom-up; the frame at the ceiling still
+discovers its bodies and each is reported as a depth cut. `world` §4.6/§4.9, `structure` §4.4/§4.5
+and `adapter` §3/§8.4 state the rule. **Status:** implemented with the tests that pin it: a
+seventeen-level nest captures sixteen frames and reports one depth cut at the deepest anchor, both
+siblings are captured before any grandchild under a shared budget, a policy without the `nested`
+kind queries no provider, the ceiling frame queries its anchor exactly once and builds no child, and
+two captures of one world produce the same frame order and the same cut report.
+
+
 ### D-68 — An anchor's value is a heading in the definition frame
 
 `AnchorSpec.value` names the anchor's heading in the blueprint's own coordinates. At check time the
@@ -1384,6 +1511,7 @@ describe the world orientation it was drawn for. No shipped datapack declares an
 over `src/main/resources/data`), so the breakage is confined to third-party documents, which the
 module docs call out.
 
+
 ### D-70 — The set host documents the shape the code has
 
 `StructureSetHost` takes the manager it works against and one function that reserves a draft per
@@ -1397,6 +1525,7 @@ wraps the same function; an instance supplier would force every caller through o
 
 **What the second constructor buys.** Passing the manager explicitly turns a silent mismatch — a
 draft committed into another manager — into a verification step. It stays.
+
 
 ### D-72 — A mod contributes catalog entries through the plugin entry point it already has
 
@@ -1420,6 +1549,29 @@ catalog is built.
 from a class it cannot resolve — is a fatal load failure named by its id, and every
 plugin that depends on it is skipped — the loader's existing classes, not a new one.
 
+
+### D-73 — Performance is a JMH number, produced on CI and on the development machine
+
+The kernel's cost is measured by JMH benchmarks in a `src/jmh` source set, run by a `jmh` task. There
+is no counting layer, no complexity bookkeeping and no threshold: a benchmark reports throughput and
+latency for one operation, and the numbers are compared by a person looking at two runs.
+
+**Why JMH alone.** JIT warmup, dead-code elimination and constant folding make a hand-timed loop
+meaningless, and a counter of "how many sorts happened" answers a question nobody asks once the wall
+time is known.
+
+**Where it runs.** `./gradlew jmh` on a developer machine and in CI. The build compiles the source set
+so it cannot rot; it never runs benchmarks inside `check`, because a shared runner's numbers are for
+comparison, not for gating.
+
+**What it cannot measure.** Capture against a live level and anything that needs a server tick. Those
+are not benchmarked at all; a change that touches them is reviewed by reading the code.
+
+**Status:** implemented — the `jmh` source set and task, and the six benchmarks of the cost pass
+(`06-verification.md` §7); the CI half is deferred until the repository has a remote, so no workflow
+file is kept yet.
+
+
 ### D-74 — The adapter joins the signature gate in batches, with a shrinking list
 
 `spec-check` reads `src/main/java` as a second source root and compares the adapter's public types
@@ -1434,6 +1586,7 @@ longer than the gate itself, and a half-written section would produce failures n
 **Why a list and not a comment.** A comment rots silently. A file the gate reads forces every new
 public adapter type to be a decision, and every batch to remove entries.
 
+
 ### D-75 — Determinism is proven across processes, and the order dependence is removed at the source
 
 Two `Set.copyOf` sites decide the iteration order of a public collection: `SnapshotPolicy.kinds`,
@@ -1447,6 +1600,28 @@ identity hashes repeat within a process, so any hash-order dependence passes.
 **Why both.** The source fix makes the output correct; the gate makes it stay correct. The gate alone
 would pin today's accidental order in a file; the fix alone would regress the first time someone adds a
 `Set.copyOf`.
+
+
+### D-76 — Host laws run on a real server, in the test source set that already has one
+
+The behaviours a host must satisfy — capture honours the read policy, an unreadable cell stays
+unreadable rather than reading as air, a nested body is present when it was captured, a settlement
+answers with this key's rows and a conflict answers with the incumbent rows and its finding — are
+asserted in `src/test` against a server level booted by the existing JUnit-with-Minecraft runner. No
+new source set, no dependency from `test` on `kernelTest` output.
+
+**Why not share the suite with `TestWorld`.** Sharing would need a test-to-test dependency and would
+still compare a double with a host. The double exists to make kernel scenarios fast; the laws exist to
+prove the shipped host, and the shipped host is the one that can boot.
+
+**What happens to `TestWorld`.** Its `View` gains the read-policy filter and the src/test support
+ledger returns the requested rows (the shipped ledger already answers so). Its remaining differences
+are documented in place; the kernel tests stay scenario tests, not law tests.
+
+**Status:** implemented — `HostLawsTest` (6 laws, `06-verification.md` §3.8) boots one real dedicated
+server per class run through `HostServer`; commenting out the entity-kind gates in `LevelCapture`
+turns the read-policy law red, and the kernel and adapter suites stay green over the aligned doubles.
+
 
 ### D-79 — A rollback releases what the set wrote; it never restores the previous occupant
 
@@ -1466,6 +1641,31 @@ removed the whole instance.
 **Law 6 stays absolute.** With the replay gone, `engine.settle` remains the only writer and every row
 it writes comes from the planner. D-78 is withdrawn.
 
+
+### D-80 — A cell that was not captured has no value
+
+`WorldView.get(cell, type)` answers null when the cell lies outside the capture, belongs to a refused
+section, or was refused individually. Air is answered only for a cell that was captured and holds air.
+`read(cell)` already distinguishes the two: `Found` versus `Unreadable`.
+
+The Minecraft-facing `BlockGetter` accessor keeps answering air, because the game interface it
+implements has no null; it serves internal helpers and never reaches a check.
+
+**Why.** The two states are different questions. A check that asks "is this stone" and receives air for
+a cell nobody looked at reports a mismatch; it should report that it cannot tell, and the engine turns
+that into `Undecided`.
+
+**Consequence:** `LevelSnapshot.get(cell, type)` serves only cells whose `read` is `Found`;
+`SnapshotLevel.get` guards its own frame bounds, and its air fallbacks stay for the `BlockGetter` face
+and the digest. An all-air section was captured and still answers air; an out-of-bounds cell, a refused
+section and a refused cell answer null, so `Expectations.host` returns `Unreadable` with the absent
+code (`SC-MC-0010`) instead of a mismatch against air. `world` §4.11, `10-host-data.md` §4 and
+`adapter` §3.1 state the rule. **Status:** implemented with the tests that pin it: an out-of-bounds
+cell, a refused section and an individually refused cell answer null for every host type, a captured
+air cell and an all-air section still answer air, the `BlockGetter` face keeps answering air, and a
+check expecting stone over an uncaptured cell is `Unreadable`, never an air mismatch.
+
+
 ### D-81 — A plugin class that cannot be loaded is logged and skipped
 
 Discovery catches `LinkageError` around each candidate class, logs the class name and the cause at
@@ -1481,8 +1681,7 @@ degrades by skipping, and a skipped plugin surfaces as unknown kinds at document
 **Why not extend the failure record (A).** A record that can hold "an instance or a class name" changes
 a public shape for one message that the log already carries.
 
-> Numbering note: D-46 is still a proposal carried by
-> `Data/StructureCumulus/plan-2026-11-01/`; it enters this file when its code lands.
+
 
 > Numbering note: D-78 was a proposal (`37-law-6-host-may-replay.md`) whose plan was withdrawn before
 > landing; it never entered this file, so the withdrawal above closes a proposal, not a recorded

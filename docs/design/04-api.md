@@ -125,7 +125,7 @@ answers from its one snapshot, never from the live level. The adapter owns the c
 
 A host-fact expectation is
 `Expectations.host(type, test, mismatchCode, absentCode, description)`: one typed read at the
-subject's anchor; a missing value is `Unreadable` with the caller's absent code, and a false
+subject's ref; a missing value is `Unreadable` with the caller's absent code, and a false
 predicate is `Mismatch`. Both codes come from the caller; the kernel never mints an MC code. The
 adapter registers `property`, `state`, `tag` and `fluid` as ordinary check kinds in its document
 catalog, and each lowers to one or two `Expectations.host` leaves. The `fluid` kind is two leaves

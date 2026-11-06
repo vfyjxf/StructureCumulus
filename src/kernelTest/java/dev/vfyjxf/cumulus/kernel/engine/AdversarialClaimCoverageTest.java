@@ -168,12 +168,8 @@ class AdversarialClaimCoverageTest {
         assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Settled(0, List.of(row)));
         assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Settled(-1, List.of()));
 
-        FindingBundle findings = findingBundle("conflict");
-        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of(), findings));
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> new ClaimVerdict.Conflict(List.of(row), FindingBundle.empty())
-        );
+        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of()));
+        assertTrue(new ClaimVerdict.Conflict(List.of(row)).incumbents().contains(row));
 
         assertEquals(new ClaimVerdict.RevisionMoved(0, 1), new ClaimVerdict.RevisionMoved(0, 1));
         assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.RevisionMoved(-1, 0));

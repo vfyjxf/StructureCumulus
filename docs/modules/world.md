@@ -162,7 +162,7 @@ public interface WorldView {
     default ReadStatus statusOf(LatticePoint cell);
     @Nullable OccupantSnapshot occupant(OccupantRef ref);
     default <H> @Nullable H get(LatticePoint pos, HostType<H> type);         // null
-    default <H> @Nullable H get(OccupantRef ref, HostType<H> type);          // the anchor
+    default <H> @Nullable H get(OccupantRef ref, HostType<H> type);          // the occupant
     java.util.List<OccupantSnapshot> occupants(Cuboid box, OccupantFilter filter);
     @Nullable WorldView nested(LatticePoint cell);
     long contentDigest(SectionKey key);
@@ -172,6 +172,7 @@ public record SnapshotPolicy(int maxElements, int maxDepth,
                              java.util.Set<OccupantKind> kinds,
                              java.util.Set<NamespacedId> traits,
                              java.util.List<EntityWindow> windows) {
+    public static final int defaultMaxDepth = 16;
     public static SnapshotPolicy minimal();
 }
 
@@ -307,8 +308,8 @@ component orders `null` first. The five-argument constructor is the compatibilit
 occupants, not one.
 
 `from(snapshot)` compares only the snapshot. A ref from another snapshot or frame is not answerable:
-`occupant(ref)` returns `null` unless `ref.snapshot().equals(snapshotId())`, `ref.frame() == frame()`
-and the ref matches the indexed body exactly.
+`occupant(ref)` and `get(ref, type)` return `null` unless `ref.snapshot().equals(snapshotId())`,
+`ref.frame() == frame()` and the ref matches the indexed body exactly.
 
 There is one `SnapshotId` per capture, shared by every frame. A nested view has
 `depth = parent.depth + 1`, a unique `frame`, the same `snapshotId`, the exposing parent and its own
@@ -316,8 +317,9 @@ local origin. `parent()` is null at the root. **The root** has frame `0`, depth 
 `(0,0,0)` and world bounds/cells. **A child** has `origin` = the extent's origin (the world position
 of child-local `(0,0,0)`), local bounds = the extent's absolute bounds translated by `-origin`, and
 local cells; every world cell is `origin + local`. `policy()` is the same capture policy in every
-frame; `maxDepth` is the nested ceiling, so a view at `depth == policy().maxDepth()` cannot nest
-further.
+frame; `maxDepth` is the host-allowed hard ceiling on nested levels (the framework passes the constant
+`SnapshotPolicy.defaultMaxDepth`, 16), so a view at `depth == policy().maxDepth()` cannot nest
+further but still carries the bodies it discovered.
 
 There is no `nested` field on `OccupantSnapshot`; a child view is reached through
 `WorldView.nested(cell)` and a nested body is an ordinary parent-frame occupant with kind `nested`,
@@ -350,7 +352,9 @@ handle is open. `close()` releases the host's resource; the kernel never closes 
 it.
 
 `SnapshotPolicy` is a ceiling, not a request to over-read: `maxElements` bounds the total captured
-elements (root plus every child frame); `maxDepth` bounds the nested frames below the root; `kinds`
+elements (root plus every child frame); `maxDepth` is the host-allowed hard ceiling on nested levels
+below the root, and the framework's own captures pass the constant `SnapshotPolicy.defaultMaxDepth`
+(16) instead of deriving one from the blueprint (D-65); `kinds`
 and `traits` say what must be resolved; `windows` names the world-frame entity windows the host must
 include. The host derives the policy from `Blueprint.reads()` (`structure` §4.5), mapping the local
 windows through the siting. `kinds` iterates in `OccupantKind` order, and `traits` — like
@@ -366,7 +370,9 @@ the trait reports an unreadable trait, never a mismatch. The same rule holds for
 `OccupantDescriptor` is version-independent identity only: `(type, kind)`, no state id, ordinal,
 class name, property map or tag list. Block states, properties, tags, fluids and entity data are not
 descriptor components; the host exposes them through a `HostType` and `WorldView.get` (§4.11). A
-trait remains the separate typed extension for a value a provider chose to copy (§4.6).
+trait remains the separate typed extension for a value a provider chose to copy (§4.6). Block entity
+data has no snapshot value at all: the host keeps no copy of one and no fingerprint of its contents,
+so a trait whose value is the live handle is the only way block entity data reaches a check (D-61).
 
 `OccupantSnapshot.traits` is one `TraitSlot` per trait id, sorted by id. The four states are
 exhaustive:
@@ -412,15 +418,20 @@ and an anchor.
 ### 4.9 Nested frames
 
 A nested extent is a declaration from the host: `(type, absolute bounds, origin)`. The adapter owns
-the capture and builds one child frame for it, or cuts it; the kernel never queries a capability. The
-child frame has the same `SnapshotId`, a unique `frame`, `depth + 1`, the exposing view as `parent`,
-the extent origin and the translated local bounds. A nested body is indexed in the **parent** frame
-with kind `nested`, anchor at the capability cell and footprint = the extent's bounds translated into
-that parent's frame; it is not in any `SectionSnapshot` and does not enter a section digest.
+the capture and builds one child frame for it, or cuts it; the kernel never queries a capability.
+Expansion is automatic and level-order: every body discovered in the frames of level N is captured
+before any frame of level N+1 (D-65), so the cut set never depends on which body was visited first.
+The child frame has the same `SnapshotId`, a unique `frame`, `depth + 1`, the exposing view as
+`parent`, the extent origin and the translated local bounds. A nested body is indexed in the
+**parent** frame with kind `nested`, anchor at the capability cell and footprint = the extent's
+bounds translated into that parent's frame; it is not in any `SectionSnapshot` and does not enter a
+section digest.
 
 A child that cannot be built (depth ceiling, element budget, a repeated `(type, origin)` on the open
 frame path, unloaded chunk) is cut: the nested body stays, no child exists, `nested(cell)` returns
-`null`, and the consumer reports `SC-OCC-0003`. A cut is never a partial child and never air. A child
+`null`, and the consumer reports `SC-OCC-0003`. The frame at `depth == policy().maxDepth()` still
+discovers and keeps its bodies; each of them is cut by the depth ceiling rather than silently
+dropped. A cut is never a partial child and never air. A child
 whose bounds leave the level's build height keeps the child but its outside sections are
 `Refused`/`Partial`; those cells are never air. The nested body and child view are host-capture
 facts; the kernel treats a `null` `nested(cell)` as "not available here", not as an empty structure.
@@ -445,7 +456,7 @@ just took (or refused). The kernel carries the report and never interprets it.
   `world` label (a label-less entry is legal when it sets a message), copies the notes verbatim and
   applies the §4.1 trust guard. The kernel supplies the fact; the site supplies the finding.
 - **Order is canonical.** Entries are in the host's order (the shipped adapter: audit groups sorted
-  by `(type, property, value)`, then cuts in anchor order); the relayed `FindingBundle` re-orders
+  by `(type, property, value)`, then cuts in level-order expansion); the relayed `FindingBundle` re-orders
   them canonically anyway (`finding` §4.3).
 - **Empty is normal**, including on `Unavailable`, whose own code already is its finding. No arm may
   carry two entries for one fact, and a capture report is never merged into a `MatchResult` bundle:
@@ -462,13 +473,18 @@ parameter the kernel never names and never inspects. The adapter owns the consta
 behind them.
 
 `WorldView.get(pos, type)` is a field extension of the snapshot, not a wrapper object: one snapshot,
-many typed reads. The default answers `null`; `get(ref, type)` reads `ref.anchor()`. A missing value
-means "not in this snapshot", never an exception and never a substitute. The kernel never reads a
-live world: an implementation answers from the captured snapshot. Host reads add nothing to
-`ReadScope`, because one snapshot carries every host payload.
+many typed reads. The default answers `null`; `get(ref, type)` answers for the occupant the ref names.
+A ref without a body names a cell: the default reads `ref.anchor()`. A ref with a body names one body:
+the default answers `null`, and a host that stores values per body overrides `get(ref, type)` to
+answer by body. A ref from another snapshot or frame answers `null`, exactly like `occupant(ref)`.
+A missing value means the cell was not captured — outside the capture, in a refused section, or
+refused individually — never an exception and never a substitute; air is a value only for a cell that
+was captured holding air, and `read(cell)` draws the same line as `Found` versus `Unreadable` (D-80).
+The kernel never reads a live world: an implementation answers from the captured snapshot. Host reads
+add nothing to `ReadScope`, because one snapshot carries every host payload.
 
 `Expectations.host(type, test, mismatchCode, absentCode, description)` is the one kernel bridge
-(`structure` §4.6): it reads the subject's anchor once, answers `Unreadable` with the caller's
+(`structure` §4.6): it reads the subject's ref once, answers `Unreadable` with the caller's
 `absentCode` when the value is absent, `Match` when `test` passes, and
 `Mismatch(mismatchCode, description)` when it does not. The kernel mints no MC code: `absentCode` is
 a parameter, the kernel never declares `SC-MC-0010`, and the adapter passes its `SC-MC-0010` for a
@@ -519,15 +535,15 @@ The kernel mints no `SC-MC` code: `Expectations.host` takes its absent-value cod
   anchor-only.
 - `SectionSnapshot`: canonical occupant order, `contentDigest`, box query.
 - Descriptor: exactly `(type, kind)`; equality; trait find/has/absent.
-- Host reads: the default `get` is `null`, `get(ref, type)` reads the anchor, and a bridge answers
-  only its declared `HostType`s.
+- Host reads: the default `get` is `null`, a ref without a body reads its cell, a ref with a body or
+  from another snapshot or frame answers `null`, and a bridge answers only its declared `HostType`s.
 - Host expectation: a captured value matches; a predicate failure is `Mismatch` with the supplied
   code and description; an absent value is `Unreadable` with the supplied absent code, never a
   mismatch; no `ReadScope` entry; the meta carries the supplied mismatch code.
 - Lease gate: `isCurrent` false after the host invalidates; `check` returns `Dropped`.
 - `EntityWindow.of` inflation and lattice clamp; `maxEntitySpan` rejection.
 - `SnapshotPolicy`: `traits` is a set of ids; a non-empty set stays non-empty; duplicate ids collapse
-  to one entry; `maxDepth` is the child ceiling.
+  to one entry; `maxDepth` is the host-allowed child ceiling and `minimal()` passes the default 16.
 - Capture report: `empty()` is the compatibility answer and every two-argument constructor equals its
   three-argument form with `empty()`; `of` copies its entries and keeps insertion order; a null code,
   a blank message or a blank note is rejected; `cells` may be absent; equality includes the report; a

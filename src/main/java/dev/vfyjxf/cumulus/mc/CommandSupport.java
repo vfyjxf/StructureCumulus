@@ -96,7 +96,7 @@ final class CommandSupport {
     }
 
     static SnapshotPolicy policy(ReadScope reads, List<EntityWindow> windows) {
-        return new SnapshotPolicy(maxElements, reads.depth(), reads.kinds(), reads.traits(), windows);
+        return new SnapshotPolicy(maxElements, SnapshotPolicy.defaultMaxDepth, reads.kinds(), reads.traits(), windows);
     }
 
     static List<EntityWindow> windows(List<EntityWindow> local, Siting siting) {

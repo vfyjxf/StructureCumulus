@@ -264,7 +264,7 @@ public final class Focuses {
 
         @Override
         public ReadScope reads(CuboidSet bayCells) {
-            return ReadScope.cells(staticCells(bayCells)).withKinds(Set.of(OccupantKind.nested)).withDepth(1);
+            return ReadScope.cells(staticCells(bayCells)).withKinds(Set.of(OccupantKind.nested));
         }
     }
 

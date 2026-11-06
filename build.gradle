@@ -323,6 +323,33 @@ tasks.register('specCheck', Exec) {
         'tools/spec-uncovered.txt')
 }
 
+// D-73: check only compiles src/jmh; benchmark numbers never gate.
+sourceSets {
+    jmh {
+        java.srcDir 'src/jmh/java'
+        compileClasspath += sourceSets.kernel.output
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+dependencies {
+    jmhImplementation 'org.openjdk.jmh:jmh-core:1.37'
+    jmhAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+    jmhCompileOnly 'org.jspecify:jspecify:1.0.1'
+}
+
+tasks.register('jmh', JavaExec) {
+    description = 'Runs the JMH benchmarks; -PjmhArgs forwards options to org.openjdk.jmh.Main.'
+    dependsOn tasks.named('jmhClasses')
+    classpath = sourceSets.jmh.runtimeClasspath
+    mainClass = 'org.openjdk.jmh.Main'
+    args((project.findProperty('jmhArgs') ?: '').toString().split('\\s+').findAll { !it.isEmpty() })
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('compileJmhJava')
+}
+
 tasks.named('check') {
     dependsOn 'kernelTest', 'kernelPurity', 'determinismCheck', 'compileUitestJava', 'verifyRunIsolation',
         'verifyHarnessIsolation', 'specCheck'

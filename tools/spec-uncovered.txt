@@ -59,7 +59,6 @@ dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders  # batch 6: nested-extent c
 dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup  # batch 6: nested-extent capability family
 dev.vfyjxf.cumulus.mc.capability.NestedExtentProviders  # batch 6: nested-extent capability family
 dev.vfyjxf.cumulus.mc.capability.NestedExtents  # batch 6: nested-extent capability family
-dev.vfyjxf.cumulus.mc.mixin.BlockEntityChangedMixin  # not API: mixin wiring
 dev.vfyjxf.cumulus.mc.mixin.ChunkSetBlockStateMixin  # not API: mixin wiring
 dev.vfyjxf.cumulus.mc.plugin.AnnotationPluginLookup  # batch 2: plugin loading
 dev.vfyjxf.cumulus.mc.plugin.ModPlugin  # batch 2: plugin loading

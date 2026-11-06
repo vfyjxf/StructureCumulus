@@ -15,13 +15,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
-/** What a check declares it reads: cells, keys, traits, kinds, depth and entity windows. */
+/** What a check declares it reads: cells, keys, traits, kinds and entity windows. */
 public record ReadScope(
     CuboidSet cells,
     Set<ContextKey<?>> keys,
     Set<NamespacedId> traits,
     Set<OccupantKind> kinds,
-    int depth,
     List<EntityWindow> windows
 ) {
 
@@ -31,9 +30,6 @@ public record ReadScope(
         Objects.requireNonNull(traits, "traits");
         Objects.requireNonNull(kinds, "kinds");
         Objects.requireNonNull(windows, "windows");
-        if (depth < 0) {
-            throw new IllegalArgumentException("depth >= 0");
-        }
         TreeSet<ContextKey<?>> sortedKeys = new TreeSet<>(ContextKeys.order());
         sortedKeys.addAll(keys);
         keys = Collections.unmodifiableSet(sortedKeys);
@@ -51,11 +47,11 @@ public record ReadScope(
     }
 
     public static ReadScope none() {
-        return new ReadScope(CuboidSet.empty(), Set.of(), Set.of(), Set.of(), 0, List.of());
+        return new ReadScope(CuboidSet.empty(), Set.of(), Set.of(), Set.of(), List.of());
     }
 
     public static ReadScope cells(CuboidSet cells) {
-        return new ReadScope(cells, Set.of(), Set.of(), Set.of(), 0, List.of());
+        return new ReadScope(cells, Set.of(), Set.of(), Set.of(), List.of());
     }
 
     public ReadScope union(ReadScope other) {
@@ -67,35 +63,30 @@ public record ReadScope(
             unionKeys(keys, other.keys),
             unionTraits(traits, other.traits),
             unionKinds(kinds, other.kinds),
-            Math.max(depth, other.depth),
             joined
         );
     }
 
     public ReadScope withKeys(Set<ContextKey<?>> extra) {
         Objects.requireNonNull(extra, "extra");
-        return new ReadScope(cells, unionKeys(keys, extra), traits, kinds, depth, windows);
+        return new ReadScope(cells, unionKeys(keys, extra), traits, kinds, windows);
     }
 
     public ReadScope withTraits(Set<NamespacedId> extra) {
         Objects.requireNonNull(extra, "extra");
-        return new ReadScope(cells, keys, unionTraits(traits, extra), kinds, depth, windows);
+        return new ReadScope(cells, keys, unionTraits(traits, extra), kinds, windows);
     }
 
     public ReadScope withKinds(Set<OccupantKind> extra) {
         Objects.requireNonNull(extra, "extra");
-        return new ReadScope(cells, keys, traits, unionKinds(kinds, extra), depth, windows);
-    }
-
-    public ReadScope withDepth(int extra) {
-        return new ReadScope(cells, keys, traits, kinds, Math.max(depth, extra), windows);
+        return new ReadScope(cells, keys, traits, unionKinds(kinds, extra), windows);
     }
 
     public ReadScope withWindows(List<EntityWindow> extra) {
         Objects.requireNonNull(extra, "extra");
         List<EntityWindow> joined = new ArrayList<>(windows);
         joined.addAll(extra);
-        return new ReadScope(cells, keys, traits, kinds, depth, joined);
+        return new ReadScope(cells, keys, traits, kinds, joined);
     }
 
     private static Set<ContextKey<?>> unionKeys(Set<ContextKey<?>> left, Set<ContextKey<?>> right) {

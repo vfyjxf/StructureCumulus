@@ -14,7 +14,8 @@
 > `SavedClaims` is compatible with Model C; the M3 `SavedContexts` was removed by D-40. M4a JSON reader/writer (`f2659c7`), M4b datapack reload
 > (`76a8e5c`) and the command slice (`settle` at `4899d86`, plus `compile`, `explain`, `claims`) are
 > implemented; capture-revision lease invalidation landed at `0f0bf25`. M5a adds the event-edged
-> watched-region mark counter with lazy entity and block-entity fingerprints (`d1fa42f`); P1 fixes the
+> watched-region mark counter with lazy entity and block-entity fingerprints (`d1fa42f`; the
+> block-entity half and the `setChanged` feed are removed by D-61); P1 fixes the
 > rotated-siting capture bounds with the two-phase anchored capture (`56c632c`); M5d adds the
 > non-upright orientation remap (`ac11d0c`); M5e adds the capture report the adapter answers with
 > (`SC-MC-0003`/`0004`/`0005`) plus the report site the commands print (`28d0334`). T1–T3 (D-34)
@@ -48,7 +49,8 @@
   determinism gate (`DeterminismTest`) covers canonical bytes across member order, the parse/write
   fixed point, equal compile runs and stable finding order; capture-revision lease invalidation is
   in place. M5a: the event-edged watched-region mark counter (`LevelWatch`/`WatchEvents`, refcounted
-  watched chunks, lazy entity and block-entity fingerprints) at `d1fa42f`. P1: the two-phase anchored
+  watched chunks, lazy entity and block-entity fingerprints) at `d1fa42f` — D-61 later removes the
+  block-entity fingerprint and the `setChanged` feed it served. P1: the two-phase anchored
   capture so the sited world bounds are captured under the resolved siting (`56c632c`). M5d: the
   non-upright orientation remap with `MappingResult.Unrepresentable` (`ac11d0c`). M5e: the capture
   report (over-cap `SC-MC-0005`, cut `SC-MC-0003`, the sited-capture `SC-MC-0004` audit, the
@@ -96,11 +98,11 @@
 | `LevelCapture` | `WorldCapture` | server-thread capture into a `LevelSnapshot`; the sited orientation audit; nested extents as declarations only |
 | `LevelSnapshot` | `WorldView` | one immutable view over every frame; `read`, `bounds`, `policy`, `nested`, typed `get` |
 | `FrameData` | — | package-private per-frame sections, entities, nested bodies/extents, children and the frame snapshot |
-| `SnapshotLevel` | `BlockGetter` | package-private; one frame's immutable host snapshot: copied section states, fluids, detached block entities and captured entities, in local coordinates |
-| `HostTypes` | — | public final class; the four typed host-read tokens (`blockState`, `fluidState`, `entity`, `blockEntity`) |
+| `SnapshotLevel` | `BlockGetter` | package-private; one frame's immutable host snapshot: copied section states, fluids and captured entities, in local coordinates; no block entity copy (D-61) |
+| `HostTypes` | — | public final class; the three typed host-read tokens (`blockState`, `fluidState`, `entity`) |
 | `AdapterExpectations` | — | package-private; the four host expectation factories (`property`, `state`, `tag`, `fluid`) and their catalog |
 | `AdapterCatalogs` | — | package-private; seeds the catalog registrar with the adapter's expectation and code tables before any plugin contributes |
-| `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity and block-entity fingerprints |
+| `LevelLease` | `SnapshotLease` | `isCurrent` while open, its capture is the level's latest, the world epoch matches and the watched region is unmarked; lazy entity fingerprints |
 | `LevelWatch` / `WatchEvents` | package-private | the per-level mark registry (refcounted watched chunks, marks, epoch) and the NeoForge listeners that edge the marks |
 | `OccupantDescriptors` | — | raw value → `(type, kind)` descriptor; entity body identity; nested body |
 | `McAnchors` | — | anchor siting from the captured anchor `BlockState`; the allowed orientation that maps the declared heading to the observed one wins; a missing state is `SC-MC-0010`; no live read |
@@ -150,7 +152,8 @@
 
 ## 3. Capture
 
-M1 copies blocks and block entities. M2a adds loaded entities, M2c adds trait slots and per-read
+M1 copies blocks; the block entity copy it carried is gone (D-61). M2a adds loaded entities, M2c
+adds trait slots and per-read
 refusal, M2d adds nested frames, and M5e adds the capture report and, with it, the orientation audit.
 The rules below are implemented.
 
@@ -165,10 +168,10 @@ The rules below are implemented.
 - The section walk visits every captured cell and reads its state from a per-frame copied section
   container; an all-air section is `Air(revision)`; an unloaded root chunk is
   `CaptureResult.Unavailable(notCaptured, SC-MC-0001)`. A section is never lazily resolved.
-- Block entities are read `saveWithoutMetadata`; the state and block entity are read **once** and
-  passed to capability queries. If `state.hasBlockEntity()` and the already-read block entity is
-  `null`, the cell is a plain block and no block capability is queried; the adapter never re-fetches
-  the block entity.
+- The block entity is read **once** from the live chunk (`LevelChunk#getBlockEntity`) and passed to
+  the trait and nested capability queries; nothing is copied and nothing is fingerprinted. If
+  `state.hasBlockEntity()` and the read block entity is `null`, the cell is a plain block and no
+  block capability is queried; the adapter never re-fetches the block entity.
 - Entities intersecting `bounds.inflate(maxEntitySpan)` are queried; M2a admits a loaded entity when
   its footprint intersects the bounds, adds each world-frame policy window's typed cells, and
   indexes every covered cell. A body leaving the capture is not clipped; its covered cells outside
@@ -179,7 +182,9 @@ The rules below are implemented.
   NamespacedId.of(entityType.namespace(), uuid.toString())`. Two entities of one type at one anchor
   are two refs and stay two occupants; §8.4 covers child frames.
 - Nested structures are discovered only when `policy.kinds()` contains `OccupantKind.nested`;
-  otherwise no capability is queried. Nested discovery queries loaded entities intersecting the
+  otherwise no capability is queried. Every frame discovers — including the frame sitting at the
+  depth ceiling, which queries once, keeps what it finds and reports each body as a cut (§8.4, D-65).
+  Nested discovery queries loaded entities intersecting the
   bounds for `NestedExtents.ENTITY` even when `entity` occupants are not captured; indexing the
   entity as an occupant itself still requires the `entity` kind. §8 owns the capability rules, frame
   construction, budgets and cuts.
@@ -194,9 +199,8 @@ The rules below are implemented.
   (§10). An empty report is the normal case and `Unavailable` carries one only when the host has
   extra detail; its own `SC-MC-0001` code already is its finding.
 - The capture copies host data from the same walk (§3.1): each world section's `PalettedContainer<BlockState>`
-  is copied once, the fluids are filled from the copy, block entities are detached copies and the
-  captured entity candidates keep their local footprints. The per-cell occupant walk reads the state
-  from the copy, so no cell is read twice.
+  is copied once, the fluids are filled from the copy and the captured entity candidates keep their
+  local footprints. The per-cell occupant walk reads the state from the copy, so no cell is read twice.
 - The orientation audit runs inside the sited capture, in the same loop that already read each
   `BlockState`, so it needs no chunk load and no second traversal. `LevelCapture` exposes an
   adapter-only overload `capture(CaptureRequest, @Nullable Orientation orientation)`; the orientation
@@ -207,33 +211,37 @@ The rules below are implemented.
   through the inverse siting orientation (`siting.placement().orientation().inverse()`, the pose that
   recovers the definition-frame state from the observed world state) and an unrepresentable state is
   grouped into an `SC-MC-0004` report entry. A `Mapped` state publishes nothing: `OccupantDescriptor`
-  is `(type, kind)` and the actual state still feeds the block-entity lookup, the trait capabilities,
-  the nested capability and the watch fingerprints. Child/nested frames and the phase-1 anchor
+  is `(type, kind)` and the actual state still feeds the block-entity lookup, the trait capabilities
+  and the nested capability. Child/nested frames and the phase-1 anchor
   capture are not audited: a child extent is an absolute structure (§8).
 
 ### 3.1 Snapshot and typed reads
 
 `SnapshotLevel` is the one host snapshot per frame. It implements `BlockGetter` in **local** frame
 coordinates: `getBlockState`, `getFluidState`, `getBlockEntity` and the typed `get(pos, HostType)`.
-The `BlockGetter` face keeps the vanilla contract — out-of-bounds or missing-section reads answer
-air / empty fluid / null. The typed host face never substitutes (`world.md` §4.11): a cell outside
-the frame bounds or in a section that was never captured answers null for every host type, and only
-the adapter's own `HostTypes` constants dispatch — a token that is not one of them answers null.
-The snapshot retains no `Level` of its own: block states, fluids and block entities are
-copies, and an entity cell carries the captured `EntityType`. A capability handle handed through the
+A typed `get` answers null for a cell that was not captured — outside the capture, a refused section,
+or a cell refused individually (D-80); air is answered only for a cell that was captured holding air,
+and an all-air section was captured. The `BlockGetter` face keeps answering air / empty fluid / null,
+because the game interface has no null; it serves internal helpers and never reaches a check. Only the adapter's own `HostTypes`
+constants dispatch — a token that is not one of them answers null. The
+snapshot retains no `Level` of its own: block states and fluids are copies, and an entity cell carries
+the captured `EntityType`. A capability handle handed through the
 capture is host code's object and may reach one; it is live for the lease (D-41).
 
 - `LevelCapture` copies each world section's `PalettedContainer<BlockState>` once per frame
   (`PalettedContainer.copy()`), keyed by world section coordinates; the occupant walk reads its
   `BlockState` from the copy. A section's fluids are copied into a 16³ `FluidState` array from the
   copied states.
-- Block entities are copied at capture (`saveWithId` then `BlockEntity.loadStatic`) into detached
-  snapshot instances keyed by the local cell; `getLevel()` is null on every one of them.
+- No block entity is copied: `getBlockEntity` answers null and `HostTypes` has no block-entity token
+  (D-61). Block entity data reaches a check only through a trait — the capture resolves the trait
+  once against the live block entity, and the value is the live handle (D-34).
 - The captured entity candidates are kept with their local footprints; `get(cell, entityType)`
   answers the `EntityType` of the narrowest captured entity covering the cell.
 - `FrameData` carries the snapshot per frame; nested frames build and carry their own.
-- `LevelSnapshot.get(pos, type)` dispatches to the frame snapshot; `get(ref, type)` uses the ref's
-  anchor. A `LevelSnapshot` built without a snapshot answers null. No typed read touches the level.
+- `LevelSnapshot.get(pos, type)` serves only cells whose `read` is `Found` and then dispatches to the
+  frame snapshot; `get(ref, type)` answers a bodyless ref through that cell read and a body ref
+  through the captured body index (D-52). A `LevelSnapshot` built without a snapshot answers null. No
+  typed read touches the level.
 - The section digest composes the occupant digest with `SnapshotLevel.contentDigest(region)`, which
   hashes the captured block states, fluid states and entities of the section. A same-type occupant
   with a different `BlockState` therefore changes `contentDigest`.
@@ -286,25 +294,26 @@ capture, `LevelCapture.close()`, `LevelEvent.Unload` and `ServerStoppingEvent` i
 leases. The world epoch and the watched-region mark counter below are the full specification and are
 implemented (M5a, `d1fa42f`); M3's per-level stores do not change them.
 
-The mark counter is **write-edged** (D-47): the adapter hooks `LevelChunk#setBlockState` and
-`BlockEntity#setChanged` instead of subscribing to intent events, so every server-side write is
-observed once and a write that changed nothing reports nothing. `LevelWatch` keeps its chunk marks,
+The mark counter is **write-edged** (D-47): the adapter hooks `LevelChunk#setBlockState`
+instead of subscribing to intent events, so every server-side write is
+observed once and a write that changed nothing reports nothing. The `BlockEntity#setChanged` hook D-47
+added is cancelled by D-61: contents are watched by nobody. `LevelWatch` keeps its chunk marks,
 while `CumulusHooks` owns the instance side: a chunk-grained index finds the formed instances that
 touch the written cell, and the first hit of a tick drops the instance and releases its claims — a
 piston push is a batch of writes, so a pushed structure is gone rather than translated. The two
 remaining main-bus listeners are `EntityJoinLevelEvent` and `EntityLeaveLevelEvent`; `LevelEvent.Load`
 and `LevelEvent.Unload` still open and close the level's store, whose ledger is retired on unload.
 `LevelWatch` refcounts watched chunks per level, keeps a monotonic epoch, and stores the capture's
-lazy fingerprints: entity anchor/footprint/type/UUID (verified through `Level.getEntity`, no chunk
-load) and block-entity type/NBT (`saveWithoutMetadata`, re-read through `getChunkNow` only, never
-loaded). A missing, unreadable or different entity or block entity is `isCurrent == false`, which
-closes the block-entity-NBT event gap without polling. Nested child chunks join the same watch only
-when the child frame is built; a cut child contributes nothing.
+lazy entity fingerprints: anchor/footprint/type/UUID, verified through `Level.getEntity` with no
+chunk load. A missing, unreadable or different entity is `isCurrent == false`. Block entity contents
+are deliberately outside the gate (D-61): a change or a removal without a block change keeps the
+lease current, and the trait's live handle answers the data. Nested child chunks join the same watch
+only when the child frame is built; a cut child contributes nothing.
 
 `LevelLease` holds the `SnapshotId`, the root view and two facts: the world epoch it was captured
 under, and the watched-region mark counter since capture. `isCurrent()` is
-`worldEpoch == currentEpoch && markCounter == 0 && !closed` plus the lazy fingerprint check. A block
-change, a block-entity change, an entity join/leave/move in a watched window, or a chunk unload
+`worldEpoch == currentEpoch && markCounter == 0 && !closed` plus the lazy entity fingerprint check. A
+block change, an entity join/leave/move in a watched window, or a chunk unload
 increments the mark counter; a world unload increments the epoch. A lease is closed by the host that
 opened it; the kernel never closes.
 
@@ -654,14 +663,18 @@ The adapter queries only declarations, on the server thread, in a loaded chunk, 
 ### 8.4 Adapter-owned capture
 
 A provider value is a declaration only. The adapter owns validation, frame allocation, depth, parent,
-no-chunk reads, cycle detection, budget, refusal and the child view:
+no-chunk reads, cycle detection, budget, refusal and the child view. Expansion is automatic,
+level-order and capped (D-65): a frame only ever captures itself and discovers its own nested
+declarations, the driver expands one level at a time (parent order, then anchor order within a
+parent) and assembles the immutable frames bottom-up, and no author-declared depth exists anywhere.
 
 - One `SnapshotId` per capture. The root frame is `frame = 0`, `depth = 0`, `parent = null`, `origin =
   (0,0,0)`, with world bounds and world cells. A child gets a unique `frame`, `depth + 1`, the
   exposing view as `parent`, `origin = extent.origin()`, local bounds = `extent.bounds()` translated
-  by `-origin`, and local cells; its world cells are `origin + local`. Frames are assigned in capture
-  order (cell order, depth-first); a cut child rolls its frame number back, so sibling frames follow
-  the anchor order (`NestedCaptureGameTest.siblingFramesFollowTheAnchorOrder`).
+  by `-origin`, and local cells; its world cells are `origin + local`. Frames are assigned in
+  expansion order — every sibling of a level before any child of the next — so within one parent the
+  anchor order decides (`NestedCaptureGameTest.siblingFramesFollowTheAnchorOrder`,
+  `everySiblingIsCapturedBeforeAnyChild`); a cut child rolls its frame number back.
 - One public `LevelSnapshot` implements `WorldView` over every frame; `FrameData` is package-private
   and holds a frame's sections, entities, nested bodies/extents and children. There is no
   `NestedLevelSnapshot` and no second view type.
@@ -681,7 +694,10 @@ no-chunk reads, cycle detection, budget, refusal and the child view:
 - A child is **cut** when `depth + 1 > policy.maxDepth()`, when its volume would exceed the shared
   `maxElements` budget, when its `(type, origin)` already appears on the open frame path (a cycle),
   or when a chunk it needs is unloaded; a declaration that cannot be translated into its parent frame
-  is cut too, never dropped silently. A cut rolls back the budget and the reserved frame, keeps the
+  is cut too, never dropped silently. A frame at `depth == policy.maxDepth()` still discovers and
+  keeps its bodies — each of them is cut by the depth ceiling with one report entry, so "there is
+  something here, I did not expand it" is always said, never silent (D-65). A cut rolls back the
+  budget and the reserved frame, keeps the
   nested body, creates no child, makes `nested(cell)` return `null`, and the consumer reports
   `SC-OCC-0003`. A cut is never a refused child and never air. The adapter also reports the cut in
   the capture report as one `SC-MC-0003` entry (WARNING) with the reason and, when the cut happens in
@@ -882,7 +898,8 @@ never changes the exit code.
 section/`ReadRefusal`. `SC-MC-0002` unreadable trait or
 block-entity read: carried in a `TraitSlot.Refused` and relayed by the consumer, not a capture
 finding. `SC-MC-0003` a nested extent
-the adapter cut (depth, budget, cycle, unloaded chunk, or a declaration that does not fit its parent
+the adapter cut (depth — including a body discovered by the ceiling frame itself —, budget, cycle,
+unloaded chunk, or a declaration that does not fit its parent
 frame): a WARNING entry in the `CaptureResult.Captured` report, one per cut, with the reason; the
 check still reports `SC-OCC-0003` when it needs the child and the adapter never fabricates a refused
 child. `SC-MC-0004` a captured block state cannot express the siting orientation: a WARNING entry,
@@ -998,8 +1015,9 @@ and a placement failure exits 0.
 
 The set capture is **one** `LevelCapture.capture` call for the bounding box of `rootBounds()` and
 every satellite's `worldBounds()`, with a null orientation. Its policy is one `SnapshotPolicy` with
-the adapter's element ceiling and the union of the root's and every satellite's `Blueprint.reads()`:
-maximum depth, union of kinds and traits (`ReadScope.union`), and the root and every satellite window
+the adapter's element ceiling, the nested-ceiling constant (`SnapshotPolicy.defaultMaxDepth`, 16)
+and the union of the root's and every satellite's `Blueprint.reads()`:
+union of kinds and traits (`ReadScope.union`), and the root and every satellite window
 mapped into world space by that member's own siting (`CommandSupport.windows`); a window that leaves
 the lattice under its siting is dropped. The capture report prints through `CaptureReports` before the
 set summary. The lease is closed after the host run.
@@ -1121,7 +1139,6 @@ final class SnapshotLevel implements BlockGetter {
     SnapshotLevel(LatticePoint origin, Cuboid bounds, int minBuildHeight, int height,
                   java.util.Map<Long, PalettedContainer<BlockState>> sections,
                   java.util.Map<Long, FluidState[]> fluids,
-                  java.util.Map<BlockPos, BlockEntity> blockEntities,
                   java.util.List<CapturedEntity> entities);
     LatticePoint origin();
     Cuboid bounds();
@@ -1141,7 +1158,6 @@ public final class HostTypes {
     public static final HostType<BlockState> blockState;
     public static final HostType<FluidState> fluidState;
     public static final HostType<EntityType<?>> entityType;
-    public static final HostType<BlockEntity> blockEntity;
     private HostTypes() {}
 }
 

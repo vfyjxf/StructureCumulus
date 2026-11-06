@@ -1,7 +1,5 @@
 package dev.vfyjxf.cumulus.kernel.claim;
 
-import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -20,15 +18,11 @@ public sealed interface ClaimVerdict {
         }
     }
 
-    record Conflict(List<ClaimRow> incumbents, FindingBundle findings) implements ClaimVerdict {
+    record Conflict(List<ClaimRow> incumbents) implements ClaimVerdict {
         public Conflict {
             Objects.requireNonNull(incumbents, "incumbents");
-            Objects.requireNonNull(findings, "findings");
             if (incumbents.isEmpty()) {
                 throw new IllegalArgumentException("a conflict has at least one incumbent");
-            }
-            if (findings.isEmpty()) {
-                throw new IllegalArgumentException("a conflict explains itself");
             }
             List<ClaimRow> sorted = new ArrayList<>(incumbents);
             sorted.sort(ClaimRow::compareTo);

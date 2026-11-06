@@ -8,7 +8,6 @@ import dev.vfyjxf.cumulus.kernel.core.ContextKeys;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
-import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -102,11 +101,11 @@ class StructureValidationTest {
 
     @Test
     void aConflictExplainsItself() {
-        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of(), FindingBundle.empty()));
+        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of()));
     }
 
     @Test
-    void blueprintReadsCarryTraitsCellsAndDepth() {
+    void blueprintReadsCarryTraitsCellsAndKinds() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         TraitKey<Long> energy = new TraitKey<>(id("energy"), Long.class);
         Bay bay = Bay.of(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
@@ -125,7 +124,6 @@ class StructureValidationTest {
         assertTrue(reads.cells().contains(LatticePoint.of(3, 0, 0)));
         assertTrue(reads.keys().isEmpty());
         assertTrue(reads.kinds().isEmpty());
-        assertEquals(0, reads.depth());
     }
 
     @Test
@@ -169,7 +167,6 @@ class StructureValidationTest {
         ReadScope entityReads = entityBlueprint.reads();
         assertTrue(entityReads.kinds().contains(OccupantKind.entity));
         assertEquals(1, entityReads.windows().size());
-        assertEquals(0, entityReads.depth());
 
         CuboidSet nestedCells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         Bay nestedBay = Bay.of(id("nested_bay"), nestedCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive);
@@ -180,23 +177,18 @@ class StructureValidationTest {
                 .build();
         ReadScope nestedReads = nestedBlueprint.reads();
         assertTrue(nestedReads.kinds().contains(OccupantKind.nested));
-        assertEquals(1, nestedReads.depth());
     }
 
     @Test
-    void readScopeNarrowsOnlyUpward() {
+    void readScopeUnionsSetsAndDeduplicatesWindows() {
         CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
         NamespacedId energy = id("energy");
         NamespacedId lit = id("lit");
-        ReadScope narrow = ReadScope.cells(cells).withDepth(1).withTraits(Set.of(energy));
-        assertEquals(2, narrow.withDepth(2).depth());
-        assertEquals(1, narrow.withDepth(0).depth());
+        ReadScope narrow = ReadScope.cells(cells).withTraits(Set.of(energy));
         assertEquals(0, narrow.kinds().size());
         assertEquals(1, narrow.withKinds(Set.of(OccupantKind.entity)).kinds().size());
 
-        ReadScope union = narrow
-                .union(ReadScope.none().withDepth(3).withTraits(Set.of(lit)).withKinds(Set.of(OccupantKind.entity)));
-        assertEquals(3, union.depth());
+        ReadScope union = narrow.union(ReadScope.none().withTraits(Set.of(lit)).withKinds(Set.of(OccupantKind.entity)));
         assertEquals(Set.of(energy, lit), union.traits());
         assertTrue(union.kinds().contains(OccupantKind.entity));
 

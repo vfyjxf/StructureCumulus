@@ -436,7 +436,7 @@ public final class CaptureAdversarialGameTest {
     }
 
     @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
-    public void aDepthCeilingSuppressesTheGrandchildWithoutACutEntry(GameTestHelper helper) {
+    public void theCapFrameKeepsTheBodyAndReportsTheDepthCut(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         BlockPos anchor = aligned(helper.absolutePos(BlockPos.ZERO));
         level.setBlock(anchor, Blocks.STONE.defaultBlockState(), 3);
@@ -466,14 +466,20 @@ public final class CaptureAdversarialGameTest {
                     helper.fail("depth one must still capture the child");
                     return;
                 }
-                helper.assertTrue(
-                    child.nested(LatticePoint.origin) == null,
-                    "the depth ceiling suppresses the grandchild"
+                helper.assertTrue(child.nested(LatticePoint.origin) == null, "the depth ceiling builds no grandchild");
+                helper.assertValueEqual(
+                    1,
+                    child.occupants(child.bounds(), OccupantFilter.ofKind(OccupantKind.nested)).size(),
+                    "the cap frame keeps the discovered body"
                 );
+                helper.assertValueEqual(1, captured.report().size(), "the cap frame reports its cut");
+                var entry = captured.report().entries().get(0);
+                helper.assertValueEqual(AdapterCodes.cut, entry.code(), "the cut code");
                 helper.assertTrue(
-                    captured.report().isEmpty(),
-                    "a suppressed grandchild is not a cut: " + captured.report().entries()
+                    entry.notes().stream().anyMatch(note -> note.contains("reason: depth")),
+                    "the cut names the depth ceiling: " + entry.notes()
                 );
+                helper.assertTrue(entry.cells() == null, "a child-frame cut carries no region");
             }
         } finally {
             level.removeBlock(anchor, false);

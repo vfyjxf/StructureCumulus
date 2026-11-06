@@ -20,7 +20,6 @@ import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
-import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.SnapshotId;
 import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.core.Value;
@@ -32,14 +31,11 @@ import dev.vfyjxf.cumulus.kernel.document.LinkSpec;
 import dev.vfyjxf.cumulus.kernel.document.PresenceSpec;
 import dev.vfyjxf.cumulus.kernel.document.SatelliteSpec;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
-import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
-import dev.vfyjxf.cumulus.kernel.finding.Label;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.SectionKey;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
@@ -594,7 +590,6 @@ final class StructureSetTestSupport {
         private final List<ClaimRow> rows = new ArrayList<>();
         private long revision;
 
-        boolean ledgerWide = true;
         @Nullable
         Siting movingSiting;
         @Nullable
@@ -636,20 +631,7 @@ final class StructureSetTestSupport {
             for (ClaimRow row : request.rows()) {
                 for (ClaimRow incumbent : rows) {
                     if (ClaimMatrix.conflicts(row, incumbent)) {
-                        return new ClaimVerdict.Conflict(
-                            List.of(incumbent),
-                            FindingBundle.of(
-                                List.of(
-                                    Finding.builder(Codes.claimConflict).phase(Phase.settle).message("test conflict")
-                                            .label(
-                                                Label.primary(
-                                                    Locus.world(Cuboid.of(incumbent.cell().point()).asSet()),
-                                                    "held"
-                                                )
-                                            ).build()
-                                )
-                            )
-                        );
+                        return new ClaimVerdict.Conflict(List.of(incumbent));
                     }
                 }
             }
@@ -660,7 +642,7 @@ final class StructureSetTestSupport {
                 sitings.put(request.instance(), requestSiting);
             }
             revision++;
-            return new ClaimVerdict.Settled(revision, ledgerWide ? List.copyOf(rows) : List.copyOf(request.rows()));
+            return new ClaimVerdict.Settled(revision, List.copyOf(request.rows()));
         }
 
         @Override

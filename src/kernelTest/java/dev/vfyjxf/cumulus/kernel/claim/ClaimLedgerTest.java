@@ -142,9 +142,43 @@ class ClaimLedgerTest {
 
         ClaimVerdict.Conflict conflict = assertInstanceOf(ClaimVerdict.Conflict.class, verdict);
         assertEquals(List.of(incumbent), conflict.incumbents());
-        assertTrue(!conflict.findings().findings().isEmpty());
         assertEquals(1, ledger.revision());
         assertEquals(List.of(incumbent), ledger.read(everything).rows());
+    }
+
+    @Test
+    void aConflictCarriesNoFinding() {
+        ClaimVerdict.Conflict conflict = new ClaimVerdict.Conflict(List.of(row(first, Sharing.exclusive, 0, "bay")));
+
+        assertEquals(1, conflict.incumbents().size());
+    }
+
+    @Test
+    void aConflictWithNoIncumbentIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> new ClaimVerdict.Conflict(List.of()));
+    }
+
+    @Test
+    void aConflictKeepsEveryIncumbent() {
+        ClaimLedger ledger = ClaimLedger.inMemory(world);
+        InstanceId other = new InstanceId(world, 3);
+        InstanceId fourth = new InstanceId(world, 4);
+        Siting secondAt = Siting.of(LatticePoint.of(41, 0, 0), Orientation.identity);
+        Siting thirdAt = Siting.of(LatticePoint.of(42, 0, 0), Orientation.identity);
+        Siting fourthAt = Siting.of(LatticePoint.of(43, 0, 0), Orientation.identity);
+        ClaimRow one = row(first, Sharing.shared, siting, 1, "a");
+        ClaimRow two = row(second, Sharing.shared, secondAt, 1, "b");
+        ClaimRow three = row(other, Sharing.shared, thirdAt, 1, "c");
+        settle(ledger, first, 0, one);
+        settle(ledger, second, 1, two);
+        settle(ledger, other, 2, three);
+
+        ClaimVerdict.Conflict conflict = assertInstanceOf(
+            ClaimVerdict.Conflict.class,
+            settle(ledger, fourth, 3, row(fourth, Sharing.exclusive, fourthAt, 1, "rival"))
+        );
+
+        assertEquals(List.of(one, two, three), conflict.incumbents(), "every incumbent, deduped and ordered");
     }
 
     @Test

@@ -120,7 +120,16 @@ block is not allowed to survive a commit.
 - **Performance/cost pass.** The block-entity-lazy and entity sweep, plus the known costs: claim-row
   volume for large structures, the per-cell `read`/`statusOf` cost, the section pass and the
   nested-frame budget. If a row form other than per-cell is needed, it is a `ClaimRow`/ledger
-  amendment, not a hidden optimization.
+  amendment, not a hidden optimization. The JMH pass (D-73) has measured the kernel-side debts —
+  latest run in quick mode (`-f 1 -wi 1 -i 3 -w 1s -r 1s`), 2026-11-06,
+  `Data/StructureCumulus/bench/2026-11-06-jmh-quick.json`: a 32³ claim derivation costs 0.83 ms/op
+  (32 768 rows, the sort included) against 0.015 ms/op at 8³; sorting 32 768 shuffled claim rows
+  costs 4.8 ms/op; scanning 32 768 request rows against 32 768 held rows costs ≈950 ms/op; the
+  nested-frame budget is 15.7 ms/op for a 10 000-layer chain and 606 ms/op for a 22-layer diamond
+  (8 388 606 flattened definition instances); per-cell `CuboidSet.union` over a 16³ box costs
+  583 ms/op against 2.3 ms/op for one bulk construction of the same cells; and a 1024-key
+  whole-table context publish costs 0.46 ms/op. The per-cell `read`/`statusOf` cost, the section
+  pass and the entity sweep need a live level and are reviewed by reading, not benchmarked (D-73).
 - **Visual review screenshots.** `visual/` trails this design set until its data and screenshots are
   regenerated; it is a reading aid, never a source.
 - A host scheduler with coalescing, dirty windows and a per-world ledger stays outside v1; this round

@@ -40,7 +40,7 @@ The edges, exactly:
 | `space` | `core` |
 | `finding` | `core`, `space` |
 | `world` | `core`, `space` |
-| `claim` | `core`, `space`, `finding` |
+| `claim` | `core`, `space` |
 | `structure` | `core`, `space`, `finding`, `world`, `claim` |
 | `context` | `core`, `space`, `finding`, `world`, `structure` |
 | `document` | `core`, `space`, `finding`, `claim`, `world`, `structure`, `context` |
@@ -52,8 +52,8 @@ The edges, exactly:
 Notes:
 
 - `structure` depends on `claim` for `Sharing` and `Footprint`, and `claim` does not depend on
-  `structure`. `claim` uses `finding` only for the `FindingBundle` a conflict carries; the planner
-  lives in `engine`, which may depend on both.
+  `structure`. `claim` carries no finding: a conflict is data and the engine builds its wording
+  (D-53); the planner lives in `engine`, which may depend on both.
 - `context` depends on `structure` for the `Computation`/`Plan` types; a `Computation` is declared
   by a blueprint but its contexts (`SectionContext`/`AggregateContext`) live in `structure`, so the
   store can run them without a cycle.
@@ -71,7 +71,8 @@ Notes:
   `FrameData`); M3 adds `SavedClaims` with CAS/release/reload at `d4b6d82`; D-40 removes the context `SavedData` and is
   compatible with Model C; M4 adds the JSON reader/writer, the datapack source, the merged document
   source and the five top-level `/cumulus` subcommands; M5a adds the event-edged watched-region mark counter
-  (`LevelWatch`/`WatchEvents`, lazy entity and block-entity fingerprints) at `d1fa42f`; P1 fixes the
+  (`LevelWatch`/`WatchEvents`, lazy entity and block-entity fingerprints) at `d1fa42f`, whose
+  block-entity half D-61 removes; P1 fixes the
   rotated-siting capture bounds with the two-phase anchored capture at `56c632c`; M5d adds the
   non-upright orientation remap (`ac11d0c`); M5e adds the capture report the adapter answers with
   (`world.CaptureReport`, `SC-MC-0003`/`0004`/`0005`) at `28d0334`; S6 added the sited-root descriptor
@@ -123,6 +124,13 @@ src/test/java        adapter tests
 
 `kernel` has no Minecraft on its compile classpath. `main` depends on `kernel`. The kernel has no
 `@Mod`, no loader metadata and no service file.
+
+The test layering follows the same split (D-76). Kernel scenarios run in `kernelTest` over the
+`TestWorld` double — fast, no Minecraft. The host laws run in `src/test` against a real server level
+booted by the existing JUnit-with-Minecraft runner (`HostLawsTest`): the double exists to make kernel
+scenarios fast, and only the booted host can prove host behaviour. The double answers the read policy
+and the ledger like the host does, so scenarios are not staged against a lie, but no law test ever
+runs against it.
 
 ## 5. Naming rules that generate names
 

@@ -6,7 +6,9 @@ import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
+import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
+import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -20,6 +22,9 @@ import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -72,6 +77,44 @@ class ClaimStressScenarioTest {
         MatchResult.Failed failed = assertInstanceOf(MatchResult.Failed.class, result);
         assertTrue(MagicFixtures.hasCode(failed, Codes.claimConflict), "the exclusive wall conflicts");
         assertEquals(1, TestWorld.rows(ledger).size(), "the failed check writes nothing");
+    }
+
+    @Test
+    void theSettleConflictRendersLikeThePreCheck() {
+        ClaimLedger ledger = MagicFixtures.ledger();
+        Blueprint blueprint = wall("claim/wording", Sharing.exclusive);
+        assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(blueprint, siting, airView(), ledger));
+
+        MatchResult.Failed predicted = assertInstanceOf(
+            MatchResult.Failed.class,
+            MagicFixtures.check(
+                blueprint,
+                rivalSiting,
+                airView(),
+                ledger.read(MagicFixtures.worldBounds(blueprint, rivalSiting)),
+                MagicFixtures.rival,
+                MagicFixtures.rivalInstance
+            )
+        );
+
+        ClaimView blind = new ClaimView(List.of(), ledger.revision(), true);
+        MatchRequest request = MagicFixtures
+                .request(blueprint, rivalSiting, airView(), blind, MagicFixtures.rival, MagicFixtures.rivalInstance);
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
+        MatchResult.Failed refused = assertInstanceOf(
+            MatchResult.Failed.class,
+            MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request))
+        );
+
+        List<Finding> preCheck = conflictFindings(predicted);
+        List<Finding> settle = conflictFindings(refused);
+        assertFalse(preCheck.isEmpty(), "the pre-check names the conflict");
+        assertEquals(preCheck.size(), settle.size(), "both paths group the conflict the same way");
+        for (int i = 0; i < preCheck.size(); i++) {
+            assertEquals(Phase.check, preCheck.get(i).phase());
+            assertEquals(Phase.settle, settle.get(i).phase());
+            assertEquals(atPhase(preCheck.get(i), Phase.settle), settle.get(i), "one builder, one wording");
+        }
     }
 
     @Test
@@ -180,6 +223,28 @@ class ClaimStressScenarioTest {
                 ledger,
                 TestAttempt.of(request)
             )
+        );
+    }
+
+    private static List<Finding> conflictFindings(MatchResult result) {
+        List<Finding> found = new ArrayList<>();
+        for (Finding finding : result.findings().findings()) {
+            if (finding.code().equals(Codes.claimConflict.code())) {
+                found.add(finding);
+            }
+        }
+        return found;
+    }
+
+    private static Finding atPhase(Finding finding, Phase phase) {
+        return new Finding(
+            finding.code(),
+            finding.severity(),
+            finding.message(),
+            finding.labels(),
+            finding.notes(),
+            finding.suggestion(),
+            phase
         );
     }
 

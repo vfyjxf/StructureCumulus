@@ -519,7 +519,17 @@ public final class MatchEngine {
                 );
             }
             if (verdict instanceof ClaimVerdict.Conflict conflict) {
-                findings.addAll(conflict.findings().findings());
+                List<Finding> settleConflicts = conflicts(phase, derived.rows(), conflict.incumbents(), request.cancel());
+                if (settleConflicts == null) {
+                    findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
+                    return new MatchResult.Undecided(
+                        phase,
+                        UndecidedReason.cancelled,
+                        FindingBundle.of(findings),
+                        admitted.outcome()
+                    );
+                }
+                findings.addAll(settleConflicts);
                 return new MatchResult.Failed(phase, FindingBundle.of(findings));
             }
             ClaimVerdict.Settled settled = (ClaimVerdict.Settled) verdict;

@@ -499,7 +499,8 @@ server owner and one instance per checked structure.
   capture otherwise (`10-host-data.md`; the anchor property still selects the orientation).
 - The one capture region is the bounding box of the root bounds and every satellite's world bounds.
   Its policy is one `SnapshotPolicy` over the union of the root's and every satellite's
-  `Blueprint.reads()`: the maximum depth, the union of kinds and traits, and the root and every
+  `Blueprint.reads()`: the union of kinds and traits, the nested-ceiling constant
+  (`SnapshotPolicy.defaultMaxDepth`, D-65), and the root and every
   satellite window mapped into world space by that member's own siting; the adapter's element ceiling
   is the cap.
 - The capture carries no orientation, so it runs no orientation audit. One world-frame capture
