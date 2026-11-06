@@ -1725,9 +1725,11 @@ turns the read-policy law red, and the kernel and adapter suites stay green over
 
 ### D-77 — Game tests live in their own source set
 
-The 23 `*GameTest` classes and `structure/empty.nbt` move to `src/gametest`, registered with the mod the
-same way `src/uitest` is. Production artifacts contain no `*GameTest*.class` and no test resource, and a
-check asserts it. The orphan `capturegametest.empty.nbt` is deleted.
+The 23 `*GameTest` classes and their structure templates move to `src/gametest`, registered with the
+mod the same way `src/uitest` is. Production artifacts contain no `*GameTest*.class` and no test
+resource, and a check asserts it. `capturegametest.empty.nbt` moves with `empty.nbt`: `CaptureGameTest`
+carries no `@PrefixGameTestTemplate(false)`, so NeoForge derives its template name from the class name
+and that file is referenced only at runtime.
 
 **Why a source set and not a jar exclusion.** Excluding from the jar hides the code but leaves it in
 `src/main`, where it keeps compiling against production dependencies and keeps inviting more.

@@ -121,7 +121,7 @@ src/main/java        dev.vfyjxf.cumulus.**          mod entry + mc adapter
 src/main/resources   metadata + data
 src/test/java        adapter tests
 src/gametest/java    @GameTest classes in dev.vfyjxf.cumulus.mc (D-77)
-src/gametest/resources  the structure/empty.nbt template
+src/gametest/resources  the GameTest structure templates
 ```
 
 `kernel` has no Minecraft on its compile classpath. `main` depends on `kernel`. The kernel has no

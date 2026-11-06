@@ -115,7 +115,7 @@ suppression, and batch 1 (set host, snapshot pair, host tokens, document family)
 | `kernelTest` | kernel scenario tests over the in-memory doubles | `./gradlew kernelTest`; JUnit 5, no Minecraft |
 | `test` | adapter unit tests and the booted-host laws (D-76) | `./gradlew test`; the JUnit-with-Minecraft runner |
 | `uitest` | visual client-test scenarios and probes | the harness runs load them as the separate `structurecumulusuitest` mod |
-| `gametest` | the `@GameTest` classes and `structure/empty.nbt` (D-77) | every run that loads the mod carries them; `./gradlew runGameTestServer` executes them |
+| `gametest` | the `@GameTest` classes and their structure templates (D-77) | every run that loads the mod carries them; `./gradlew runGameTestServer` executes them |
 
 The published jar carries neither dev composition: `verifyHarnessIsolation` pins the UI-test half and
 `verifyGameTestIsolation` the GameTest half, so no `*GameTest*.class` and no test resource reaches it.

@@ -491,7 +491,9 @@ tasks.register('verifyGameTestIsolation') {
         def offenders = []
         new java.util.zip.ZipFile(productionJar.get().asFile).withCloseable { zip ->
             zip.entries().each { entry ->
-                if (entry.name ==~ /.*GameTest.*\.class/ || entry.name.endsWith('structure/empty.nbt')) {
+                if (entry.name ==~ /.*GameTest.*\.class/
+                        || entry.name.endsWith('structure/empty.nbt')
+                        || entry.name.endsWith('structure/capturegametest.empty.nbt')) {
                     offenders.add(entry.name)
                 }
             }
