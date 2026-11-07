@@ -31,6 +31,9 @@ import dev.vfyjxf.cumulus.kernel.structure.FactoryContext;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DocumentCompilerTest {
@@ -1077,6 +1081,150 @@ class DocumentCompilerTest {
     void aRewordedRejectionKeepsItsCode() {
         assertEquals(Codes.baysOverlap.code(), overlapFinding("a", "b").code());
         assertEquals(Codes.baysOverlap.code(), overlapFinding("north_wall_bay", "south_wall_bay").code());
+    }
+
+    @Test
+    void aTenThousandLayerChainCompiles() {
+        int depth = 10_000;
+        Map<NamespacedId, BlueprintSpec> definitions = new LinkedHashMap<>();
+        for (int i = 0; i < depth; i++) {
+            List<PlacementSpec> placements = i == depth - 1
+                    ? List.of()
+                    : List.of(new PlacementSpec(id("d" + (i + 1)), LatticePoint.origin, id("p"), null));
+            definitions.put(id("d" + i), geometrySpec(id("d" + i), List.of(), placements));
+        }
+        BlueprintSpec root = new BlueprintSpec(
+            id("chain_root"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("d0"), LatticePoint.origin, id("p"), null)),
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context());
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        assertNotNull(result.blueprint());
+    }
+
+    @Test
+    void aThirtyLayerDiamondStopsAtTheBudget() {
+        int layers = 30;
+        Map<NamespacedId, BlueprintSpec> definitions = new LinkedHashMap<>();
+        for (int i = 0; i < layers; i++) {
+            List<PlacementSpec> placements = i == layers - 1
+                    ? List.of()
+                    : List.of(
+                        new PlacementSpec(id("d" + (i + 1)), LatticePoint.origin, id("twice"), null),
+                        new PlacementSpec(id("d" + (i + 1)), LatticePoint.origin, id("twice"), null)
+                    );
+            definitions.put(id("d" + i), geometrySpec(id("d" + i), List.of(), placements));
+        }
+        BlueprintSpec root = new BlueprintSpec(
+            id("diamond_root"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            List.of(new PlacementSpec(id("d0"), LatticePoint.origin, id("twice"), null)),
+            Map.of(),
+            null
+        );
+        CompileResult result = assertTimeoutPreemptively(
+            Duration.ofSeconds(30),
+            () -> DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context())
+        );
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(Codes.documentTooLarge.code());
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertEquals(1, result.findings().size(), () -> result.findings().findings().toString());
+    }
+
+    @Test
+    void theBudgetCountsBaysAndSeams() {
+        int bayCount = 100;
+        int placements = 1_000;
+        List<BaySpec> bays = new ArrayList<>();
+        for (int i = 0; i < bayCount; i++) {
+            bays.add(
+                new BaySpec(
+                    id("bay" + i),
+                    CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+                    Coverage.everyCell,
+                    Footprint.none(),
+                    Sharing.shared,
+                    null,
+                    null
+                )
+            );
+        }
+        Map<NamespacedId, BlueprintSpec> definitions = new LinkedHashMap<>();
+        definitions.put(id("unit"), geometrySpec(id("unit"), bays, List.of()));
+        List<PlacementSpec> rootPlacements = new ArrayList<>();
+        for (int i = 0; i < placements; i++) {
+            rootPlacements.add(new PlacementSpec(id("unit"), LatticePoint.origin, id("p" + i), null));
+        }
+        BlueprintSpec root = new BlueprintSpec(
+            id("wide_root"),
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            true,
+            false,
+            Value.object(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            rootPlacements,
+            Map.of(),
+            null
+        );
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context());
+        assertNull(result.blueprint());
+        List<Finding> found = result.findings().ofCode(Codes.documentTooLarge.code());
+        assertEquals(1, found.size(), () -> result.findings().findings().toString());
+        assertEquals(1, result.findings().size(), () -> result.findings().findings().toString());
+    }
+
+    private static BlueprintSpec geometrySpec(NamespacedId specId, List<BaySpec> bays, List<PlacementSpec> placements) {
+        return new BlueprintSpec(
+            specId,
+            Cuboid.of(0, 0, 0, 1, 1, 1),
+            false,
+            false,
+            Value.object(),
+            bays,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of(),
+            null,
+            placements,
+            Map.of(),
+            null
+        );
     }
 
     private static Finding overlapFinding(String left, String right) {
