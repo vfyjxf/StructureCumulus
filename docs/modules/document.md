@@ -264,7 +264,9 @@ check time, never a default.
 A key declaration maps a JSON type name to a `Class`: `long`, `int`, `boolean`, `string`, `id`,
 `cuboid`, `cuboid_set`. A custom type needs a `CompilerContext.types` entry; a document key is always
 a built-in type in v1. `merge` names `sum`, `union`, `min`, `max`, `and`, `or`; absent means
-single-writer, and a merge that does not fit the type is `SC-DOC-0008`.
+single-writer, and a merge that does not fit the type is `SC-DOC-0008`. `retention` is `instance`
+(published by a settle or derive) or `match` (visible only to later units of the same attempt, never
+published), and the compiler honours it as declared.
 
 ### 4.2 Definitions in v1
 
