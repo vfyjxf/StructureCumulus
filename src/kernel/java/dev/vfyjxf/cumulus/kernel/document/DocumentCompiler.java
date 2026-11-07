@@ -89,8 +89,7 @@ public final class DocumentCompiler {
             return new CompileResult(FindingBundle.of(findings), null);
         }
         Flat flat = new Flat(document.root());
-        Set<String> active = new HashSet<>();
-        flatten(document.root(), document, context, "", LatticePoint.origin, flat, findings, active);
+        flatten(document, context, flat, findings);
         if (hasErrors(findings)) {
             return new CompileResult(FindingBundle.of(findings), null);
         }
@@ -225,174 +224,212 @@ public final class DocumentCompiler {
         }
     }
 
-    private static void flatten(
-        BlueprintSpec spec,
-        Document owner,
-        CompilerContext context,
-        String prefix,
-        LatticePoint offset,
-        Flat flat,
-        List<Finding> findings,
-        Set<String> active
-    ) {
-        String key = owner.root().id() + "/" + spec.id();
-        if (!active.add(key)) {
-            error(findings, Codes.definitionCycle, "definition cycle at " + spec.id(), spec.source(), null, owner);
-            return;
-        }
-        if (!prefix.isEmpty()) {
-            if (!spec.checks().isEmpty()
-                    || !spec.computations().isEmpty()
-                    || !spec.keys().isEmpty()
-                    || !spec.derivations().isEmpty()
-                    || !spec.anchors().isEmpty()
-                    || spec.orientation() != null
-                    || spec.envelope()
-                    || spec.envelopeEntities()) {
+    private static final int contributionBudget = 100_000;
+
+    private record Frame(BlueprintSpec spec, Document owner, String prefix, LatticePoint offset) {}
+
+    private record Exit(String key) {}
+
+    /** A placement resolves into its child frame at pop time, keeping the walk depth-first. */
+    private record Expand(Frame parent, PlacementSpec placement) {}
+
+    private static void flatten(Document document, CompilerContext context, Flat flat, List<Finding> findings) {
+        Set<String> active = new HashSet<>();
+        int contributions = 0;
+        Deque<Object> work = new ArrayDeque<>();
+        work.push(new Frame(document.root(), document, "", LatticePoint.origin));
+        while (!work.isEmpty()) {
+            Object next = work.pop();
+            if (next instanceof Exit exit) {
+                active.remove(exit.key());
+                continue;
+            }
+            if (next instanceof Expand expand) {
+                expandPlacement(expand, context, work, findings);
+                continue;
+            }
+            Frame frame = (Frame) next;
+            BlueprintSpec spec = frame.spec();
+            Document owner = frame.owner();
+            String key = owner.root().id() + "/" + spec.id();
+            if (!active.add(key)) {
+                error(findings, Codes.definitionCycle, "definition cycle at " + spec.id(), spec.source(), null, owner);
+                continue;
+            }
+            contributions += 1 + spec.bays().size() + spec.seams().size();
+            if (contributions > contributionBudget) {
                 error(
                     findings,
-                    Codes.documentField,
-                    "a definition may contribute only bays, seams and placements",
-                    spec.source(),
-                    null,
-                    owner
+                    Codes.documentTooLarge,
+                    "the document expands to more than " + contributionBudget + " declarations",
+                    document.root().source(),
+                    documentLocus(document),
+                    document
                 );
-                active.remove(key);
                 return;
             }
-            CuboidSet inside = CuboidSet.empty();
+            String prefix = frame.prefix();
+            LatticePoint offset = frame.offset();
+            if (!prefix.isEmpty()) {
+                if (!spec.checks().isEmpty()
+                        || !spec.computations().isEmpty()
+                        || !spec.keys().isEmpty()
+                        || !spec.derivations().isEmpty()
+                        || !spec.anchors().isEmpty()
+                        || spec.orientation() != null
+                        || spec.envelope()
+                        || spec.envelopeEntities()) {
+                    error(
+                        findings,
+                        Codes.documentField,
+                        "a definition may contribute only bays, seams and placements",
+                        spec.source(),
+                        null,
+                        owner
+                    );
+                    active.remove(key);
+                    continue;
+                }
+                CuboidSet inside = CuboidSet.empty();
+                for (BaySpec bay : spec.bays()) {
+                    inside = inside.union(bay.cells());
+                }
+                for (SeamSpec seam : spec.seams()) {
+                    inside = inside.union(CuboidSet.of(seam.cells()));
+                }
+                if (!spec.bounds().asSet().containsAll(inside)) {
+                    error(
+                        findings,
+                        Codes.documentField,
+                        "definition " + spec.id() + " puts cells outside its own bounds",
+                        spec.source(),
+                        null,
+                        owner
+                    );
+                }
+            } else {
+                flat.checks.addAll(spec.checks());
+                flat.computations.addAll(spec.computations());
+                flat.keys.addAll(spec.keys());
+                flat.derivations.addAll(spec.derivations());
+            }
             for (BaySpec bay : spec.bays()) {
-                inside = inside.union(bay.cells());
+                CuboidSet translated = translate(bay.cells(), offset);
+                if (translated == null) {
+                    error(
+                        findings,
+                        Codes.placementOutside,
+                        "bay " + bay.id() + " leaves the lattice",
+                        bay.source(),
+                        null,
+                        owner
+                    );
+                    continue;
+                }
+                Footprint footprint = translate(bay.footprint(), offset);
+                if (footprint == null) {
+                    error(
+                        findings,
+                        Codes.placementOutside,
+                        "the footprint of " + bay.id() + " leaves the lattice",
+                        bay.source(),
+                        null,
+                        owner
+                    );
+                    continue;
+                }
+                flat.bays.add(
+                    new BaySpec(
+                        qualify(prefix, bay.id()),
+                        translated,
+                        bay.coverage(),
+                        footprint,
+                        bay.sharing(),
+                        bay.description(),
+                        bay.source()
+                    )
+                );
             }
             for (SeamSpec seam : spec.seams()) {
-                inside = inside.union(CuboidSet.of(seam.cells()));
-            }
-            if (!spec.bounds().asSet().containsAll(inside)) {
-                error(
-                    findings,
-                    Codes.documentField,
-                    "definition " + spec.id() + " puts cells outside its own bounds",
-                    spec.source(),
-                    null,
-                    owner
-                );
-            }
-        } else {
-            flat.checks.addAll(spec.checks());
-            flat.computations.addAll(spec.computations());
-            flat.keys.addAll(spec.keys());
-            flat.derivations.addAll(spec.derivations());
-        }
-        for (BaySpec bay : spec.bays()) {
-            CuboidSet translated = translate(bay.cells(), offset);
-            if (translated == null) {
-                error(
-                    findings,
-                    Codes.placementOutside,
-                    "bay " + bay.id() + " leaves the lattice",
-                    bay.source(),
-                    null,
-                    owner
-                );
-                continue;
-            }
-            Footprint footprint = translate(bay.footprint(), offset);
-            if (footprint == null) {
-                error(
-                    findings,
-                    Codes.placementOutside,
-                    "the footprint of " + bay.id() + " leaves the lattice",
-                    bay.source(),
-                    null,
-                    owner
-                );
-                continue;
-            }
-            flat.bays.add(
-                new BaySpec(
-                    qualify(prefix, bay.id()),
-                    translated,
-                    bay.coverage(),
-                    footprint,
-                    bay.sharing(),
-                    bay.description(),
-                    bay.source()
-                )
-            );
-        }
-        for (SeamSpec seam : spec.seams()) {
-            Cuboid translated = seam.cells().translate(offset.x(), offset.y(), offset.z());
-            if (translated == null) {
-                error(
-                    findings,
-                    Codes.placementOutside,
-                    "seam " + seam.id() + " leaves the lattice",
-                    seam.source(),
-                    null,
-                    owner
-                );
-                continue;
-            }
-            flat.seams.add(
-                new SeamSpec(
-                    new SeamId(qualify(prefix, seam.id().id())),
-                    translated,
-                    seam.kind(),
-                    seam.properties(),
-                    seam.source()
-                )
-            );
-        }
-        for (PlacementSpec placement : spec.placements()) {
-            BlueprintSpec definition = owner.definitions().get(placement.definition());
-            Document nextOwner;
-            if (definition == null) {
-                Document external = context.documents().find(placement.definition());
-                if (external == null) {
+                Cuboid translated = seam.cells().translate(offset.x(), offset.y(), offset.z());
+                if (translated == null) {
                     error(
                         findings,
-                        Codes.definitionMissing,
-                        "no definition " + placement.definition(),
-                        placement.source(),
+                        Codes.placementOutside,
+                        "seam " + seam.id() + " leaves the lattice",
+                        seam.source(),
                         null,
                         owner
                     );
                     continue;
                 }
-                if (external.schemaVersion() != Document.currentVersion) {
-                    error(
-                        findings,
-                        Codes.schemaVersion,
-                        "definition " + placement.definition() + " uses schema version " + external.schemaVersion(),
-                        placement.source(),
-                        null,
-                        owner
-                    );
-                    continue;
-                }
-                definition = external.root();
-                nextOwner = external;
-            } else {
-                nextOwner = owner;
+                flat.seams.add(
+                    new SeamSpec(
+                        new SeamId(qualify(prefix, seam.id().id())),
+                        translated,
+                        seam.kind(),
+                        seam.properties(),
+                        seam.source()
+                    )
+                );
             }
-            LatticePoint next = offset.offset(placement.offset().x(), placement.offset().y(), placement.offset().z());
-            if (next == null) {
+            work.push(new Exit(key));
+            List<PlacementSpec> placements = spec.placements();
+            for (int i = placements.size() - 1; i >= 0; i--) {
+                work.push(new Expand(frame, placements.get(i)));
+            }
+        }
+    }
+
+    private static void expandPlacement(
+        Expand expand,
+        CompilerContext context,
+        Deque<Object> work,
+        List<Finding> findings
+    ) {
+        Frame frame = expand.parent();
+        Document owner = frame.owner();
+        PlacementSpec placement = expand.placement();
+        BlueprintSpec definition = owner.definitions().get(placement.definition());
+        Document nextOwner;
+        if (definition == null) {
+            Document external = context.documents().find(placement.definition());
+            if (external == null) {
                 error(
                     findings,
-                    Codes.placementOutside,
-                    "placement leaves the lattice",
+                    Codes.definitionMissing,
+                    "no definition " + placement.definition(),
                     placement.source(),
                     null,
                     owner
                 );
-                continue;
+                return;
             }
-            String nextPrefix = prefix.isEmpty()
-                    ? placement.alias().path() + "/"
-                    : prefix + placement.alias().path() + "/";
-            flatten(definition, nextOwner, context, nextPrefix, next, flat, findings, active);
+            if (external.schemaVersion() != Document.currentVersion) {
+                error(
+                    findings,
+                    Codes.schemaVersion,
+                    "definition " + placement.definition() + " uses schema version " + external.schemaVersion(),
+                    placement.source(),
+                    null,
+                    owner
+                );
+                return;
+            }
+            definition = external.root();
+            nextOwner = external;
+        } else {
+            nextOwner = owner;
         }
-        active.remove(key);
+        LatticePoint next = frame.offset()
+                .offset(placement.offset().x(), placement.offset().y(), placement.offset().z());
+        if (next == null) {
+            error(findings, Codes.placementOutside, "placement leaves the lattice", placement.source(), null, owner);
+            return;
+        }
+        String prefix = frame.prefix();
+        String nextPrefix = prefix.isEmpty() ? placement.alias().path() + "/" : prefix + placement.alias().path() + "/";
+        work.push(new Frame(definition, nextOwner, nextPrefix, next));
     }
 
     private static Map<NamespacedId, ContextKey<?>> buildKeys(
