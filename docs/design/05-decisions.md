@@ -1845,6 +1845,34 @@ tools/spec-check.py` and, when a change touches the kernel's hot paths, `./gradl
 When a remote exists, a workflow runs that same list; the document is the source of truth so the
 workflow cannot drift from it.
 
+### D-83 — A document's expansion is bounded
+
+Placement expansion runs on an explicit work stack and charges a budget of 100,000 contributions:
+one per expanded definition, one per bay and one per seam added to the flat result. Exceeding the
+budget is a single `SC-DOC-0015` finding, and nothing of that document is lowered.
+
+**Why a budget and not a depth limit.** Depth bounds the stack, not the work. A twenty-two-layer
+"place the previous layer twice" document costs 4.2 s and doubles per layer, at a nesting depth of
+22. The budget bounds time and the number of emitted bay/seam specs in one number.
+
+**Why iterative.** A six-thousand-layer chain overflows the default stack. The document law says
+document content never throws, and `StackOverflowError` is not an exception a caller can contain.
+
+**Why 100,000.** Measured about one microsecond per contribution (4.19M contributions ≈ 4.2 s), so
+the ceiling costs about 0.1 s; the shipped documents stay far below a thousand.
+
+**Rejected: catching `StackOverflowError` at the compile boundary.** It leaves the stall and the
+memory growth in place, and catching `Error` is not a boundary a library may rely on.
+
+**Rejected: a host-tunable budget.** Two hosts would accept different documents for the same file;
+a constant keeps the language closed and the behaviour testable.
+
+**Status:** implemented in `DocumentCompiler` — `DocumentCompilerTest.aTenThousandLayerChainCompiles`
+pins that depth no longer overflows, `aThirtyLayerDiamondStopsAtTheBudget` and
+`theBudgetCountsBaysAndSeams` pin the single finding at the ceiling, and
+`BuiltinDocumentsTest.builtinDocumentsStayInsideTheExpansionBudget` pins that the shipped documents
+compile without the code.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is

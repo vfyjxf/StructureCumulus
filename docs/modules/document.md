@@ -285,8 +285,9 @@ definition no placement reaches, directly or through another placement, is `SC-D
 ### 4.3 Lowering
 
 1. Validate the envelope, ids, boxes and ranges.
-2. Resolve placements recursively. A cycle is `SC-DOC-0009`; a missing definition is `SC-DOC-0011`;
-   a placed cell outside the root bounds is `SC-DOC-0005`.
+2. Resolve placements on an explicit depth-first work stack. A cycle is `SC-DOC-0009`; a missing
+   definition is `SC-DOC-0011`; a placed cell outside the root bounds is `SC-DOC-0005`; an
+   expansion past the budget is `SC-DOC-0015` (§4.6).
 3. Merge definitions into the root as bays and seams (definitions are geometry only); duplicate ids
    with different content are `SC-DOC-0004`, equal duplicates collapse. Root checks, computations,
    keys, derivations and anchors are then built against the merged ids.
@@ -380,6 +381,16 @@ same method on `StructureSetSpec`, `SatelliteSpec`, `LinkSpec` and `PresenceSpec
 content-only form used for round-trip comparison; the blueprint writer's absence of `kind` is the
 canonical blueprint form.
 
+### 4.6 The expansion budget
+
+Placement expansion runs on an explicit work stack, not the Java call stack: a ten-thousand-layer
+chain of definitions compiles instead of overflowing. The walk charges one contribution per
+expanded definition, one per bay and one per seam added to the flat result, and stops at 100,000
+contributions. A document past the ceiling is one `SC-DOC-0015` finding and `blueprint` is null;
+nothing of that document is lowered. The budget is a constant, not a host option: the same document
+must behave the same everywhere (D-83). The ceiling is not a depth limit — a deep chain of few
+declarations stays legal.
+
 ## 5. Codes
 
 | Code | Sev | Meaning | Producer |
@@ -398,6 +409,7 @@ canonical blueprint form.
 | `SC-DOC-0012` | INFO | reader supplied no spans | `DocumentReader` |
 | `SC-DOC-0013` | ERROR | reader/writer parse/format failure | `DocumentReader`/`Writer` |
 | `SC-DOC-0014` | ERROR | a declaration disagrees with the factory that produces it | `DocumentCompiler` |
+| `SC-DOC-0015` | ERROR | the document expands beyond the compile budget | `DocumentCompiler` |
 
 `StructureSetCompiler` reuses `SC-DOC-0002` for a malformed or nested set reference,
 `SC-DOC-0004` for a duplicate satellite id (raised by the reader) and `SC-DOC-0011` for a root or
