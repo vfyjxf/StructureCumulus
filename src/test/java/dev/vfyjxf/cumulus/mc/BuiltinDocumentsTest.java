@@ -10,6 +10,7 @@ import dev.vfyjxf.cumulus.kernel.document.DocumentCompiler;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetCompileResult;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetCompiler;
 import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
@@ -41,6 +42,29 @@ class BuiltinDocumentsTest {
         assertEquals(BuiltinDocuments.airCellId(), blueprint.id());
         assertEquals(1, blueprint.bays().size());
         assertEquals(1, blueprint.checks().size());
+    }
+
+    @Test
+    void builtinDocumentsStayInsideTheExpansionBudget() {
+        Catalogs catalogs = Catalogs.builtin();
+        CompilerContext context = new CompilerContext(
+            catalogs.focuses(),
+            catalogs.expectations(),
+            catalogs.computations(),
+            Map.of(),
+            BuiltinDocuments.source()
+        );
+        for (NamespacedId documentId : List
+                .of(BuiltinDocuments.airCellId(), BuiltinDocuments.setRootId(), BuiltinDocuments.setWingId())) {
+            Document document = BuiltinDocuments.source().find(documentId);
+            assertNotNull(document, documentId + " resolves");
+            CompileResult result = DocumentCompiler.compile(document, context);
+            assertTrue(
+                result.findings().ofCode(Codes.documentTooLarge.code()).isEmpty(),
+                documentId + " reported " + result.findings().findings()
+            );
+            assertNotNull(result.blueprint(), documentId + " compiles");
+        }
     }
 
     @Test

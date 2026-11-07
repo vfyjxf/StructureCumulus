@@ -206,7 +206,7 @@ export default function App() {
                 StructureCumulus / {zh ? '设计 review 1.2' : 'design review 1.2'}<br />
                 {zh ? '14 份设计文档 · 11 个 kernel 模块 + adapter 规范' : '14 design documents · 11 kernel modules + adapter spec'}<br />
                 {zh ? <>kernel 11 个 package · {CODE_COUNT} 个 code · {TEST_COUNT} 个 kernel 测试</> : <>kernel 11 packages · {CODE_COUNT} codes · {TEST_COUNT} kernel tests</>}<br />
-                D-82 tree · reviewed 2026.11.06
+                D-83 tree · reviewed 2026.11.07
               </div>
             </div>
             <div className="footer-rule rule" />

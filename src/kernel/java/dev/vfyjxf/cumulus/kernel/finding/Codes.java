@@ -379,6 +379,14 @@ public final class Codes {
                 + "The compiler never retargets a declaration; correct the document or the factory."
     );
 
+    public static final CodeEntry documentTooLarge = entry(
+        FindingCode.Family.doc,
+        15,
+        Severity.error,
+        "The document expands beyond the compile budget.",
+        "The placements expand to more than 100,000 declarations. Split the document or place the parts separately."
+    );
+
     public static final CodeEntry computationFailed = entry(
         FindingCode.Family.ctx,
         1,
@@ -610,6 +618,7 @@ public final class Codes {
         noPositions,
         readerFailed,
         documentDeclared,
+        documentTooLarge,
         computationFailed,
         deriverMissing,
         deriverFailed,

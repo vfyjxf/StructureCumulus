@@ -832,7 +832,7 @@ is defensively re-checked; the set's total reads never exceed `budget.cells()`; 
 rollback invalidates the `StructureContext` of every formed attempt via `StructureEvent.Broken`
 (`rolledBack` still lists only the successful releases); a failed release does not skip the
 invalidation. The record set is now 35 decisions (D-35). **Status (S6):** implemented; the focused
-kernel/adapter tests are green; `./gradlew check` and `runGameTestServer` are green on this tree (569 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0).
+kernel/adapter tests are green; `./gradlew check` and `runGameTestServer` are green on this tree (572 kernel / 68 containers, 443 adapter / 46 containers, 140/140 GameTests; check exit 0).
 
 ### D-36 — Nested-extent lookup is generic per holder
 
@@ -973,7 +973,7 @@ and the attempt. `Host` carries a `StructureManager`; `StructureKernel.settle` t
 `StructureAttempt`.
 The record set is now 40 decisions (D-40). **Status:** implemented; `StructureManagerTest`,
 `AdversarialManagerTest`, `StructureLifecycleGameTest` and
-`StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on this tree (569 kernel / 68 containers, 442 adapter / 46 containers, 140/140 GameTests; check exit 0).
+`StructureLifecycleAdversarialGameTest`; `./gradlew check` and `runGameTestServer` are green on this tree (572 kernel / 68 containers, 443 adapter / 46 containers, 140/140 GameTests; check exit 0).
 
 ### D-41 — The snapshot carries values; a live handle is a contract, not a guard
 
@@ -1844,6 +1844,34 @@ tools/spec-check.py` and, when a change touches the kernel's hot paths, `./gradl
 
 When a remote exists, a workflow runs that same list; the document is the source of truth so the
 workflow cannot drift from it.
+
+### D-83 — A document's expansion is bounded
+
+Placement expansion runs on an explicit work stack and charges a budget of 100,000 contributions:
+one per expanded definition, one per bay and one per seam added to the flat result. Exceeding the
+budget is a single `SC-DOC-0015` finding, and nothing of that document is lowered.
+
+**Why a budget and not a depth limit.** Depth bounds the stack, not the work. A twenty-two-layer
+"place the previous layer twice" document costs 4.2 s and doubles per layer, at a nesting depth of
+22. The budget bounds time and the number of emitted bay/seam specs in one number.
+
+**Why iterative.** A six-thousand-layer chain overflows the default stack. The document law says
+document content never throws, and `StackOverflowError` is not an exception a caller can contain.
+
+**Why 100,000.** Measured about one microsecond per contribution (4.19M contributions ≈ 4.2 s), so
+the ceiling costs about 0.1 s; the shipped documents stay far below a thousand.
+
+**Rejected: catching `StackOverflowError` at the compile boundary.** It leaves the stall and the
+memory growth in place, and catching `Error` is not a boundary a library may rely on.
+
+**Rejected: a host-tunable budget.** Two hosts would accept different documents for the same file;
+a constant keeps the language closed and the behaviour testable.
+
+**Status:** implemented in `DocumentCompiler` — `DocumentCompilerTest.aTenThousandLayerChainCompiles`
+pins that depth no longer overflows, `aThirtyLayerDiamondStopsAtTheBudget` and
+`theBudgetCountsBaysAndSeams` pin the single finding at the ceiling, and
+`BuiltinDocumentsTest.builtinDocumentsStayInsideTheExpansionBudget` pins that the shipped documents
+compile without the code.
 
 ## 3. Consequences a reviewer should attack
 

@@ -95,19 +95,19 @@ export const ZH_GROUPS: Record<string, string> = {
 };
 
 export const ZH_GATES: Record<string, { label: string; note: string }> = {
-  Compile: { label: '编译', note: 'gradlew check 在 D-82 tree 通过' },
+  Compile: { label: '编译', note: 'gradlew check 在 D-83 tree 通过' },
   Purity: { label: '纯度', note: '0 个 Minecraft 名字' },
-  Tests: { label: '测试', note: 'kernel JUnit 5 · 68 个容器；adapter 442 / 46 个容器；GameTests 140/140' },
-  'Spec index': { label: '规范索引', note: 'spec-check.py · 66 codes' },
+  Tests: { label: '测试', note: 'kernel JUnit 5 · 68 个容器；adapter 443 / 46 个容器；GameTests 140/140' },
+  'Spec index': { label: '规范索引', note: 'spec-check.py · 67 codes' },
   'No stubs': { label: '无空桩', note: 'TODO · FIXME · UOE 扫描' },
   Determinism: { label: '确定性', note: 'DeterminismTest · canonical bytes、fixed point、compile runs' },
 };
 
 export const ZH_HERO_STATS: Record<string, { label: string; note: string }> = {
-  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 442 · GameTests 140/140' },
+  tests: { label: '测试', note: 'kernel JUnit 5 · adapter 443 · GameTests 140/140' },
   codes: { label: '代码', note: '13 个 kernel family · 一张 Codes 表' },
   'purity leaks': { label: '纯度泄漏', note: 'kernel 里的 Minecraft 名字' },
-  decisions: { label: '决策', note: 'D-82 · ruling，不是偏好' },
+  decisions: { label: '决策', note: 'D-83 · ruling，不是偏好' },
 };
 
 export const ZH_LAYERS: Record<string, { title: string; text: string }> = {

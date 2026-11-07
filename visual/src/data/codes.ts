@@ -48,6 +48,7 @@ export const codes: Code[] = [
   {"id": "NO_POSITIONS", "code": "SC-DOC-0012", "family": "DOC", "number": 12, "severity": "INFO", "summary": "The reader produced no source spans.", "body": "The document text is available but no offsets were reported. Rendering falls back to document labels.", "producer": "adapter JsonReader, StructureSetReader"},
   {"id": "READER_FAILED", "code": "SC-DOC-0013", "family": "DOC", "number": 13, "severity": "ERROR", "summary": "The reader or writer failed.", "body": "The port could not parse or format the document. Check the text and the port.", "producer": "adapter JsonReader, DatapackBlueprints"},
   {"id": "DOCUMENT_DECLARED", "code": "SC-DOC-0014", "family": "DOC", "number": 14, "severity": "ERROR", "summary": "A declaration disagrees with the factory that produces it.", "body": "The document and the registered factory disagree on a computation's id, output or inputs. The compiler never retargets a declaration; correct the document or the factory.", "producer": "DocumentCompiler"},
+  {"id": "DOCUMENT_TOO_LARGE", "code": "SC-DOC-0015", "family": "DOC", "number": 15, "severity": "ERROR", "summary": "The document expands beyond the compile budget.", "body": "The placements expand to more than 100,000 declarations. Split the document or place the parts separately.", "producer": "DocumentCompiler"},
   {"id": "BUDGET_EXHAUSTED", "code": "SC-ENG-0001", "family": "ENG", "number": 1, "severity": "ERROR", "summary": "The budget ran out.", "body": "The attempt stopped before it could conclude. Raise the budget or reduce the read scope.", "producer": "MatchEngine check"},
   {"id": "SNAPSHOT_STALE", "code": "SC-ENG-0002", "family": "ENG", "number": 2, "severity": "WARNING", "summary": "The snapshot is no longer current.", "body": "The lease stopped matching the live world. Re-capture the snapshot before retrying.", "producer": "MatchEngine check and settle, adapter StructureSetHost"},
   {"id": "DESIGN_DEFECT", "code": "SC-ENG-0004", "family": "ENG", "number": 4, "severity": "ERROR", "summary": "An internal plan invariant failed.", "body": "The engine reached a state the plan says is impossible. Check the blueprint build and the plan.", "producer": "MatchEngine check and settle"},
@@ -78,4 +79,4 @@ export const codes: Code[] = [
   {"id": "CATALOG_DUPLICATE", "code": "SC-SPI-0003", "family": "SPI", "number": 3, "severity": "ERROR", "summary": "A catalog build found a duplicate entry.", "body": "One id was added twice with different values. Keep one registration.", "producer": "Catalog.Builder.put"},
 ];
 
-export const CODE_COUNT = 66;
+export const CODE_COUNT = 67;

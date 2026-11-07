@@ -16,7 +16,7 @@ export const testClasses: TestClass[] = [
   {"file": "dev/vfyjxf/cumulus/kernel/context/StructureManagerTest.java", "package": "context", "className": "StructureManagerTest", "count": 8},
   {"file": "dev/vfyjxf/cumulus/kernel/core/CoreTest.java", "package": "core", "className": "CoreTest", "count": 16},
   {"file": "dev/vfyjxf/cumulus/kernel/document/ComputationSpecTest.java", "package": "document", "className": "ComputationSpecTest", "count": 1},
-  {"file": "dev/vfyjxf/cumulus/kernel/document/DocumentCompilerTest.java", "package": "document", "className": "DocumentCompilerTest", "count": 23},
+  {"file": "dev/vfyjxf/cumulus/kernel/document/DocumentCompilerTest.java", "package": "document", "className": "DocumentCompilerTest", "count": 26},
   {"file": "dev/vfyjxf/cumulus/kernel/document/DocumentParityTest.java", "package": "document", "className": "DocumentParityTest", "count": 11},
   {"file": "dev/vfyjxf/cumulus/kernel/document/StructureSetCompilerTest.java", "package": "document", "className": "StructureSetCompilerTest", "count": 15},
   {"file": "dev/vfyjxf/cumulus/kernel/engine/AdversarialClaimCoverageTest.java", "package": "engine", "className": "AdversarialClaimCoverageTest", "count": 24},
@@ -80,7 +80,7 @@ export const TEST_GROUPS = [
   {"name": "claim", "count": 28},
   {"name": "context", "count": 16},
   {"name": "core", "count": 16},
-  {"name": "document", "count": 50},
+  {"name": "document", "count": 53},
   {"name": "engine", "count": 296},
   {"name": "finding", "count": 37},
   {"name": "kernel", "count": 2},
@@ -90,4 +90,4 @@ export const TEST_GROUPS = [
   {"name": "world", "count": 21},
 ];
 
-export const TEST_COUNT = 569;
+export const TEST_COUNT = 572;
