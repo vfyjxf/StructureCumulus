@@ -86,6 +86,7 @@ export const decisions: Decision[] = [
   {"id": "D-80", "title": "A cell that was not captured has no value", "summary": "WorldView.get(cell, type) answers null when the cell lies outside the capture, belongs to a refused section, or was refused individually. Air is answered only for a cell that was captured and holds air. read(cell) already distinguishes the two: Found versus Unreadable."},
   {"id": "D-81", "title": "A plugin class that cannot be loaded is logged and skipped", "summary": "Discovery catches LinkageError around each candidate class, logs the class name and the cause at error level, and continues. Nothing is added to the loading result: a class that never loaded has no plugin id and no dependency edges, so the failure record — which names a plugin — cannot represent it."},
   {"id": "D-82", "title": "Gates run on the development machine until the repository has a remote", "summary": "No CI workflow is added. 06-verification.md lists the exact commands that constitute a green build: ./gradlew check, ./gradlew kernelTest test, ./gradlew runGameTestServer, python3 tools/spec-check.py and, when a change touches the kernel's hot paths, ./gradlew jmh."},
+  {"id": "D-83", "title": "A document's expansion is bounded", "summary": "Placement expansion runs on an explicit work stack and charges a budget of 100,000 contributions: one per expanded definition, one per bay and one per seam added to the flat result. Exceeding the budget is a single SC-DOC-0015 finding, and nothing of that document is lowered."},
 ];
 
-export const DECISION_COUNT = 81;
+export const DECISION_COUNT = 82;

@@ -99,10 +99,10 @@ export const DOCS = [
 ];
 
 export const HERO_STATS = [
-  { value: '569', label: 'tests', note: 'kernel JUnit 5 · adapter 442 · GameTests 140/140' },
-  { value: '66', label: 'codes', note: '13 kernel families · one Codes table' },
+  { value: '572', label: 'tests', note: 'kernel JUnit 5 · adapter 443 · GameTests 140/140' },
+  { value: '67', label: 'codes', note: '13 kernel families · one Codes table' },
   { value: '0', label: 'purity leaks', note: 'Minecraft names in kernel' },
-  { value: '81', label: 'decisions', note: 'D-82 · rulings, not preferences' },
+  { value: '82', label: 'decisions', note: 'D-83 · rulings, not preferences' },
 ];
 
 export const LAYERS = [
@@ -120,10 +120,10 @@ export const LAYERS = [
 ];
 
 export const GATES = [
-  { label: 'Compile', value: 'PASS', note: 'gradlew check green on the D-82 tree' },
+  { label: 'Compile', value: 'PASS', note: 'gradlew check green on the D-83 tree' },
   { label: 'Purity', value: 'PASS', note: '0 Minecraft names' },
-  { label: 'Tests', value: '569/569', note: 'kernel JUnit 5 · 68 containers; adapter 442 · 46 containers; GameTests 140/140' },
-  { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 66 codes' },
+  { label: 'Tests', value: '572/572', note: 'kernel JUnit 5 · 68 containers; adapter 443 · 46 containers; GameTests 140/140' },
+  { label: 'Spec index', value: 'PASS', note: 'spec-check.py · 67 codes' },
   { label: 'No stubs', value: 'PASS', note: 'TODO · FIXME · UOE scan' },
   { label: 'Determinism', value: 'PASS', note: 'DeterminismTest · canonical bytes, fixed point, compile runs' },
 ];
