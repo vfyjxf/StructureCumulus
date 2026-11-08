@@ -2,13 +2,16 @@ package dev.vfyjxf.cumulus.kernel.space;
 
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.SourceSpan;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.SplittableRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -69,6 +72,23 @@ class SpaceTest {
     }
 
     @Test
+    void ofSizeIsTheAuthoringFormOfOf() {
+        assertEquals(Cuboid.of(1, 2, 3, 3, 3, 7), Cuboid.ofSize(1, 2, 3, 2, 1, 4));
+        assertTrue(Cuboid.ofSize(-1, -1, -1, 0, 0, 0).isEmpty(), "a zero size names the empty box");
+        assertEquals(Cuboid.of(5, 5, 5, 5, 5, 5), Cuboid.ofSize(5, 5, 5, 0, 0, 0));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Cuboid.ofSize(0, 0, 0, -1, 1, 1),
+            "a negative size is refused"
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> Cuboid.ofSize(LatticePoint.maxXz, 0, 0, 1, 0, 0),
+            "off the lattice"
+        );
+    }
+
+    @Test
     void cuboidSetKeepsTouchingBoxesSeparate() {
         CuboidSet set = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1), Cuboid.of(1, 0, 0, 2, 1, 1));
         assertEquals(2, set.boxCount());
@@ -102,6 +122,30 @@ class SpaceTest {
             assertEquals(Orientation.identity, orientation.inverse().compose(orientation));
             assertEquals(orientation, orientation.compose(Orientation.identity));
         }
+    }
+
+    @Test
+    void orientationOfNormalisesEveryTripleOntoThe48() {
+        List<Orientation> all = Orientation.all();
+        Set<Orientation> images = new HashSet<>();
+        int triples = 0;
+        for (Turn turn : Turn.values()) {
+            for (Tilt tilt : Tilt.values()) {
+                for (Flip flip : Flip.values()) {
+                    triples++;
+                    Orientation orientation = Orientation.of(turn, tilt, flip);
+                    assertTrue(all.contains(orientation), turn + "/" + tilt + "/" + flip + " maps into the 48");
+                    images.add(orientation);
+                }
+            }
+        }
+        assertEquals(72, triples, "the naming triples");
+        assertEquals(48, images.size(), "72 triples name the same 48 elements");
+        assertEquals(
+            Orientation.of(Turn.none, Tilt.level, Flip.frontBack),
+            Orientation.of(Turn.half, Tilt.level, Flip.leftRight),
+            "the documented normalisation pair"
+        );
     }
 
     @Test
@@ -140,6 +184,31 @@ class SpaceTest {
         assertEquals(LatticePoint.of(10, 64, -5), p.apply(LatticePoint.origin));
         Placement edge = new Placement(Orientation.identity, LatticePoint.of(LatticePoint.minXz, 0, 0));
         assertNull(edge.inverse());
+    }
+
+    @Test
+    void placementIsAffineNotLinear() {
+        LatticePoint base = LatticePoint.of(3, -2, 5);
+        LatticePoint delta = LatticePoint.of(1, 4, -2);
+        for (Orientation orientation : Orientation.all()) {
+            Placement placement = new Placement(orientation, LatticePoint.of(11, -7, 2));
+            LatticePoint image = Objects.requireNonNull(placement.apply(base), "base image");
+            LatticePoint shifted = Objects.requireNonNull(placement.apply(offset(base, delta)), "shifted image");
+            LatticePoint orientedDelta = Objects.requireNonNull(orientation.apply(delta), "oriented delta");
+            assertEquals(offset(image, orientedDelta), shifted, "a local delta is oriented before it is added");
+        }
+        Placement quarter = new Placement(
+            Orientation.of(Turn.clockwise, Tilt.level, Flip.none),
+            LatticePoint.of(10, 64, -5)
+        );
+        LatticePoint image = Objects.requireNonNull(quarter.apply(LatticePoint.of(2, 0, 0)));
+        LatticePoint shifted = Objects.requireNonNull(quarter.apply(LatticePoint.of(3, 0, 0)));
+        assertNotEquals(offset(image, LatticePoint.of(1, 0, 0)), shifted, "a raw delta is not added linearly");
+    }
+
+    private static LatticePoint offset(LatticePoint point, LatticePoint delta) {
+        LatticePoint shifted = point.offset(delta.x(), delta.y(), delta.z());
+        return Objects.requireNonNull(shifted, "the offset stays in the lattice");
     }
 
     @Test
@@ -276,6 +345,26 @@ class SpaceTest {
     }
 
     @Test
+    void sectionKeyOrdersByWorldFrameXAndZBeforeY() {
+        World overworld = World.of(NamespacedId.of("minecraft", "overworld"));
+        World nether = World.of(NamespacedId.of("minecraft", "nether"));
+        SectionKey root = new SectionKey(overworld, 0, 0, 0, 0);
+        SectionKey nested = new SectionKey(overworld, 1, 0, 0, 0);
+        SectionKey netherFrame1 = new SectionKey(nether, 1, 9, 9, 9);
+        SectionKey netherFrame2 = new SectionKey(nether, 2, 0, 0, 0);
+        SectionKey negativeX = new SectionKey(overworld, 0, -1, 5, 5);
+        SectionKey lowZHighY = new SectionKey(overworld, 0, 0, 9, 1);
+        SectionKey highZLowY = new SectionKey(overworld, 0, 0, 0, 2);
+        List<SectionKey> keys = new ArrayList<>(
+            List.of(highZLowY, nested, root, netherFrame2, negativeX, lowZHighY, netherFrame1)
+        );
+        keys.sort(null);
+        assertEquals(List.of(netherFrame1, netherFrame2, negativeX, root, lowZHighY, highZLowY, nested), keys);
+        assertNotEquals(root, nested, "the frame separates a nested view from the root");
+        assertTrue(lowZHighY.compareTo(highZLowY) < 0, "z orders before y");
+    }
+
+    @Test
     void locusFramesValidate() {
         Locus local = Locus.local(CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)));
         assertEquals(LocusFrame.local, local.frame());
@@ -286,6 +375,73 @@ class SpaceTest {
             IllegalArgumentException.class,
             () -> new Locus(LocusFrame.definition, CuboidSet.empty(), null, null)
         );
+    }
+
+    @Test
+    void locusRejectsEveryIllegalFrameFieldCombination() {
+        SourceSpan source = new SourceSpan(NamespacedId.of("test", "doc"), 0, 4);
+        KeyLocus key = new KeyLocus(new InstanceId(World.of(NamespacedId.of("w")), 1), NamespacedId.of("k"));
+        CuboidSet cells = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1));
+
+        assertEquals(LocusFrame.definition, Locus.definition(source).frame());
+        assertEquals(
+            LocusFrame.definition,
+            Locus.definition(cells, source).frame(),
+            "a definition locus may carry cells"
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Locus(LocusFrame.definition, CuboidSet.empty(), null, null),
+            "a definition locus without a source"
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Locus(LocusFrame.definition, CuboidSet.empty(), key, source),
+            "a definition locus with a key"
+        );
+        for (LocusFrame frame : List.of(LocusFrame.local, LocusFrame.world)) {
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new Locus(frame, cells, key, null),
+                "a cell locus with a key"
+            );
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new Locus(frame, cells, null, source),
+                "a cell locus with a source"
+            );
+            assertThrows(
+                IllegalArgumentException.class,
+                () -> new Locus(frame, CuboidSet.empty(), null, null),
+                "a cell locus without cells"
+            );
+        }
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Locus(LocusFrame.key, CuboidSet.empty(), null, null),
+            "a key locus without a key"
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Locus(LocusFrame.key, cells, key, null),
+            "a key locus with cells"
+        );
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new Locus(LocusFrame.key, CuboidSet.empty(), key, source),
+            "a key locus with a source"
+        );
+    }
+
+    @Test
+    void locusFrameWireNamesAreTheUppercaseTags() {
+        assertEquals("DEFINITION", LocusFrame.definition.wireName());
+        assertEquals("LOCAL", LocusFrame.local.wireName());
+        assertEquals("WORLD", LocusFrame.world.wireName());
+        assertEquals("KEY", LocusFrame.key.wireName());
+        for (LocusFrame frame : LocusFrame.values()) {
+            assertNotEquals(frame.name(), frame.wireName(), "the wire tag does not follow the lowerCamel constant");
+        }
     }
 
     @Test
@@ -312,5 +468,18 @@ class SpaceTest {
         assertEquals(whole.hashCode(), split.hashCode());
         assertEquals(whole, CuboidSet.of(Cuboid.of(0, 0, 0, 2, 1, 1)));
         assertNotEquals(whole, CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)));
+    }
+
+    @Test
+    void cuboidSetAlgebraIsIdempotent() {
+        CuboidSet split = CuboidSet.of(Cuboid.of(0, 0, 0, 1, 2, 1), Cuboid.of(1, 0, 0, 2, 1, 1));
+        CuboidSet shell = CuboidSet.of(Cuboid.of(0, 0, 0, 3, 3, 3)).subtract(Cuboid.of(1, 1, 1, 2, 2, 2));
+        for (CuboidSet set : List.of(split, shell)) {
+            assertEquals(set, CuboidSet.of(set.decomposition()), "re-of the decomposition is the same set");
+            assertEquals(set, set.union(set), "union with itself changes nothing");
+            assertEquals(set, set.union(CuboidSet.empty()), "union with the empty set changes nothing");
+            assertEquals(set, set.subtract(CuboidSet.empty()), "subtracting nothing changes nothing");
+            assertEquals(CuboidSet.empty(), set.subtract(set), "subtracting itself empties the set");
+        }
     }
 }
