@@ -36,7 +36,7 @@ TYPE_RE = re.compile(
 )
 CODE_RE = re.compile(r"SC-([A-Z]{2,6})-(\d{4})")
 ADAPTER_PUBLIC_RE = re.compile(
-    r"(?m)^\s*public\s+(?:final\s+|abstract\s+|sealed\s+|non-sealed\s+)*(?:class|interface|record|enum)\s+([A-Za-z0-9_]*)"
+    r"(?m)^\s*public\s+(?:final\s+|abstract\s+|sealed\s+|non-sealed\s+)*(?:class|interface|record|enum|@interface)\s+([A-Za-z0-9_]*)"
 )
 ADAPTER_ANY_RE = re.compile(
     r"(?m)^\s*(?:(?:public|private|protected|static|final|abstract|sealed|non-sealed)\s+)*(?:class|interface|record|enum)\s+([A-Za-z0-9_]*)"
@@ -142,6 +142,20 @@ def uncovered_types() -> dict[str, str]:
         entry, _, reason = line.partition("#")
         out[entry.strip()] = reason.strip()
     return out
+
+
+def check_uncovered_reasons() -> int:
+    """A listed type must carry a reason; the list is the gate's own ledger."""
+    problems = 0
+    for line in UNCOVERED.read_text().split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        _, sep, reason = stripped.partition("#")
+        if not sep or not reason.strip():
+            print(f"spec-uncovered: {stripped} lists no reason")
+            problems += 1
+    return problems
 
 
 def check_adapter() -> int:
@@ -421,6 +435,7 @@ def main() -> int:
     problems += check_produced_codes(doc_codes)
     problems += check_producer_mirror()
     problems += check_code_count_claims()
+    problems += check_uncovered_reasons()
 
     if problems:
         return 1
