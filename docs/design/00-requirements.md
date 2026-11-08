@@ -31,7 +31,7 @@ extension path is one interface and one catalog registration. The host path is f
 | **F-03** | A match produces typed runtime context, not only a boolean. | `context`: `ContextKey<T>`, `Computation`, `Deriver`, `StructureContext`. |
 | **F-04** | No controller entity is required. The orientation comes from a declared anchor property at the definition origin. | `structure`: `AnchorSpec`, `OrientationPolicy`; `space`: 48 orientations, `Siting`. |
 | **F-05** | A bay is a rectangular region tested atomically; a door is the canonical two-cell case. | `structure`: `Bay`, `Focus`, `Expectation<DoorView>`, `Coverage.oneSubject`. |
-| **F-06** | Claims are explicit: shared vs exclusive, per cell, with one conflict predicate and one compare-and-set. | `claim`: `Sharing`, `ClaimRow`, `ClaimMatrix`, `ClaimLedger`. |
+| **F-06** | Claims are explicit: shared vs exclusive, per cell, per instance, with one conflict predicate and one compare-and-set. | `claim`: `Sharing`, `ClaimRow`, `ClaimMatrix`, `ClaimLedger`. |
 | **F-07** | Checking and claiming are separate entry points. `check` writes nothing; `settle` is the only writer. | `engine`: `check`, `settle`; `spi`: `StructureKernel`. |
 | **F-08** | Structure definitions are data-driven and code-driven at once: one IR, two frontends. | `document`: `Document`, `BlueprintSpec`, `DocumentCompiler`; `structure`: `BlueprintBuilder`. |
 | **F-09** | Findings are compiler-grade: stable codes, severity, located labels, notes, suggestions, deterministic order. | `finding`: `Finding`, `FindingBundle`, `Codes`, `FindingRenderer`. |
@@ -64,7 +64,7 @@ internally consistent.
 | **I-03** | Every footprint is a `CuboidSet`; no voxel enumeration in the kernel. | `space`; `CuboidSet` has no cell stream. |
 | **I-04** | `check` is given no write port: no claim, no context frame, no world writer. A live host value is a write port the host owns; writing through it is a contract violation, not a kernel outcome. | `engine.check` has no writer parameter; `StructureKernel.check` has no ledger write; the purity contract in `world` §4.7. |
 | **I-05** | `settle` is the only claim writer; `Formed` exists only after `Settled`. | `claim` API; `engine.settle`. |
-| **I-06** | Every claim row is derived by the pure planner from `(blueprint, siting, owner, bindings)`; a caller cannot hand in rows. | `ClaimPlanner`; `Admitted` carries bindings, not rows. |
+| **I-06** | Every claim row is derived by the pure planner from `(blueprint, siting, instance, bindings)`; a caller cannot hand in rows. | `ClaimPlanner`; `Admitted` carries bindings, not rows. |
 | **I-07** | A `MISMATCH` is refutation, `UNREADABLE` is ignorance, `ABSTAIN` is refusal; they do not collapse. | `Reply` four-state family; `MatchResult` fold. |
 | **I-08** | Findings are the only report channel; a machine consumer reads a code and a locus, never a message. | `Finding` shape; renderers are pure projections. |
 | **I-09** | Detection and context production are separate: a `Computation` reads the snapshot, a `Deriver` reads the result and context, neither mutates the match. | `context` interfaces; `derive` takes a `Formed`. |

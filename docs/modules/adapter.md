@@ -327,8 +327,7 @@ a nested body is never a claim binding (`engine` §7.5), and a failed check stil
 `settle` runs on the server thread and is one atomic replacement of one instance's rows after
 checking `expectedRevision` and the matrix; `release(instance)` removes that instance's rows and
 bumps the revision only when something was removed;
-`read` is a copy. A crash between the in-memory mutation and `setDirty` loses the revision; the host
-re-reads the store on load. The `/cumulus settle` command drives this path on the server thread.
+`read` is a copy. The `/cumulus settle` command drives this path on the server thread.
 
 ## 6. Context
 
@@ -343,7 +342,8 @@ is `Broken` and releases the claim rows; a placement is `Invalidated` and releas
 that moves any claimed cell is `Invalidated` and releases the rows — a pushed structure is gone,
 not translated; a partial move/destroy is `Invalidated` and releases the rows; a level unload is
 `Unloaded`, dispatched by `ServerState.unload` rather than by `WatchEvents`. The adapter produces no move event. `Loaded` exists for a host
-that restores its own instances, but this adapter has no persisted instances to restore. A manager
+that restores its own instances, but this adapter has no persisted instances to restore. It has no
+persisted claim rows either (D-44): rows live and die with the world's structure state. A manager
 rejects an event that would create a duplicate `(owner, siting)`; `Broken`/`Invalidated` are
 idempotent. The kernel manager reports `findAt`/`findIn`/`instances` registry-wide (no `World`); the
 adapter's one-manager-per-level layout makes those results per-level. `find(World, owner, siting)` is

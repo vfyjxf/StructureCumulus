@@ -34,7 +34,7 @@
 | computation | `Computation<T>` | context | produces a key from the snapshot |
 | deriver | `Deriver<T>` | context | produces a key from a formed result |
 | context | `StructureContext` | context | typed values of one instance |
-| claim | `ClaimRow` | claim | one cell of one world owned by one bay of one siting |
+| claim | `ClaimRow` | claim | one cell of one world held by one bay of one instance at one siting |
 | ledger | `ClaimLedger` | claim | per-world claim store |
 | finding | `Finding` | finding | one report with a stable code |
 | bundle | `FindingBundle` | finding | ordered, deduplicated, capped report |
