@@ -44,7 +44,7 @@ Until the repository has a remote, the gates run on the development machine (D-8
 When a remote exists, a workflow runs that same list; this document stays the source of truth so the
 workflow cannot drift from it.
 
-Current evidence (2026-11-07, this tree): M1, M2a, M2b, M2c, M2d and
+Current evidence (2026-11-08, this tree): M1, M2a, M2b, M2c, M2d and
 M3 (`d4b6d82`) are committed; M4a/M4b, the command slice (`settle` at `4899d86`, plus `compile`,
 `explain`, `claims`), capture-revision lease invalidation (`0f0bf25`), the rotated-siting two-phase
 capture (P1, `56c632c`), the event-edged watched-region mark counter (M5a, `d1fa42f`), the non-upright
@@ -66,8 +66,8 @@ closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `StructureEven
 invalidation, and one set budget shared by presence and every member attempt (§3.3). The manager round
 (D-40 with D-44/D-45) then makes claims session-scoped and instance-keyed, and D-47 moves block
 observation into the funnel. The current
-suites total 572 kernel tests (68 containers), 443 adapter unit tests (46 containers) and 140
-`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (572 kernel / 68 containers, 443 adapter / 46 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
+suites total 583 kernel tests (68 containers), 449 adapter unit tests (47 containers) and 140
+`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (583 kernel / 68 containers, 449 adapter / 47 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
 `Codes.all` has 67 entries and the decision record has 82 decisions (D-83; D-78 withdrawn). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
@@ -600,7 +600,7 @@ latency for one operation, and the numbers are compared by a person looking at t
 
 ## 8. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 140 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (572 kernel / 68 containers, 443 adapter / 46 containers, 140/140 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 140 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (583 kernel / 68 containers, 449 adapter / 47 containers, 140/140 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
