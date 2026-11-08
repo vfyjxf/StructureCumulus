@@ -1331,6 +1331,9 @@ is defence in depth. No other error is caught: an `OutOfMemoryError` leaves no s
 commit, so an exception between them locks that spot until the level unloads. A settle that formed
 and then threw leaves rows with no instance; releasing that key on the way out is the only cleanup.
 
+**Amendment (A04, `4470f63`):** the guard also catches `LinkageError` (a plugin class that fails to
+link); it is logged and answered like any verb failure, and no other error joined the catch.
+
 ### D-55 — The envelope judges cells; entities are opt-in
 
 The derived envelope judges the occupant stored at each cell: block state, fluid and block entity. An

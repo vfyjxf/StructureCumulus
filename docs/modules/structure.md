@@ -414,7 +414,7 @@ what the instance owns, `Sharing` says how claims meet. They are three independe
 | `oneSubject` | at least one check binds subjects; static cells stay inside the bay | union of bound subject footprints equals `bay.cells()` |
 | `anySubject` | every check's static cells is empty; a claiming footprint also requires every subject-binding focus to be claimable | — |
 
-`exclusive` must own cells at build when the owned set is already known (R1): `None` and a
+`exclusive` must own cells at build when the owned set is already known: `None` and a
 `Declared` with no cells are contradictions (`SC-BPT-0005`). A `Bound` bay is not judged here —
 its owned set exists only at settle. `oneSubject + Box` is legal (the bay owns its air);
 `anySubject + Bound` is legal (a pen owns the animal's cells) only when every focus that binds a
@@ -618,15 +618,21 @@ consequence of the blueprint, not a second declaration.
 | --- | --- |
 | id/bounds non-null, bounds non-empty, at least one check | `SC-BPT-0001` |
 | two bays' owned sets (`Box` cells, `Declared` cells) intersect and at least one is `exclusive`; a `Bound` owned set is unknown at build and is not judged here | `SC-BPT-0002` |
-| a bay is empty or leaves `bounds` | `SC-BPT-0003` |
+| a bay leaves `bounds` | `SC-BPT-0003` |
 | duplicate bay/check/seam id, or two different bays with one id | `SC-BPT-0004` |
-| coverage/footprint R1–R4, an `exclusive` bay owning no known cell (`None`, an empty `Declared`), `Declared` outside bounds | `SC-BPT-0005` |
-| anchor roles duplicated, primary role absent, allowed empty/duplicate/not upright, anchors without a policy | `SC-BPT-0006` |
+| a bay breaks its coverage obligation (§4.1), a claiming bay binds a non-claimable focus, an `exclusive` bay owning no known cell (`None`, an empty `Declared`) | `SC-BPT-0005` |
+| anchor roles duplicated, primary role absent, anchors without a policy | `SC-BPT-0006` |
 | computation DAG cycle/missing input/duplicate output/empty region/section input | `SC-BPT-0007` |
-| derivation order negative/duplicate, output duplicate/also a computation output | `SC-BPT-0008` |
+| derivation order duplicate, output duplicate/also a computation output | `SC-BPT-0008` |
 | seam outside every bay | `SC-BPT-0009` |
+| a declared footprint leaves `bounds` | `SC-BPT-0010` |
 | a focus's static cells leave its bay | `SC-CHK-0003` |
 | a required `match` key is produced by no computation | `SC-CHK-0002` |
+
+An empty `Bay`, an empty, duplicated or `uprightOnly`-breaking `allowed` list (`OrientationPolicy`)
+and a negative `DerivationSpec.order` are rejected at construction, before `build()`, by a bare
+`IllegalArgumentException` that carries no code; the document face catches each and reports it as a
+positioned `SC-DOC-0002`.
 
 A required `instance` key needs no computation producer: the host may supply it from the instance's
 cached context, and a runtime absence is the engine's `SC-CTX-0007`, not a build error. A required

@@ -179,9 +179,8 @@ public final class Codes {
         FindingCode.Family.bpt,
         3,
         Severity.error,
-        "A bay is empty or outside the blueprint bounds.",
-        "Every bay must be non-empty and contained in the root bounds. Check the bay cells "
-                + "against the declaration."
+        "A bay is outside the blueprint bounds.",
+        "Every bay must be contained in the root bounds. Check the bay cells " + "against the declaration."
     );
 
     public static final CodeEntry duplicateId = entry(
@@ -197,7 +196,8 @@ public final class Codes {
         5,
         Severity.error,
         "The coverage or footprint rules failed.",
-        "The declared coverage and footprint cannot be satisfied by the checks. Check rules R1 " + "to R4 for this bay."
+        "Check the bay's coverage kind against its checks, make every subject-binding focus of "
+                + "a claiming bay claimable, and give an exclusive bay a footprint that owns cells."
     );
 
     public static final CodeEntry anchorInvalid = entry(

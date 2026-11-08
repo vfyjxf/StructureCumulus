@@ -43,6 +43,7 @@ dev.vfyjxf.cumulus.mc.plugin.PluginDependency  # batch 2: plugin loading
 dev.vfyjxf.cumulus.mc.plugin.PluginLoader  # batch 2: plugin loading
 dev.vfyjxf.cumulus.mc.plugin.PluginLoadingException  # batch 2: plugin loading
 dev.vfyjxf.cumulus.mc.plugin.PluginLookup  # batch 2: plugin loading
+dev.vfyjxf.cumulus.mc.plugin.PluginMarker  # batch 2: plugin loading
 dev.vfyjxf.cumulus.mc.plugin.SpiPluginLookup  # batch 2: plugin loading
 dev.vfyjxf.cumulus.mc.trait.BlockTraitContext  # batch 3: trait providers
 dev.vfyjxf.cumulus.mc.trait.BlockTraitProviders  # batch 3: trait providers

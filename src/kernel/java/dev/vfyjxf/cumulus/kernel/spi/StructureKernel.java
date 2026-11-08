@@ -36,7 +36,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
-/** The facade: five pipeline operations, two helpers and three lookups. */
+/** The facade: four pipeline operations, three helpers and four lookups. */
 public final class StructureKernel {
 
     private final Catalogs catalogs;

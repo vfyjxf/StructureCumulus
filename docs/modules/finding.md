@@ -345,9 +345,9 @@ sites lists every class that emits it.
 | `SC-CLM-0005` | ERROR | P | an exclusive bay's resolved footprint is empty (a Bound footprint whose subjects are absent or air) | claim | `MatchEngine` (validate), `ClaimPlanner` (`PlanRejected`) |
 | `SC-BPT-0001` | ERROR | P | a blueprint has no checks/bounds | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
 | `SC-BPT-0002` | ERROR | P | two bays overlap with an exclusive side | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
-| `SC-BPT-0003` | ERROR | P | a bay is empty or outside bounds | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0003` | ERROR | P | a bay is outside bounds | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
 | `SC-BPT-0004` | ERROR | P | a bay/check/seam/anchor id is duplicated | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
-| `SC-BPT-0005` | ERROR | P | coverage/footprint rules R1–R4 fail | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
+| `SC-BPT-0005` | ERROR | P | a bay breaks its coverage obligation, a claiming bay binds a non-claimable focus, or an exclusive bay owns no known cell | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
 | `SC-BPT-0006` | ERROR | P | anchor/orientation policy is invalid | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel), adapter `McAnchors` |
 | `SC-BPT-0007` | ERROR | P | a computation plan is cyclic or has a missing/duplicate producer | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
 | `SC-BPT-0008` | ERROR | P | a derivation order/output is invalid | structure | `BlueprintBuilder.build`, `DocumentCompiler` (the `BlueprintRejected` channel) |
