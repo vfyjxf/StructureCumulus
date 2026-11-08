@@ -120,6 +120,33 @@ class ClaimStressScenarioTest {
     }
 
     @Test
+    void aRevisionMovedRetryReplacesASameSitingInstance() {
+        ClaimLedger ledger = MagicFixtures.ledger();
+        Blueprint blueprint = wall("claim/retry_replacement", Sharing.exclusive);
+        ClaimView blind = new ClaimView(List.of(), ledger.revision(), true);
+        MatchRequest request = MagicFixtures
+                .request(blueprint, siting, airView(), blind, MagicFixtures.rival, MagicFixtures.rivalInstance);
+        MatchResult.Admitted admitted = assertInstanceOf(MatchResult.Admitted.class, MatchEngine.check(request));
+
+        assertInstanceOf(MatchResult.Formed.class, MagicFixtures.settle(blueprint, siting, airView(), ledger));
+        assertEquals(blind.revision() + 1, ledger.revision(), "another instance settled between check and settle");
+
+        MatchResult.Formed formed = assertInstanceOf(
+            MatchResult.Formed.class,
+            MatchEngine.settle(request, admitted, ledger, TestAttempt.of(request))
+        );
+        assertFalse(
+            MagicFixtures.hasCode(formed, Codes.claimConflict),
+            "a same-siting incumbent is replaced by the settle, never reported (D-48)"
+        );
+        assertEquals(1, TestWorld.rows(ledger).size(), "the takeover leaves one instance's rows");
+        assertTrue(
+            TestWorld.rows(ledger).stream().allMatch(row -> row.instance().equals(MagicFixtures.rivalInstance)),
+            "the retry's settle replaced the incumbent"
+        );
+    }
+
+    @Test
     void aScatteredContestRendersOneLocusOverEveryCell() {
         ClaimLedger ledger = MagicFixtures.ledger();
         CuboidSet cells = CuboidSet.of(Cuboid.of(LatticePoint.of(2, 0, 2)), Cuboid.of(LatticePoint.of(-2, 0, -2)));

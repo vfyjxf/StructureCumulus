@@ -183,8 +183,10 @@ settle(request, admitted, ledger, attempt):
                                                 admitted.ledgerRevision()))
       if RevisionMoved:
           fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
-              matrix(rows, fresh.rows()) cancelled -> Undecided(cancelled);
-                                        conflict  -> Failed(SC-CLM-0001); retry once at fresh.revision()
+              survivors = fresh.rows() minus this instance's rows minus every row at one of the
+                  request's sitings (D-48: the settle replaces them, so they never conflict)
+              matrix(rows, survivors) cancelled     -> Undecided(cancelled);
+                                        conflict   -> Failed(SC-CLM-0001); retry once at fresh.revision()
           moved twice                                 -> Undecided(ledgerMoved)
       if Conflict                                     -> Failed(SC-CLM-0001) with incumbents
       revision = settled.revision()                   // unchanged when the content matched (D-60)
