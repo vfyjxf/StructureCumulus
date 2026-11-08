@@ -293,6 +293,7 @@ public final class LevelCapture implements WorldCapture {
         private final Map<SectionKey, Cuboid> digestRegions = new TreeMap<>();
         private final Map<Long, PalettedContainer<BlockState>> snapshotStates = new HashMap<>();
         private final Map<Long, FluidState[]> snapshotFluids = new HashMap<>();
+        private final Set<Long> airSections = new HashSet<>();
         private final Set<Long> copiedSections = new HashSet<>();
         private final Map<LatticePoint, NestedExtent> blockExtents = new TreeMap<>();
         private final LevelWatch.WatchRegion watch = new LevelWatch.WatchRegion();
@@ -385,6 +386,7 @@ public final class LevelCapture implements WorldCapture {
                 level.getHeight(),
                 snapshotStates,
                 snapshotFluids,
+                airSections,
                 capturedEntities
             );
         }
@@ -527,10 +529,15 @@ public final class LevelCapture implements WorldCapture {
                         }
                         LevelChunkSection chunkSection = chunk.getSection(sectionIndex);
                         long worldSection = SnapshotLevel.worldSectionKey(worldX, worldY, worldZ);
-                        if (copiedSections.add(worldSection) && !chunkSection.hasOnlyAir()) {
-                            PalettedContainer<BlockState> states = chunkSection.getStates().copy();
-                            snapshotStates.put(worldSection, states);
-                            snapshotFluids.put(worldSection, copyFluids(states));
+                        if (copiedSections.add(worldSection)) {
+                            // an all-air section is captured without its 4096-cell container
+                            if (chunkSection.hasOnlyAir()) {
+                                airSections.add(worldSection);
+                            } else {
+                                PalettedContainer<BlockState> states = chunkSection.getStates().copy();
+                                snapshotStates.put(worldSection, states);
+                                snapshotFluids.put(worldSection, copyFluids(states));
+                            }
                         }
                         PalettedContainer<BlockState> sectionStates = snapshotStates.get(worldSection);
                         BlockState state = sectionStates == null

@@ -36,6 +36,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.material.Fluids;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
@@ -46,6 +48,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -109,6 +112,40 @@ class HostLawsTest {
                     );
                 }
                 chicken.discard();
+            } finally {
+                region.clear();
+            }
+        });
+    }
+
+    @Test
+    void anAllAirSectionStillReadsAir() throws Exception {
+        host.onServer(() -> {
+            ServerLevel level = host.overworld();
+            Region region = new Region(level, 2);
+            try {
+                int airY = region.block(0, 40, 0).getY();
+                LevelChunk chunk = level.getChunk(region.block(0, 0, 0).getX() >> 4, region.block(0, 0, 0).getZ() >> 4);
+                assertTrue(
+                    chunk.getSection(chunk.getSectionIndex(airY)).hasOnlyAir(),
+                    "the captured section is all air"
+                );
+                Cuboid bounds = region.bounds(0, 40, 0, 1, 41, 1);
+                LatticePoint cell = region.point(0, 40, 0);
+
+                try (SnapshotLease lease = captured(level, bounds, kinds(Set.of())).lease()) {
+                    WorldView view = lease.view();
+                    assertTrue(view.read(cell) instanceof CellRead.Found, "the air cell reads Found");
+                    assertTrue(
+                        Objects.requireNonNull(view.get(cell, HostTypes.blockState), "air").isAir(),
+                        "an all-air section still answers its captured air (D-80)"
+                    );
+                    assertEquals(
+                        Fluids.EMPTY.defaultFluidState(),
+                        view.get(cell, HostTypes.fluidState),
+                        "the all-air section answers the empty fluid"
+                    );
+                }
             } finally {
                 region.clear();
             }
