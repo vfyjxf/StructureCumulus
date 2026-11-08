@@ -34,7 +34,8 @@ public interface ContextStore {
             @Override
             public StructureContext context(InstanceId instance) {
                 Objects.requireNonNull(instance, "instance");
-                return contexts.computeIfAbsent(instance, StructureContext::empty);
+                StructureContext context = contexts.get(instance);
+                return context == null ? StructureContext.empty(instance) : context;
             }
 
             @Override
