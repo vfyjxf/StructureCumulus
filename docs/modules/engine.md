@@ -183,8 +183,10 @@ settle(request, admitted, ledger, attempt):
                                                 admitted.ledgerRevision()))
       if RevisionMoved:
           fresh = ledger.read(derived.footprint()); !fresh.available() -> Undecided(ledgerUnavailable);
-              matrix(rows, fresh.rows()) cancelled -> Undecided(cancelled);
-                                        conflict  -> Failed(SC-CLM-0001); retry once at fresh.revision()
+              survivors = fresh.rows() minus this instance's rows minus every row at one of the
+                  request's sitings (D-48: the settle replaces them, so they never conflict)
+              matrix(rows, survivors) cancelled     -> Undecided(cancelled);
+                                        conflict   -> Failed(SC-CLM-0001); retry once at fresh.revision()
           moved twice                                 -> Undecided(ledgerMoved)
       if Conflict                                     -> Failed(SC-CLM-0001) with incumbents
       revision = settled.revision()                   // unchanged when the content matched (D-60)
@@ -383,7 +385,9 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
 - Gate: an invalidated lease is `Dropped`; nothing written.
 - Ledger: revision moved once retries; twice is `Undecided`; conflict is `Failed`; no row on failure.
 - Bindings: another snapshot, a nested frame, a cell outside the bay, an empty exclusive bound.
-- Derive: order, missing deriver, missing key, one publish, stale match key.
+- Derive: order, missing deriver, missing key, one publish, stale match key; the requires gate and
+  the pass's view answer by the slot `(id, type)`, so a requirement declared with another merge
+  instance still runs.
 
 ## 10. Dependencies
 

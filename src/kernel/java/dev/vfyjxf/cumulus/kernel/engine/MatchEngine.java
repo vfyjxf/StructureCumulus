@@ -487,7 +487,12 @@ public final class MatchEngine {
                         admitted.outcome()
                     );
                 }
-                List<Finding> retryConflicts = conflicts(phase, derived.rows(), fresh.rows(), request.cancel());
+                List<Finding> retryConflicts = conflicts(
+                    phase,
+                    derived.rows(),
+                    settleSurvivors(derived.rows(), fresh.rows()),
+                    request.cancel()
+                );
                 if (retryConflicts == null) {
                     findings.add(code(Codes.cancelled, phase, "the attempt was cancelled", null));
                     return new MatchResult.Undecided(
@@ -565,7 +570,9 @@ public final class MatchEngine {
         Objects.requireNonNull(derivers, "derivers");
         Objects.requireNonNull(contexts, "contexts");
         StructureContext base = contexts.context(formed.instance());
-        Map<ContextKey<?>, Object> values = new LinkedHashMap<>(base.values());
+        // the slot comparator makes every lookup below answer by (id, type), not by the full record
+        Map<ContextKey<?>, Object> values = new TreeMap<>(ContextKeys.order());
+        values.putAll(base.values());
         List<Finding> findings = new ArrayList<>(formed.findings().findings());
         List<DerivationSpec> ordered = new ArrayList<>(derivations);
         ordered.sort(Comparator.comparingInt(DerivationSpec::order).thenComparing(spec -> spec.deriver()));
@@ -808,6 +815,23 @@ public final class MatchEngine {
             }
         }
         return FindingBundle.of(missing);
+    }
+
+    /** The retry matrix sees only the incumbents the settle leaves in place (D-48). */
+    private static List<ClaimRow> settleSurvivors(List<ClaimRow> requested, List<ClaimRow> held) {
+        Set<Siting> replaced = new HashSet<>();
+        for (ClaimRow row : requested) {
+            replaced.add(row.siting());
+        }
+        InstanceId instance = requested.get(0).instance();
+        List<ClaimRow> survivors = new ArrayList<>(held.size());
+        for (ClaimRow incumbent : held) {
+            if (incumbent.instance().equals(instance) || replaced.contains(incumbent.siting())) {
+                continue;
+            }
+            survivors.add(incumbent);
+        }
+        return survivors;
     }
 
     private static @Nullable List<Finding> conflicts(

@@ -87,6 +87,16 @@ class ContextTest {
     }
 
     @Test
+    void aBareReadDoesNotWriteTheTable() {
+        ContextStore store = ContextStore.inMemory();
+
+        StructureContext read = store.context(instance);
+        assertTrue(read.keys().isEmpty(), "an unknown instance reads as an empty context");
+        assertEquals(0, read.revision());
+        assertNull(store.remove(instance), "a bare read never creates the stored context");
+    }
+
+    @Test
     void absentAndMismatchedValuesStayAbsent() {
         ContextKey<Long> key = ContextKeys.of(id("key"), Long.class, Retention.instance);
         StructureContext context = StructureContext.empty(instance);

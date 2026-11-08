@@ -149,10 +149,6 @@ class AdversarialFuzzTest {
             InstanceId first = new InstanceId(world, 1L);
             InstanceId second = new InstanceId(otherWorld, 1L);
             Map<InstanceId, StructureContext> model = new LinkedHashMap<>();
-            model.put(first, StructureContext.empty(first));
-            model.put(second, StructureContext.empty(second));
-            store.context(first);
-            store.context(second);
             for (int step = 0; step < 80; step++) {
                 String where = "seed=" + seed + " step=" + step;
                 InstanceId target = random.nextBoolean() ? first : second;
@@ -161,28 +157,34 @@ class AdversarialFuzzTest {
                     Map<ContextKey<?>, Object> values = randomValues(random);
                     Spend spend = new Spend(random.nextInt(4), random.nextInt(3));
                     FindingBundle findings = randomFindings(random, where);
-                    StructureContext expected = replace(
-                        Objects.requireNonNull(model.get(target)),
-                        values,
-                        findings,
-                        spend
-                    );
+                    StructureContext expected = replace(readModel(target, model), values, findings, spend);
                     StructureContext actual = store.publish(target, values, findings, spend);
                     assertEquals(expected, actual, where + " publish result");
                     assertEquals(expected, store.context(target), where + " stored context");
                     InstanceId other = target.equals(first) ? second : first;
-                    assertEquals(model.get(other), store.context(other), where + " the other instance must not change");
+                    assertEquals(
+                        readModel(other, model),
+                        store.context(other),
+                        where + " the other instance must not change"
+                    );
                     model.put(target, expected);
                 } else if (op < 8) {
-                    StructureContext before = model.get(target);
+                    StructureContext stored = model.get(target);
                     StructureContext removed = store.remove(target);
-                    assertEquals(before, removed, where + " first remove returns the stored context");
-                    assertNull(store.remove(target), where + " second remove answers null");
-                    StructureContext empty = StructureContext.empty(target);
-                    assertEquals(empty, store.context(target), where + " the removed instance reads empty");
-                    model.put(target, empty);
+                    if (stored == null) {
+                        assertNull(removed, where + " removing a never-written instance answers null");
+                    } else {
+                        assertEquals(stored, removed, where + " first remove returns the stored context");
+                    }
+                    assertEquals(
+                        StructureContext.empty(target),
+                        store.context(target),
+                        where + " the removed instance reads empty"
+                    );
+                    assertNull(store.remove(target), where + " a bare read after the remove writes nothing");
+                    model.remove(target);
                 } else {
-                    StructureContext before = model.get(target);
+                    StructureContext before = readModel(target, model);
                     assertThrows(
                         IllegalArgumentException.class,
                         () -> store.publish(target, Map.of(matchKey, 1L), FindingBundle.empty(), Spend.zero),
@@ -192,6 +194,12 @@ class AdversarialFuzzTest {
                 }
             }
         }
+    }
+
+    /** The context a read answers: the stored one, or the empty context when nothing was written. */
+    private static StructureContext readModel(InstanceId instance, Map<InstanceId, StructureContext> model) {
+        StructureContext stored = model.get(instance);
+        return stored == null ? StructureContext.empty(instance) : stored;
     }
 
     @Test

@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /** One frame's immutable host snapshot, addressed by local coordinates. */
@@ -44,6 +45,7 @@ final class SnapshotLevel implements BlockGetter {
     private final int height;
     private final Map<Long, PalettedContainer<BlockState>> sections;
     private final Map<Long, FluidState[]> fluids;
+    private final Set<Long> airSections;
     private final List<CapturedEntity> entities;
     private final Map<NamespacedId, EntityType<?>> entityTypesByBody;
 
@@ -56,12 +58,26 @@ final class SnapshotLevel implements BlockGetter {
         Map<Long, FluidState[]> fluids,
         List<CapturedEntity> entities
     ) {
+        this(origin, bounds, minBuildHeight, height, sections, fluids, Set.of(), entities);
+    }
+
+    SnapshotLevel(
+        LatticePoint origin,
+        Cuboid bounds,
+        int minBuildHeight,
+        int height,
+        Map<Long, PalettedContainer<BlockState>> sections,
+        Map<Long, FluidState[]> fluids,
+        Set<Long> airSections,
+        List<CapturedEntity> entities
+    ) {
         this.origin = Objects.requireNonNull(origin, "origin");
         this.bounds = Objects.requireNonNull(bounds, "bounds");
         this.minBuildHeight = minBuildHeight;
         this.height = height;
         this.sections = Map.copyOf(Objects.requireNonNull(sections, "sections"));
         this.fluids = Map.copyOf(Objects.requireNonNull(fluids, "fluids"));
+        this.airSections = Set.copyOf(Objects.requireNonNull(airSections, "airSections"));
         ArrayList<CapturedEntity> sortedEntities = new ArrayList<>(entities.size());
         HashMap<NamespacedId, EntityType<?>> typesByBody = new HashMap<>(entities.size());
         for (CapturedEntity entity : entities) {
@@ -125,7 +141,11 @@ final class SnapshotLevel implements BlockGetter {
     }
 
     private boolean captured(LatticePoint pos) {
-        return contains(pos.x(), pos.y(), pos.z()) && sections.containsKey(sectionAt(pos.x(), pos.y(), pos.z()));
+        if (!contains(pos.x(), pos.y(), pos.z())) {
+            return false;
+        }
+        long key = sectionAt(pos.x(), pos.y(), pos.z());
+        return sections.containsKey(key) || airSections.contains(key);
     }
 
     @SuppressWarnings("unchecked")
