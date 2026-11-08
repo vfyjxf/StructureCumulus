@@ -565,7 +565,9 @@ public final class MatchEngine {
         Objects.requireNonNull(derivers, "derivers");
         Objects.requireNonNull(contexts, "contexts");
         StructureContext base = contexts.context(formed.instance());
-        Map<ContextKey<?>, Object> values = new LinkedHashMap<>(base.values());
+        // the slot comparator makes every lookup below answer by (id, type), not by the full record
+        Map<ContextKey<?>, Object> values = new TreeMap<>(ContextKeys.order());
+        values.putAll(base.values());
         List<Finding> findings = new ArrayList<>(formed.findings().findings());
         List<DerivationSpec> ordered = new ArrayList<>(derivations);
         ordered.sort(Comparator.comparingInt(DerivationSpec::order).thenComparing(spec -> spec.deriver()));

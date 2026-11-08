@@ -133,6 +133,29 @@ class DeriveScenarioTest {
     }
 
     @Test
+    void aRequirementOfTheSameSlotRunsEvenWithAnotherMergeInstance() {
+        ContextKey<Long> stored = ContextKeys.of(id("heat"), Long.class, Retention.instance, Long::sum);
+        ContextKey<Long> declared = ContextKeys
+                .of(id("heat"), Long.class, Retention.instance, (left, right) -> left + right + 1);
+        ContextKey<Long> derived = ContextKeys.of(id("derived"), Long.class, Retention.instance);
+        InstanceId instance = new InstanceId(TestWorld.world, 1);
+        ContextStore store = ContextStore.inMemory();
+        store.publish(instance, Map.of(stored, 40L), FindingBundle.empty(), Spend.zero);
+
+        List<String> ran = new ArrayList<>();
+        Deriver<Long> reader = echo(derived, declared, 1L, ran, "reader");
+        Catalog<Deriver<?>> derivers = Catalog.<Deriver<?>>builder(id("derivers")).put(id("reader"), reader).build();
+        List<DerivationSpec> specs = List.of(new DerivationSpec(id("reader"), Value.object(), derived.id(), 0));
+
+        StructureContext context = MatchEngine.derive(formed(instance), specs, derivers, store);
+        assertEquals(List.of("reader"), ran, "a same-slot requirement is present, not absent");
+        assertEquals(41L, context.get(derived));
+        assertTrue(
+            context.findings().findings().stream().noneMatch(finding -> finding.code().equals(Codes.keyAbsent.code()))
+        );
+    }
+
+    @Test
     void deriveReadsTheStoreNotTheFormedOutcome() {
         ContextKey<Long> heat = ContextKeys.of(id("heat"), Long.class, Retention.instance);
         ContextKey<Long> derived = ContextKeys.of(id("derived"), Long.class, Retention.instance);

@@ -383,7 +383,9 @@ default for a refused section read and `SC-SPI-0001` extension guard. A host cod
 - Gate: an invalidated lease is `Dropped`; nothing written.
 - Ledger: revision moved once retries; twice is `Undecided`; conflict is `Failed`; no row on failure.
 - Bindings: another snapshot, a nested frame, a cell outside the bay, an empty exclusive bound.
-- Derive: order, missing deriver, missing key, one publish, stale match key.
+- Derive: order, missing deriver, missing key, one publish, stale match key; the requires gate and
+  the pass's view answer by the slot `(id, type)`, so a requirement declared with another merge
+  instance still runs.
 
 ## 10. Dependencies
 
