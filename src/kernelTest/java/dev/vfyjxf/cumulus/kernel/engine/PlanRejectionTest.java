@@ -13,8 +13,12 @@ import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
 import dev.vfyjxf.cumulus.kernel.structure.Coverage;
+import dev.vfyjxf.cumulus.kernel.structure.Expectation;
+import dev.vfyjxf.cumulus.kernel.structure.ExpectationContext;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
+import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
+import dev.vfyjxf.cumulus.kernel.structure.Reply;
 import dev.vfyjxf.cumulus.kernel.world.OccupantDescriptor;
 import dev.vfyjxf.cumulus.kernel.world.OccupantKind;
 import dev.vfyjxf.cumulus.kernel.world.OccupantRef;
@@ -23,8 +27,10 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -119,6 +125,47 @@ class PlanRejectionTest {
         assertEquals(Codes.bindingInvalid, nestedRejection.code());
         String message = Objects.requireNonNull(nestedRejection.getMessage(), "message");
         assertTrue(message.startsWith("SC-CLM-0004:"), message);
+    }
+
+    @Test
+    void anUnrelatedIllegalArgumentExceptionIsNotReportedAsAPlanFailure() {
+        Bay bay = MagicFixtures
+                .bay(id("throwing_reads_bay"), oneCell, Coverage.everyCell, Footprint.box(), Sharing.shared);
+        AtomicInteger calls = new AtomicInteger();
+        // the engine calls reads() in chargeScope outside its extension guard, unlike take/test which become SC-SPI-0001
+        Expectation<OccupantSnapshot> throwingReads = new Expectation<>() {
+            @Override
+            public Class<OccupantSnapshot> subject() {
+                return OccupantSnapshot.class;
+            }
+
+            @Override
+            public ReadScope reads() {
+                if (calls.incrementAndGet() > 1) {
+                    throw new IllegalArgumentException("unrelated");
+                }
+                return ReadScope.none();
+            }
+
+            @Override
+            public Reply test(ExpectationContext<OccupantSnapshot> ctx) {
+                return Reply.match();
+            }
+        };
+        Blueprint blueprint = Blueprint.builder(id("throwing_reads")).bounds(Cuboid.of(origin))
+                .check(Check.of(id("throwing_reads_check"), bay, Focuses.occupant(origin), throwingReads)).build();
+        Siting siting = MagicFixtures.identity(origin);
+        MatchRequest request = MagicFixtures
+                .request(blueprint, siting, MagicFixtures.view(), new ClaimView(List.of(), 0, true));
+
+        IllegalArgumentException thrown = assertThrows(
+            IllegalArgumentException.class,
+            () -> MatchEngine.check(request),
+            "an IAE that is not a PlanRejected stays a programmer error (D-66)"
+        );
+        assertEquals("unrelated", thrown.getMessage());
+        assertFalse(thrown instanceof PlanRejected, "the engine did not wrap it as a planner refusal");
+        assertEquals(2, calls.get(), "the engine's own reads() call threw");
     }
 
     @Test
