@@ -554,8 +554,14 @@ final class StructureSetHost {
     StructureSetHost(StructureKernel kernel, StructureManager structures);
     StructureSetResult check(StructureSet set, SnapshotLease lease, OwnerId owner,
                              Budget budget, Function<StructureSpec, StructureAttempt> drafts);
+    StructureSetResult check(StructureSet set, SnapshotLease lease, OwnerId owner,
+                             Budget budget, StructureManager structures,
+                             Function<StructureSpec, StructureAttempt> drafts);
     StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner,
                            Budget budget, Function<StructureSpec, StructureAttempt> drafts);
+    StructureSetResult run(StructureSet set, SnapshotLease lease, OwnerId owner,
+                           Budget budget, StructureManager structures,
+                           Function<StructureSpec, StructureAttempt> drafts);
 }
 
 record StructureSetResult(Map<NamespacedId, MatchOutcome> outcomes, List<Finding> setFindings,
@@ -573,7 +579,8 @@ reserves a draft per spec (D-70); the host calls it in check order root-first, a
 shared by presence and every member attempt. `StructureSetHost.check` takes the same
 arguments, runs the same presence/link/check sequence and stops before the settle pass: it returns
 outcomes and set findings only, with empty `settled`, `rolledBack`, `rollbackFailures` and `claims`.
-Rollback dispatches `StructureEvent.Broken` through the
+Each also has an overload that takes the `StructureManager` explicitly, for a caller whose drafts
+function reserves from that manager. Rollback dispatches `StructureEvent.Broken` through the
 bound `StructureManager` for every formed attempt; it does not call `ContextStore.remove`.
 
 A caller binds the level's kernel and manager (D-70):
