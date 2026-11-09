@@ -82,6 +82,7 @@ final class CellIterator implements Iterator<LatticePoint> {
         }
 
         @Override
+        @SuppressWarnings("PMD.OverrideBothEqualsAndHashCodeOnComparable") // a heap cursor mutates after insertion, so only compareTo is sound
         public int compareTo(Cursor other) {
             return cell().compareTo(other.cell());
         }
