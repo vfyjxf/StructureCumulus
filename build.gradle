@@ -524,18 +524,17 @@ tasks.register('verifyHarnessIsolation') {
     }
 }
 
-// The published jar stays game-test-free: no GameTest class and no GameTest structure template in it.
+// The published jar stays game-test-free: no GameTest class and no nbt data file in it.
 tasks.register('verifyGameTestIsolation') {
     group = 'verification'
-    description = 'Verifies the production jar carries no GameTest class and no GameTest structure template.'
+    description = 'Verifies the production jar carries no GameTest class and no nbt data file.'
     inputs.files(productionJar)
     doLast {
         def offenders = []
         new java.util.zip.ZipFile(productionJar.get().asFile).withCloseable { zip ->
             zip.entries().each { entry ->
                 if (entry.name ==~ /.*GameTest.*\.class/
-                        || entry.name.endsWith('structure/empty.nbt')
-                        || entry.name.endsWith('structure/capturegametest.empty.nbt')) {
+                        || entry.name ==~ /.*\.nbt/) {
                     offenders.add(entry.name)
                 }
             }
@@ -543,7 +542,7 @@ tasks.register('verifyGameTestIsolation') {
         if (!offenders.isEmpty()) {
             throw new GradleException('the production jar carries GameTest code or data: ' + offenders)
         }
-        logger.lifecycle('gametest isolation verified: no GameTest class or template in the production jar')
+        logger.lifecycle('gametest isolation verified: no GameTest class or nbt data in the production jar')
     }
 }
 
