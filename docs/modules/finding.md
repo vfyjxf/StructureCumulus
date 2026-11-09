@@ -328,7 +328,7 @@ sites lists every class that emits it.
 | --- | --- | --- | --- | --- | --- |
 | `SC-SPC-0001` | ERROR | P | a locus/cell cannot be mapped into the requested frame | space | `MatchEngine` check and settle, `ClaimPlanner` (`PlanRejected`), `StructureSetCompiler`, adapter `StructureSet`, `StructureSetHost` |
 | `SC-SPC-0002` | ERROR | P | a declared cell or box would leave the lattice | space | `BuiltinSupport` (the built-in focus factories) |
-| `SC-OCC-0001` | ERROR | P | a focus could not bind the subject it needs (none, more than one, or a missing part) | world | `Focuses` (built by `Check.missing`) |
+| `SC-OCC-0001` | ERROR | P | a focus could not bind the subject it needs (none, more than one, or a missing part) | world | `Check.missing` |
 | `SC-OCC-0002` | WARNING | P | a footprint leaves the snapshot | world | `Focuses` |
 | `SC-OCC-0003` | ERROR | P | a nested view was cut by depth, an element cap, a cycle or an unloaded chunk | world | `Focuses.nested` |
 | `SC-OCC-0004` | ERROR | P | a required read is unavailable (default refusal; also the substitute for a relayed kernel code) | world | `Check.unreadable`/`Check.relay`, adapter `CaptureReports`; refusal default in `BayView`, `Expectations`, `MatchEngine`, `LevelSnapshot` |
@@ -336,7 +336,7 @@ sites lists every class that emits it.
 | `SC-EXP-0002` | ERROR | P | a negated test matched | structure | `Expectations.not` |
 | `SC-EXP-0003` | ERROR | P | a threshold cannot be met | structure | `Expectations` thresholds |
 | `SC-EXP-0004` | ERROR | P | a focus or expectation declaration names no kind (an unregistered kind is `SC-DOC-0003`) | document | `DocumentCompiler` |
-| `SC-EXP-0005` | ERROR | P | a factory returned null or bad args | document | `DocumentCompiler`, `BuiltinSupport` (for `BuiltinFocuses`/`BuiltinExpectations`), adapter `AdapterExpectations` |
+| `SC-EXP-0005` | ERROR | P | a factory returned null or bad args | document | `DocumentCompiler`, `BuiltinFocuses`, `BuiltinExpectations`, adapter `AdapterExpectations` |
 | `SC-EXP-0006` | ERROR | P | a cell in the derived envelope holds a non-air occupant | structure | `Expectations.envelopeAir` (the synthetic envelope check) |
 | `SC-CLM-0001` | ERROR | P | two claims conflict | claim | `MatchEngine` check and settle, `ClaimPlanner` (`PlanRejected`, planned rows overlap) |
 | `SC-CLM-0002` | WARNING | – | the ledger cannot answer | claim | `MatchEngine` check and settle |
@@ -392,7 +392,7 @@ sites lists every class that emits it.
 | `SC-SET-0005` | ERROR | – | duplicate satellite placement | document | `StructureSetCompiler`, adapter `StructureSet.place` |
 | `SC-SET-0006` | ERROR | – | duplicate parent face link | document | `StructureSetCompiler`, adapter `StructureSet.place` |
 | `SC-SET-0007` | ERROR | – | structure set rollback failed | adapter | `StructureSetHost` settle |
-| `SC-SET-0008` | ERROR | – | root/satellite placement collision | document | `StructureSetCompiler`, adapter `StructureSet.place`, `StructureSetHost` re-check |
+| `SC-SET-0008` | ERROR | – | root/satellite placement collision | document | `StructureSetCompiler`, adapter `StructureSet.place` |
 | `SC-MC-0006` | ERROR | P | a block property does not match | adapter | `property` expectation (mismatch) |
 | `SC-MC-0007` | ERROR | P | a block state does not match | adapter | `state` expectation (mismatch) |
 | `SC-MC-0008` | ERROR | P | a block/fluid/entity tag does not match | adapter | `tag` expectation (mismatch) |
