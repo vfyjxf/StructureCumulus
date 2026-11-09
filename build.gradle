@@ -262,9 +262,33 @@ tasks.register('determinismCheck') {
             text.endsWith('\n') ? text : text + '\n'
         }
         if (determinismUpdate.isPresent()) {
+            def firstDiff = { String left, String right ->
+                def a = left.readLines()
+                def b = right.readLines()
+                for (int line = 0; line < Math.max(a.size(), b.size()); line++) {
+                    def want = line < a.size() ? a[line] : '<missing>'
+                    def have = line < b.size() ? b[line] : '<missing>'
+                    if (want != have) {
+                        return "line ${line + 1}: [${want}] vs [${have}]"
+                    }
+                }
+                return 'no line-level difference'
+            }
+            def disagreements = []
+            determinismModes.eachWithIndex { mode, index ->
+                if (index > 0 && texts[index] != texts[0]) {
+                    disagreements << "JVM 1 (-XX:hashCode=${determinismModes[0]}) vs JVM ${index + 1} " +
+                        "(-XX:hashCode=${mode}), ${firstDiff(texts[0], texts[index])}"
+                }
+            }
+            if (!disagreements.isEmpty()) {
+                throw new GradleException(
+                    "the three runs disagree; refusing to bless a nondeterministic tree:\n${disagreements.join('\n')}"
+                )
+            }
             determinismGolden.parentFile.mkdirs()
             determinismGolden.setText(texts[0], 'UTF-8')
-            logger.lifecycle('determinism golden updated from the first JVM run')
+            logger.lifecycle('determinism golden updated from three agreeing JVM runs')
             return
         }
         if (!determinismGolden.exists()) {
