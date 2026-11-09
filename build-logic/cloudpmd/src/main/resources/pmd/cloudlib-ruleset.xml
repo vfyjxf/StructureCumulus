@@ -1088,4 +1088,115 @@
         <priority>1</priority>
     </rule>
 
+    <!-- ======================================================================================
+          SESSION DEFECTS - the five defect classes of the StructureCumulus PMD lane
+          ============================================================================================
+          Each rule below mechanises one defect this project's review session actually hit; the
+          comment names the defect id, the shape it had, and the stock the first full-tree run
+          measured. All five run over BOTH gated source sets of this project (pmdMain and the
+          kernel gate pmdKernel wired in build.gradle), because the finding and context-key
+          machinery lives in the kernel sources pmdMain cannot see. -->
+
+    <!-- C-01 Finding message: a message must not embed its own SC code (K06-D06).
+          The renderer prefixes the finding code itself, so `message("SC-OCC-0004 …")` renders the
+          code twice. Two sinks are checked: `.message(...)` on a Finding.builder chain (a split
+          Finding.Builder local included) and a same-file `code(...)` helper that returns a Finding
+          (MatchEngine's shape). The deliberate code carriers are NOT Finding messages and stay
+          legal: BlueprintBuilder's fail(code, message) and the PlanRejected/BlueprintRejected
+          constructors (D-66), the IAE texts of Catalog.put and Check (D-69), and notes that name
+          another code (CaptureReports relays "reported as SC-OCC-0004").
+          Stock: 0 across main and kernel. -->
+    <rule name="FindingMessageMustNotEmbedCodes"
+          language="java"
+          message="A Finding message must not embed its SC code"
+          class="dev.vfyjxf.cloudlib.pmd.rules.FindingMessageMustNotEmbedCodesRule">
+        <description>
+            Reports a string literal containing an SC-family code passed to the message slot of a
+            Finding builder chain or of a same-file Finding-returning code(...) helper; the renderer
+            prefixes the code itself. K06-D06.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- C-02 Context-key maps: slot order, not hash order (K08-D01).
+          A ContextKey hashes its slot (id, type) but equals as the full record, so a hash container
+          keys by the whole record while the engine looks keys up by slot — the derive path's
+          whole-record lookup silently missed. The only legal container is
+          `new TreeMap<>(ContextKeys.order())`.
+          Stock: 4, all in MatchEngine (the two `published` locals and the Session fields
+          `contributions` and `values`), all fixed by switching to the slot-ordered TreeMap; the
+          field types keep their Map interface, so no caller changed. -->
+    <rule name="ContextKeyMapsUseSlotOrder"
+          language="java"
+          message="A ContextKey map must be a TreeMap in ContextKeys.order()"
+          class="dev.vfyjxf.cloudlib.pmd.rules.ContextKeyMapsUseSlotOrderRule">
+        <description>
+            Reports an allocation of HashMap or LinkedHashMap whose key type argument is ContextKey,
+            written out or inferred from the declared type the file gives the result. K08-D01.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- C-03 Read discipline: a read accessor must not create state (A06-D03, K08-D03).
+          store(level) resurrected the store an unload had just removed, and context(id) fell into
+          the table and created a context no derive produced. The prefix names the read contract
+          (get, find, read, context, index, peek, lookup); the field receiver is what makes the
+          computeIfAbsent a mutation that survives the method. The legitimate creation points keep
+          their own names — ServerState.openLevel is the level lifecycle's, and LevelWatch.acquire /
+          MatchEngine's contribute and absorb are writes.
+          Stock: 0 across main and kernel; every computeIfAbsent in the tree sits either in a
+          creation-named method or on a local map. -->
+    <rule name="ReadAccessorsMustNotCreateState"
+          language="java"
+          message="A read accessor must not create state"
+          class="dev.vfyjxf.cloudlib.pmd.rules.ReadAccessorsMustNotCreateStateRule">
+        <description>
+            Reports a computeIfAbsent on a field map inside a method whose name starts with get,
+            find, read, context, index, peek or lookup; creation belongs to the lifecycle's creation
+            point. A06-D03 and K08-D03.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- C-04 Public order: canonical, not the JVM's hash salt (X03-D06, D-75).
+          Set.copyOf and Map.copyOf freeze the source collection's iteration order; a hash source's
+          order is salted per JVM, so a public surface built on them leaks identity-hash order and
+          two runs of the same build disagree (the determinism gate exists to catch exactly this).
+          Only the public surface is gated: a public method's direct return, and a public record's
+          component initialiser. A private or local copy keeps the order inside the module, where
+          the canonicalisation that follows is visible in the same method, and List.copyOf keeps
+          encounter order everywhere.
+          Stock: 0 across main and kernel; the tree's copyOf sites are private fields, private
+          methods or plain classes (SnapshotLevel, WatchHandle, TraitLookup, JsonVocabulary). -->
+    <rule name="PublicCollectionsKeepCanonicalOrder"
+          language="java"
+          message="A public collection must keep canonical order"
+          class="dev.vfyjxf.cloudlib.pmd.rules.PublicCollectionsKeepCanonicalOrderRule">
+        <description>
+            Reports Set.copyOf or Map.copyOf as the direct return value of a public method or as the
+            initialiser of a public record component; both freeze the source's iteration order, and a
+            hash source's order varies per JVM. X03-D06, D-75.
+        </description>
+        <priority>1</priority>
+    </rule>
+
+    <!-- C-05 Grouping keys: records, not separator-joined strings (X02-D01).
+          `bay + "|" + instance` collided the moment an id itself contained "|", and no reader of
+          the map can tell the join apart from a key part. A record key keeps the parts separate
+          and cannot collide. Only the KEY argument of a Map's computeIfAbsent/put/get is checked —
+          a log line, a path or a message built the same way is not a grouping key.
+          Stock: 0 across main and kernel; the siting map was re-keyed by the SitingKey record when
+          X02-D01 was fixed, and no other delimiter-joined key exists. -->
+    <rule name="NoStringConcatGroupingKeys"
+          language="java"
+          message="A map key must not be a concatenated string"
+          class="dev.vfyjxf.cloudlib.pmd.rules.NoStringConcatGroupingKeysRule">
+        <description>
+            Reports a computeIfAbsent, put or get on a Map whose key argument is a string
+            concatenation containing a separator literal (| : . / - # ,); group by a record with one
+            field per part instead. X02-D01.
+        </description>
+        <priority>1</priority>
+    </rule>
+
 </ruleset>

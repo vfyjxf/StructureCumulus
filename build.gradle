@@ -352,6 +352,24 @@ tasks.register('jmh', JavaExec) {
     args((project.findProperty('jmhArgs') ?: '').toString().split('\\s+').findAll { !it.isEmpty() })
 }
 
+// The kernel sources are gated with the same error ruleset, because the finding and context-key
+// rules target kernel types pmdMain cannot see.
+def kernelPmd = tasks.named('pmdKernel', org.gradle.api.plugins.quality.Pmd) {
+    enabled = true
+    setRuleSets(List.of())
+    setRuleSetFiles(project.files(layout.buildDirectory.file('cloudpmd/cloudlib-ruleset.xml')))
+    source = fileTree('src/kernel/java') { include '**/*.java' }
+    classpath = sourceSets.kernel.output + sourceSets.kernel.compileClasspath
+    reports {
+        html.required = true
+        xml.required = true
+    }
+    dependsOn tasks.named('unpackPmdRuleset')
+}
+tasks.named('check') {
+    dependsOn kernelPmd
+}
+
 tasks.named('check') {
     dependsOn tasks.named('compileJmhJava')
 }

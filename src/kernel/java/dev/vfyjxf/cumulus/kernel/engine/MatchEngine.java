@@ -662,7 +662,7 @@ public final class MatchEngine {
                 );
             }
         }
-        Map<ContextKey<?>, Object> published = new LinkedHashMap<>();
+        Map<ContextKey<?>, Object> published = new TreeMap<>(ContextKeys.order());
         for (Map.Entry<ContextKey<?>, Object> entry : values.entrySet()) {
             if (entry.getKey().retention() == Retention.instance) {
                 published.put(entry.getKey(), entry.getValue());
@@ -677,7 +677,7 @@ public final class MatchEngine {
         MatchOutcome outcome,
         List<Finding> findings
     ) {
-        Map<ContextKey<?>, Object> published = new LinkedHashMap<>();
+        Map<ContextKey<?>, Object> published = new TreeMap<>(ContextKeys.order());
         for (Map.Entry<ContextKey<?>, Object> entry : outcome.values().entrySet()) {
             if (entry.getKey().retention() == Retention.instance) {
                 published.put(entry.getKey(), entry.getValue());
@@ -964,10 +964,12 @@ public final class MatchEngine {
     private static final class Session {
 
         private final MatchRequest request;
-        private final Map<ContextKey<?>, TreeMap<SectionKey, Object>> contributions = new LinkedHashMap<>();
+        private final Map<ContextKey<?>, TreeMap<SectionKey, Object>> contributions = new TreeMap<>(
+            ContextKeys.order()
+        );
         private final Set<ContextKey<?>> refused = new HashSet<>();
         private final Set<ContextKey<?>> missing = new HashSet<>();
-        private final Map<ContextKey<?>, Object> values = new LinkedHashMap<>();
+        private final Map<ContextKey<?>, Object> values = new TreeMap<>(ContextKeys.order());
         private final List<Finding> findings = new ArrayList<>();
         private final Map<NamespacedId, LinkedHashMap<OccupantRef, OccupantSnapshot>> subjects = new LinkedHashMap<>();
         private final ContextView context;

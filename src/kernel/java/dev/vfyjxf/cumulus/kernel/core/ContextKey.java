@@ -26,6 +26,7 @@ public record ContextKey<T>(NamespacedId id, Class<T> type, Retention retention,
 
     /** Hashes the slot, {@code (id, type)}; equality stays the full record, so equal keys hash alike. */
     @Override
+    @SuppressWarnings("PMD.OverrideBothEqualsAndHashcode") // the record's generated equals pairs with this slot hash
     public int hashCode() {
         return Objects.hash(id, type.getName());
     }
