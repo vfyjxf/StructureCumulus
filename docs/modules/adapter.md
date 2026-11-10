@@ -315,7 +315,8 @@ under, and the watched-region mark counter since capture. `isCurrent()` is
 `worldEpoch == currentEpoch && markCounter == 0 && !closed` plus the lazy entity fingerprint check. A
 block change, an entity join/leave/move in a watched window, or a chunk unload
 increments the mark counter; a world unload increments the epoch. A lease is closed by the host that
-opened it; the kernel never closes.
+opened it; the kernel never closes. `isCurrent()` runs on the server thread; only `view()` may be
+read from any thread.
 
 ## 5. Claims
 
@@ -844,7 +845,9 @@ instance's key through `CommandSupport.releaseQuietly` instead of leaving an orp
 unloads.
 
 - `/cumulus check <id> <origin>` — capture, siting, read the per-level claims view for the captured
-  bounds, then `check`; print the result and findings. The claims read and the check write nothing.
+  bounds, then `check`; print the result and findings. check predicts with the same siting
+  replacement the settle performs: the view drops the rows of the request's own siting (D-48).
+  The claims read and the check write nothing.
   An anchored blueprint captures twice (P1, `56c632c`): the anchor cell is captured, `McAnchors`
   resolves the siting from that captured view (`view.get(origin, HostTypes.blockState)`), and the
   sited bounds are the capture the orientation audit runs on. The phase-1 view is closed after

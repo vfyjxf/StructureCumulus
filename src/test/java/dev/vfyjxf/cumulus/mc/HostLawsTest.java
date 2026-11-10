@@ -1,13 +1,26 @@
 package dev.vfyjxf.cumulus.mc;
 
+import com.mojang.brigadier.CommandDispatcher;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
+import dev.vfyjxf.cumulus.kernel.claim.Footprint;
 import dev.vfyjxf.cumulus.kernel.claim.SettleRequest;
 import dev.vfyjxf.cumulus.kernel.claim.Sharing;
+import dev.vfyjxf.cumulus.kernel.context.StructureInstance;
+import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.core.Outcome;
+import dev.vfyjxf.cumulus.kernel.core.Phase;
+import dev.vfyjxf.cumulus.kernel.core.Retention;
+import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
+import dev.vfyjxf.cumulus.kernel.finding.Finding;
+import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
+import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
@@ -15,6 +28,14 @@ import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.space.Tilt;
 import dev.vfyjxf.cumulus.kernel.space.Turn;
+import dev.vfyjxf.cumulus.kernel.structure.Bay;
+import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.kernel.structure.Check;
+import dev.vfyjxf.cumulus.kernel.structure.Coverage;
+import dev.vfyjxf.cumulus.kernel.structure.Expectations;
+import dev.vfyjxf.cumulus.kernel.structure.Focuses;
+import dev.vfyjxf.cumulus.kernel.structure.SectionComputation;
+import dev.vfyjxf.cumulus.kernel.structure.SectionContext;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.CellRead;
@@ -30,7 +51,11 @@ import dev.vfyjxf.cumulus.mc.capability.NestedExtent;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolder;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Chicken;
@@ -38,6 +63,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.Fluids;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
@@ -55,6 +83,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -403,10 +432,198 @@ class HostLawsTest {
         });
     }
 
+    @Test
+    void aComputationFailureInsideTheSettlePathPropagatesAndFreesTheSiting() throws Exception {
+        host.onServer(() -> {
+            ServerLevel level = host.overworld();
+            ServerState state = requireState();
+            ClaimLedger ledger = state.claims(level);
+            // the two cells straddle a section boundary, so the poisoned merge folds two contributions
+            Region region = new Region(level, 6);
+            level.getChunk((region.base().getX() - 1) >> 4, region.base().getZ() >> 4);
+            LatticePoint origin = region.point(-1, 0, 0);
+            Siting siting = Siting.of(origin, Orientation.identity);
+            Cuboid worldBounds = orphanBounds.translate(origin.x(), origin.y(), origin.z());
+            assertNotNull(worldBounds, "the fixture bounds stay in the lattice");
+            RecordingSource recording = new RecordingSource();
+            CommandSourceStack source = stack(level, recording);
+            try {
+                // the check-phase outcome validation rejects the merged null before any settle write
+                NullPointerException thrown = assertThrows(
+                    NullPointerException.class,
+                    () -> SettleCommand.settle(source, state, level, poisonedBlueprint(), origin),
+                    "the poisoned computation's null value fails the attempt"
+                );
+                assertTrue(thrown.getMessage() == null || thrown.getMessage().contains("value"), "the outcome failure");
+                ClaimView held = ledger.read(worldBounds);
+                assertTrue(held.rows().isEmpty(), "the failed attempt leaves no row: " + held.rows());
+                assertNull(
+                    state.structures(level).find(state.world(level), state.owner(), siting),
+                    "the aborted draft leaves no instance at the siting"
+                );
+
+                MatchResult again = SettleCommand.settle(source, state, level, orphanCellBlueprint(), origin);
+                assertTrue(
+                    again instanceof MatchResult.Formed,
+                    "the siting is free for a new settle: " + again + " / " + recording.text()
+                );
+            } finally {
+                StructureInstance formed = state.structures(level).find(state.world(level), state.owner(), siting);
+                if (formed != null) {
+                    ledger.release(formed.id());
+                }
+            }
+        });
+    }
+
+    @Test
+    void claimsPrintAtMostFiftyRowsAndSummarizeTheRest() throws Exception {
+        host.onServer(() -> {
+            ServerLevel level = host.overworld();
+            ServerState state = requireState();
+            ClaimLedger ledger = state.claims(level);
+            int totalRows = CommandSupport.maxChatLines + 10;
+            InstanceId instance = new InstanceId(state.world(level), 9_000_007L);
+            List<ClaimRow> rows = new ArrayList<>(totalRows);
+            for (int index = 0; index < totalRows; index++) {
+                rows.add(row(LatticePoint.of(8000 + index, -60, 4096), instance, id("cap_bay")));
+            }
+            RecordingSource recording = new RecordingSource();
+            CommandSourceStack source = stack(level, recording);
+            try {
+                ClaimVerdict settled = ledger.settle(new SettleRequest(instance, rows, ledger.revision()));
+                assertInstanceOf(ClaimVerdict.Settled.class, settled, "the fixture rows settled");
+                String command = "cumulus claims 8000 -60 4096 " + (8000 + totalRows - 1) + " -60 4096";
+                assertEquals(1, dispatcher().execute(command, source), "the claims read exits one");
+                String text = recording.text();
+                assertTrue(text.contains(totalRows + " row(s)"), "the header keeps the full count: " + text);
+                assertTrue(text.contains("... and 10 more rows"), "the tail summarizes the hidden rows: " + text);
+                long rowLines = recording.messages.stream().filter(message -> message.startsWith("  ")).count();
+                assertEquals(CommandSupport.maxChatLines, rowLines, "only the first fifty rows print");
+            } finally {
+                ledger.release(instance);
+            }
+        });
+    }
+
+    @Test
+    void printFindingsSendsOneMessagePerLineAndCapsTheCount() throws Exception {
+        host.onServer(() -> {
+            ServerLevel level = host.overworld();
+            RecordingSource recording = new RecordingSource();
+            CommandSourceStack source = stack(level, recording);
+            int total = CommandSupport.maxChatLines + 10;
+            CommandSupport.printFindings(source, "cap header: findings", capBundle(total));
+            assertEquals("cap header: findings", recording.messages.get(0), "the header is its own message");
+            assertEquals(
+                CommandSupport.maxChatLines + 2,
+                recording.messages.size(),
+                "fifty lines, one summary line and the header"
+            );
+            assertTrue(
+                recording.messages.stream().noneMatch(message -> message.contains("\n")),
+                "one line per message"
+            );
+            String tail = recording.messages.get(recording.messages.size() - 1);
+            assertTrue(tail.contains("10 more lines"), "the tail summarizes the hidden lines: " + tail);
+
+            recording.clear();
+            CommandSupport.printFindings(source, "cap header: findings", capBundle(2));
+            assertEquals(3, recording.messages.size(), "a small bundle prints header and both lines");
+            assertTrue(recording.messages.get(1).contains("cap finding 0"), "the first finding line");
+            assertTrue(recording.messages.get(2).contains("cap finding 1"), "the second finding line");
+        });
+    }
+
     private static ServerState requireState() {
         ServerState state = ServerState.current();
         assertNotNull(state, "the booted server opened its state");
         return state;
+    }
+
+    private static final Cuboid orphanBounds = Cuboid.of(0, 0, 0, 2, 1, 1);
+
+    private static Blueprint orphanCellBlueprint() {
+        return Blueprint.builder(id("orphan_cell")).bounds(orphanBounds).check(orphanCheck()).build();
+    }
+
+    private static Blueprint poisonedBlueprint() {
+        return Blueprint.builder(id("orphan_poisoned")).bounds(orphanBounds).computation(poisonedComputation())
+                .check(orphanCheck()).build();
+    }
+
+    /** The merge returns null, so the folded outcome value is null and the settle's publish throws. */
+    @SuppressWarnings("NullAway")
+    private static SectionComputation<Integer> poisonedComputation() {
+        ContextKey<Integer> output = new ContextKey<>(
+            id("orphan_poison"),
+            Integer.class,
+            Retention.instance,
+            (left, right) -> null
+        );
+        return new SectionComputation<>() {
+
+            @Override
+            public Outcome<Integer> compute(SectionContext ctx) {
+                return Outcome.found(1);
+            }
+
+            @Override
+            public ContextKey<Integer> output() {
+                return output;
+            }
+
+            @Override
+            public Set<ContextKey<?>> inputs() {
+                return Set.of();
+            }
+
+            @Override
+            public CuboidSet region() {
+                return CuboidSet.of(orphanBounds);
+            }
+        };
+    }
+
+    private static Check<?> orphanCheck() {
+        Bay bay = Bay.of(
+            id("orphan_bay"),
+            CuboidSet.of(orphanBounds),
+            Coverage.everyCell,
+            Footprint.box(),
+            Sharing.exclusive
+        );
+        return Check.of(id("orphan_check"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
+    }
+
+    private static FindingBundle capBundle(int count) {
+        List<Finding> findings = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            findings.add(
+                Finding.builder(Codes.claimConflict).phase(Phase.check).message("cap finding " + index).build()
+            );
+        }
+        return FindingBundle.of(findings);
+    }
+
+    private static CommandSourceStack stack(ServerLevel level, CommandSource source) {
+        return new CommandSourceStack(
+            source,
+            Vec3.atLowerCornerOf(new BlockPos(8000, -60, 4096)),
+            Vec2.ZERO,
+            level,
+            4,
+            "gametest",
+            Component.literal("gametest"),
+            level.getServer(),
+            null
+        );
+    }
+
+    private static CommandDispatcher<CommandSourceStack> dispatcher() {
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        CumulusCommand.register(new RegisterCommandsEvent(dispatcher, Commands.CommandSelection.ALL, null));
+        return dispatcher;
     }
 
     private static ClaimRow row(LatticePoint cell, InstanceId instance, NamespacedId bay) {
@@ -468,6 +685,10 @@ class HostLawsTest {
             level.getChunk(base.getX() >> 4, base.getZ() >> 4);
         }
 
+        BlockPos base() {
+            return base;
+        }
+
         BlockPos block(int dx, int dy, int dz) {
             return base.offset(dx, dy, dz);
         }
@@ -522,6 +743,40 @@ class HostLawsTest {
 
         NestedExtentLookup lookup() {
             return lookup;
+        }
+    }
+
+    /** Captures every chat message the command paths send through a bare source. */
+    private static final class RecordingSource implements CommandSource {
+
+        private final List<String> messages = new ArrayList<>();
+
+        @Override
+        public void sendSystemMessage(Component message) {
+            messages.add(message.getString());
+        }
+
+        @Override
+        public boolean acceptsSuccess() {
+            return true;
+        }
+
+        @Override
+        public boolean acceptsFailure() {
+            return true;
+        }
+
+        @Override
+        public boolean shouldInformAdmins() {
+            return false;
+        }
+
+        private String text() {
+            return String.join("\n", messages);
+        }
+
+        private void clear() {
+            messages.clear();
         }
     }
 }

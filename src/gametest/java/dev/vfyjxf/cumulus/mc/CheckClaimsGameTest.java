@@ -12,10 +12,13 @@ import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Flip;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
+import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.kernel.structure.Check;
@@ -38,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The check command reads the ledger: an incumbent row decides the check, and a check writes nothing. */
+/** The check command reads the ledger: a foreign siting's row decides the check, the request's own siting is replaced (D-48), and a check writes nothing. */
 @NullMarked
 @GameTestHolder(Constants.modId)
 @PrefixGameTestTemplate(false)
@@ -83,20 +86,55 @@ public final class CheckClaimsGameTest {
             );
             ledger.settle(new SettleRequest(incumbentInstance, List.of(incumbentRow), ledger.revision()));
             long claimedRevision = ledger.revision();
-            MatchResult contested = CumulusCommand.check(source, state, level, cellBlueprint(), point);
-            if (!(contested instanceof MatchResult.Failed)) {
-                helper.fail("a contested check did not fail: " + contested + " / " + recording.text());
+            MatchResult replaced = CumulusCommand.check(source, state, level, cellBlueprint(), point);
+            if (!(replaced instanceof MatchResult.Admitted)) {
+                helper.fail(
+                    "a same-siting incumbent is replaced by the settle, so the check admits: " + replaced + " / "
+                            + recording.text()
+                );
                 return;
             }
-            helper.assertTrue(
-                contested.findings().findings().stream()
-                        .anyMatch(finding -> finding.code().equals(Codes.claimConflict.code())),
-                "the check reports the incumbent claim conflict: "
-                        + contested.findings().findings().stream().map(finding -> finding.code().text()).toList()
-                        + " / " + recording.text()
-            );
-            helper.assertValueEqual(claimedRevision, ledger.revision(), "a failed check does not write the ledger");
+            helper.assertValueEqual(claimedRevision, ledger.revision(), "an admitting check does not write the ledger");
             helper.assertValueEqual(1, ledger.read(Cuboid.of(point)).rows().size(), "the incumbent row is untouched");
+            ledger.release(incumbentInstance);
+
+            Siting foreignSiting = Siting.of(point, Orientation.of(Turn.half, Tilt.level, Flip.none));
+            InstanceId foreignInstance = new InstanceId(ledger.world(), 1_000_001L);
+            ClaimRow foreignRow = new ClaimRow(
+                LatticeKey.of(point),
+                Sharing.exclusive,
+                foreignSiting,
+                otherBayId,
+                foreignInstance
+            );
+            try {
+                ledger.settle(new SettleRequest(foreignInstance, List.of(foreignRow), ledger.revision()));
+                long contestedRevision = ledger.revision();
+                MatchResult contested = CumulusCommand.check(source, state, level, cellBlueprint(), point);
+                if (!(contested instanceof MatchResult.Failed)) {
+                    helper.fail("a contested check did not fail: " + contested + " / " + recording.text());
+                    return;
+                }
+                helper.assertTrue(
+                    contested.findings().findings().stream()
+                            .anyMatch(finding -> finding.code().equals(Codes.claimConflict.code())),
+                    "the check reports the incumbent claim conflict: "
+                            + contested.findings().findings().stream().map(finding -> finding.code().text()).toList()
+                            + " / " + recording.text()
+                );
+                helper.assertValueEqual(
+                    contestedRevision,
+                    ledger.revision(),
+                    "a failed check does not write the ledger"
+                );
+                helper.assertValueEqual(
+                    1,
+                    ledger.read(Cuboid.of(point)).rows().size(),
+                    "the incumbent row is untouched"
+                );
+            } finally {
+                ledger.release(foreignInstance);
+            }
         } finally {
             ledger.release(incumbentInstance);
         }

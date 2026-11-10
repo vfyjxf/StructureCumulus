@@ -3,6 +3,8 @@ package dev.vfyjxf.cumulus.mc;
 import com.mojang.brigadier.context.CommandContext;
 import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -44,6 +46,9 @@ import java.util.function.ToIntFunction;
 final class CommandSupport {
 
     private static final int maxElements = 1_000_000;
+
+    /** One chat print sends at most this many lines, then summarizes the rest. */
+    static final int maxChatLines = 50;
 
     static NamespacedId id(CommandContext<CommandSourceStack> context, String name) {
         ResourceLocation location = ResourceLocationArgument.getId(context, name);
@@ -261,13 +266,43 @@ final class CommandSupport {
         return Cuboid.of(minX, minY, minZ, (int) maxX, (int) maxY, (int) maxZ);
     }
 
+    // A settle replaces its siting's incumbent rows, so the commands' view must not carry them as conflicts.
+    static ClaimView remainingClaims(ClaimLedger ledger, Cuboid bounds, Siting siting) {
+        ClaimView view = ledger.read(bounds);
+        List<ClaimRow> kept = new ArrayList<>(view.rows().size());
+        for (ClaimRow row : view.rows()) {
+            if (!row.siting().equals(siting)) {
+                kept.add(row);
+            }
+        }
+        return new ClaimView(kept, view.revision(), view.available());
+    }
+
     static void printFindings(CommandSourceStack source, String header, FindingBundle findings) {
         source.sendSuccess(() -> Component.literal(header), false);
         if (findings.isEmpty()) {
             source.sendSuccess(() -> Component.literal("no findings"), false);
             return;
         }
-        source.sendSuccess(() -> Component.literal(FindingRenderer.human(findings, RenderContext.plain())), false);
+        for (String line : chatLines(FindingRenderer.human(findings, RenderContext.plain()))) {
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+    }
+
+    /** One rendered line per chat message, capped, so one print cannot flood the chat. */
+    static List<String> chatLines(String rendered) {
+        List<String> lines = new ArrayList<>();
+        for (String line : rendered.split("\n", -1)) {
+            if (!line.isBlank()) {
+                lines.add(line);
+            }
+        }
+        if (lines.size() <= maxChatLines) {
+            return lines;
+        }
+        List<String> capped = new ArrayList<>(lines.subList(0, maxChatLines));
+        capped.add("... and " + (lines.size() - maxChatLines) + " more lines");
+        return capped;
     }
 
     static int guarded(
