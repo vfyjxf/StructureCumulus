@@ -58,8 +58,11 @@ public final class CommandBoundaryGameTest {
         Siting siting = Siting.of(origin, Orientation.identity);
         StructureAttempt again = state.structures(level)
                 .begin(state.world(level), new StructureSpec(state.owner(), siting, blueprint.id()));
-        helper.assertTrue(again.isOpen(), "the aborted draft frees the siting for a new attempt");
-        again.abort();
+        try {
+            helper.assertTrue(again.isOpen(), "the aborted draft frees the siting for a new attempt");
+        } finally {
+            again.abort();
+        }
         helper.succeed();
     }
 
