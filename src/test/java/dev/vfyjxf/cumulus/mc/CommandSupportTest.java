@@ -26,6 +26,7 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -113,6 +114,27 @@ class CommandSupportTest {
         SnapshotPolicy policy = CommandSupport
                 .policy(declared.reads(), Siting.of(LatticePoint.origin, Orientation.identity));
         assertTrue(policy.traits().contains(inventory), "a declared trait reaches the capture policy");
+    }
+
+    @Test
+    void chatLinesKeepsOneEntryPerRenderedLine() {
+        List<String> lines = CommandSupport.chatLines("first[code]: one\n\nsecond[code]: two\n");
+        assertEquals(List.of("first[code]: one", "second[code]: two"), lines, "blank separators drop out");
+    }
+
+    @Test
+    void chatLinesCapsAtTheLineCeilingAndSummarizesTheRest() {
+        StringBuilder rendered = new StringBuilder();
+        for (int index = 0; index < CommandSupport.maxChatLines + 3; index++) {
+            if (index > 0) {
+                rendered.append("\n\n");
+            }
+            rendered.append("line ").append(index);
+        }
+        List<String> lines = CommandSupport.chatLines(rendered.toString());
+        assertEquals(CommandSupport.maxChatLines + 1, lines.size(), "the ceiling plus one summary line");
+        assertEquals("line " + (CommandSupport.maxChatLines - 1), lines.get(lines.size() - 2), "the last kept line");
+        assertEquals("... and 3 more lines", lines.get(lines.size() - 1), "the hidden count");
     }
 
     private static Blueprint boundsBlueprint() {

@@ -9,9 +9,6 @@ import dev.vfyjxf.cumulus.kernel.core.Budget;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
-import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
-import dev.vfyjxf.cumulus.kernel.finding.FindingRenderer;
-import dev.vfyjxf.cumulus.kernel.finding.RenderContext;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import net.minecraft.commands.CommandSourceStack;
@@ -167,7 +164,7 @@ public final class CumulusCommand {
                     claims
                 );
                 MatchResult checked = state.kernel().check(request);
-                print(source, summary(blueprint.id(), origin, checked), checked.findings());
+                CommandSupport.printFindings(source, summary(blueprint.id(), origin, checked), checked.findings());
                 return checked;
             } finally {
                 CommandSupport.abortQuietly(draft);
@@ -191,15 +188,6 @@ public final class CumulusCommand {
             throw new IllegalArgumentException("unknown match result " + result);
         }
         return "check " + id.text() + " at " + origin + ": " + state;
-    }
-
-    private static void print(CommandSourceStack source, String header, FindingBundle findings) {
-        source.sendSuccess(() -> Component.literal(header), false);
-        if (findings.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("no findings"), false);
-            return;
-        }
-        source.sendSuccess(() -> Component.literal(FindingRenderer.human(findings, RenderContext.plain())), false);
     }
 
     private CumulusCommand() {}

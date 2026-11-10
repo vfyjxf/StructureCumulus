@@ -13,8 +13,12 @@ import dev.vfyjxf.cumulus.kernel.core.ContextKey;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Outcome;
+import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
+import dev.vfyjxf.cumulus.kernel.finding.Codes;
+import dev.vfyjxf.cumulus.kernel.finding.Finding;
+import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.Flip;
@@ -502,6 +506,35 @@ class HostLawsTest {
         });
     }
 
+    @Test
+    void printFindingsSendsOneMessagePerLineAndCapsTheCount() throws Exception {
+        host.onServer(() -> {
+            ServerLevel level = host.overworld();
+            RecordingSource recording = new RecordingSource();
+            CommandSourceStack source = stack(level, recording);
+            int total = CommandSupport.maxChatLines + 10;
+            CommandSupport.printFindings(source, "cap header: findings", capBundle(total));
+            assertEquals("cap header: findings", recording.messages.get(0), "the header is its own message");
+            assertEquals(
+                CommandSupport.maxChatLines + 2,
+                recording.messages.size(),
+                "fifty lines, one summary line and the header"
+            );
+            assertTrue(
+                recording.messages.stream().noneMatch(message -> message.contains("\n")),
+                "one line per message"
+            );
+            String tail = recording.messages.get(recording.messages.size() - 1);
+            assertTrue(tail.contains("10 more lines"), "the tail summarizes the hidden lines: " + tail);
+
+            recording.clear();
+            CommandSupport.printFindings(source, "cap header: findings", capBundle(2));
+            assertEquals(3, recording.messages.size(), "a small bundle prints header and both lines");
+            assertTrue(recording.messages.get(1).contains("cap finding 0"), "the first finding line");
+            assertTrue(recording.messages.get(2).contains("cap finding 1"), "the second finding line");
+        });
+    }
+
     private static ServerState requireState() {
         ServerState state = ServerState.current();
         assertNotNull(state, "the booted server opened its state");
@@ -561,6 +594,16 @@ class HostLawsTest {
             Sharing.exclusive
         );
         return Check.of(id("orphan_check"), bay, Focuses.bay(), Expectations.eachCell(Expectations.anyOccupant()));
+    }
+
+    private static FindingBundle capBundle(int count) {
+        List<Finding> findings = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            findings.add(
+                Finding.builder(Codes.claimConflict).phase(Phase.check).message("cap finding " + index).build()
+            );
+        }
+        return FindingBundle.of(findings);
     }
 
     private static CommandSourceStack stack(ServerLevel level, CommandSource source) {

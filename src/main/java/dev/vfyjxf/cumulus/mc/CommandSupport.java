@@ -284,7 +284,25 @@ final class CommandSupport {
             source.sendSuccess(() -> Component.literal("no findings"), false);
             return;
         }
-        source.sendSuccess(() -> Component.literal(FindingRenderer.human(findings, RenderContext.plain())), false);
+        for (String line : chatLines(FindingRenderer.human(findings, RenderContext.plain()))) {
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
+    }
+
+    /** One rendered line per chat message, capped, so one print cannot flood the chat. */
+    static List<String> chatLines(String rendered) {
+        List<String> lines = new ArrayList<>();
+        for (String line : rendered.split("\n", -1)) {
+            if (!line.isBlank()) {
+                lines.add(line);
+            }
+        }
+        if (lines.size() <= maxChatLines) {
+            return lines;
+        }
+        List<String> capped = new ArrayList<>(lines.subList(0, maxChatLines));
+        capped.add("... and " + (lines.size() - maxChatLines) + " more lines");
+        return capped;
     }
 
     static int guarded(
