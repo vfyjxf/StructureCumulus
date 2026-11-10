@@ -152,7 +152,8 @@ public final class CumulusCommand {
         }
         try (CommandSupport.Attempt prepared = attempt) {
             CommandSupport.printCaptureFindings(source, blueprint.id(), prepared.report(), state.kernel());
-            ClaimView claims = state.claims(level).read(prepared.bounds());
+            ClaimView claims = CommandSupport
+                    .remainingClaims(state.claims(level), prepared.bounds(), prepared.siting());
             StructureAttempt draft = state.structures(level)
                     .begin(state.world(level), new StructureSpec(state.owner(), prepared.siting(), blueprint.id()));
             try {

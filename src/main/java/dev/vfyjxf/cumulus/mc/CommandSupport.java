@@ -3,6 +3,8 @@ package dev.vfyjxf.cumulus.mc;
 import com.mojang.brigadier.context.CommandContext;
 import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
+import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.core.InstanceId;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
@@ -259,6 +261,18 @@ final class CommandSupport {
             return null;
         }
         return Cuboid.of(minX, minY, minZ, (int) maxX, (int) maxY, (int) maxZ);
+    }
+
+    // A settle replaces its siting's incumbent rows, so the commands' view must not carry them as conflicts.
+    static ClaimView remainingClaims(ClaimLedger ledger, Cuboid bounds, Siting siting) {
+        ClaimView view = ledger.read(bounds);
+        List<ClaimRow> kept = new ArrayList<>(view.rows().size());
+        for (ClaimRow row : view.rows()) {
+            if (!row.siting().equals(siting)) {
+                kept.add(row);
+            }
+        }
+        return new ClaimView(kept, view.revision(), view.available());
     }
 
     static void printFindings(CommandSourceStack source, String header, FindingBundle findings) {
