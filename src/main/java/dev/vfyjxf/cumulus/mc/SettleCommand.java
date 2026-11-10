@@ -70,6 +70,7 @@ final class SettleCommand {
             StructureAttempt draft = state.structures(level)
                     .begin(state.world(level), new StructureSpec(state.owner(), prepared.siting(), blueprint.id()));
             boolean closed = false;
+            boolean settleAttempted = false;
             MatchResult settled = null;
             try {
                 MatchRequest request = MatchRequest.of(
@@ -90,6 +91,7 @@ final class SettleCommand {
                     );
                     return checked;
                 }
+                settleAttempted = true;
                 settled = kernel.settle(request, admitted, draft);
                 if (settled instanceof MatchResult.Formed) {
                     draft.commit(prepared.bounds().asSet());
@@ -101,7 +103,7 @@ final class SettleCommand {
             } finally {
                 if (!closed) {
                     CommandSupport.abortQuietly(draft);
-                    if (settled instanceof MatchResult.Formed) {
+                    if (settleAttempted) {
                         CommandSupport.releaseQuietly(state.claims(level), draft.id());
                     }
                 }
