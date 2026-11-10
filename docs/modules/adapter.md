@@ -315,7 +315,8 @@ under, and the watched-region mark counter since capture. `isCurrent()` is
 `worldEpoch == currentEpoch && markCounter == 0 && !closed` plus the lazy entity fingerprint check. A
 block change, an entity join/leave/move in a watched window, or a chunk unload
 increments the mark counter; a world unload increments the epoch. A lease is closed by the host that
-opened it; the kernel never closes.
+opened it; the kernel never closes. `isCurrent()` runs on the server thread; only `view()` may be
+read from any thread.
 
 ## 5. Claims
 
