@@ -47,6 +47,9 @@ final class CommandSupport {
 
     private static final int maxElements = 1_000_000;
 
+    /** One chat print sends at most this many lines, then summarizes the rest. */
+    static final int maxChatLines = 50;
+
     static NamespacedId id(CommandContext<CommandSourceStack> context, String name) {
         ResourceLocation location = ResourceLocationArgument.getId(context, name);
         return NamespacedId.of(location.getNamespace(), location.getPath());

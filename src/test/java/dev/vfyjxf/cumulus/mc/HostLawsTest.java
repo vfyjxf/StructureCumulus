@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc;
 
+import com.mojang.brigadier.CommandDispatcher;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimVerdict;
@@ -48,6 +49,7 @@ import dev.vfyjxf.cumulus.mc.capability.NestedExtentHolders;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -59,6 +61,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
@@ -469,6 +472,36 @@ class HostLawsTest {
         });
     }
 
+    @Test
+    void claimsPrintAtMostFiftyRowsAndSummarizeTheRest() throws Exception {
+        host.onServer(() -> {
+            ServerLevel level = host.overworld();
+            ServerState state = requireState();
+            ClaimLedger ledger = state.claims(level);
+            int totalRows = CommandSupport.maxChatLines + 10;
+            InstanceId instance = new InstanceId(state.world(level), 9_000_007L);
+            List<ClaimRow> rows = new ArrayList<>(totalRows);
+            for (int index = 0; index < totalRows; index++) {
+                rows.add(row(LatticePoint.of(8000 + index, -60, 4096), instance, id("cap_bay")));
+            }
+            RecordingSource recording = new RecordingSource();
+            CommandSourceStack source = stack(level, recording);
+            try {
+                ClaimVerdict settled = ledger.settle(new SettleRequest(instance, rows, ledger.revision()));
+                assertInstanceOf(ClaimVerdict.Settled.class, settled, "the fixture rows settled");
+                String command = "cumulus claims 8000 -60 4096 " + (8000 + totalRows - 1) + " -60 4096";
+                assertEquals(1, dispatcher().execute(command, source), "the claims read exits one");
+                String text = recording.text();
+                assertTrue(text.contains(totalRows + " row(s)"), "the header keeps the full count: " + text);
+                assertTrue(text.contains("... and 10 more rows"), "the tail summarizes the hidden rows: " + text);
+                long rowLines = recording.messages.stream().filter(message -> message.startsWith("  ")).count();
+                assertEquals(CommandSupport.maxChatLines, rowLines, "only the first fifty rows print");
+            } finally {
+                ledger.release(instance);
+            }
+        });
+    }
+
     private static ServerState requireState() {
         ServerState state = ServerState.current();
         assertNotNull(state, "the booted server opened its state");
@@ -542,6 +575,12 @@ class HostLawsTest {
             level.getServer(),
             null
         );
+    }
+
+    private static CommandDispatcher<CommandSourceStack> dispatcher() {
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        CumulusCommand.register(new RegisterCommandsEvent(dispatcher, Commands.CommandSelection.ALL, null));
+        return dispatcher;
     }
 
     private static ClaimRow row(LatticePoint cell, InstanceId instance, NamespacedId bay) {

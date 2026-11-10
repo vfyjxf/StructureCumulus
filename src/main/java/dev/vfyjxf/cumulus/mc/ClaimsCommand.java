@@ -37,8 +37,14 @@ final class ClaimsCommand {
                 + " row(s), revision " + view.revision() + (view.available() ? "" : ", unavailable");
         source.sendSuccess(() -> Component.literal(header), false);
         ServerLevel level = source.getLevel();
-        for (ClaimRow row : view.rows()) {
+        int printed = Math.min(view.rows().size(), CommandSupport.maxChatLines);
+        for (int index = 0; index < printed; index++) {
+            ClaimRow row = view.rows().get(index);
             source.sendSuccess(() -> Component.literal(describe(state, level, row)), false);
+        }
+        int hidden = view.rows().size() - printed;
+        if (hidden > 0) {
+            source.sendSuccess(() -> Component.literal("... and " + hidden + " more rows"), false);
         }
         return 1;
     }
