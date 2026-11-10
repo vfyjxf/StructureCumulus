@@ -66,8 +66,13 @@ closes the set layer (D-35): `SC-SET-0008` same-siting rejection, `StructureEven
 invalidation, and one set budget shared by presence and every member attempt (§3.3). The manager round
 (D-40 with D-44/D-45) then makes claims session-scoped and instance-keyed, and D-47 moves block
 observation into the funnel. The current
-suites total 583 kernel tests (68 containers), 449 adapter unit tests (47 containers) and 140
-`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (583 kernel / 68 containers, 449 adapter / 47 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
+suites total 584 kernel tests (69 containers), 454 adapter unit tests (47 containers) and 140
+`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (584 kernel / 69 containers, 454 adapter / 47 containers, 140/140 GameTests; check exit 0). `tools/spec-check.py` is clean.
+The product-fix round adds the settle-throw characterization (`SettleThrowScenarioTest`: a publish
+failure after the ledger write propagates and keeps the written rows with the caller, which
+`SettleCommand.settle` now releases whenever the kernel settle was attempted), the D-48 claims view
+for `/cumulus check` (§3.8), and the chat output caps — fifty claim rows and fifty finding lines per
+print, each ending with a summary of what was held back.
 `Codes.all` has 67 entries and the decision record has 82 decisions (D-83; D-78 withdrawn). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
@@ -474,6 +479,9 @@ funnel — is the shipped host. The suite needs no new source set and no depende
 | `Settled.rows` equals the requested rows of that key, and another key's rows never leak into an answer (`claim` §4.5) | `settleAnswersWithThisKeysRows` |
 | A conflicting settle answers `Conflict` with the incumbent rows only — the finding is the engine's (D-53) — and writes nothing (`claim` §4.6) | `aConflictCarriesItsIncumbentsAndWritesNothing` |
 | One real write inside the capture retires the lease (`isCurrent()` false) | `aWriteInsideTheCaptureRetiresTheLease` |
+| A computation failure inside the settle path propagates, writes no row, leaves no instance and frees the siting for a new settle | `aComputationFailureInsideTheSettlePathPropagatesAndFreesTheSiting` |
+| `/cumulus claims` prints at most fifty rows and summarizes the hidden count in its tail line | `claimsPrintAtMostFiftyRowsAndSummarizeTheRest` |
+| A printed finding bundle sends one chat message per rendered line and caps at fifty lines | `printFindingsSendsOneMessagePerLineAndCapsTheCount` |
 
 The read-policy law is pinned by mutation: commenting out the entity-kind gates in `LevelCapture`
 turns it red. The conflict law asserts data only (D-53); the finding half is covered by the booted
@@ -600,7 +608,7 @@ latency for one operation, and the numbers are compared by a person looking at t
 
 ## 8. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 140 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (583 kernel / 68 containers, 449 adapter / 47 containers, 140/140 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 140 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (584 kernel / 69 containers, 454 adapter / 47 containers, 140/140 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the
