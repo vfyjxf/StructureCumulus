@@ -172,10 +172,14 @@ public final class CaptureGameTest {
             Siting siting = Siting.of(point, Orientation.identity);
             StructureAttempt draft = state.structures(helper.getLevel())
                     .begin(state.world(helper.getLevel()), new StructureSpec(state.owner(), siting, blueprint.id()));
-            MatchResult result = state.kernel().check(
-                MatchRequest.of(blueprint, siting, lease, draft.id(), state.owner(), Budget.unbounded(), null)
-            );
-            draft.abort();
+            MatchResult result;
+            try {
+                result = state.kernel().check(
+                    MatchRequest.of(blueprint, siting, lease, draft.id(), state.owner(), Budget.unbounded(), null)
+                );
+            } finally {
+                draft.abort();
+            }
             if (result instanceof MatchResult.Failed failed) {
                 helper.fail("check failed: " + FindingRenderer.human(failed.findings(), RenderContext.plain()));
                 return;

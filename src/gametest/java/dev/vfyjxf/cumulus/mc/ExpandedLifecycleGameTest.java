@@ -569,8 +569,11 @@ public final class ExpandedLifecycleGameTest {
         assertEquals(helper, 0L, reloaded.revision(), "a fresh store starts at revision zero");
         StructureAttempt next = manager
                 .begin(state.world(level), new StructureSpec(ownerD, secondSiting, cellBlueprintId));
-        assertTrue(helper, next.id().serial() > maxSerial, "the serial continues across unload and load");
-        next.abort();
+        try {
+            assertTrue(helper, next.id().serial() > maxSerial, "the serial continues across unload and load");
+        } finally {
+            next.abort();
+        }
         cleanup(manager, ledger, ownerA, firstSiting);
         cleanup(manager, ledger, ownerB, secondSiting);
         helper.succeed();
