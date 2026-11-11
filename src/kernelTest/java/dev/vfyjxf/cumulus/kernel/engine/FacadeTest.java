@@ -20,6 +20,7 @@ import dev.vfyjxf.cumulus.kernel.core.Outcome;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.core.Retention;
+import dev.vfyjxf.cumulus.kernel.core.Spend;
 import dev.vfyjxf.cumulus.kernel.core.Value;
 import dev.vfyjxf.cumulus.kernel.document.BaySpec;
 import dev.vfyjxf.cumulus.kernel.document.BlueprintSpec;
@@ -33,7 +34,10 @@ import dev.vfyjxf.cumulus.kernel.finding.Explanation;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.finding.Label;
+import dev.vfyjxf.cumulus.kernel.finding.Severity;
+import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
 import dev.vfyjxf.cumulus.kernel.remedy.EditPlan;
+import dev.vfyjxf.cumulus.kernel.remedy.Marker;
 import dev.vfyjxf.cumulus.kernel.remedy.OverlayModel;
 import dev.vfyjxf.cumulus.kernel.remedy.Remedy;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyContext;
@@ -41,6 +45,7 @@ import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
 import dev.vfyjxf.cumulus.kernel.remedy.SolveResult;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
@@ -55,8 +60,10 @@ import dev.vfyjxf.cumulus.kernel.structure.Coverage;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
 import dev.vfyjxf.cumulus.kernel.structure.Expectations;
 import dev.vfyjxf.cumulus.kernel.structure.Focuses;
+import dev.vfyjxf.cumulus.kernel.structure.ReadScope;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -162,12 +169,72 @@ class FacadeTest {
             0,
             null,
             null,
-            2
+            2,
+            null
         );
         SolveResult result = kernel.solve(FindingBundle.of(List.of(finding)), context);
+        // the custom repair outranks the previews; two providers' previews never merge, so the cap keeps one
         assertEquals(2, result.remedies().size());
         assertInstanceOf(Remedy.Repair.class, result.remedies().get(0));
+        assertInstanceOf(Remedy.Preview.class, result.remedies().get(1));
         assertTrue(result.findings().isEmpty());
+    }
+
+    @Test
+    void solveMergesOneProvidersPreviewsIntoOneOverlay() {
+        StructureKernel kernel = StructureKernel.create(Catalogs.builtin());
+        Bay bay = Bay.of(
+            id("merge_bay"),
+            CuboidSet.of(Cuboid.of(0, 0, 0, 1, 1, 1)),
+            Coverage.everyCell,
+            Footprint.none(),
+            Sharing.shared
+        );
+        Blueprint blueprint = Blueprint.builder(id("merge")).bounds(Cuboid.of(0, 0, 0, 1, 1, 1)).check(
+            Check.of(id("merge_check"), bay, Focuses.occupant(LatticePoint.origin), Expectations.block(TestWorld.stone))
+        ).build();
+        CuboidSet cell = CuboidSet.of(Cuboid.of(LatticePoint.origin));
+        Finding missing = Finding.builder(Codes.expected).phase(Phase.check).message("missing")
+                .label(Label.primary(Locus.world(cell), "missing")).build();
+        Finding blocked = Finding.builder(Codes.claimConflict).phase(Phase.check).message("blocked")
+                .label(Label.primary(Locus.world(cell), "blocked")).build();
+        Finding orientation = Finding.builder(FindingCode.of(FindingCode.Family.mc, 4), Severity.error)
+                .phase(Phase.check).message("orientation").label(Label.primary(Locus.world(cell), "orientation"))
+                .build();
+        Finding cancelled = Finding.builder(Codes.cancelled).phase(Phase.check).message("cancelled")
+                .label(Label.primary(Locus.world(cell), "cancelled")).build();
+        MatchOutcome outcome = new MatchOutcome(
+            new TestWorld.View().air(LatticePoint.origin),
+            Map.of(),
+            List.of(),
+            ReadScope.none(),
+            Spend.zero
+        );
+        RemedyContext context = new RemedyContext(
+            blueprint,
+            Siting.of(LatticePoint.origin, Orientation.identity),
+            null,
+            0,
+            outcome,
+            null,
+            8,
+            null
+        );
+
+        SolveResult result = kernel.solve(FindingBundle.of(List.of(missing, blocked, orientation, cancelled)), context);
+
+        List<Remedy.Preview> previews = new ArrayList<>();
+        for (Remedy remedy : result.remedies()) {
+            if (remedy instanceof Remedy.Preview preview) {
+                previews.add(preview);
+            }
+        }
+        assertEquals(1, previews.size(), () -> result.remedies().toString());
+        OverlayModel overlay = previews.get(0).overlay();
+        assertEquals(CellMark.blocked, overlay.cells().get(LatticeKey.of(LatticePoint.origin)));
+        // the bundle sorts by severity then code, so the orientation finding precedes the cancellation
+        assertEquals(List.of("orientation", "cancelled"), overlay.markers().stream().map(Marker::label).toList());
+        assertEquals(blueprint.bounds(), overlay.bounds());
     }
 
     @Test
@@ -290,11 +357,14 @@ class FacadeTest {
             0,
             null,
             null,
-            2
+            4,
+            null
         );
 
         SolveResult result = kernel.solve(FindingBundle.of(List.of(finding)), context);
-        assertTrue(result.remedies().isEmpty());
+        // the failing provider yields nothing; the built-in preview still answers SC-OCC-0001
+        assertEquals(1, result.remedies().size());
+        assertInstanceOf(Remedy.Preview.class, result.remedies().get(0));
         assertEquals(1, result.findings().findings().size());
         assertEquals(Codes.remedyFailed.code(), result.findings().findings().get(0).code());
     }

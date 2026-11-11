@@ -14,4 +14,9 @@ public interface Expectation<T> {
     default ReadScope reads() {
         return ReadScope.none();
     }
+
+    /** The declaration as a value (D-91); anything the kernel cannot see through is undescribable. */
+    default ExpectationDeclaration declaration() {
+        return new ExpectationDeclaration.Undescribable();
+    }
 }

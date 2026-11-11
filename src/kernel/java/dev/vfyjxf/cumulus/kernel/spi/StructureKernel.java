@@ -21,20 +21,27 @@ import dev.vfyjxf.cumulus.kernel.finding.Explanation;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.finding.FindingBundle;
 import dev.vfyjxf.cumulus.kernel.finding.Label;
+import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
+import dev.vfyjxf.cumulus.kernel.remedy.Marker;
+import dev.vfyjxf.cumulus.kernel.remedy.OverlayModel;
 import dev.vfyjxf.cumulus.kernel.remedy.Remedy;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyContext;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
 import dev.vfyjxf.cumulus.kernel.remedy.SolveResult;
+import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.structure.DerivationSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 
 /** The facade: four pipeline operations, three helpers and four lookups. */
 public final class StructureKernel {
@@ -108,6 +115,7 @@ public final class StructureKernel {
         List<Remedy> remedies = new ArrayList<>();
         List<Finding> problems = new ArrayList<>();
         Set<Remedy> unique = new LinkedHashSet<>();
+        Map<NamespacedId, Remedy.Preview> previews = new LinkedHashMap<>();
         for (Finding finding : findings.findings()) {
             for (var id : catalogs.remedies().ids()) {
                 RemedyProvider provider = catalogs.remedies().require(id);
@@ -121,6 +129,8 @@ public final class StructureKernel {
                                     "provider " + id + " returned a null remedy"
                                 )
                             );
+                        } else if (remedy instanceof Remedy.Preview preview) {
+                            previews.merge(id, preview, StructureKernel::mergePreview);
                         } else {
                             unique.add(remedy);
                         }
@@ -133,6 +143,7 @@ public final class StructureKernel {
             }
         }
         remedies.addAll(unique);
+        remedies.addAll(previews.values());
         remedies.sort(Comparator.comparingInt(StructureKernel::applicability));
         if (remedies.size() > context.maxResults()) {
             remedies = new ArrayList<>(remedies.subList(0, context.maxResults()));
@@ -156,6 +167,22 @@ public final class StructureKernel {
             "The code belongs to " + code.family().subject() + ".",
             List.of()
         );
+    }
+
+    /** One provider's previews describe one overlay: a cell keeps the loudest mark, markers keep processing order. */
+    private static Remedy.Preview mergePreview(Remedy.Preview left, Remedy.Preview right) {
+        Map<LatticeKey, CellMark> cells = new TreeMap<>(left.overlay().cells());
+        for (Map.Entry<LatticeKey, CellMark> mark : right.overlay().cells().entrySet()) {
+            cells.merge(mark.getKey(), mark.getValue(), CellMark::louder);
+        }
+        List<Marker> markers = new ArrayList<>(left.overlay().markers());
+        markers.addAll(right.overlay().markers());
+        OverlayModel overlay = new OverlayModel(
+            left.overlay().bounds().bounding(right.overlay().bounds()),
+            cells,
+            markers
+        );
+        return new Remedy.Preview(overlay, left.rationale());
     }
 
     private static int applicability(Remedy remedy) {

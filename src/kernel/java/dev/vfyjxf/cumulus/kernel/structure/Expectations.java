@@ -217,6 +217,11 @@ public final class Expectations {
         public ExpectationMeta meta() {
             return ExpectationMeta.of(id("block"), 10, code(1));
         }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return new ExpectationDeclaration.BlockLeaf(type);
+        }
     }
 
     private record Air(FindingCode mismatchCode, NamespacedId metaId) implements Expectation<OccupantSnapshot> {
@@ -239,6 +244,13 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             return ExpectationMeta.of(metaId, 10, mismatchCode);
+        }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return mismatchCode.equals(Codes.envelopeOpen.code())
+                    ? ExpectationDeclaration.MarkerLeaf.envelopeAir
+                    : ExpectationDeclaration.MarkerLeaf.air;
         }
     }
 
@@ -284,6 +296,11 @@ public final class Expectations {
         public ExpectationMeta meta() {
             return ExpectationMeta.of(id("host"), 10, mismatchCode);
         }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return new ExpectationDeclaration.HostLeaf(type.id(), mismatchCode, absentCode);
+        }
     }
 
     private record HasTrait(TraitKey<?> key) implements Expectation<OccupantSnapshot> {
@@ -316,6 +333,11 @@ public final class Expectations {
         @Override
         public ReadScope reads() {
             return ReadScope.none().withTraits(Set.of(key.id()));
+        }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return new ExpectationDeclaration.TraitLeaf(key, true);
         }
     }
 
@@ -367,6 +389,11 @@ public final class Expectations {
         public ReadScope reads() {
             return ReadScope.none().withTraits(Set.of(key.id()));
         }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return new ExpectationDeclaration.TraitLeaf(key, true);
+        }
     }
 
     private record TraitAbsent(TraitKey<?> key) implements Expectation<OccupantSnapshot> {
@@ -403,6 +430,11 @@ public final class Expectations {
         @Override
         public ReadScope reads() {
             return ReadScope.none().withTraits(Set.of(key.id()));
+        }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return new ExpectationDeclaration.TraitLeaf(key, false);
         }
     }
 
@@ -456,6 +488,11 @@ public final class Expectations {
         public ExpectationMeta meta() {
             return ExpectationMeta.of(id("empty"), 10, code(1));
         }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return ExpectationDeclaration.MarkerLeaf.empty;
+        }
     }
 
     private record NonFluid() implements Expectation<OccupantSnapshot> {
@@ -478,6 +515,11 @@ public final class Expectations {
         public ExpectationMeta meta() {
             return ExpectationMeta.of(id("non_fluid"), 10, code(1));
         }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return ExpectationDeclaration.MarkerLeaf.nonFluid;
+        }
     }
 
     private static boolean isVanillaFluid(NamespacedId type) {
@@ -499,6 +541,11 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             return ExpectationMeta.of(id("any_occupant"), 0, code(1));
+        }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return ExpectationDeclaration.MarkerLeaf.anyOccupant;
         }
     }
 
@@ -596,6 +643,16 @@ public final class Expectations {
         }
 
         @Override
+        public ExpectationDeclaration declaration() {
+            ExpectationDeclaration.CompositeKind kind = switch (mode) {
+                case all -> ExpectationDeclaration.CompositeKind.allOf;
+                case any -> ExpectationDeclaration.CompositeKind.anyOf;
+                case sequence -> ExpectationDeclaration.CompositeKind.sequence;
+            };
+            return new ExpectationDeclaration.Composite(kind, describe(children));
+        }
+
+        @Override
         public ReadScope reads() {
             ReadScope scope = ReadScope.none();
             for (Expectation<T> child : children) {
@@ -634,6 +691,14 @@ public final class Expectations {
         @Override
         public ExpectationMeta meta() {
             return new ExpectationMeta(id("not"), 0, child.meta().requires(), Codes.negationMatched.code());
+        }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            return new ExpectationDeclaration.Composite(
+                ExpectationDeclaration.CompositeKind.not,
+                List.of(child.declaration())
+            );
         }
 
         @Override
@@ -731,6 +796,16 @@ public final class Expectations {
                 case exactly -> "exactly";
             };
             return new ExpectationMeta(id(name), 0, requires, code(1));
+        }
+
+        @Override
+        public ExpectationDeclaration declaration() {
+            ExpectationDeclaration.ThresholdKind kind = switch (mode) {
+                case atLeast -> ExpectationDeclaration.ThresholdKind.atLeast;
+                case atMost -> ExpectationDeclaration.ThresholdKind.atMost;
+                case exactly -> ExpectationDeclaration.ThresholdKind.exactly;
+            };
+            return new ExpectationDeclaration.Threshold(kind, count, describe(children));
         }
 
         @Override
@@ -839,6 +914,14 @@ public final class Expectations {
             };
         }
 
+        @Override
+        public ExpectationDeclaration declaration() {
+            return new ExpectationDeclaration.Composite(
+                ExpectationDeclaration.CompositeKind.eachCell,
+                List.of(element.declaration())
+            );
+        }
+
         private static ReadRefusal undecided() {
             return new ReadRefusal(ReadStatus.notCaptured, Codes.unreadableRead.code());
         }
@@ -877,6 +960,14 @@ public final class Expectations {
         public ReadScope reads() {
             return reads;
         }
+    }
+
+    private static List<ExpectationDeclaration> describe(List<? extends Expectation<?>> children) {
+        List<ExpectationDeclaration> described = new ArrayList<>(children.size());
+        for (Expectation<?> child : children) {
+            described.add(child.declaration());
+        }
+        return described;
     }
 
     private Expectations() {}

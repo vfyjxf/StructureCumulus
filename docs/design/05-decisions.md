@@ -1905,20 +1905,22 @@ a repair; the preview session renders an overlay).
 
 ### D-86 — Solve preferences are a kernel value that only orders legal candidates
 
-`SolvePreferences(preferredCells, preferredOrientation, partPins)` is a kernel value;
+`SolvePreferences(preferredCells, partPins)` is a kernel value;
 `RemedyContext` gains it as a nullable final component (a record component append is a public shape
 change, recorded in `remedy` §5 first). The iron law: preferences order or pick among equally legal
 candidates, never change an applicability rung, never fabricate an edit; null or empty is the
 canonical order; the same input with the same preferences solves byte-identically. The pin law: a
-pin selects only within its part's legal candidate set; an illegal pin is ignored and annotated,
-never obeyed; a conflict resolves user pin > memory > preference score > canonical order, and the
-displaced part is offered as a sibling remedy — never silently.
+pin is the strongest preference rank — the pinned cells come first and every displaced legal
+candidate is offered as a sibling remedy, never silently; an illegal pin is ignored and annotated,
+never obeyed; the full order is user pin > memory > preference score > canonical order.
 
 **Why a kernel value.** Cell-level choice is remedy semantics: which legal cell a threshold deficit
 fills is a solve question, and a plugin provider needs the same preference the built-ins see.
 Siting-level choice is not kernel semantics — it involves players and reach — so it stays in the
 adapter (`BuildPreferences`, design 15 §9); this record is the only preference that crosses the
-boundary.
+boundary. An earlier draft carried a third component, `preferredOrientation`; it was removed
+because orientation is a siting-level decision the host owns (design 15 §7) and no kernel consumer
+existed.
 
 **Why `partPins` in the kernel shape.** A pin is per-part information (bay/focus id → legal cells);
 flattening it into `preferredCells` order would lose the per-part semantics and let several parts'

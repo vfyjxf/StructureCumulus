@@ -420,7 +420,8 @@ def main() -> int:
                     "BuiltinComputations", "BuiltinExpectations", "BuiltinFocuses",
                     "BuiltinSupport", "DefaultCatalogs", "DefaultCatalogRegistrar",
                     "BuilderImpl", "InMemoryClaimLedger",
-                    "CellIterator", "BlueprintRejected", "PlanRejected"}
+                    "CellIterator", "BlueprintRejected", "PlanRejected",
+                    "LeafCover", "FindingCells", "CellRef"}
         missing_in_doc = sorted((code - doc) - internal)
         if missing_in_code:
             print(f"{module}: documented but not in code: {', '.join(missing_in_code)}")

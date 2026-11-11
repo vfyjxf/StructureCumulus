@@ -123,11 +123,17 @@ Then the module files, in dependency order:
   union capture and check-only host path, the built-in `set_root`/`set_wing`/`set_demo` documents and
   the real-level set GameTests (`design/06-verification.md` §3.5). S6 closes the set layer: the
   `SC-SET-0008` same-siting rejection, `ContextStore.remove` with rollback invalidation, and one set
-  budget shared by presence and every member attempt (D-35). The tree registers 583
-  kernel tests in 68 containers, 449 adapter unit tests in 47 containers and 140 `@GameTest` methods;
-  a full `./gradlew check` and `runGameTestServer` on this tree are both green (583
-  kernel tests, 449 adapter tests, 140/140 GameTests). Pending only: acting on the measured
-  kernel-side cost debts and the live-level review items (`07` §7), and fresh visual review
+  budget shared by presence and every member attempt (D-35). The auto-build/preview design round
+  (designs 14/15, D-84…D-91) landed at `1e050b6`; its P1 kernel slice adds the remedy registrar
+  contribution, the two built-in remedy providers with the finding→remedy mapping and overlay
+  derivation, `SolvePreferences` with part pins, the D-91 declaration description port and the
+  per-provider preview merge in `solve`. The tree registers 643
+  kernel tests in 73 containers, 449 adapter unit tests in 47 containers and 140 `@GameTest` methods;
+  a full `./gradlew check` is green on this tree (643 kernel tests, 449 adapter tests), and
+  `runGameTestServer` last passed at the P1 boundary (140/140 GameTests, kernel-only changes).
+  Pending only: acting on the measured
+  kernel-side cost debts and the live-level review items (`07` §7), the auto-build/preview
+  milestones P2–P7 (`docs/plan/autobuild-preview-plan.md`), and fresh visual review
   screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
@@ -136,11 +142,12 @@ Then the module files, in dependency order:
   mod entry and the adapter. The adapter is the only place allowed to name Minecraft. The `@GameTest`
   classes and their GameTest structure templates live in `src/gametest`, folded into the mod for
   every run and kept out of the published jar (D-77).
-- Verification (2026-11-08): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 583 kernel JUnit 5 tests (68 test
+- Verification (2026-11-11): the kernel compiles with
+  `javac --release 21` and JSpecify only. The tree registers 643 kernel JUnit 5 tests (73 test
   containers), 449 adapter unit tests (47 containers) and 140 `@GameTest` methods; a full
-  `./gradlew check` and `runGameTestServer` both pass at this revision (583 kernel tests, 449 adapter
-  tests, 140/140 GameTests, 0 failures, 0 skipped). `Codes.all` has 67 entries
+  `./gradlew check` passes at this revision (643 kernel tests, 449 adapter
+  tests, 0 failures, 0 skipped), and `runGameTestServer` last passed with 140/140 GameTests
+  before the kernel-only P1 slice. `Codes.all` has 67 entries
   and the decision record has 90 decisions (D-91; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule

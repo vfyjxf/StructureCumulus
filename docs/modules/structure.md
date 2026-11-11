@@ -33,6 +33,7 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `Expectation<T>` | interface | one test over one subject type |
 | `ExpectationContext<T>` | interface | focus context + the subject and its re-typing |
 | `ExpectationMeta` | record | id, specificity, required keys, default mismatch code |
+| `ExpectationDeclaration` | sealed | a declaration as a value (D-91): leaf payloads, composite children, undescribable for custom |
 | `Reply` | sealed | `Match`, `Mismatch`, `Unreadable`, `Abstain` |
 | `ReadScope` | record | cells + keys + trait ids + occupant kinds + entity windows |
 | `BayView` | record | a bay's own read face; total `read` |
@@ -129,6 +130,22 @@ public interface Expectation<T> {
     Class<T> subject();
     default ExpectationMeta meta();
     default ReadScope reads();
+    default ExpectationDeclaration declaration();
+}
+
+public sealed interface ExpectationDeclaration {
+    record BlockLeaf(NamespacedId type) implements ExpectationDeclaration { }
+    record TraitLeaf(TraitKey<?> key, boolean present) implements ExpectationDeclaration { }
+    record HostLeaf(NamespacedId type, FindingCode mismatchCode, FindingCode absentCode)
+            implements ExpectationDeclaration { }
+    enum MarkerLeaf implements ExpectationDeclaration { air, anyOccupant, empty, nonFluid, envelopeAir }
+    record Composite(CompositeKind kind, java.util.List<ExpectationDeclaration> children)
+            implements ExpectationDeclaration { }
+    enum CompositeKind { allOf, anyOf, not, sequence, eachCell }
+    record Threshold(ThresholdKind kind, int count, java.util.List<ExpectationDeclaration> children)
+            implements ExpectationDeclaration { }
+    enum ThresholdKind { atLeast, atMost, exactly }
+    record Undescribable() implements ExpectationDeclaration { }
 }
 
 public interface ExpectationContext<T> extends FocusContext {
@@ -740,11 +757,11 @@ the envelope `Unreadable`, never a silent pass; an unreadable envelope cell is t
 `SC-OCC-0004` relay and leaves the check `Unreadable`, never a mismatch. `BlueprintBuilder.build()`
 does not mutate the builder's lists, so it can be called twice with equal results.
 
-### 4.12 Declaration description port (D-91, approved, landing with P1)
+### 4.12 Declaration description port (D-91)
 
-Remedy derivation (D-85) needs the blueprint's declarations as values. `structure` gains a
-**total** declaration description port over `Expectation` trees, approved here and landing with the
-P1 code in the same commit (the exact signature and the §3 block update then):
+Remedy derivation (D-85) needs the blueprint's declarations as values. `structure` has a
+**total** declaration description port over `Expectation` trees — `Expectation.declaration()`
+returns an `ExpectationDeclaration` (§3), landed with P1:
 
 - Every built-in leaf describes as a sealed declaration value carrying its declaration: `block` its
   type (the leaf declares no properties — orientation-derived properties are the materializer's,
@@ -754,11 +771,6 @@ P1 code in the same commit (the exact signature and the §3 block update then):
   describes as its kind — with its count for the thresholds — plus access to its children.
 - A `custom` expectation describes as **undescribable**: the kernel cannot know what a custom body
   expects, and a remedy over an undescribable expectation is advisory, never `machineApplicable`.
-
-```java
-// Indicative shape only; the exact signature lands with P1 and enters §3 in the same commit.
-public sealed interface ExpectationDeclaration { }
-```
 
 The port is total — every expectation answers exactly one arm — and it reads declarations only: it
 never evaluates a `Reply` and never touches a world. If P1 finds that resolving a finding's cell to

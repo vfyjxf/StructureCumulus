@@ -27,9 +27,11 @@ overlay (`mc`), finding text (`finding`).
 | `Marker` | record | `(Locus, String, MarkerKind)` |
 | `MarkerKind` | enum | error/warning/info/anchor/seam |
 | `RemedyProvider` | interface | `solve(finding, context)` → ordered remedies |
-| `RemedyContext` | record | blueprint, siting, claims, outcome, context, cap |
+| `RemedyContext` | record | blueprint, siting, claims, outcome, context, cap, preferences (D-86) |
 | `SolveResult` | record | remedies + findings from the solve pass |
-| `SolvePreferences` | record | preferred cells, preferred orientation, part pins; orders legal candidates, never changes applicability (D-86, lands with P1) |
+| `SolvePreferences` | record | preferred cells and part pins; orders legal candidates, never changes applicability (D-86) |
+| `StandardRepairProvider` | record | the built-in `structurecumulus:cell_repair` (D-85) |
+| `StandardPreviewProvider` | record | the built-in `structurecumulus:preview` (D-85) |
 
 ## 3. Signatures
 
@@ -61,7 +63,10 @@ public record OverlayModel(Cuboid bounds, java.util.Map<LatticeKey, CellMark> ce
     public OverlayModel { /* immutable; cells sorted by key */ }
 }
 
-public enum CellMark { expected, present, missing, extra, wrong, blocked, unknown }
+public enum CellMark {
+    expected, present, missing, extra, wrong, blocked, unknown;
+    public static CellMark louder(CellMark left, CellMark right);
+}
 
 public record Marker(Locus locus, String label, MarkerKind kind) { }
 
@@ -75,11 +80,21 @@ public interface RemedyProvider {
 public record RemedyContext(Blueprint blueprint, Siting siting,
                             @Nullable ClaimView claims, long ledgerRevision,
                             @Nullable MatchOutcome outcome,
-                            @Nullable StructureContext context, int maxResults) {
+                            @Nullable StructureContext context, int maxResults,
+                            @Nullable SolvePreferences preferences) {
     public RemedyContext { /* maxResults >= 1 */ }
 }
 
 public record SolveResult(java.util.List<Remedy> remedies, FindingBundle findings) { }
+
+public record SolvePreferences(java.util.List<CuboidSet> preferredCells,
+                               java.util.Map<NamespacedId, CuboidSet> partPins) {
+    public SolvePreferences { /* a null list or map argument means empty; copies immutable; pins sorted */ }
+}
+
+public record StandardRepairProvider() implements RemedyProvider { }
+
+public record StandardPreviewProvider() implements RemedyProvider { }
 ```
 
 ## 4. Laws
@@ -109,13 +124,13 @@ public record SolveResult(java.util.List<Remedy> remedies, FindingBundle finding
 - The kernel never validates a plan against a live world and never reports an `ApplyReport`; the
   host's executor owns that report and may use `finding` values.
 
-## 5. Built-in providers (D-85, approved, landing with P1)
+## 5. Built-in providers (D-85)
 
 Two built-in providers join the `Catalogs.builtin()` remedies family (spi §4.1):
-`structurecumulus:cell_repair` and `structurecumulus:preview`. Both are pure and re-entrant and
-read only `RemedyContext` (blueprint, siting, claims, outcome, context) — never a live world. The
-shapes in this section are approved (D-85/D-86) and land in the same P1 commit as the code; the
-§3 block updates in that commit.
+`structurecumulus:cell_repair` (`StandardRepairProvider`) and `structurecumulus:preview`
+(`StandardPreviewProvider`). Both are pure and re-entrant and read only `RemedyContext` (blueprint,
+siting, claims, outcome, context) — never a live world. The solve pass merges one provider's
+previews into a single overlay (§6); the exact signatures live in §3.
 
 ### 5.1 Finding → edit mapping
 
@@ -124,7 +139,9 @@ never parses finding message text (D-66). It may classify the finding's cells ag
 snapshot in `RemedyContext.outcome` (absent / different occupant / forbidden presence); that view
 is a capture, not a live read. A `machineApplicable` `Place`/`Replace` derives only from a leaf the
 declaration description port can describe (`structure` §4.12, D-91); an expectation the port
-cannot describe is always advisory, never `machineApplicable`.
+cannot describe is always advisory, never `machineApplicable`. A negated trait leaf (`SC-EXP-0002`)
+follows the mirror rule: only a leaf that states presence is broken by removing the trait, and a
+leaf that states absence has no machine edit.
 
 | Finding (codes) | Remedy | Applicability |
 | --- | --- | --- |
@@ -133,10 +150,14 @@ cannot describe is always advisory, never `machineApplicable`.
 | an occupant where the expectation wants none — `SC-EXP-0001` (air leaf), `SC-EXP-0002`, `SC-EXP-0006` | `Edit.Remove(cells)` | machineApplicable; execution is policy-gated (design 14 §9) |
 | threshold deficit — `SC-EXP-0003` with child `SC-EXP-0001`s | `Edit.Place` at candidate cells inside the region, chosen by `SolvePreferences.preferredCells`/`partPins`, canonical lattice order without one; the unchosen candidates are offered as sibling repairs | machineApplicable |
 | threshold excess (`atMost`/`exactly` over) — `SC-EXP-0003` | no machine edit; advisory — which cells to remove is not decidable per cell, and the default policy forbids removal | hasPlaceholders |
-| trait value mismatch — `SC-EXP-0001` (trait leaf) | `Edit.SetTrait` | maybeIncorrect: the kernel cannot know whether the host can write it, and v1 never auto-applies it |
+| trait absent expected but present — `SC-EXP-0001` (`traitAbsent` leaf) | `Edit.SetTrait(cells, Trait.absent(key))` | maybeIncorrect: the kernel cannot know whether the host can write it, and v1 never auto-applies it |
+| trait present expected but absent or mismatched — `SC-EXP-0001` (`trait`/`trait(value)` leaf) | no machine edit; advisory — the declaration carries no expected value, so the kernel does not fabricate a payload | hasPlaceholders |
 | claim conflict — `SC-CLM-0001` | no machine edit; advisory, and the preview marks the cells `blocked` | hasPlaceholders |
 | orientation / anchor / budget / cancellation — `SC-MC-0004`, `SC-BPT-0006`, `SC-ENG-0001`, `SC-ENG-0005` | no edit; a `Marker` (anchor/seam/error/warning/info) | — |
 | unreadable or unjudged cells — `SC-OCC-0001`…`0004`, `SC-ENG-0002` | no edit; the preview marks the cells `unknown` | — |
+
+The built-in providers emit only `error`, `warning` and `info` markers; `anchor` and `seam` are the
+host's vocabulary (design 15 §4/§7) and have no kernel producer.
 
 ### 5.2 Overlay derivation
 
@@ -157,26 +178,16 @@ present`.
 
 ### 5.3 `SolvePreferences` (D-86)
 
-```java
-public record SolvePreferences(
-    java.util.List<CuboidSet> preferredCells,
-    @Nullable Orientation preferredOrientation,
-    java.util.Map<NamespacedId, CuboidSet> partPins
-) {
-    public SolvePreferences { /* copies immutable; a null list or map means empty */ }
-}
-```
-
-`RemedyContext` gains a final component `@Nullable SolvePreferences preferences` — a record
-component append is a public shape change, recorded here first.
+The signature is in §3. `RemedyContext` carries it as the final component
+`@Nullable SolvePreferences preferences`. All cell sets in the record are world-frame at the solve
+siting; the providers map them through `Siting` to reach the blueprint's local declarations.
 
 - `preferredCells`: earlier is more preferred; orders only same-rung legal candidates.
-- `preferredOrientation`: breaks ties between equal candidates, deterministically.
-- `partPins`: bay/focus id → the user's pinned legal cell set (design 15 §8). A pin selects only
-  within its part's legal candidate set; a pin that names an illegal cell is ignored, never
-  obeyed, and the preview carries one info `Marker` naming the part. A conflict resolves as user
-  pin > memory > preference score > canonical order; the displaced part is offered as a sibling
-  repair — a conflict is never silent.
+- `partPins`: bay/focus id → the user's pinned legal cell set (design 15 §8). A pin is the
+  strongest preference rank: the pinned cells come first, canonically ordered among themselves,
+  and every displaced legal candidate is offered as a sibling repair — never silently. A pin that
+  names an illegal cell is ignored, never obeyed, and the preview carries one info `Marker` naming
+  the part. The full order is user pin > memory > preference score > canonical lattice order.
 - The iron law of §4 applies to every component.
 
 ## 6. Pipeline role
@@ -184,6 +195,12 @@ component append is a public shape change, recorded here first.
 `solve` is a facade helper after a result; it never runs inside `check`/`settle`. The kernel's
 `StructureKernel.solve(findings, context)` collects remedies; the host applies a chosen repair
 through its own executor.
+
+**Preview merge.** The provider interface answers one finding at a time, but a bundle describes one
+overlay. `solve` therefore merges the `Remedy.Preview`s one provider returns over the whole bundle
+into one: cells union by `CellMark.louder` (the loudest mark wins, §5.2), markers concatenate in
+processing order, bounds are the union of the input bounds and the rationale is the first
+preview's. Previews never merge across providers, and a merge never happens inside a provider.
 
 ## 7. Codes
 
@@ -195,9 +212,10 @@ through its own executor.
 - `EditPlan`/`Edit` immutability and cell sets.
 - Overlay model order and marker kinds.
 - Built-in providers (P1): the mapping table per code family; the overlay derivation and the
-  loudest-mark rule; preference determinism (same input, same preferences → byte-identical solve);
-  pin legality (an illegal pin is ignored and annotated), the conflict order and the displaced
-  sibling offer; a null/empty preference is the canonical order.
+  loudest-mark rule; the merge of one provider's previews into one overlay (loudest cell, markers
+  in processing order); preference determinism (same input, same preferences → byte-identical
+  solve); pin legality (an illegal pin is ignored and annotated), the conflict order and the
+  displaced sibling offer; a null/empty preference is the canonical order.
 
 ## 9. Dependencies
 

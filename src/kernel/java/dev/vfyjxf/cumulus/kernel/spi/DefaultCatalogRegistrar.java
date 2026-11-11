@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.context.Deriver;
 import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
+import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
 import dev.vfyjxf.cumulus.kernel.structure.ComputationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.ExpectationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.FocusFactory;
@@ -20,6 +21,7 @@ final class DefaultCatalogRegistrar implements CatalogRegistrar {
     private final Catalog.Builder<ComputationFactory> computations;
     private final Catalog.Builder<Deriver<?>> derivers;
     private final Catalog.Builder<CodeEntry> codes;
+    private final Catalog.Builder<RemedyProvider> remedies;
     private final List<RegistrationFailure> failures = new ArrayList<>();
 
     DefaultCatalogRegistrar(Catalogs builtin) {
@@ -28,6 +30,7 @@ final class DefaultCatalogRegistrar implements CatalogRegistrar {
         computations = seeded(builtin.computations());
         derivers = seeded(builtin.derivers());
         codes = seeded(builtin.codes());
+        remedies = seeded(builtin.remedies());
     }
 
     private static <T> Catalog.Builder<T> seeded(Catalog<T> catalog) {
@@ -68,6 +71,12 @@ final class DefaultCatalogRegistrar implements CatalogRegistrar {
     }
 
     @Override
+    public CatalogRegistrar remedy(NamespacedId id, RemedyProvider provider) {
+        remedies.put(id, provider);
+        return this;
+    }
+
+    @Override
     public void fail(NamespacedId pluginId, RuntimeException failure) {
         failures.add(new RegistrationFailure(pluginId, failure));
     }
@@ -80,6 +89,7 @@ final class DefaultCatalogRegistrar implements CatalogRegistrar {
     @Override
     public Catalogs catalogs() {
         return Catalogs.builder().expectations(expectations.build()).focuses(focuses.build())
-                .computations(computations.build()).derivers(derivers.build()).codes(codes.build()).build();
+                .computations(computations.build()).derivers(derivers.build()).codes(codes.build())
+                .remedies(remedies.build()).build();
     }
 }

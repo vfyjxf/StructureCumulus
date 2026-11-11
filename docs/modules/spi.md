@@ -62,6 +62,7 @@ public interface CatalogRegistrar {
     CatalogRegistrar computation(NamespacedId id, ComputationFactory factory);
     CatalogRegistrar deriver(NamespacedId id, Deriver<?> deriver);
     CatalogRegistrar code(CodeEntry entry);
+    CatalogRegistrar remedy(NamespacedId id, RemedyProvider provider);
     void fail(NamespacedId pluginId, RuntimeException failure);
     java.util.List<RegistrationFailure> failures();
     Catalogs catalogs();
@@ -110,9 +111,8 @@ Six frozen families, each a `Catalog<T>` keyed by `NamespacedId` and insertion-o
 
 `builtin()` ships the leaf factories (`block`, `air`, `trait`, `any_occupant`), the focus
 factories (`occupant`, `bay`, `all_cells`, `entity`, `nested`, `door`, `context`), the computations
-(`count`, `volume`, `air`), every shipped `CodeEntry`, no deriver and — until the P1 commit that
-lands D-85 — no remedy provider; D-85 adds the two built-in providers `structurecumulus:cell_repair`
-and `structurecumulus:preview` (remedy §5) to this family. The
+(`count`, `volume`, `air`), every shipped `CodeEntry`, no deriver, and the two built-in remedy
+providers of D-85 (`structurecumulus:cell_repair` and `structurecumulus:preview`, remedy §5). The
 structural expectation forms (`all_of`, `any_of`, `not`, `sequence`, `at_least`, `at_most`, `exactly`,
 `each_cell`) are grammar, not catalog entries; the compiler resolves them and calls the leaf
 factories for the children.
@@ -152,7 +152,10 @@ created without a host can compile and check, but `settle` with claimable rows i
   host's context store.
 - **`solve(findings, context)`** iterates the remedy catalog by id, calls each provider once per
   finding, catches `RuntimeException` (`SC-RMD-0001`), dedupes by value and caps at
-  `context.maxResults()`; the cap puts `machineApplicable` first.
+  `context.maxResults()`; the cap puts `machineApplicable` first. One provider's `Preview`s merge
+  into a single overlay for the whole bundle: cells take the loudest mark, markers concatenate in
+  processing order, bounds are the union, and the rationale is the first preview's. Previews never
+  merge across providers (`remedy` §6).
 - **`explain(code)`** looks up `structurecumulus:<code-text-lowercase>` in the code catalog; an addon
   code is not found, which is legal.
 - **`explainOrFallback(code)`** returns the registered explanation or a synthesised family-level one.
@@ -191,16 +194,7 @@ compiler turns a null into `SC-DOC-0003` if no finding was reported.
 `CatalogRegistrar` is the one collection point for catalog contributions. `builtin()` starts from the
 six built-in tables; `expectation`/`focus`/`computation`/`deriver` add one entry each and return the
 registrar, `code` adds a `CodeEntry` keyed by its code text, and `catalogs()` freezes the six
-families. Remedies contribute through `remedy(id, provider)` (D-84, approved; the signature lands
-in the same P1 commit as the code, and the §3 block updates in that commit):
-
-```java
-public interface CatalogRegistrar {
-    CatalogRegistrar remedy(NamespacedId id, RemedyProvider provider);
-}
-```
-
-The method adds one provider and returns the registrar; the duplicate law below applies unchanged,
+families. Remedies contribute through `remedy(id, provider)` (D-84; the signature is in §3). The method adds one provider and returns the registrar; the duplicate law below applies unchanged,
 so a built-in remedy id cannot be replaced, and `fail`/`failures` attribute a plugin's
 remedy-register failure like any other contribution. A host calls the contributions at assembly time —
 the adapter through its plugin entry point (`ModPlugin.register`, adapter §7.5), once per plugin in

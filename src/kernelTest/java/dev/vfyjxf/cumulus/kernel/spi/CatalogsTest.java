@@ -45,7 +45,9 @@ class CatalogsTest {
             assertTrue(catalogs.computations().has(kind(computation)), computation);
         }
         assertTrue(catalogs.derivers().isEmpty());
-        assertTrue(catalogs.remedies().isEmpty());
+        assertEquals(2, catalogs.remedies().size());
+        assertTrue(catalogs.remedies().has(NamespacedId.of("structurecumulus", "cell_repair")));
+        assertTrue(catalogs.remedies().has(NamespacedId.of("structurecumulus", "preview")));
         assertEquals(Codes.all.size(), catalogs.codes().size());
     }
 

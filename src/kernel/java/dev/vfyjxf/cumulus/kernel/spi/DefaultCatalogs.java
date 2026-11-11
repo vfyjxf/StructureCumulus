@@ -5,6 +5,8 @@ import dev.vfyjxf.cumulus.kernel.core.Catalog;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
 import dev.vfyjxf.cumulus.kernel.remedy.RemedyProvider;
+import dev.vfyjxf.cumulus.kernel.remedy.StandardPreviewProvider;
+import dev.vfyjxf.cumulus.kernel.remedy.StandardRepairProvider;
 import dev.vfyjxf.cumulus.kernel.structure.ComputationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.ExpectationFactory;
 import dev.vfyjxf.cumulus.kernel.structure.FocusFactory;
@@ -73,8 +75,15 @@ final class DefaultCatalogs implements Catalogs {
             BuiltinComputations.catalog(),
             Catalog.empty(family("derivers")),
             BuiltinCodes.catalog(),
-            Catalog.empty(family("remedies"))
+            builtinRemedies()
         );
+    }
+
+    /** The two built-in remedy providers of D-85. */
+    static Catalog<RemedyProvider> builtinRemedies() {
+        return Catalog.<RemedyProvider>builder(family("remedies"))
+                .put(NamespacedId.of("structurecumulus", "cell_repair"), new StandardRepairProvider())
+                .put(NamespacedId.of("structurecumulus", "preview"), new StandardPreviewProvider()).build();
     }
 
     private static NamespacedId family(String name) {
@@ -88,7 +97,7 @@ final class DefaultCatalogs implements Catalogs {
         private Catalog<ComputationFactory> computations = BuiltinComputations.catalog();
         private Catalog<Deriver<?>> derivers = Catalog.empty(family("derivers"));
         private Catalog<CodeEntry> codes = BuiltinCodes.catalog();
-        private Catalog<RemedyProvider> remedies = Catalog.empty(family("remedies"));
+        private Catalog<RemedyProvider> remedies = builtinRemedies();
 
         @Override
         public Catalogs.Builder expectations(Catalog<ExpectationFactory> catalog) {

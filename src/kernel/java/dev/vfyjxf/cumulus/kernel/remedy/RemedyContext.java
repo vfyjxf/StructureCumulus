@@ -17,7 +17,8 @@ public record RemedyContext(
     long ledgerRevision,
     @Nullable MatchOutcome outcome,
     @Nullable StructureContext context,
-    int maxResults
+    int maxResults,
+    @Nullable SolvePreferences preferences
 ) {
 
     public RemedyContext {
