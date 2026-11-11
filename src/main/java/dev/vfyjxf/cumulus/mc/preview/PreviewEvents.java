@@ -6,13 +6,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
-/** The preview's server wiring: payload registration, the session tick and the three lifecycle exits. */
+/** The preview's server wiring: payload registration, the catalog sync, the session tick and the lifecycle exits. */
 @EventBusSubscriber(modid = Constants.modId)
 public final class PreviewEvents {
 
@@ -21,6 +22,11 @@ public final class PreviewEvents {
     @SubscribeEvent
     private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
         PreviewPayloads.register(event);
+    }
+
+    @SubscribeEvent
+    private static void onDatapackSync(OnDatapackSyncEvent event) {
+        PreviewCatalogSync.send(event.getRelevantPlayers());
     }
 
     @SubscribeEvent

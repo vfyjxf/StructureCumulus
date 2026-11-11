@@ -1,11 +1,10 @@
 # 15. Preview: sessions, payloads, rendering, orientation ergonomics and preferences
 
-> Status: approved, design first (P0). The code lands with milestones P3, P4 and P5 of
-> [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md); until then this
-> document is specified, not implemented. It covers roadmap §7 and §8 with the ergonomics
-> convergence of `09-ergonomics-expansion.md` §11: the item numbers cited below (1.1, 3.2, 4.6, …)
-> are that document's. The P8 backlog lives only in the plan file; 3.5 (a lossy-orientation back
-> door) is explicitly rejected (D-88).
+> Status: approved, design first (P0), landed with milestones P3, P4 and P5 of
+> [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md). It covers roadmap §7 and
+> §8 with the ergonomics convergence of `09-ergonomics-expansion.md` §11: the item numbers cited
+> below (1.1, 3.2, 4.6, …) are that document's. The P8 backlog lives only in the plan file; 3.5 (a
+> lossy-orientation back door) is explicitly rejected (D-88).
 
 ## 1. Problem
 
@@ -147,6 +146,85 @@ the mod down.
 - The view is an isometric, drag-rotatable 3D rendering with a Y-slice slider and tooltips that
   summarize the expected blocks (id, properties, counts).
 - A "Ghost to world" button opens an in-world session (§4) at the player's crosshair.
+
+### 6.1 The catalog (server → client)
+
+A JEI page has no player, world or siting, so a session's candidate machinery does not apply: the
+entry is the blueprint's expected states under the **identity** orientation, resolved server-side
+from the declarations exactly as a session resolves them, and shipped as one sync-time payload.
+
+- **When.** The catalog is built on NeoForge's datapack-sync hook, which fires on a player's join
+  and on `/reload` (before the recipes are sent). A datapack document that changes therefore reaches
+  an open client without a reconnect, and nothing polls.
+- **What.** One entry per blueprint that compiles: its id, its expected cells in the session's
+  `GhostCell` shape (block id plus serialized properties), and its material lines (the item the block
+  yields and how many expected cells ask for it). Structure sets are not entries — the preview is one
+  blueprint at a time.
+- **Caps.** Every cap is a code constant and none truncates silently, the same law as the session's
+  payload caps (§3): a blueprint that does not compile, or whose projection exceeds 512 expected
+  cells, or whose summary exceeds 64 distinct material items, is **left out of the catalog entirely**
+  and named in a WARNING log line. A partial scene or a partial material list would lie about the
+  blueprint, so the entry is absent rather than wrong. One whole-catalog cap (4096 expected cells)
+  keeps a single payload inside the network frame limit; the ids it leaves out are named the same
+  way, in catalog order, so the same source always drops the same entries.
+- **Client table.** The last catalog is a read-only client snapshot; it parses no document and
+  recomputes no kernel decision. The JEI recipe table is seeded from it at `registerRecipes` and
+  reconciled on every later push: a new id is `addRecipes`, a changed id updates the existing recipe
+  instance in place, a vanished id is `hideRecipes` and a returning one is `unhideRecipes` — JEI has
+  no removal, so a reload hides instead. Recipe identity is the instance, so a reload never
+  duplicates a page; every recipe handed to JEI is tracked once.
+
+### 6.2 The isometric view
+
+`IRecipeCategory.draw` is handed the recipe's area with the pose already translated to its origin,
+and the category owns the whole face: a scene, a slider, the material summary and the button.
+
+- **Camera.** Yaw and pitch are per-recipe view state; dragging the viewport rotates them, the pitch
+  clamps just short of the poles, and the scale is fitted to the blueprint's bounds on every frame,
+  so a 1×1×1 cell and a 40-block tower both fill the viewport.
+- **Geometry.** One expected cell is one block model rendered by `BlockRenderDispatcher` at full
+  brightness, resolved from the wire block id plus its property strings against the client's block
+  registry (an id or value this client does not know leaves the property at its default). Rendering
+  happens inside the GUI pass: Minecraft's GUI pass is an orthographic 3D pass with the depth buffer
+  cleared at its start and the 3D item lighting already set up, which is the same path vanilla uses
+  to draw a block model as an item icon.
+- **Depth.** Cells are drawn far-to-near by their camera depth and the depth buffer resolves the
+  opaque cubes; the batch is flushed with `BufferSource.endBatch()` and **not** `GuiGraphics.flush()`,
+  whose contract temporarily disables the depth test around the batch and would drop the scene's
+  occlusion.
+- **Y slice.** The slider (and the wheel over the viewport) chooses how many layers from the
+  blueprint's bottom are shown — the same mental model as the in-world slice (§5, 4.2). A one-layer
+  blueprint pins the slider; a hidden layer is not drawn and not picked.
+- **Tooltip.** The cursor is unprojected into the scene's orthographic view; the nearest visible cell
+  whose box the ray crosses names its block id and each of its property values. The material list's
+  icons answer with the item name and count.
+- **Bounds.** The fitted scale keeps every projected corner inside the viewport, so the scene never
+  paints over a neighbouring recipe.
+
+### 6.3 "Ghost to world"
+
+The button sends one C2S payload carrying only the blueprint id; the server opens the ordinary
+session of §4 with the crosshair origin (1.1) and the crosshair face's neighbour as the second
+candidate. There is no second session mechanism: a preview opened from JEI, from the command or from
+the anchor gesture is the same session object, and the same confirm path (§4) leaves it.
+
+### 6.4 Failure isolation
+
+- **JEI absent.** The client setup pass checks the mod list before resolving any JEI type; nothing
+  is scanned, registered or loaded.
+- **JEI incompatible.** The built-in plugin is also a `ModPlugin`, so the adapter's loader pass
+  reports its id, dependencies and failures through `PluginLoader` (fatal failures logged, never
+  thrown, D-81); JEI's own plugin finder logs the class it cannot link and keeps loading the rest.
+  Either way the mod keeps running, without the category.
+- **Dedicated server.** The package is client-only: its event subscriber is `Dist.CLIENT`, its
+  payload handlers resolve client classes only inside their enqueued work (adapter §17), and the
+  catalog payload itself is plain data any client can receive.
+
+### 6.5 Not in this milestone
+
+A GUI-integration plugin subtype (`GuiPlugin`, the shape a second renderer such as EMI copies) is
+P7's evaluation item: P4 keeps the conditional built-in as one `@JeiPlugin` + `@PluginMarker` class
+validated by the adapter's loader, and adds no public registrar for GUI contributions.
 
 ## 7. Orientation ergonomics
 

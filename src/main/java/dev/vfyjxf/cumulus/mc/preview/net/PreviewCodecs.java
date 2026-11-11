@@ -31,6 +31,12 @@ final class PreviewCodecs {
     static final StreamCodec<RegistryFriendlyByteBuf, PreviewControlPayload> control = StreamCodec
             .of(PreviewCodecs::encodeControl, PreviewCodecs::decodeControl);
 
+    static final StreamCodec<RegistryFriendlyByteBuf, PreviewCatalogPayload> catalog = StreamCodec
+            .of(PreviewCodecs::encodeCatalog, PreviewCodecs::decodeCatalog);
+
+    static final StreamCodec<RegistryFriendlyByteBuf, PreviewOpenPayload> open = StreamCodec
+            .of(PreviewCodecs::encodeOpen, PreviewCodecs::decodeOpen);
+
     private PreviewCodecs() {}
 
     private static void encodeSync(RegistryFriendlyByteBuf buffer, PreviewSyncPayload payload) {
@@ -51,13 +57,7 @@ final class PreviewCodecs {
         writeMarkers(buffer, overlay.markers());
         buffer.writeVarInt(payload.ghostCells().size());
         for (GhostCell ghost : payload.ghostCells()) {
-            writePoint(buffer, ghost.cell());
-            writeId(buffer, ghost.block());
-            buffer.writeVarInt(ghost.properties().size());
-            for (Map.Entry<String, String> property : ghost.properties().entrySet()) {
-                buffer.writeUtf(property.getKey());
-                buffer.writeUtf(property.getValue());
-            }
+            writeGhost(buffer, ghost);
         }
         writeMarkers(buffer, payload.markers());
     }
@@ -82,14 +82,7 @@ final class PreviewCodecs {
         int ghostCount = buffer.readVarInt();
         List<GhostCell> ghosts = new ArrayList<>(ghostCount);
         for (int index = 0; index < ghostCount; index++) {
-            LatticePoint cell = readPoint(buffer);
-            NamespacedId block = readId(buffer);
-            int propertyCount = buffer.readVarInt();
-            Map<String, String> properties = new TreeMap<>();
-            for (int property = 0; property < propertyCount; property++) {
-                properties.put(buffer.readUtf(), buffer.readUtf());
-            }
-            ghosts.add(new GhostCell(cell, block, properties));
+            ghosts.add(readGhost(buffer));
         }
         List<Marker> markers = readMarkers(buffer, bounds);
         return new PreviewSyncPayload(
@@ -115,6 +108,71 @@ final class PreviewCodecs {
         PreviewControlPayload.Control control = controls[buffer.readUnsignedByte()];
         LatticePoint target = buffer.readBoolean() ? readPoint(buffer) : null;
         return new PreviewControlPayload(control, target);
+    }
+
+    private static void encodeCatalog(RegistryFriendlyByteBuf buffer, PreviewCatalogPayload payload) {
+        buffer.writeVarInt(payload.entries().size());
+        for (PreviewCatalogPayload.Entry entry : payload.entries()) {
+            writeId(buffer, entry.blueprintId());
+            buffer.writeVarInt(entry.cells().size());
+            for (GhostCell ghost : entry.cells()) {
+                writeGhost(buffer, ghost);
+            }
+            buffer.writeVarInt(entry.materials().size());
+            for (PreviewCatalogPayload.MaterialLine line : entry.materials()) {
+                writeId(buffer, line.item());
+                buffer.writeVarInt(line.count());
+            }
+        }
+    }
+
+    private static PreviewCatalogPayload decodeCatalog(RegistryFriendlyByteBuf buffer) {
+        int entryCount = buffer.readVarInt();
+        List<PreviewCatalogPayload.Entry> entries = new ArrayList<>(entryCount);
+        for (int entry = 0; entry < entryCount; entry++) {
+            NamespacedId blueprintId = readId(buffer);
+            int cellCount = buffer.readVarInt();
+            List<GhostCell> cells = new ArrayList<>(cellCount);
+            for (int cell = 0; cell < cellCount; cell++) {
+                cells.add(readGhost(buffer));
+            }
+            int materialCount = buffer.readVarInt();
+            List<PreviewCatalogPayload.MaterialLine> materials = new ArrayList<>(materialCount);
+            for (int material = 0; material < materialCount; material++) {
+                materials.add(new PreviewCatalogPayload.MaterialLine(readId(buffer), buffer.readVarInt()));
+            }
+            entries.add(new PreviewCatalogPayload.Entry(blueprintId, cells, materials));
+        }
+        return new PreviewCatalogPayload(entries);
+    }
+
+    private static void encodeOpen(RegistryFriendlyByteBuf buffer, PreviewOpenPayload payload) {
+        writeId(buffer, payload.blueprintId());
+    }
+
+    private static PreviewOpenPayload decodeOpen(RegistryFriendlyByteBuf buffer) {
+        return new PreviewOpenPayload(readId(buffer));
+    }
+
+    private static void writeGhost(RegistryFriendlyByteBuf buffer, GhostCell ghost) {
+        writePoint(buffer, ghost.cell());
+        writeId(buffer, ghost.block());
+        buffer.writeVarInt(ghost.properties().size());
+        for (Map.Entry<String, String> property : ghost.properties().entrySet()) {
+            buffer.writeUtf(property.getKey());
+            buffer.writeUtf(property.getValue());
+        }
+    }
+
+    private static GhostCell readGhost(RegistryFriendlyByteBuf buffer) {
+        LatticePoint cell = readPoint(buffer);
+        NamespacedId block = readId(buffer);
+        int propertyCount = buffer.readVarInt();
+        Map<String, String> properties = new TreeMap<>();
+        for (int property = 0; property < propertyCount; property++) {
+            properties.put(buffer.readUtf(), buffer.readUtf());
+        }
+        return new GhostCell(cell, block, properties);
     }
 
     private static void writeMarkers(RegistryFriendlyByteBuf buffer, List<Marker> markers) {

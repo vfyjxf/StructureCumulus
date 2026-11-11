@@ -100,6 +100,11 @@ final class BuiltinDocuments {
         );
     }
 
+    /** The built-in blueprint ids in listing order; the structure-set demo is not a blueprint. */
+    static List<NamespacedId> blueprintIds() {
+        return List.of(airCell, setRoot, setWing);
+    }
+
     private static Document cellDocument(NamespacedId id, boolean claimable) {
         return new Document(
             Document.currentVersion,

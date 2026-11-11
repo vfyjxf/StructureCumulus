@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc.preview.client;
 
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
 
 /**
@@ -12,5 +13,9 @@ public final class PreviewClientBridge {
 
     public static void accept(PreviewSyncPayload payload) {
         PreviewClientState.accept(payload);
+    }
+
+    public static void acceptCatalog(PreviewCatalogPayload payload) {
+        PreviewCatalogClient.accept(payload);
     }
 }

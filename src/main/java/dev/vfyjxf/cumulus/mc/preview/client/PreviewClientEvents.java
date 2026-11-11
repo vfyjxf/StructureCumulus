@@ -61,5 +61,6 @@ public final class PreviewClientEvents {
     @SubscribeEvent
     private static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         PreviewClientState.clear();
+        PreviewCatalogClient.clear();
     }
 }

@@ -56,27 +56,58 @@ public final class PreviewService {
 
     /** The session-opening entry: {@code /cumulus preview <id> [origin]} and its dev twin call this. */
     public static int open(CommandSourceStack source, NamespacedId id, @Nullable LatticePoint origin) {
-        StructureKernel kernel = LevelAccess.kernel();
-        if (kernel == null) {
-            source.sendFailure(Component.literal("StructureCumulus is not running"));
-            StructureCumulus.logger.info("preview {} refused: the server state is not open", id.text());
-            return 0;
-        }
-        Blueprint blueprint = blueprint(source, kernel, id);
-        if (blueprint == null) {
-            return 0;
-        }
         ServerPlayer player = source.getPlayer();
         if (player == null) {
             source.sendFailure(Component.literal("a preview needs a player"));
             StructureCumulus.logger.info("preview {} refused: the command source has no player", id.text());
             return 0;
         }
+        Opened opened = openFor(player, id, origin);
+        if (!opened.opened()) {
+            source.sendFailure(Component.literal(opened.message()));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal(opened.message()), false);
+        return 1;
+    }
+
+    /** The JEI "ghost to world" entry: the crosshair supplies the origin and chat carries the outcome. */
+    public static void open(ServerPlayer player, NamespacedId id) {
+        player.sendSystemMessage(Component.literal(openFor(player, id, null).message()));
+    }
+
+    private record Opened(boolean opened, String message) {}
+
+    private static Opened failed(String message) {
+        return new Opened(false, message);
+    }
+
+    private static Opened openFor(ServerPlayer player, NamespacedId id, @Nullable LatticePoint origin) {
+        StructureKernel kernel = LevelAccess.kernel();
+        if (kernel == null) {
+            StructureCumulus.logger.info("preview {} refused: the server state is not open", id.text());
+            return failed("StructureCumulus is not running");
+        }
+        Document document = kernel.document(id);
+        if (document == null) {
+            StructureCumulus.logger.info("preview {} refused: no document of that id", id.text());
+            return failed("no document " + id.text());
+        }
+        CompileResult compiled = kernel.compile(document);
+        Blueprint blueprint = compiled.blueprint();
+        if (blueprint == null) {
+            StructureCumulus.logger.info(
+                "preview {} refused: compile reported {} finding(s), first: {}",
+                id.text(),
+                compiled.findings().findings().size(),
+                compiled.findings().findings().isEmpty() ? "none" : compiled.findings().findings().get(0).message()
+            );
+            return failed("compile " + id.text() + " failed");
+        }
         List<LatticePoint> origins = origins(player, origin);
         if (origins.isEmpty()) {
-            source.sendFailure(Component.literal("look at a block, or pass an origin"));
             StructureCumulus.logger.info("preview {} refused: no origin candidate", id.text());
-            return 0;
+            return failed("look at a block, or pass an origin");
         }
         PreviewSession previous = sessions.remove(key(player));
         if (previous != null) {
@@ -85,9 +116,8 @@ public final class PreviewService {
         PreviewSession.OpenResult opened = PreviewSession.open(player, blueprint, origins, player.getDirection());
         PreviewSession session = opened.session();
         if (session == null) {
-            source.sendFailure(Component.literal("preview " + id.text() + ": " + opened.failure()));
             StructureCumulus.logger.info("preview {} refused: {}", id.text(), opened.failure());
-            return 0;
+            return failed("preview " + id.text() + ": " + opened.failure());
         }
         sessions.put(key(player), session);
         StructureCumulus.logger.info(
@@ -98,13 +128,10 @@ public final class PreviewService {
             origins.get(0)
         );
         int candidateCount = session.payload().candidates().size();
-        source.sendSuccess(
-            () -> Component.literal(
-                "preview " + id.text() + " at " + origins.get(0) + ": " + candidateCount + " candidate(s)"
-            ),
-            false
+        return new Opened(
+            true,
+            "preview " + id.text() + " at " + origins.get(0) + ": " + candidateCount + " candidate(s)"
         );
-        return 1;
     }
 
     /** One control from the client; a session that cannot recompute is closed. */
@@ -192,27 +219,6 @@ public final class PreviewService {
 
     private static Key key(ServerPlayer player) {
         return new Key(player.getUUID(), player.serverLevel().dimension());
-    }
-
-    private static @Nullable Blueprint blueprint(CommandSourceStack source, StructureKernel kernel, NamespacedId id) {
-        Document document = kernel.document(id);
-        if (document == null) {
-            source.sendFailure(Component.literal("no document " + id.text()));
-            StructureCumulus.logger.info("preview {} refused: no document of that id", id.text());
-            return null;
-        }
-        CompileResult compiled = kernel.compile(document);
-        Blueprint blueprint = compiled.blueprint();
-        if (blueprint == null) {
-            source.sendFailure(Component.literal("compile " + id.text() + " failed"));
-            StructureCumulus.logger.info(
-                "preview {} refused: compile reported {} finding(s), first: {}",
-                id.text(),
-                compiled.findings().findings().size(),
-                compiled.findings().findings().isEmpty() ? "none" : compiled.findings().findings().get(0).message()
-            );
-        }
-        return blueprint;
     }
 
     /**

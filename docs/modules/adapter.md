@@ -1097,9 +1097,9 @@ ledgers; S5 adds the two real-level GameTest classes above, and S6 extends them 
 No schematic importer and no scheduler. No built-in nested source provider and no adapter-owned
 nested source registry. The document reader/writer is the only text format; capture/import tools
 are host tools, not kernel modules. The single-structure build executor and the
-`/cumulus build`/`/cumulus build undo` commands land at P2 (§16.1); the server-side preview session,
-the network payload and the client overlay renderer land at P3 (§17, design 15); the JEI GUI and the
-structure-set build are approved design (§16.2, §18) and land with P4 and P6 of
+`/cumulus build`/`/cumulus build undo` commands landed at P2 (§16.1); the server-side preview
+session, the network payloads, the client overlay renderer and the JEI category landed at P3 and P4
+(§17, design 15); the structure-set build is approved design (§16.2) and lands with P6 of
 [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md).
 
 ## 15. Signatures
@@ -1124,6 +1124,7 @@ public final class LevelAccess {
     public static @Nullable World world(ServerLevel level);
     public static @Nullable OwnerId owner();
     public static long blockRevision(ServerLevel level, Cuboid region);
+    public static java.util.List<NamespacedId> documentIds();
 }
 
 public final class StructureSetHost {
@@ -1231,6 +1232,7 @@ public final class PreviewCommand {
 
 public final class PreviewService {
     public static int open(CommandSourceStack source, NamespacedId id, @Nullable LatticePoint origin);
+    public static void open(ServerPlayer player, NamespacedId id);
     public static void control(ServerPlayer player, PreviewControlPayload.Control control, @Nullable LatticePoint target);
     public static void installConfirmHandler(PreviewConfirmHandler handler);
 }
@@ -1268,6 +1270,21 @@ public record SitingCandidate(Siting siting, int score) { }
 
 public record GhostCell(LatticePoint cell, NamespacedId block, java.util.Map<String, String> properties) { }
 
+public record PreviewCatalogPayload(java.util.List<Entry> entries) implements CustomPacketPayload {
+    public static final Type<PreviewCatalogPayload> type;
+    @Override public Type<? extends CustomPacketPayload> type();
+
+    public record Entry(NamespacedId blueprintId, java.util.List<GhostCell> cells,
+                        java.util.List<MaterialLine> materials) { }
+
+    public record MaterialLine(NamespacedId item, int count) { }
+}
+
+public record PreviewOpenPayload(NamespacedId blueprintId) implements CustomPacketPayload {
+    public static final Type<PreviewOpenPayload> type;
+    @Override public Type<? extends CustomPacketPayload> type();
+}
+
 public final class PreviewPayloads {
     public static void register(RegisterPayloadHandlersEvent event);
 }
@@ -1295,9 +1312,39 @@ public final class PreviewKeys {
 
 public final class PreviewClientBridge {
     public static void accept(PreviewSyncPayload payload);
+    public static void acceptCatalog(PreviewCatalogPayload payload);
+}
+
+public final class PreviewCatalogClient {
+    public static void accept(PreviewCatalogPayload payload);
+    public static java.util.List<PreviewCatalogPayload.Entry> entries();
+    public static void listen(Runnable listener);
+    public static void unlisten(Runnable listener);
+    public static void clear();
 }
 
 public final class PreviewClientEvents { }
+
+package dev.vfyjxf.cumulus.mc.preview.jei;
+
+public final class JeiPreview {
+    public static java.util.List<NamespacedId> blueprintIds();
+    public static int drawnFrames();
+    public static int drawnCells();
+    public static void openWorld(NamespacedId blueprintId);
+    public static boolean show(NamespacedId blueprintId);
+}
+
+public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
+    @Override public ResourceLocation getPluginUid();
+    @Override public NamespacedId pluginId();
+    @Override public void registerCategories(IRecipeCategoryRegistration registration);
+    @Override public void registerRecipes(IRecipeRegistration registration);
+    @Override public void onRuntimeAvailable(IJeiRuntime jeiRuntime);
+    @Override public void onRuntimeUnavailable();
+}
+
+public final class JeiPreviewClientEvents { }
 ```
 
 ## 16. Build (design 14, P2 landed the single structure; P6 adds the set build)
@@ -1405,6 +1452,40 @@ The landed half (P3), with the wire facts a second implementation would need:
   `PreviewClientEvents` (a `Dist.CLIENT` `EventBusSubscriber`) owns the keys, the two render stages
   and the HUD layer. Ghost models resolve through the block renderer with a forced-alpha translucent
   pass; no block entity, capability or world read backs them.
+
+The JEI half (P4), with the same kind of wire and lifecycle facts:
+
+- **Conditional plugin.** `JeiPreviewPlugin` carries both annotations (`@JeiPlugin` for JEI's own
+  scan, `@PluginMarker` for the adapter's) and implements both interfaces (`IModPlugin`, `ModPlugin`),
+  so the adapter's loader pass sees the same id, dependencies and failure attribution every other
+  plugin gets. `JeiPreviewPlugins.load` is the pass: it returns before resolving a JEI type when
+  `ModList` does not list JEI, otherwise it runs `PluginLoader.load(AnnotationPluginLookup.of(
+  ModPlugin.class, JeiPlugin.class))` and logs each failure (fatal ones logged, never thrown, D-81);
+  the category itself is a singleton both instances share. JEI's own instances do the registration —
+  the adapter's instance is the validation copy. A GUI-integration plugin subtype for a second
+  renderer is P7's evaluation item; P4 adds no public registrar for GUI contributions.
+- **Catalog.** `PreviewCatalog` builds one payload from `LevelAccess.documentIds()` (the merged
+  built-in plus datapack ids) and `kernel.compile`; it keeps the identity-orientation projection only.
+  `PreviewCatalogSync` pushes it from `PreviewEvents`' `OnDatapackSyncEvent` handler, which fires on
+  join and on `/reload` before recipes are sent. Caps are code constants — 512 cells and 64 material
+  lines per entry, 4096 cells for the whole catalog — and an over-cap or non-compiling blueprint is
+  left out of the payload and named in a WARNING log line, never truncated. `PreviewCatalogClient` is the client snapshot plus a
+  listener list; `PreviewCatalogPayload`/`PreviewOpenPayload` are plain data, so the payload
+  registration path loads no client class.
+- **Recipe table.** `registerRecipes` seeds from the snapshot, `onRuntimeAvailable` and every later
+  catalog push reconcile it: a new id is `addRecipes`, a known id updates the existing instance in
+  place, a vanished id is `hideRecipes`, a returning one is `unhideRecipes`. Identity sets (`sent`,
+  `hidden`) make the two paths order-independent, and JEI's set-backed recipe list never sees the
+  same instance twice.
+- **View.** `BlueprintPreviewCategory.draw` owns the whole face: `PreviewScene` renders the cells as
+  block models under its own orthographic camera, far-to-near by depth, and flushes with
+  `BufferSource.endBatch()` rather than `GuiGraphics.flush()` (whose contract disables the depth test
+  around the batch). `PreviewInputHandler` is the one input surface — drag rotates, the slider and
+  the wheel move the Y slice, the button calls `JeiPreview.openWorld`. `JeiPreview` is the public
+  face: listed ids, the frame counters the harness asserts on, `show(id)` and `openWorld(id)`.
+- **Ghost to world.** `PreviewOpenPayload` carries only the blueprint id; `PreviewService.open(
+  ServerPlayer, NamespacedId)` takes the crosshair origin and runs the same session path as
+  `/cumulus preview`, so a JEI-opened preview is the §4 session with the same confirm exit.
 
 ## 18. Preferences (design 15 §9, landed with P5)
 

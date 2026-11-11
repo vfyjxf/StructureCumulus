@@ -47,6 +47,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 
 /** The server-side owner of the kernel and the per-level capture and persistence state. */
 @NullMarked
@@ -166,6 +167,13 @@ public final class ServerState {
 
     DatapackBlueprints blueprints() {
         return blueprints;
+    }
+
+    /** Every blueprint id of the merged source, sorted; a datapack document overrides the built-in one. */
+    List<NamespacedId> documentIds() {
+        TreeSet<NamespacedId> ids = new TreeSet<>(BuiltinDocuments.blueprintIds());
+        ids.addAll(blueprints.documents().keySet());
+        return List.copyOf(ids);
     }
 
     @Nullable

@@ -164,6 +164,9 @@ dependencies {
     uitestCompileOnly "dev.vfyjxf.cloudlib:cloudlib-uitest:${project.cloudlib_version}"
     // CloudLib declares JEI as a required mod dependency.
     localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${project.jei_version}"
+    // The preview category compiles against the JEI API only; the published jar neither carries nor
+    // requires JEI, and a JEI-less install simply registers no category (D-90).
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge:${project.jei_version}"
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.mc;
 
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.context.StructureManager;
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
@@ -12,6 +13,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -27,6 +29,12 @@ public final class LevelAccess {
     public static @Nullable StructureKernel kernel() {
         ServerState state = ServerState.current();
         return state == null ? null : state.kernel();
+    }
+
+    /** Every blueprint id of the merged document source, sorted; empty before the server opened. */
+    public static List<NamespacedId> documentIds() {
+        ServerState state = ServerState.current();
+        return state == null ? List.of() : state.documentIds();
     }
 
     public static @Nullable LevelCapture capture(ServerLevel level) {
