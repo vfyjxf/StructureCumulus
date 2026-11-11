@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:build_set_root",
+  "bounds": [0, 0, 0, 1, 1, 1],
+  "bays": [
+    {
+      "id": "body",
+      "box": [0, 0, 0, 1, 1, 1],
+      "coverage": "every_cell",
+      "footprint": "box",
+      "sharing": "exclusive"
+    }
+  ],
+  "checks": [
+    {
+      "id": "body_check",
+      "bay": "body",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone"}}
+    }
+  ]
+}

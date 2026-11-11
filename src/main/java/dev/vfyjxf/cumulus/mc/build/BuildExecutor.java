@@ -39,7 +39,6 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.mc.CaptureReports;
 import dev.vfyjxf.cumulus.mc.LevelCapture;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
 
@@ -73,13 +72,24 @@ public final class BuildExecutor {
 
     public ApplyReport run(BuildRequest request) {
         Objects.requireNonNull(request, "request");
-        Blueprint blueprint = blueprint(request.blueprint());
+        BuildJournal journal = new BuildJournal(capture.level(), request.player().getUUID());
+        return run(blueprint(request.blueprint()), request, journal);
+    }
+
+    /**
+     * Runs a blueprint the caller already holds — a set member's compiled blueprint is not always a
+     * document — and records its pre-image in the caller's journal.
+     */
+    public ApplyReport run(Blueprint blueprint, BuildRequest request, BuildJournal journal) {
+        Objects.requireNonNull(blueprint, "blueprint");
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(journal, "journal");
         BuildPolicy policy = effective(request.policy());
         Cuboid bounds = request.siting().toWorld(blueprint.bounds());
         if (bounds == null) {
             throw new IllegalArgumentException("the sited bounds leave the lattice: " + request.siting());
         }
-        return new Run(request, blueprint, policy, bounds).execute();
+        return new Run(request, blueprint, policy, bounds, journal).execute();
     }
 
     /** A per-run policy may tighten the server's ceiling, never raise it. */
@@ -108,13 +118,21 @@ public final class BuildExecutor {
         private final BuildPolicy policy;
         private final Cuboid bounds;
         private final ServerLevel level;
+        private final BuildJournal journal;
 
-        private Run(BuildRequest request, Blueprint blueprint, BuildPolicy policy, Cuboid bounds) {
+        private Run(
+            BuildRequest request,
+            Blueprint blueprint,
+            BuildPolicy policy,
+            Cuboid bounds,
+            BuildJournal journal
+        ) {
             this.request = request;
             this.blueprint = blueprint;
             this.policy = policy;
             this.bounds = bounds;
             this.level = capture.level();
+            this.journal = journal;
         }
 
         private ApplyReport execute() {
@@ -217,7 +235,7 @@ public final class BuildExecutor {
                 consumed,
                 FindingBundle.of(findings)
             );
-            BuildHistory.record(level, request.player().getUUID(), preImage);
+            journal.record(preImage);
             return recheck(committed);
         }
 
@@ -244,21 +262,10 @@ public final class BuildExecutor {
                     );
                 }
             }
-            for (ItemStack stack : consumed) {
-                ItemStack remainder = request.source().insert(stack.copy(), ExtractionMode.execute);
-                if (!remainder.isEmpty()) {
-                    incomplete = true;
-                    spawn(remainder, touched.bounds());
-                    findings.add(
-                        BuildFindings.at(
-                            BuildCodes.incompleteRollbackEntry,
-                            Phase.settle,
-                            remainder.getCount() + " " + remainder.getItem() + " could not be returned",
-                            touched.bounds()
-                        )
-                    );
-                }
-            }
+            List<Finding> returned = BuildReturns
+                    .insertAll(level, request.source(), consumed, touched.bounds(), Phase.settle);
+            incomplete = incomplete || !returned.isEmpty();
+            findings.addAll(returned);
             return new ApplyReport(
                 incomplete ? ApplyReport.Status.partiallyRolledBack : ApplyReport.Status.rolledBack,
                 steps,
@@ -363,15 +370,6 @@ public final class BuildExecutor {
                 extracted.add(taken);
             }
             return extracted;
-        }
-
-        private void spawn(ItemStack stack, @Nullable Cuboid where) {
-            if (where == null) {
-                return;
-            }
-            LatticePoint cell = where.min();
-            ItemEntity entity = new ItemEntity(level, cell.x() + 0.5, cell.y() + 0.5, cell.z() + 0.5, stack);
-            level.addFreshEntity(entity);
         }
 
         private Finding noMachineRepair(MatchResult checked) {

@@ -469,7 +469,8 @@ record StructureSetResult(
     List<NamespacedId> settled,
     List<NamespacedId> rolledBack,
     List<Finding> rollbackFailures,
-    Map<NamespacedId, List<ClaimRow>> claims
+    Map<NamespacedId, List<ClaimRow>> claims,
+    Map<NamespacedId, ApplyReport> builds
 ) { }
 ```
 
@@ -482,6 +483,11 @@ order. Rollback releases claims and removes the kernel context of every formed a
 release or a failed `Broken` dispatch stays in `rollbackFailures` as `SC-SET-0007`, and a failed
 release keeps its structure out of `rolledBack` while its context is still removed through the
 `Broken` dispatch.
+
+`builds` is the one member-keyed extension the set build adds (design 14 §13): one `ApplyReport` per
+member in build order, empty for a check or settle run. A set build's `rolledBack` names the members
+it tore down through their pre-images before the settle pass's release order, and a torn-down member's
+entry answers `rolledBack`.
 
 ### 10.5 Production command and one capture (S5)
 

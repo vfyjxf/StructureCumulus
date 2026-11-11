@@ -26,10 +26,15 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.BiFunction;
+
 /**
  * The command surface: {@code check}, {@code compile}, {@code settle}, {@code build}, {@code explain},
- * {@code claims}, {@code preview}, {@code prefs} and the structure-set pair {@code set check}/{@code set
- * settle}.
+ * {@code claims}, {@code preview}, {@code prefs} and the structure-set triple {@code set check}/{@code
+ * set settle}/{@code set build}.
  */
 @NullMarked
 public final class CumulusCommand {
@@ -125,47 +130,123 @@ public final class CumulusCommand {
                                                 )
                                             )
                                         )
+                                        .then(
+                                            Commands.literal("build").then(
+                                                Commands.argument("id", ResourceLocationArgument.id()).then(setOrigin())
+                                            )
+                                        )
                             )
                 );
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> buildOrigin() {
-        var origin = buildFlags(
-            Commands.argument("origin", BlockPosArgument.blockPos()),
-            BuildCommand.Kind.defaultSource
-        );
-        origin.then(
-            Commands.literal("with").then(buildFlags(Commands.literal("creative"), BuildCommand.Kind.creative))
-                    .then(buildFlags(Commands.literal("player"), BuildCommand.Kind.player)).then(
-                        buildFlags(
-                            Commands.literal("container").then(Commands.argument("pos", BlockPosArgument.blockPos())),
-                            BuildCommand.Kind.container
-                        )
-                    )
-        );
-        return origin;
+        return origin(EnumSet.of(BuildFlag.dry, BuildFlag.allowRemoval), CumulusCommand::buildBody);
     }
 
-    /** The flags nest in either order, so {@code --dry --allow-removal} and its reverse both parse. */
-    private static <T extends ArgumentBuilder<CommandSourceStack, T>> T buildFlags(T node, BuildCommand.Kind kind) {
-        node.executes(buildBody(kind, false, false));
-        node.then(
-            Commands.literal("--dry").executes(buildBody(kind, true, false))
-                    .then(Commands.literal("--allow-removal").executes(buildBody(kind, true, true)))
+    private static ArgumentBuilder<CommandSourceStack, ?> setOrigin() {
+        return origin(EnumSet.allOf(BuildFlag.class), CumulusCommand::setBuildBody);
+    }
+
+    /** The origin argument, every flag subset and the three source forms. */
+    private static ArgumentBuilder<CommandSourceStack, ?> origin(
+        Set<BuildFlag> flags,
+        BiFunction<Set<BuildFlag>, BuildCommand.Kind, Command<CommandSourceStack>> body
+    ) {
+        ArgumentBuilder<CommandSourceStack, ?> node = flags(
+            Commands.argument("origin", BlockPosArgument.blockPos()),
+            BuildCommand.Kind.defaultSource,
+            EnumSet.noneOf(BuildFlag.class),
+            flags,
+            body
         );
         node.then(
-            Commands.literal("--allow-removal").executes(buildBody(kind, false, true))
-                    .then(Commands.literal("--dry").executes(buildBody(kind, true, true)))
+            Commands.literal("with")
+                    .then(
+                        flags(
+                            Commands.literal("creative"),
+                            BuildCommand.Kind.creative,
+                            EnumSet.noneOf(BuildFlag.class),
+                            flags,
+                            body
+                        )
+                    )
+                    .then(
+                        flags(
+                            Commands.literal("player"),
+                            BuildCommand.Kind.player,
+                            EnumSet.noneOf(BuildFlag.class),
+                            flags,
+                            body
+                        )
+                    )
+                    .then(
+                        flags(
+                            Commands.literal("container").then(Commands.argument("pos", BlockPosArgument.blockPos())),
+                            BuildCommand.Kind.container,
+                            EnumSet.noneOf(BuildFlag.class),
+                            flags,
+                            body
+                        )
+                    )
         );
         return node;
     }
 
-    private static Command<CommandSourceStack> buildBody(BuildCommand.Kind kind, boolean dry, boolean allowRemoval) {
+    /** Every flag subset in every order, each node executable, so the flags nest either way. */
+    private static <T extends ArgumentBuilder<CommandSourceStack, T>> T flags(
+        T node,
+        BuildCommand.Kind kind,
+        Set<BuildFlag> chosen,
+        Set<BuildFlag> remaining,
+        BiFunction<Set<BuildFlag>, BuildCommand.Kind, Command<CommandSourceStack>> body
+    ) {
+        node.executes(body.apply(chosen, kind));
+        for (BuildFlag flag : List.copyOf(remaining)) {
+            Set<BuildFlag> with = EnumSet.copyOf(chosen);
+            with.add(flag);
+            Set<BuildFlag> rest = EnumSet.copyOf(remaining);
+            rest.remove(flag);
+            node.then(flags(Commands.literal(flag.literal), kind, with, rest, body));
+        }
+        return node;
+    }
+
+    private static Command<CommandSourceStack> buildBody(Set<BuildFlag> flags, BuildCommand.Kind kind) {
         return context -> CommandSupport.guarded(
             context,
             "build",
-            command -> BuildCommand.run(command, new BuildCommand.Options(dry, allowRemoval, kind))
+            command -> BuildCommand.run(
+                command,
+                new BuildCommand.Options(flags.contains(BuildFlag.dry), flags.contains(BuildFlag.allowRemoval), kind)
+            )
         );
+    }
+
+    private static Command<CommandSourceStack> setBuildBody(Set<BuildFlag> flags, BuildCommand.Kind kind) {
+        return context -> CommandSupport.guarded(
+            context,
+            "set build",
+            command -> SetCommand.build(
+                command,
+                new SetCommand.BuildOptions(
+                    flags.contains(BuildFlag.dry),
+                    flags.contains(BuildFlag.allowRemoval),
+                    flags.contains(BuildFlag.settle),
+                    kind
+                )
+            )
+        );
+    }
+
+    /** One leaf flag: its literal on the command line. */
+    private enum BuildFlag {
+        dry("--dry"), allowRemoval("--allow-removal"), settle("--settle");
+
+        private final String literal;
+
+        BuildFlag(String literal) {
+            this.literal = literal;
+        }
     }
 
     private static int check(CommandContext<CommandSourceStack> context) {

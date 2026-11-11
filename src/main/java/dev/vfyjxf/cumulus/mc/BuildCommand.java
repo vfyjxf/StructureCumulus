@@ -53,7 +53,8 @@ final class BuildCommand {
         if (origin == null) {
             return 0;
         }
-        ItemSource items = items(source, level, player, context, options);
+        BlockPos container = options.kind() == Kind.container ? BlockPosArgument.getBlockPos(context, "pos") : null;
+        ItemSource items = items(source, level, player, options.kind(), container);
         if (items == null) {
             return 0;
         }
@@ -87,23 +88,27 @@ final class BuildCommand {
         return report.status() == ApplyReport.Status.committed ? 1 : 0;
     }
 
-    private static @Nullable ItemSource items(
+    /** The command line's source choice, resolved once for the single build and the set build. */
+    static @Nullable ItemSource items(
         CommandSourceStack source,
         ServerLevel level,
         ServerPlayer player,
-        CommandContext<CommandSourceStack> context,
-        Options options
+        Kind kind,
+        @Nullable BlockPos container
     ) {
-        return switch (options.kind()) {
+        return switch (kind) {
             case creative -> new CreativeItemSource();
             case player -> new PlayerInventorySource(player);
             case container -> {
-                BlockPos pos = BlockPosArgument.getBlockPos(context, "pos");
-                ItemHandlerSource container = ItemHandlerSource.at(level, pos, null);
                 if (container == null) {
-                    source.sendFailure(Component.literal("no item handler at " + pos.toShortString()));
+                    source.sendFailure(Component.literal("a container source needs a position"));
+                    yield null;
                 }
-                yield container;
+                ItemHandlerSource handler = ItemHandlerSource.at(level, container, null);
+                if (handler == null) {
+                    source.sendFailure(Component.literal("no item handler at " + container.toShortString()));
+                }
+                yield handler;
             }
             case defaultSource -> player.isCreative() ? new CreativeItemSource() : new PlayerInventorySource(player);
         };

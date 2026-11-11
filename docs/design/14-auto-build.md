@@ -45,6 +45,8 @@ four are host concerns.
 | `BuildRequest` | record | blueprint, siting, source, policy, dry flag, preferences |
 | `BuildExecutor` | final class | the capture → solve → validate → apply flow |
 | `SetBuildHost` | final class | set-level build over one shared source and budget (P6) |
+| `SetBuildRequest` | record | the placed set, its shared source, gate, player and the dry/settle flags (P6) |
+| `BuildJournal` | final class | the pre-images one build run committed, in commit order (P6) |
 
 ## 4. Signatures
 
@@ -187,6 +189,9 @@ caller can juxtapose "what the plan asked" with "what the world answered" withou
 plan. `itemsConsumed` is what the commit actually extracted; `findings` carries every refusal and
 warning code the run produced.
 
+A set build answers the set result of §13: `StructureSetResult.builds` carries one `ApplyReport` per
+member, so a caller juxtaposes the set lifecycle with what each member's plan asked and got.
+
 Two report-text laws (expansion 6.3, 9.2):
 
 - A refusal message names the policy and the config key that gates it ("which rule, who can change
@@ -248,9 +253,11 @@ confirm validate clean.
 ## 11. Undo
 
 `/cumulus build undo` replays the stored pre-image in reverse as its own transaction (the undo is
-itself reportable and rollback-safe). v1 keeps a one-entry history per `(player, level)`; the
-bounded undo/redo stack is P8 backlog (expansion 5.3). The history is in-memory and is not
-persisted across a restart; this document is the warning.
+itself reportable and rollback-safe). A set build publishes one merged entry per run, so its undo
+restores every member in reverse commit order; the rows a `--settle` run wrote are not part of a
+pre-image — they stay with their instances until the next settle takes them over (D-79). v1 keeps a
+one-entry history per `(player, level)`; the bounded undo/redo stack is P8 backlog (expansion 5.3).
+The history is in-memory and is not persisted across a restart; this document is the warning.
 
 ## 12. Commands
 
@@ -266,21 +273,70 @@ when its mutation succeeded.
   default build takes no claims. Returns 1 on `committed` (or on a clean dry validation), 0 otherwise.
   Chat prints a summary only; the detail lives in the preview HUD, not in chat spam.
 - `/cumulus build undo` — §11; same permission gate; returns 1 on a committed undo.
-- `/cumulus set build <id> <origin> [with …] [--settle]` — §13 (P6).
+- `/cumulus set build <id> <origin> [with creative|player|container <pos>] [--dry] [--allow-removal]
+  [--settle]` — §13 (P6). Its exit code is `built()` without `--settle` and `formed()` with it.
 
 ## 13. Structure-set build (P6)
 
-`SetBuildHost` reuses the `StructureSetHost` shape (adapter §13.4, D-89): presence is probed first
-and formed/present members are skipped; the remaining members run the §10 flow in declaration
-order; the whole set shares **one** `ItemSource` and **one** budget, like the set check's shared
-budget law (D-35). Build is not settle (§10): a default set build takes no claims, and a member
-failure tears the already-built members down through their pre-images in reverse order — world
-writes only. With `--settle`, each member's `Formed` re-check chains `StructureSetHost.run`, and a
-member failure then rolls back both the world writes and the claims the run took, the claims
-through the existing set rollback path (release + `StructureEvent.Broken` dispatch, adapter §13.4).
-The report extends
-`StructureSetResult` with a per-member `ApplyReport`. The `SC-SET-0008` same-siting refusal and
-every other set-layer refusal apply unchanged.
+`SetBuildHost` lives in `mc.build` beside the executor and reuses the `StructureSetHost` shape
+(adapter §13.4, D-89):
+
+```java
+public final class SetBuildHost {
+    public SetBuildHost(LevelCapture capture, StructureKernel kernel, OwnerId owner);
+    public StructureSetResult run(SetBuildRequest request, SnapshotLease lease, Budget budget);
+}
+
+public record SetBuildRequest(StructureSet set, ItemSource source, BuildPolicy policy,
+                              ServerPlayer player, boolean dry, boolean settle) { }
+```
+
+The one set capture the caller already took drives every set-layer gate: `StructureSet.validate`
+(the same-siting `SC-SET-0008` and every other placement refusal), the presence probe — every
+presence cell charged `(1, 0)` against the set's one budget (D-35) — and the link distance and
+coverage findings. An unprovable presence (`SC-SET-0004`) or a stale lease stops the build before
+any write, exactly as it stops a check. Absence is not a refusal here: an absent member is the build
+target, so `SC-SET-0001` stays a check/settle finding and never a build one.
+
+The members then run the §10 flow in declaration order, root first, one member at a time, and the
+whole set shares **one** `ItemSource` and **one** budget (D-35). The source is live, so each
+member's dry run simulates against what the earlier members actually took and its commit extracts
+from the same remainder: a member that runs the source dry reports its `SC-BLD-0003` shortage with
+the per-item counts before it writes anything. A member whose presence probe answered present and
+whose §10 check already matches is skipped — the executor's idempotent empty report, no items, no
+writes — while a present member that does not match is repaired by the same flow. Each member's
+§10 flow captures fresh (its check, its commit's pre-image and its post-build re-check);
+the caller's single set capture is the set-layer read, not the member writes (§13.5 governs
+check/settle, whose members write nothing). `--dry` runs every member's steps 1–4 and writes
+nothing; a dry run consumes no item, so each member is validated against the same live count — a
+dry set build proves each member's feasibility, not the set's combined bill.
+
+Build is not settle (§10), so a default set build takes no claims. Any member failure — a refusal or
+a rolled-back commit — tears the members this run already wrote down through their own pre-images in
+**reverse commit order**, returns to the shared source what they consumed (an unreturned remainder
+spills at that member's cells as `SC-BLD-0006`, never silently), and reports the original finding.
+Nothing the failed run wrote stays in the world, and the undo entry the run published is dropped with
+it. A member that committed but whose post-build re-check still reports `SC-BLD-0007` is not a
+failure: the write stays (§10), the set is simply not `built()`, and the user re-runs — a member
+whose check needs several repairs therefore takes one repair per run, exactly like the single build.
+
+With `--settle`, a run whose members all committed chains the existing set settle path:
+`SetBuildHost` re-captures the region and policy of the set capture after the writes and runs
+`StructureSetHost.run` over the whole set (takeover, presence, links, check-all, settle-all). A
+failure in that pass is the set host's own rollback — release plus `StructureEvent.Broken` dispatch
+(adapter §13.4) — and the set build then tears its own world writes down in reverse, so a settle
+failure rolls back both the world and the claims the run took. A run that is not `built()` never
+reaches the settle pass (an incomplete member keeps its write and waits for the next run), and
+`--dry` never settles.
+
+The report extends `StructureSetResult` with a per-member `ApplyReport` in build order. `builds`
+holds each member's final report: a member torn down by the run answers `rolledBack`, a skipped one
+the idempotent empty report. `itemsConsumed()` is what the members' commits took,
+`setFindings` carries every member's findings next to the set-layer ones, and `rolledBack` names the
+members this run tore down before the ids the settle pass released. `built()` is the build success
+criterion — every member committed, no error finding, no rollback failure — and it is the plain set
+build's exit code; a `--settle` run exits on `formed()` instead. The `SC-SET-0008` same-siting
+refusal and every other set-layer refusal apply unchanged.
 
 ## 14. Codes
 

@@ -144,9 +144,9 @@
 | `StructureSet.Satellite` | record | one placed satellite: id, compiled satellite, absolute siting, world bounds, presence cells |
 | `StructureSet.Placement` | record | the placed set or the findings that prevented it |
 | `StructureSetHost` | — | presence/link/check-all/settle-all/rollback sequencing over the kernel facade; `check` stops before the settle pass |
-| `StructureSetResult` | record | per-structure outcomes and filtered claims, set findings, settled/rolled-back ids and rollback failures |
-| `CumulusCommand` | — | the five top-level `/cumulus` subcommands (`check`, `compile`, `settle`, `explain`, `claims`) plus `set check`/`set settle` |
-| `SetCommand` | final class, package-private | the structure-set driver: compile, root siting, placement, one union capture, host check or settle, the set summary and its exit code |
+| `StructureSetResult` | record | per-structure outcomes and filtered claims, set findings, settled/rolled-back ids, rollback failures and, for a set build, one `ApplyReport` per member |
+| `CumulusCommand` | — | the five top-level `/cumulus` subcommands (`check`, `compile`, `settle`, `explain`, `claims`), `build`/`build undo`, `preview`, `prefs` and `set check`/`set settle`/`set build` |
+| `SetCommand` | final class, package-private | the structure-set driver: compile, root siting, placement, one union capture, host check, settle or build, the set summary and its exit code |
 | `FindingOutput` | — | human/JSON to chat, log or a file (absent; the commands print inline today) |
 | `MatchScheduler` | — | optional host execution: submit, coalesce, markDirty, tick (absent) |
 
@@ -878,6 +878,12 @@ unloads.
   declaration order. The command prints the set id/origin, the root and satellite outcomes, `settled`,
   `rolledBack`, `rollbackFailures`, the per-structure claim row counts and `firstFailure`, then the set
   findings. `set check` writes no row.
+- `/cumulus set build <id> <origin> [with creative|player|container <pos>] [--dry] [--allow-removal]
+  [--settle]` — the set build driver (§16.3): the same compile, root siting, placement and one union
+  capture, then `SetBuildHost.run` over the placed set. It prints the set id/origin, the root and
+  satellite build reports, the total consumed items, `settled`, `rolledBack`, `rollbackFailures`,
+  `firstFailure` and the set findings. A plain set build exits 1 only on `built()`, a `--settle` one
+  only on `formed()`.
 - `ServerAboutToStartEvent` opens `ServerState`; `ServerStoppingEvent` closes it, and
   `ServerStoppedEvent` closes it again on the crash path, where the stopping event never fires.
   `LevelEvent.Load` creates that world's per-level store; `LevelEvent.Unload` — handled by
@@ -1099,8 +1105,9 @@ nested source registry. The document reader/writer is the only text format; capt
 are host tools, not kernel modules. The single-structure build executor and the
 `/cumulus build`/`/cumulus build undo` commands landed at P2 (§16.1); the server-side preview
 session, the network payloads, the client overlay renderer and the JEI category landed at P3 and P4
-(§17, design 15); the structure-set build is approved design (§16.2) and lands with P6 of
-[`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md).
+(§17, design 15); the structure-set build is the set layer's own build (§16.3, design 14 §13). What
+stays absent is the single structure's `--settle` flag: design 14 §12 lists it, and only the set
+build chains the settle pass today.
 
 ## 15. Signatures
 
@@ -1359,12 +1366,14 @@ sit in `dev.vfyjxf.cumulus.mc.BuildCommand`, registered by `CumulusCommand`, bec
 helpers (`CommandSupport`, the anchor siting path) are package-scoped to `mc`; the build package owns
 the flow and the command is its thin shell.
 
-Two deviations from design 14 §4, both deliberate: `BuildExecutor` takes the `OwnerId` explicitly
+Deviations from design 14 §4, all deliberate: `BuildExecutor` takes the `OwnerId` explicitly
 (`BuildExecutor(LevelCapture, StructureKernel, OwnerId, BuildPolicy)`) because the executor begins a
-draft for the check and cannot reach `ServerState.owner()` from a subpackage, and claims come from
-`StructureKernel.ledger()` rather than a constructor argument. `--settle` is deferred to P6 with the
-set build, and `--dry` runs steps 1–4 and prints the summary without a preview payload (the payload
-belongs to §17).
+draft for the check and cannot reach `ServerState.owner()` from a subpackage; claims come from
+`StructureKernel.ledger()` rather than a constructor argument; `run(Blueprint, BuildRequest,
+BuildJournal)` lets a caller that already holds the compiled blueprint (the set build does) skip the
+document lookup, which a hand-built set cannot satisfy; and `--dry` runs steps 1–4 and prints the
+summary without a preview payload (the payload belongs to §17). The single build's `--settle` is still
+open; only the set build has the flag (§16.3).
 
 `BuildPolicy` is the host gate. `config/structurecumulus-server.toml` carries `maxTouchedVolume`
 (default 4096) and `allowRemoval` (default false); `BuildConfig.policy()` reads them, the permission
@@ -1390,12 +1399,44 @@ carries the list until then.
 
 ### 16.2 Build is not settle
 
-Build takes no claims; `--settle` (P6) chains the existing settle path after the formed re-check,
-and only then does rollback cover claims (design 14 §10). Design 14 owns the remaining contracts:
-two-phase item handling, pre-image transactions with reverse restore, refusal as a finding-carrying
-report with zero writes, idempotence as a verifier property, the `SC-BLD` code family (§12) and the
-structure-set build (§13, P6). D-16 stands: no executor, transaction, validator or report enters the
-kernel.
+Build takes no claims; `--settle` chains the existing settle path after the formed re-check, and only
+then does rollback cover claims (design 14 §10). The set build landed that flag (§16.3); the single
+build's own `--settle` is still open. Design 14 owns the remaining contracts: two-phase item handling,
+pre-image transactions with reverse restore, refusal as a finding-carrying report with zero writes,
+idempotence as a verifier property and the `SC-BLD` code family (§12). D-16 stands: no executor,
+transaction, validator or report enters the kernel.
+
+### 16.3 The set build (P6, design 14 §13)
+
+`dev.vfyjxf.cumulus.mc.build.SetBuildHost` sequences a structure set's build. Its one set-level read is
+the caller's capture: `StructureSet.validate` (the `SC-SET-0008` same-siting refusal included), the
+presence probe through the shared `SetPresence` law — each cell charged `(1, 0)` against the set's one
+`Budget` — and `StructureSet.linkFindings` per satellite. An unprovable presence (`SC-SET-0004`) or a
+stale lease stops the build before any write; an absent member is the build target, not `SC-SET-0001`.
+
+The root and then the satellites run the §10 executor flow in declaration order, one at a time, with
+**one** `ItemSource` and **one** `BuildJournal`. The journal appends each committed member's pre-image
+in commit order and republishes the merged map as the run's `BuildHistory` entry, so the set build is
+one undo step. A member whose check already matched is the executor's idempotent empty report (present
+and formed, skipped). A member whose report is refused or rolled back is a failure: the members
+already written down are torn down in reverse commit order, their consumed items return to the shared
+source (a remainder spills as `SC-BLD-0006`) and the undo entry is dropped; each torn-down member's
+report answers `rolledBack`. `SC-BLD-0007` is not a member failure: the committed write stays (§16.1)
+and the set is only not `built()`, so a member with several faulty checks takes one repair per run. `--dry` runs every
+member's steps 1–4 and never writes; a dry run consumes no item, so its per-member validation is not a
+combined bill.
+
+`--settle` re-captures the set capture's region and policy after the writes and runs the existing
+`StructureSetHost.run` — only when the run is `built()`, so an incomplete member waits for the next
+run instead of being torn down; the settle's presence, links, check-all and settle-all are the set
+layer's own; the claims rollback of a failed settle is the set host's release + `StructureEvent.Broken` path,
+and the build then tears its world writes down in reverse. The report is the `StructureSetResult` of
+§13.5 with `builds` filled: per-member `ApplyReport` in build order, `itemsConsumed()` summing them,
+`rolledBack` naming the torn-down members before the settle releases, and `built()` as the plain
+build's success criterion. `SetBuildHost` is constructed as
+`new SetBuildHost(LevelCapture, StructureKernel, OwnerId)` and run as
+`run(SetBuildRequest, SnapshotLease lease, Budget budget)`; `SetBuildRequest(StructureSet, ItemSource,
+BuildPolicy, ServerPlayer, boolean dry, boolean settle)`.
 
 ## 17. Preview (design 15, approved, landing with P3/P4)
 

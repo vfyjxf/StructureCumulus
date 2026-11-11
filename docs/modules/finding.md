@@ -327,7 +327,7 @@ sites lists every class that emits it.
 
 | Code | Sev | Label | Meaning | Owner | Producer sites |
 | --- | --- | --- | --- | --- | --- |
-| `SC-SPC-0001` | ERROR | P | a locus/cell cannot be mapped into the requested frame | space | `MatchEngine` check and settle, `ClaimPlanner` (`PlanRejected`), `StructureSetCompiler`, adapter `StructureSet`, `StructureSetHost` |
+| `SC-SPC-0001` | ERROR | P | a locus/cell cannot be mapped into the requested frame | space | `MatchEngine` check and settle, `ClaimPlanner` (`PlanRejected`), `StructureSetCompiler`, adapter `StructureSet` |
 | `SC-SPC-0002` | ERROR | P | a declared cell or box would leave the lattice | space | `BuiltinSupport` (the built-in focus factories) |
 | `SC-OCC-0001` | ERROR | P | a focus could not bind the subject it needs (none, more than one, or a missing part) | world | `Check.missing` |
 | `SC-OCC-0002` | WARNING | P | a footprint leaves the snapshot | world | `Focuses` |
@@ -387,9 +387,9 @@ sites lists every class that emits it.
 | `SC-SPI-0001` | ERROR | P | an extension threw or returned a malformed finding | spi | `MatchEngine` extension guard (check, derive, fold) |
 | `SC-SPI-0003` | ERROR | T | a catalog registration found a duplicate or a different value | spi | `Catalog.Builder.put` |
 | `SC-SET-0001` | ERROR | – | a required satellite is absent | adapter | `StructureSetHost` presence |
-| `SC-SET-0002` | ERROR | – | a satellite link distance is invalid | document | `StructureSetCompiler`, `StructureSetHost` link re-check |
-| `SC-SET-0003` | ERROR | – | a link cell is outside its blueprint or not covered by a check | document | `StructureSetCompiler`, `StructureSetHost` re-check |
-| `SC-SET-0004` | ERROR | – | satellite presence is unreadable | adapter | `StructureSetHost` presence |
+| `SC-SET-0002` | ERROR | – | a satellite link distance is invalid | document | `StructureSetCompiler`, `StructureSet` link re-check |
+| `SC-SET-0003` | ERROR | – | a link cell is outside its blueprint or not covered by a check | document | `StructureSetCompiler`, `StructureSet` re-check |
+| `SC-SET-0004` | ERROR | – | satellite presence is unreadable | adapter | `SetPresence` |
 | `SC-SET-0005` | ERROR | – | duplicate satellite placement | document | `StructureSetCompiler`, adapter `StructureSet.place` |
 | `SC-SET-0006` | ERROR | – | duplicate parent face link | document | `StructureSetCompiler`, adapter `StructureSet.place` |
 | `SC-SET-0007` | ERROR | – | structure set rollback failed | adapter | `StructureSetHost` settle |

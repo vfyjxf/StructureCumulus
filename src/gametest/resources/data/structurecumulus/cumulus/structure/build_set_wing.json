@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:build_set_wing",
+  "bounds": [0, 0, 0, 1, 1, 1],
+  "bays": [
+    {
+      "id": "cell",
+      "box": [0, 0, 0, 1, 1, 1],
+      "coverage": "every_cell",
+      "footprint": "box",
+      "sharing": "exclusive"
+    }
+  ],
+  "checks": [
+    {
+      "id": "cell_check",
+      "bay": "cell",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone"}}
+    }
+  ]
+}

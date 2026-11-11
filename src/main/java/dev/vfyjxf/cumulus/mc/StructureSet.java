@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Phase;
 import dev.vfyjxf.cumulus.kernel.document.CompiledSatellite;
 import dev.vfyjxf.cumulus.kernel.document.CompiledStructureSet;
+import dev.vfyjxf.cumulus.kernel.document.DistanceMetric;
 import dev.vfyjxf.cumulus.kernel.document.LinkMode;
 import dev.vfyjxf.cumulus.kernel.document.LinkSpec;
 import dev.vfyjxf.cumulus.kernel.document.SatelliteSpec;
@@ -18,6 +19,7 @@ import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.kernel.structure.Check;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -238,6 +240,130 @@ public record StructureSet(
             }
         }
         return List.copyOf(findings);
+    }
+
+    /**
+     * Re-checks one satellite's links against the placed plan: the parent cell through the root siting,
+     * the port through the satellite's own, then the face or range distance between them.
+     */
+    public static List<Finding> linkFindings(StructureSet set, Satellite satellite) {
+        Objects.requireNonNull(set, "set");
+        Objects.requireNonNull(satellite, "satellite");
+        List<Finding> findings = new ArrayList<>();
+        Blueprint root = set.root();
+        for (LinkSpec link : satellite.links()) {
+            if (link.mode() == LinkMode.none) {
+                continue;
+            }
+            LatticePoint parent = link.parentCell();
+            LatticePoint port = link.satelliteCell();
+            if (parent == null || port == null) {
+                findings.add(
+                    problem(
+                        Codes.linkCoverageInvalid,
+                        "the link of " + satellite.id().text() + " needs both cells",
+                        Locus.local(satellite.blueprint().bounds().asSet())
+                    )
+                );
+                continue;
+            }
+            if (!root.bounds().contains(parent) || !covers(root, parent)) {
+                findings.add(
+                    problem(
+                        Codes.linkCoverageInvalid,
+                        "the parent cell " + parent + " of " + satellite.id().text()
+                                + " is outside the root or not read by any root check",
+                        localOrWorld(set.rootSiting(), parent)
+                    )
+                );
+                continue;
+            }
+            Blueprint satelliteBlueprint = satellite.blueprint();
+            if (!satelliteBlueprint.bounds().contains(port) || !covers(satelliteBlueprint, port)) {
+                findings.add(
+                    problem(
+                        Codes.linkCoverageInvalid,
+                        "the satellite cell " + port + " of " + satellite.id().text()
+                                + " is outside the satellite or not read by any satellite check",
+                        localOrWorld(satellite.siting(), port)
+                    )
+                );
+                continue;
+            }
+            LatticePoint parentWorld = set.rootSiting().toWorld(parent);
+            LatticePoint portWorld = satellite.siting().toWorld(port);
+            if (parentWorld == null || portWorld == null) {
+                findings.add(
+                    problem(
+                        Codes.locusUnmapped,
+                        "the link of " + satellite.id().text() + " cannot be mapped into the world",
+                        Locus.local(CuboidSet.of(Cuboid.of(parent), Cuboid.of(port)))
+                    )
+                );
+                continue;
+            }
+            long dx = (long) portWorld.x() - parentWorld.x();
+            long dy = (long) portWorld.y() - parentWorld.y();
+            long dz = (long) portWorld.z() - parentWorld.z();
+            Locus cells = Locus.world(CuboidSet.of(Cuboid.of(parentWorld), Cuboid.of(portWorld)));
+            long manhattan = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+            if (link.mode() == LinkMode.face) {
+                if (manhattan != 1) {
+                    findings.add(
+                        problem(
+                            Codes.linkDistanceInvalid,
+                            "the face link of " + satellite.id().text() + " is not adjacent (Manhattan " + manhattan
+                                    + ")",
+                            cells
+                        )
+                    );
+                }
+            } else if (!within(link.metric(), dx, dy, dz, link.maxDistance())) {
+                findings.add(
+                    problem(
+                        Codes.linkDistanceInvalid,
+                        "the range link of " + satellite.id().text() + " exceeds " + link.maxDistance() + " under "
+                                + link.metric(),
+                        cells
+                    )
+                );
+            }
+        }
+        return List.copyOf(findings);
+    }
+
+    private static boolean covers(Blueprint blueprint, LatticePoint cell) {
+        for (Check<?> check : blueprint.checks()) {
+            if (check.reads().cells().contains(cell)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean within(DistanceMetric metric, long dx, long dy, long dz, int maxDistance) {
+        long x = Math.abs(dx);
+        long y = Math.abs(dy);
+        long z = Math.abs(dz);
+        return switch (metric) {
+            case chebyshev -> Math.max(x, Math.max(y, z)) <= maxDistance;
+            case manhattan -> x + y + z <= maxDistance;
+            case euclidean -> {
+                if (x > maxDistance || y > maxDistance || z > maxDistance) {
+                    yield false;
+                }
+                long limit = (long) maxDistance * maxDistance;
+                long sum = x * x + y * y;
+                yield sum <= limit && z * z <= limit - sum;
+            }
+        };
+    }
+
+    private static Locus localOrWorld(Siting siting, LatticePoint local) {
+        LatticePoint world = siting.toWorld(local);
+        return world == null
+                ? Locus.local(CuboidSet.of(Cuboid.of(local)))
+                : Locus.world(CuboidSet.of(Cuboid.of(world)));
     }
 
     private static boolean hasErrors(List<Finding> findings) {

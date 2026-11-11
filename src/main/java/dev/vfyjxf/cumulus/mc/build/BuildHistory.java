@@ -36,6 +36,18 @@ public final class BuildHistory {
         return levelHistory != null && levelHistory.containsKey(player);
     }
 
+    /** Drops the player's last build in this level: the run it described has been undone already. */
+    public static void forget(ServerLevel level, UUID player) {
+        Map<UUID, Map<LatticePoint, BlockPlacement>> levelHistory = history.get(level.dimension());
+        if (levelHistory == null) {
+            return;
+        }
+        levelHistory.remove(player);
+        if (levelHistory.isEmpty()) {
+            history.remove(level.dimension());
+        }
+    }
+
     /** Undoes the player's last build in this level, or answers null when there is nothing to undo. */
     public static @Nullable ApplyReport undo(ServerLevel level, UUID player) {
         Map<UUID, Map<LatticePoint, BlockPlacement>> levelHistory = history.get(level.dimension());
@@ -52,7 +64,7 @@ public final class BuildHistory {
         if (levelHistory.isEmpty()) {
             history.remove(level.dimension());
         }
-        Cuboid bounds = boundsOf(preImage);
+        Cuboid bounds = Cells.bounds(preImage.keySet());
         if (bounds == null) {
             return ApplyReport.formed();
         }
@@ -106,27 +118,6 @@ public final class BuildHistory {
 
     public static void forgetAll() {
         history.clear();
-    }
-
-    private static @Nullable Cuboid boundsOf(Map<LatticePoint, BlockPlacement> cells) {
-        int minX = Integer.MAX_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxY = Integer.MIN_VALUE;
-        int maxZ = Integer.MIN_VALUE;
-        for (LatticePoint cell : cells.keySet()) {
-            minX = Math.min(minX, cell.x());
-            minY = Math.min(minY, cell.y());
-            minZ = Math.min(minZ, cell.z());
-            maxX = Math.max(maxX, cell.x());
-            maxY = Math.max(maxY, cell.y());
-            maxZ = Math.max(maxZ, cell.z());
-        }
-        if (maxX < minX) {
-            return null;
-        }
-        return Cuboid.of(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1);
     }
 
     private BuildHistory() {}

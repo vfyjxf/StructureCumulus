@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "kind": "structure_set",
+  "id": "structurecumulus:build_set",
+  "root": "structurecumulus:build_set_root",
+  "satellites": [
+    {
+      "id": "left_wing",
+      "blueprint": "structurecumulus:build_set_wing",
+      "at": [1, 0, 0],
+      "orientation": "identity",
+      "required": true,
+      "links": [
+        {"mode": "face", "parent_cell": [0, 0, 0], "satellite_cell": [0, 0, 0]}
+      ]
+    }
+  ]
+}
