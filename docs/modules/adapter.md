@@ -930,6 +930,14 @@ a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (
 The capture report never enters a `MatchResult` bundle; the commands print it as their own block
 before the attempt's findings (§11).
 
+`SC-BLD-0001`…`0008` are the adapter's build family (design 14 §14, approved, landing with P2/P3):
+`0001` no `machineApplicable` remedy (WARNING), `0002` policy refusal (ERROR), `0003` item shortage
+(ERROR), `0004` materialization failure (ERROR), `0005` transaction step failure (ERROR), `0006`
+incomplete rollback (WARNING), `0007` post-build re-check still not formed (ERROR), `0008` preview
+session invalidated (WARNING). They register through `AdapterCodes` under the same law as the
+`SC-MC-*` codes: each entry carries its canonical severity and explanation, and no entry ever
+enters `Codes.all`.
+
 ## 13. Structure sets
 
 ### 13.1 Host plan
@@ -1083,10 +1091,12 @@ ledgers; S5 adds the two real-level GameTest classes above, and S6 extends them 
 
 ## 14. What is deliberately absent
 
-No client overlay renderer, no network payload, no schematic importer, no GUI, no scheduler in this
-round. No built-in nested source provider and no adapter-owned nested source registry. The overlay
-model is data; a later adapter may render it. The document reader/writer is the only text format;
-capture/import tools are host tools, not kernel modules.
+No schematic importer and no scheduler. No built-in nested source provider and no adapter-owned
+nested source registry. The document reader/writer is the only text format; capture/import tools
+are host tools, not kernel modules. The build executor, the build command, the client overlay
+renderer, the network payload and the GUI are approved design (§16–§18, designs 14 and 15) and land
+with milestones P2–P6 of [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md);
+this file records them as specified, not implemented.
 
 ## 15. Signatures
 
@@ -1094,7 +1104,9 @@ The adapter's public types join the spec gate in batches (D-74). A type is eithe
 listed in `tools/spec-uncovered.txt` with a reason; the gate fails when a documented signature
 drifts, when a public type is in neither place, and when a listed type no longer exists — so the list
 only shrinks. Batch 1 covers the set host, the snapshot pair, the host tokens and the document
-family. The block compares against `src/main/java` through `AdapterIndexTest` (member-level) and
+family. The build, preview and preference types specified in §16–§18 join the same rule when their
+milestones land: each is either documented in this section or listed in `tools/spec-uncovered.txt`
+with a reason. The block compares against `src/main/java` through `AdapterIndexTest` (member-level) and
 `tools/spec-check.py` (name-level).
 
 ```java
@@ -1197,3 +1209,37 @@ public final class JsonWriter implements DocumentWriter {
     @Override public String write(Document document);
 }
 ```
+
+## 16. Build (design 14, approved, landing with P2/P6)
+
+`dev.vfyjxf.cumulus.mc.build` owns execution: the `ItemSource` SPI and its built-ins
+(`CreativeItemSource`, `PlayerInventorySource`, `ItemHandlerSource`, `CompositeItemSource`), the
+`Materializer` SPI and `VanillaMaterializer`, `EditTransaction`, `ApplyReport`, `BuildPolicy`,
+`BuildExecutor` and the `/cumulus build` / `/cumulus build undo` commands; P6 adds `SetBuildHost`
+and `/cumulus set build`. Build is not settle: a default build takes no claims; `--settle` chains
+the existing settle path after the formed re-check, and only then does rollback cover claims
+(design 14 §10). Design 14 owns the contracts: two-phase item handling, pre-image
+transactions with reverse restore, refusal as a finding-carrying report with zero writes,
+idempotence as a verifier property, and the `SC-BLD` code family (§12). D-16 stands: no executor,
+transaction, validator or report enters the kernel.
+
+## 17. Preview (design 15, approved, landing with P3/P4)
+
+`dev.vfyjxf.cumulus.mc.preview` (server and payloads), `...preview.client` (`Dist.CLIENT`) and
+`...preview.jei` (a conditional built-in plugin, D-90) own the preview. A session is keyed by
+`(player, level)`, keeps its candidates, overlay and ghosts server-side, invalidates on the
+`LevelWatch` mark counter (`SC-BLD-0008`), retracts its ghosts on timeout and recalls (design 15
+§4), and never writes the world; CONFIRM is the build flow (§16). Design 15 owns the payload
+shapes, the client rendering, the JEI category and the orientation ergonomics: the expressibility
+filter (3.4), turn snap (3.1), support scoring (3.2), flip memory (3.6), reset (3.7) and the
+part-pin interaction (2.1, 2.2, 2.4). A lossy orientation fallback is explicitly rejected (3.5,
+D-88).
+
+## 18. Preferences (design 15 §9, approved, landing with P5)
+
+`dev.vfyjxf.cumulus.mc.pref` owns `BuildPreferences`, the frequency-weighted `ChoiceHistory` memory
+(7.1: last eight choices, mode wins, ties break recent), `SitingCandidateScorer` with its
+deterministic canonical-order fallback, `PreferencesSavedData` (per-level, keyed by player UUID,
+the claims lifecycle law of §5) and `/cumulus prefs`. The only preference value that crosses into
+the kernel is `SolvePreferences` (D-86, `remedy` §5): cell-level ordering enters `RemedyContext`;
+siting-level ordering stays here — the kernel does not know players.

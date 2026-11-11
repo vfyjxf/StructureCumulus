@@ -1876,6 +1876,142 @@ pins that depth no longer overflows, `aThirtyLayerDiamondStopsAtTheBudget` and
 `BuiltinDocumentsTest.builtinDocumentsStayInsideTheExpansionBudget` pins that the shipped documents
 compile without the code.
 
+### D-84 — The catalog registrar gains a remedy contribution method
+
+`CatalogRegistrar.remedy(NamespacedId, RemedyProvider)` adds one provider to the remedies family
+under the same law as every other contribution: an equal re-put collapses, a different value throws
+`SC-SPI-0003`, and `fail`/`failures` attribute a plugin's register failure to its id.
+`Catalogs.builtin()`'s remedies family goes from empty to the two built-in providers of D-85.
+
+**Why a registrar method.** The remedies family existed with no way to fill it: `solve` iterated an
+always-empty catalog, and a plugin that wanted to propose repairs had no channel. One more method
+keeps every contribution on the one assembly path a host already runs (X05, D-72) instead of
+inventing a second registry beside the frozen catalogs.
+
+### D-85 — The kernel ships two built-in remedy providers and a finding→remedy mapping law
+
+`structurecumulus:cell_repair` and `structurecumulus:preview` are built-in, pure, re-entrant and
+read only `RemedyContext` — never a live world. The mapping table (per finding code), the overlay
+derivation table and the applicability law live in `remedy` §5. A repair's payload derives from the
+blueprint's declared expectations at the siting, never from finding message text (D-66).
+
+**Why built-ins.** Without them every host re-derives the same standard interpretation of the same
+codes. The kernel already owns the vocabulary (`Edit`, `OverlayModel`, `CellMark`); the standard
+mapping belongs beside it, and a host that disagrees registers its own provider through D-84.
+
+**Why two providers, not one.** Repair and preview answer different questions — "what edits fix
+this" and "what does this look like" — and a host consumes them independently (the executor picks
+a repair; the preview session renders an overlay).
+
+### D-86 — Solve preferences are a kernel value that only orders legal candidates
+
+`SolvePreferences(preferredCells, preferredOrientation, partPins)` is a kernel value;
+`RemedyContext` gains it as a nullable final component (a record component append is a public shape
+change, recorded in `remedy` §5 first). The iron law: preferences order or pick among equally legal
+candidates, never change an applicability rung, never fabricate an edit; null or empty is the
+canonical order; the same input with the same preferences solves byte-identically. The pin law: a
+pin selects only within its part's legal candidate set; an illegal pin is ignored and annotated,
+never obeyed; a conflict resolves user pin > memory > preference score > canonical order, and the
+displaced part is offered as a sibling remedy — never silently.
+
+**Why a kernel value.** Cell-level choice is remedy semantics: which legal cell a threshold deficit
+fills is a solve question, and a plugin provider needs the same preference the built-ins see.
+Siting-level choice is not kernel semantics — it involves players and reach — so it stays in the
+adapter (`BuildPreferences`, design 15 §9); this record is the only preference that crosses the
+boundary.
+
+**Why `partPins` in the kernel shape.** A pin is per-part information (bay/focus id → legal cells);
+flattening it into `preferredCells` order would lose the per-part semantics and let several parts'
+pins dilute each other (the fallback the ergonomics expansion rejected, §11).
+
+### D-87 — The build executor, item sources and transactions live in the adapter
+
+D-16 stands: the kernel gains no `EditExecutor`, `EditTransaction`, `PlanValidator` or
+`ApplyReport`. The adapter's `mc.build` owns the two-phase `ItemSource` (simulate, then execute;
+rollback returns and never silently voids), the `EditTransaction` (live pre-image, ordered apply,
+skip-if-equal, reverse restore), the policy that refuses with a finding-carrying report and zero
+writes, and the re-check after commit whose failure returns the same code deterministically.
+
+**Why host-side, again.** Execution names Minecraft types, reads the live world and consumes real
+items; the kernel's remedy values stay host-agnostic and testable without a game. The dry run is a
+host walk over a fresh capture, not a kernel validator — the kernel cannot see the world it would
+validate against (D-16).
+
+### D-88 — Preview is a server-held session, and orientation ergonomics are filtered, never lossy
+
+A preview session is keyed `(player, level)` on the server; the client renders and sends control
+codes, and every candidate, score and mark is computed server-side and re-synced. A world change
+inside the footprint invalidates the session (`SC-BLD-0008`, via the M5a mark counter); a timeout
+retracts the ghosts without killing the session (4.6). The orientation laws: unrepresentable poses
+are filtered out of the candidate cycle before the user ever sees them (3.4); the cycle snaps to
+the player's upright facing and opens fully on sneak (3.1); support is a scoring weight (3.2); the
+flip state is remembered (3.6); reset returns the highest-scored candidate (3.7). A lossy
+orientation fallback — building a pose the blocks cannot express — is explicitly rejected (3.5):
+lossy means the document is wrong, and the answer is the explain chain, not a back door.
+
+**Why a server session.** The candidates come from `solve` and the claims view — server data.
+Computing them twice, once per side, would fork the determinism the gates pin; the client is a
+renderer and an input device.
+
+**Why filter, never degrade.** A silent identity or a dropped property is the M5d law's failure
+mode (`SC-MC-0004` exists precisely to refuse it); the preview must not reintroduce it as a
+convenience.
+
+### D-89 — Structure-set build reuses the set host shape with one shared item source
+
+`SetBuildHost` mirrors `StructureSetHost`: presence is probed first and formed/present members are
+skipped, members build in declaration order, and the whole set shares one `ItemSource` and one
+budget (D-35's law). Build is not settle: a default set build takes no claims, and a member
+failure tears the built members down through their pre-images in reverse order — world writes
+only. With `--settle`, each member's `Formed` re-check chains `StructureSetHost.run`, and a member
+failure then rolls back world writes and claims alike, the claims through the existing set
+rollback path (release + `StructureEvent.Broken` dispatch). The result extends
+`StructureSetResult` with a per-member `ApplyReport`; `SC-SET-0008` and every other set-layer
+refusal apply unchanged.
+
+**Why reuse.** The set layer already owns presence, ordering, budget sharing and rollback (D-32,
+D-35); a second orchestration would fork those laws. Keeping claims out of the default build keeps
+the build path free of claim semantics entirely — only the explicit `--settle` chain pays for the
+two-layer rollback.
+
+### D-90 — The JEI preview is a conditional built-in plugin
+
+The "Multiblock Preview" category registers only when JEI is present, through the existing
+`PluginLoader` discovery, ordering and failure-attribution policy (adapter §7.4/§7.5, D-81). JEI
+absent means no registration; an incompatible JEI is a plugin load failure attributed to the
+built-in plugin, never a crash of the mod. Entries are generated generically from the merged
+document source; there are no preset scenes.
+
+**Why conditional.** JEI is a dev-runtime convenience, not a dependency of the mod; a hard link
+would make every user install it. The conditional built-in is also the template a later EMI (or
+any renderer/GUI) integration copies (P7).
+
+### D-91 — The expectation tree exposes a total declaration description port
+
+`structure` gains a declaration description port over `Expectation` trees (`structure` §4.12):
+every built-in leaf describes as a sealed declaration value carrying its declaration (the `block`
+leaf its type — the leaf declares no properties; orientation-derived properties are the
+materializer's, design 14 §6 — a `trait`/`traitAbsent` leaf its key, a `host` leaf its host-type
+token and codes; `air`, `anyOccupant`, `empty`, `nonFluid` and `envelopeAir` are marker arms);
+every composite describes as its kind plus access to its children; a `custom` expectation describes
+as **undescribable**, and a remedy over an undescribable expectation is advisory, never
+`machineApplicable`. The port is total and reads declarations only — no `Reply`, no world. If P1
+finds that resolving a finding's cell to the expectation that produced it also lacks a public port
+on `Blueprint`, that resolution port is added in this decision's scope and reported, not under a
+new number.
+
+**Why a port at all.** D-85's `machineApplicable` `Place`/`Replace` payloads must come from the
+blueprint's own declarations; D-66 bans recovering them from finding message text, and the leaf
+records are private, so without a port the mapping law is unimplementable.
+
+**Why total with an undescribable arm.** A partial port leaves some expectations to fall through,
+and the fallback would be message parsing again. Totality forces the custom case to a declared
+answer, and that answer is advisory by construction: the kernel cannot know what a custom body
+expects, so it must not fabricate an edit.
+
+**Why in `structure`.** The port describes this module's own values; `remedy` consumes it across
+the existing `structure` → `remedy` edge (`03-modules.md`), and no kernel package gains a new edge.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -1934,6 +2070,14 @@ compile without the code.
 - A block state whose block entity was not captured answers every registered block trait with
   `Refused(notCaptured)` (D-34), even a custom trait that reads only `BlockState`; that is the price
   of never letting `BlockCapability.getCapability` fall back to a live `Level.getBlockEntity`.
+- The build undo history is one entry per `(player, level)` in memory and does not survive a
+  restart (D-87, design 14 §11), while the remembered siting choices persist through
+  `PreferencesSavedData` (D-88, design 15 §9): two host memories with different lifetimes, and a
+  reviewer should check nothing assumes the undo history outlives the server.
+- The built-in remedy providers derive repair payloads from the blueprint's declarations, never
+  from finding text (D-85, D-66); the declaration description port that makes those payloads
+  implementable is D-91, and an undescribable (`custom`) expectation degrades every remedy over it
+  to advisory by construction.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is

@@ -18,7 +18,7 @@
 | --- | --- | --- |
 | `Catalogs` | interface | six frozen families + `builtin()` + `builder()` |
 | `Catalogs.Builder` | interface | merge families over built-ins, then freeze |
-| `CatalogRegistrar` | interface | collect plugin contributions over the built-ins, then freeze |
+| `CatalogRegistrar` | interface | collect plugin contributions over the built-ins, then freeze; `remedy` joins the contribution set (D-84) |
 | `Host` | record | documents, ledger, context store, custom type registry |
 | `StructureKernel` | final class | the facade: four operations, three helpers, four lookups |
 
@@ -110,7 +110,9 @@ Six frozen families, each a `Catalog<T>` keyed by `NamespacedId` and insertion-o
 
 `builtin()` ships the leaf factories (`block`, `air`, `trait`, `any_occupant`), the focus
 factories (`occupant`, `bay`, `all_cells`, `entity`, `nested`, `door`, `context`), the computations
-(`count`, `volume`, `air`), every shipped `CodeEntry`, no deriver and no remedy provider. The
+(`count`, `volume`, `air`), every shipped `CodeEntry`, no deriver and — until the P1 commit that
+lands D-85 — no remedy provider; D-85 adds the two built-in providers `structurecumulus:cell_repair`
+and `structurecumulus:preview` (remedy §5) to this family. The
 structural expectation forms (`all_of`, `any_of`, `not`, `sequence`, `at_least`, `at_most`, `exactly`,
 `each_cell`) are grammar, not catalog entries; the compiler resolves them and calls the leaf
 factories for the children.
@@ -189,7 +191,18 @@ compiler turns a null into `SC-DOC-0003` if no finding was reported.
 `CatalogRegistrar` is the one collection point for catalog contributions. `builtin()` starts from the
 six built-in tables; `expectation`/`focus`/`computation`/`deriver` add one entry each and return the
 registrar, `code` adds a `CodeEntry` keyed by its code text, and `catalogs()` freezes the six
-families. Remedies have no contribution method. A host calls the contributions at assembly time —
+families. Remedies contribute through `remedy(id, provider)` (D-84, approved; the signature lands
+in the same P1 commit as the code, and the §3 block updates in that commit):
+
+```java
+public interface CatalogRegistrar {
+    CatalogRegistrar remedy(NamespacedId id, RemedyProvider provider);
+}
+```
+
+The method adds one provider and returns the registrar; the duplicate law below applies unchanged,
+so a built-in remedy id cannot be replaced, and `fail`/`failures` attribute a plugin's
+remedy-register failure like any other contribution. A host calls the contributions at assembly time —
 the adapter through its plugin entry point (`ModPlugin.register`, adapter §7.5), once per plugin in
 the loader's resolved order — and every later compile reads the frozen snapshot. The kernel itself
 does no discovery, ordering or failure policy.
@@ -218,7 +231,8 @@ document naming an unknown factory is `SC-DOC-0003` (the document compiler owns 
   own id; a duplicate throws.
 - `CatalogRegistrar`: an empty registrar freezes to `Catalogs.builtin()`; contributions enter the
   frozen families; a builtin id and a duplicate id with a different value throw `SC-SPI-0003`; an
-  equal re-put collapses; `fail`/`failures` attribute a register failure to its plugin id.
+  equal re-put collapses; `fail`/`failures` attribute a register failure to its plugin id. A
+  `remedy` contribution (P1) follows the same laws.
 - `Host.empty()`: compile/check work; settle with claims is `Undecided`; settle without claims is
   `Formed` through an attempt.
 - The attempt is the only publish target: a closed attempt, a foreign instance id and a mismatched

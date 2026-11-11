@@ -740,6 +740,31 @@ the envelope `Unreadable`, never a silent pass; an unreadable envelope cell is t
 `SC-OCC-0004` relay and leaves the check `Unreadable`, never a mismatch. `BlueprintBuilder.build()`
 does not mutate the builder's lists, so it can be called twice with equal results.
 
+### 4.12 Declaration description port (D-91, approved, landing with P1)
+
+Remedy derivation (D-85) needs the blueprint's declarations as values. `structure` gains a
+**total** declaration description port over `Expectation` trees, approved here and landing with the
+P1 code in the same commit (the exact signature and the §3 block update then):
+
+- Every built-in leaf describes as a sealed declaration value carrying its declaration: `block` its
+  type (the leaf declares no properties — orientation-derived properties are the materializer's,
+  design 14 §6), `trait`/`traitAbsent` their key, `host` its host-type token and codes;
+  `air`, `anyOccupant`, `empty`, `nonFluid` and `envelopeAir` are marker arms.
+- Every composite (`allOf`/`anyOf`/`not`/`sequence`/`atLeast`/`atMost`/`exactly`/`eachCell`)
+  describes as its kind — with its count for the thresholds — plus access to its children.
+- A `custom` expectation describes as **undescribable**: the kernel cannot know what a custom body
+  expects, and a remedy over an undescribable expectation is advisory, never `machineApplicable`.
+
+```java
+// Indicative shape only; the exact signature lands with P1 and enters §3 in the same commit.
+public sealed interface ExpectationDeclaration { }
+```
+
+The port is total — every expectation answers exactly one arm — and it reads declarations only: it
+never evaluates a `Reply` and never touches a world. If P1 finds that resolving a finding's cell to
+the expectation that produced it also lacks a public port on `Blueprint`, that resolution port is
+added in D-91's scope and reported, not under a new decision number.
+
 ## 5. Pipeline role
 
 - `compile`: the builder validates; the document compiler builds the same value.

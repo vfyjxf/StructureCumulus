@@ -29,6 +29,10 @@ table defines who may emit each finding code.
     manager: instances, drafts, events.
 14. [design/13-nested-extent-access.md](design/13-nested-extent-access.md) — the capability and
     attachment sources of a nested extent.
+15. [design/14-auto-build.md](design/14-auto-build.md) — the host-side build: item sources,
+    materialization, transactions and the executor (approved, pending P2/P6).
+16. [design/15-preview.md](design/15-preview.md) — preview sessions, payloads, rendering,
+    orientation ergonomics and preferences (approved, pending P3–P5).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -64,6 +68,10 @@ Then the module files, in dependency order:
   values (D-34), implemented as T1–T3; 12 replaces the detached context map with the host-driven
   `StructureManager` (D-40, with D-44's session-scoped claims and D-45's instance key); 13 splits the
   nested-extent sources into capability and attachment, superseding D-36's capability-only seam.
+  [14 auto-build](design/14-auto-build.md) and [15 preview](design/15-preview.md) are approved,
+  design-first extensions (D-84…D-91) tracked by
+  [plan/autobuild-preview-plan.md](plan/autobuild-preview-plan.md); they are specified, not
+  implemented, and their milestones carry the implementation status.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -133,7 +141,7 @@ Then the module files, in dependency order:
   containers), 449 adapter unit tests (47 containers) and 140 `@GameTest` methods; a full
   `./gradlew check` and `runGameTestServer` both pass at this revision (583 kernel tests, 449 adapter
   tests, 140/140 GameTests, 0 failures, 0 skipped). `Codes.all` has 67 entries
-  and the decision record has 82 decisions (D-83; D-29 and D-36 superseded, D-78 withdrawn).
+  and the decision record has 90 decisions (D-91; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 
