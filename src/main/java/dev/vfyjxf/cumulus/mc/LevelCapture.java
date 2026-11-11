@@ -79,7 +79,7 @@ public final class LevelCapture implements WorldCapture {
     private @Nullable WatchHandle watch;
 
     /** The level instance this capture was built for; a reloaded dimension builds a new one. */
-    ServerLevel level() {
+    public ServerLevel level() {
         return level;
     }
 

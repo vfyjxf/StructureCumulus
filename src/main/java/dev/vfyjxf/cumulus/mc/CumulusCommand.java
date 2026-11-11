@@ -1,6 +1,8 @@
 package dev.vfyjxf.cumulus.mc;
 
+import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
@@ -23,8 +25,8 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The command surface: {@code check}, {@code compile}, {@code settle}, {@code explain}, {@code claims}
- * and the structure-set pair {@code set check}/{@code set settle}.
+ * The command surface: {@code check}, {@code compile}, {@code settle}, {@code build}, {@code explain},
+ * {@code claims} and the structure-set pair {@code set check}/{@code set settle}.
  */
 @NullMarked
 public final class CumulusCommand {
@@ -49,12 +51,23 @@ public final class CumulusCommand {
                                 Commands.literal("settle")
                                         .then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(
-                                                Commands.argument("origin", BlockPosArgument.blockPos())
-                                                        .executes(
-                                                            context -> CommandSupport
-                                                                    .guarded(context, "settle", SettleCommand::run)
-                                                        )
+                                                Commands.argument("origin", BlockPosArgument.blockPos()).executes(
+                                                    context -> CommandSupport
+                                                            .guarded(context, "settle", SettleCommand::run)
+                                                )
                                             )
+                                        )
+                            )
+                            .then(
+                                Commands.literal("build")
+                                        .then(
+                                            Commands.literal("undo")
+                                                    .executes(
+                                                        context -> CommandSupport
+                                                                .guarded(context, "build undo", BuildCommand::undo)
+                                                    )
+                                        ).then(
+                                            Commands.argument("id", ResourceLocationArgument.id()).then(buildOrigin())
                                         )
                             )
                             .then(
@@ -112,6 +125,45 @@ public final class CumulusCommand {
                                         )
                             )
                 );
+    }
+
+    private static ArgumentBuilder<CommandSourceStack, ?> buildOrigin() {
+        var origin = buildFlags(
+            Commands.argument("origin", BlockPosArgument.blockPos()),
+            BuildCommand.Kind.defaultSource
+        );
+        origin.then(
+            Commands.literal("with").then(buildFlags(Commands.literal("creative"), BuildCommand.Kind.creative))
+                    .then(buildFlags(Commands.literal("player"), BuildCommand.Kind.player)).then(
+                        buildFlags(
+                            Commands.literal("container").then(Commands.argument("pos", BlockPosArgument.blockPos())),
+                            BuildCommand.Kind.container
+                        )
+                    )
+        );
+        return origin;
+    }
+
+    /** The flags nest in either order, so {@code --dry --allow-removal} and its reverse both parse. */
+    private static <T extends ArgumentBuilder<CommandSourceStack, T>> T buildFlags(T node, BuildCommand.Kind kind) {
+        node.executes(buildBody(kind, false, false));
+        node.then(
+            Commands.literal("--dry").executes(buildBody(kind, true, false))
+                    .then(Commands.literal("--allow-removal").executes(buildBody(kind, true, true)))
+        );
+        node.then(
+            Commands.literal("--allow-removal").executes(buildBody(kind, false, true))
+                    .then(Commands.literal("--dry").executes(buildBody(kind, true, true)))
+        );
+        return node;
+    }
+
+    private static Command<CommandSourceStack> buildBody(BuildCommand.Kind kind, boolean dry, boolean allowRemoval) {
+        return context -> CommandSupport.guarded(
+            context,
+            "build",
+            command -> BuildCommand.run(command, new BuildCommand.Options(dry, allowRemoval, kind))
+        );
     }
 
     private static int check(CommandContext<CommandSourceStack> context) {

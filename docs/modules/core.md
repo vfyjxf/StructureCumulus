@@ -146,7 +146,7 @@ public interface CancelToken {
 public record FindingCode(Family family, int number) implements Comparable<FindingCode> {
     public enum Family {
         spc("SPC"), occ("OCC"), exp("EXP"), clm("CLM"), bpt("BPT"), chk("CHK"), doc("DOC"), ctx("CTX"),
-        eng("ENG"), dia("DIA"), rmd("RMD"), spi("SPI"), set("SET"), mc("MC");
+        eng("ENG"), dia("DIA"), rmd("RMD"), spi("SPI"), set("SET"), mc("MC"), bld("BLD");
         public String subject();
     }
     public static FindingCode of(Family family, int number);       // 1..9999

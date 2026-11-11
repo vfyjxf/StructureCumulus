@@ -4,10 +4,15 @@ import dev.vfyjxf.cumulus.mc.CumulusCommand;
 import dev.vfyjxf.cumulus.mc.DatapackBlueprints;
 import dev.vfyjxf.cumulus.mc.ServerState;
 import dev.vfyjxf.cumulus.mc.WatchEvents;
+import dev.vfyjxf.cumulus.mc.build.BuildConfig;
+import dev.vfyjxf.cumulus.mc.build.BuildHistory;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +34,11 @@ public final class StructureCumulus {
         NeoForge.EVENT_BUS.addListener(ServerState::stopped);
         NeoForge.EVENT_BUS.addListener(ServerState::unload);
         NeoForge.EVENT_BUS.addListener(CumulusCommand::register);
+        // The undo history is in-memory: a level unload or a server stop ends what it can describe.
+        NeoForge.EVENT_BUS.addListener(BuildHistory::levelUnloaded);
+        NeoForge.EVENT_BUS.addListener((ServerStoppingEvent event) -> BuildHistory.forgetAll());
+        NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> BuildHistory.forgetAll());
+        container.registerConfig(ModConfig.Type.SERVER, BuildConfig.spec);
         WatchEvents.register();
         logger.info("{} loading", Constants.modId);
     }

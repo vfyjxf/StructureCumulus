@@ -921,7 +921,8 @@ registers the `SC-MC-0006`…`0010` catalog entries and the `property`/`state`/`
 passing `SC-MC-0010` as the absent code (§3.2).
 
 The adapter registers its codes in its own code catalog through `Catalogs.Builder.codes`
-(`AdapterCodes` holds the ten codes and their entries), so each carries the canonical severity
+(`AdapterCodes` holds the ten `SC-MC` codes and their entries; `BuildCodes` holds the build family),
+so each carries the canonical severity
 above and an explanation, and `/cumulus explain` resolves it. The catalog is the host's, not
 `Codes.all`: `Codes.all` has 67 entries, and a capture entry's code is never a kernel registry
 entry. `CaptureReports` is the only report site: it reads the code's `CodeEntry` (or answers `error`
@@ -936,7 +937,8 @@ before the attempt's findings (§11).
 incomplete rollback (WARNING), `0007` post-build re-check still not formed (ERROR), `0008` preview
 session invalidated (WARNING). They register through `AdapterCodes` under the same law as the
 `SC-MC-*` codes: each entry carries its canonical severity and explanation, and no entry ever
-enters `Codes.all`.
+enters `Codes.all`. `BuildCodes` mints the family and its entries, and `AdapterCatalogs` feeds them
+into the code catalog.
 
 ## 13. Structure sets
 
@@ -1093,10 +1095,11 @@ ledgers; S5 adds the two real-level GameTest classes above, and S6 extends them 
 
 No schematic importer and no scheduler. No built-in nested source provider and no adapter-owned
 nested source registry. The document reader/writer is the only text format; capture/import tools
-are host tools, not kernel modules. The build executor, the build command, the client overlay
-renderer, the network payload and the GUI are approved design (§16–§18, designs 14 and 15) and land
-with milestones P2–P6 of [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md);
-this file records them as specified, not implemented.
+are host tools, not kernel modules. The single-structure build executor and the
+`/cumulus build`/`/cumulus build undo` commands land at P2 (§16.1); the server-side preview session,
+the network payload, the client overlay renderer, the JEI GUI and the structure-set build are
+approved design (§16.2, §17, §18) and land with P3, P4 and P6 of
+[`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md).
 
 ## 15. Signatures
 
@@ -1210,18 +1213,55 @@ public final class JsonWriter implements DocumentWriter {
 }
 ```
 
-## 16. Build (design 14, approved, landing with P2/P6)
+## 16. Build (design 14, P2 landed the single structure; P6 adds the set build)
+
+### 16.1 The landed build layer
 
 `dev.vfyjxf.cumulus.mc.build` owns execution: the `ItemSource` SPI and its built-ins
 (`CreativeItemSource`, `PlayerInventorySource`, `ItemHandlerSource`, `CompositeItemSource`), the
 `Materializer` SPI and `VanillaMaterializer`, `EditTransaction`, `ApplyReport`, `BuildPolicy`,
-`BuildExecutor` and the `/cumulus build` / `/cumulus build undo` commands; P6 adds `SetBuildHost`
-and `/cumulus set build`. Build is not settle: a default build takes no claims; `--settle` chains
-the existing settle path after the formed re-check, and only then does rollback cover claims
-(design 14 §10). Design 14 owns the contracts: two-phase item handling, pre-image
-transactions with reverse restore, refusal as a finding-carrying report with zero writes,
-idempotence as a verifier property, and the `SC-BLD` code family (§12). D-16 stands: no executor,
-transaction, validator or report enters the kernel.
+`BuildRequest`, `BuildHistory`, `BuildGates`, `BuildConfig` and `BuildExecutor`. The command bodies
+sit in `dev.vfyjxf.cumulus.mc.BuildCommand`, registered by `CumulusCommand`, because the command
+helpers (`CommandSupport`, the anchor siting path) are package-scoped to `mc`; the build package owns
+the flow and the command is its thin shell.
+
+Two deviations from design 14 §4, both deliberate: `BuildExecutor` takes the `OwnerId` explicitly
+(`BuildExecutor(LevelCapture, StructureKernel, OwnerId, BuildPolicy)`) because the executor begins a
+draft for the check and cannot reach `ServerState.owner()` from a subpackage, and claims come from
+`StructureKernel.ledger()` rather than a constructor argument. `--settle` is deferred to P6 with the
+set build, and `--dry` runs steps 1–4 and prints the summary without a preview payload (the payload
+belongs to §17).
+
+`BuildPolicy` is the host gate. `config/structurecumulus-server.toml` carries `maxTouchedVolume`
+(default 4096) and `allowRemoval` (default false); `BuildConfig.policy()` reads them, the permission
+level stays the root's `LEVEL_GAMEMASTERS` gate, and `--allow-removal` lifts the removal gate for one
+run only (the config OR the flag). `BuildGates` is the pure dry run: volume ceiling, removal,
+foreign exclusive claims (a shared claim allows the run) and the item simulation, each refusal an
+`ApplyReport` with zero writes.
+
+A matched check is the "already built" signal. `Formed` belongs to settle (D-16: the build takes no
+claims), so the pre-build check and the post-build re-check of an unserettled siting answer
+`Admitted`; `BuildExecutor` accepts both and reports `SC-BLD-0007` when the re-check still mismatches.
+
+`EditTransaction.open` captures the live pre-image (`BlockState` + block-entity NBT) of the plan's
+cells; `apply` compares each cell with its target first (`skipped`, never rewritten) and records the
+step's writes; `rollback` restores them in reverse order, skips a cell already at its pre-image, and
+names the remaining cells when a restore fails. A commit records one entry per player and dimension
+in `BuildHistory`; `/cumulus build undo` replays it in reverse as its own transaction, and the entry
+is dropped on `LevelEvent.Unload` and on server stop (in memory only, never persisted).
+
+The signatures are the ones in design 14 §4 with the owner argument added; the types join the
+§15 signature batch at P7 (D-74), so §16 states the contracts in prose and `tools/spec-uncovered.txt`
+carries the list until then.
+
+### 16.2 Build is not settle
+
+Build takes no claims; `--settle` (P6) chains the existing settle path after the formed re-check,
+and only then does rollback cover claims (design 14 §10). Design 14 owns the remaining contracts:
+two-phase item handling, pre-image transactions with reverse restore, refusal as a finding-carrying
+report with zero writes, idempotence as a verifier property, the `SC-BLD` code family (§12) and the
+structure-set build (§13, P6). D-16 stands: no executor, transaction, validator or report enters the
+kernel.
 
 ## 17. Preview (design 15, approved, landing with P3/P4)
 

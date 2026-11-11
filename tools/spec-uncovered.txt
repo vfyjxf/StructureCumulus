@@ -65,3 +65,24 @@ dev.vfyjxf.cumulus.mc.trait.TraitRegister  # batch 3: trait providers
 dev.vfyjxf.cumulus.mc.visual.VisualClaim  # not API: dev-only visual scenarios
 dev.vfyjxf.cumulus.mc.visual.VisualInstance  # not API: dev-only visual scenarios
 dev.vfyjxf.cumulus.mc.visual.VisualSnapshot  # not API: dev-only visual scenarios
+dev.vfyjxf.cumulus.mc.CaptureReports  # batch 7: build/capture report relay
+dev.vfyjxf.cumulus.mc.build.ApplyReport  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BlockPlacement  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BuildCodes  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BuildConfig  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BuildExecutor  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BuildHistory  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BuildPolicy  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BuildRequest  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.CompositeItemSource  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.CreativeItemSource  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.EditTransaction  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.ExtractionMode  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.ItemHandlerSource  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.ItemRequirement  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.ItemSource  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.MaterializeContext  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.MaterializedEdit  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.Materializer  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.PlayerInventorySource  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.VanillaMaterializer  # batch 7: build

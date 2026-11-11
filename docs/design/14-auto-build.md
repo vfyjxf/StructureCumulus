@@ -28,7 +28,7 @@ four are host concerns.
 | Type | Kind | Contract |
 | --- | --- | --- |
 | `ItemSource` | interface (SPI) | id, template-matched count, two-phase extract/insert |
-| `ExtractionMode` | enum | `SIMULATE` / `EXECUTE` |
+| `ExtractionMode` | enum | `simulate` / `execute` |
 | `CreativeItemSource` | final class | unlimited source; insert accepts everything |
 | `PlayerInventorySource` | final class | one player's inventory |
 | `ItemHandlerSource` | final class | wraps any `IItemHandler` |
@@ -59,7 +59,7 @@ public interface ItemSource {
     ItemStack insert(ItemStack stack, ExtractionMode mode);
 }
 
-public enum ExtractionMode { SIMULATE, EXECUTE }
+public enum ExtractionMode { simulate, execute }
 
 public interface Materializer {
     NamespacedId id();
@@ -111,7 +111,8 @@ public record BuildRequest(NamespacedId blueprint, Siting siting, ItemSource sou
                            @Nullable SolvePreferences preferences, ServerPlayer player) { }
 
 public final class BuildExecutor {
-    public BuildExecutor(LevelCapture capture, StructureKernel kernel, BuildPolicy configured);
+    public BuildExecutor(LevelCapture capture, StructureKernel kernel, OwnerId owner,
+                         BuildPolicy configured);
     public ApplyReport run(BuildRequest request);
 }
 ```
@@ -120,11 +121,17 @@ public final class BuildExecutor {
 is the only preference channel the executor reads, so the build layer does not depend on the
 preference store (design 15 §9).
 
+The executor also takes the adapter's `OwnerId`: the check begins a draft, and a subpackage cannot
+reach `ServerState.owner()`. Claims come from `StructureKernel.ledger()`. The command bodies sit in
+`dev.vfyjxf.cumulus.mc.BuildCommand` because the command helpers (`CommandSupport`, the anchor
+siting path) are package-scoped there; the build package owns the flow and the command is its thin
+shell.
+
 ## 5. Item sources
 
 An `ItemSource` is the host's answer to "where do the blocks come from". It is two-phase: the
-validator `SIMULATE`s every extraction against the fresh capture and collects the shortage table;
-the commit `EXECUTE`s the same extractions; a rollback `insert`s what the transaction consumed.
+validator simulates every extraction against the fresh capture and collects the shortage table;
+the commit executes the same extractions; a rollback inserts what the transaction consumed.
 `insert` returns the remainder that did not fit; a non-empty remainder is never voided silently —
 it spawns as item entities at the affected cells and the report carries one `SC-BLD-0006` note per
 remainder.
@@ -202,7 +209,7 @@ Two report-text laws (expansion 6.3, 9.2):
   run.
 - Claims: a touched cell held by a foreign exclusive claim refuses the run (`SC-BLD-0002`); a
   shared claim allows it and the report names the incumbents.
-- Items: a non-empty `SIMULATE` shortage table refuses the run (`SC-BLD-0003`) with the per-item
+- Items: a non-empty simulated shortage table refuses the run (`SC-BLD-0003`) with the per-item
   counts.
 
 ## 10. The executor flow
@@ -210,7 +217,9 @@ Two report-text laws (expansion 6.3, 9.2):
 `BuildExecutor.run(request)` on the server thread:
 
 1. Fresh capture through the two-phase anchored siting of the check path (adapter §11), then
-   `check`. A `Formed` result is the idempotent empty report: status `committed`, no steps.
+   `check`. A matched check is the idempotent empty report: status `committed`, no steps. The match
+   arrives as `Admitted`, because `Formed` is what a *settle* answers; a build that takes no claims
+   therefore never sees one and treats both as "already built".
 2. `solve(findings, RemedyContext{…, preferences})` collects remedies; the executor picks one
    `Repair`, `machineApplicable` first, preference-scored among ties (design 15 §9). No
    `machineApplicable` remedy is `SC-BLD-0001` (a warning, not a refusal: the run stops and asks a
@@ -219,9 +228,9 @@ Two report-text laws (expansion 6.3, 9.2):
    This is the host-side dry run; the kernel has no `PlanValidator` (D-16).
 4. A failed validation is a `refused` report with the findings and zero writes.
 5. Commit: open the transaction, apply in plan order, close. A `committed` run captures fresh and
-   re-checks the same request: `Formed` is success; a still-failing check returns the same code the
-   pre-build check returned (deterministic, `SC-BLD-0007`). v1 never auto-retries; the user re-runs
-   build.
+   re-checks the same request: a matched check is success; a still-failing check returns the same
+   code the pre-build check returned (deterministic, `SC-BLD-0007`). v1 never auto-retries; the user
+   re-runs build.
 6. A committed transaction enters the undo history (§11).
 
 **Build is not settle.** A build never takes claims; claim semantics are unchanged by the build
@@ -287,7 +296,7 @@ entry ever enters `Codes.all`.
 | `SC-BLD-0004` | ERROR | materialization failed (unrepresentable orientation, unknown block/property) |
 | `SC-BLD-0005` | ERROR | the transaction failed at step *n* |
 | `SC-BLD-0006` | WARNING | rollback incomplete (remaining cells, unreturned items) |
-| `SC-BLD-0007` | ERROR | the post-build re-check is still not `Formed` (deterministic, same code) |
+| `SC-BLD-0007` | ERROR | the post-build re-check is still not matched (deterministic, same code) |
 | `SC-BLD-0008` | WARNING | preview session invalidated; the candidates are stale (design 15 §4) |
 
 ## 15. Non-goals (v1)

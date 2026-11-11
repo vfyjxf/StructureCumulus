@@ -10,8 +10,9 @@ list can only shrink. Examples inside a module file are excluded by reading only
 The producer table in `finding.md` §6 is compared with `Codes.java`, and every registered code must
 have at least one reference in the kernel or adapter sources (D-69); every producer-site name the
 table claims is cross-checked against the classes that actually emit the code. Production forms are resolved
-both ways (D-04/X03-D04): `Codes.<field>`, `AdapterCodes.<field>`, `FindingCode.of(Family.x, n)`,
-per-family `code(n)` helpers and `SC-` literals in `src/main` (including `SC-MC-*`) must name a
+both ways (D-04/X03-D04): `Codes.<field>`, `AdapterCodes.<field>`, `BuildCodes.<field>`,
+`FindingCode.of(Family.x, n)`, per-family `code(n)` helpers and `SC-` literals in `src/main`
+(including the host families `SC-MC-*` and `SC-BLD-*`) must name a
 registered or catalogued code that the docs mention; the `CodesTest` mirror and every
 "`Codes.all` has N entries" claim are checked against the registry.
 """
@@ -63,7 +64,9 @@ CODE_HELPER_RE = re.compile(
 )
 CODES_FIELD_RE = re.compile(r"\bCodes\.(\w+)")
 ADAPTER_FIELD_RE = re.compile(r"\bAdapterCodes\.(\w+)")
+BUILD_FIELD_RE = re.compile(r"\bBuildCodes\.(\w+)")
 ADAPTER_CODE_RE = re.compile(r"static final FindingCode (\w+) = code\((\d+)\);")
+BUILD_CODE_RE = re.compile(r"static final FindingCode (\w+) = buildCode\((\d+)\);")
 OF_FAMILY_RE = re.compile(r"FindingCode\.of\(\s*(?:FindingCode\.)?Family\.(\w+)\s*,\s*(\d+)\s*\)")
 HELPER_CALL_RE = re.compile(r"\bcode\((\d+)\)")
 COUNT_CLAIM_RE = re.compile(r"`Codes\.all` has (\d+) entries")
@@ -211,7 +214,7 @@ def producer_table_rows() -> dict[str, tuple[str, str, str, str]]:
     rows: dict[str, tuple[str, str, str, str]] = {}
     for line in text[start:end].splitlines():
         match = PRODUCER_ROW_RE.match(line)
-        if match and not match.group(1).startswith("SC-MC-"):
+        if match and not match.group(1).startswith(("SC-MC-", "SC-BLD-")):
             rows[match.group(1)] = (match.group(2), match.group(3), match.group(5), match.group(6))
     return rows
 
@@ -229,6 +232,9 @@ def file_emits() -> dict[Path, set[str]]:
             if field in field_codes:
                 produced.add(field_codes[field])
         for field in ADAPTER_FIELD_RE.findall(text):
+            if field in catalog:
+                produced.add(catalog[field])
+        for field in BUILD_FIELD_RE.findall(text):
             if field in catalog:
                 produced.add(catalog[field])
         for family, number in OF_FAMILY_RE.findall(text):
@@ -332,11 +338,16 @@ def count_unproduced_codes() -> int:
 
 
 def adapter_catalog() -> dict[str, str]:
-    """AdapterCodes' own codes as field -> SC-MC-NNNN."""
-    text = (ADAPTER_SOURCES / "dev" / "vfyjxf" / "cumulus" / "mc" / "AdapterCodes.java").read_text()
+    """The adapter's own codes as field -> SC-<family>-NNNN, from every host code class."""
     tags = family_tags()
-    return {field: f"SC-{tags['mc']}-{int(number):04d}"
-            for field, number in ADAPTER_CODE_RE.findall(text)}
+    catalog = {field: f"SC-{tags['mc']}-{int(number):04d}"
+               for field, number in ADAPTER_CODE_RE.findall(
+                   (ADAPTER_SOURCES / "dev" / "vfyjxf" / "cumulus" / "mc" / "AdapterCodes.java").read_text())}
+    build_codes = ADAPTER_SOURCES / "dev" / "vfyjxf" / "cumulus" / "mc" / "build" / "BuildCodes.java"
+    if build_codes.exists():
+        catalog.update({field: f"SC-{tags['bld']}-{int(number):04d}"
+                        for field, number in BUILD_CODE_RE.findall(build_codes.read_text())})
+    return catalog
 
 
 def check_produced_codes(doc_codes: set[str]) -> int:
@@ -348,9 +359,9 @@ def check_produced_codes(doc_codes: set[str]) -> int:
     for path, produced in file_emits().items():
         where = path.relative_to(ROOT)
         for code in sorted(produced):
-            if code[3:].startswith("MC-"):
+            if code[3:].startswith(("MC-", "BLD-")):
                 if code not in catalog_values:
-                    print(f"produced code: {code} in {where} is not declared in AdapterCodes")
+                    print(f"produced code: {code} in {where} is not declared in a host code class")
                     problems += 1
             elif code not in registry:
                 print(f"produced code: {code} in {where} is not in Codes.all")

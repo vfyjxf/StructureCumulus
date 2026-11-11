@@ -16,9 +16,9 @@ import java.util.List;
 import java.util.Locale;
 
 /** The report site: one opaque capture entry becomes one finding under the kernel's trust guard. */
-final class CaptureReports {
+public final class CaptureReports {
 
-    static FindingBundle relay(CaptureReport report, Catalog<CodeEntry> codes) {
+    public static FindingBundle relay(CaptureReport report, Catalog<CodeEntry> codes) {
         List<Finding> findings = new ArrayList<>(report.size());
         for (CaptureReport.Entry entry : report.entries()) {
             findings.add(relay(entry, codes));
@@ -26,7 +26,7 @@ final class CaptureReports {
         return FindingBundle.of(findings);
     }
 
-    static Finding relay(CaptureReport.Entry entry, Catalog<CodeEntry> codes) {
+    public static Finding relay(CaptureReport.Entry entry, Catalog<CodeEntry> codes) {
         boolean kernelCode = Codes.all.stream().anyMatch(candidate -> candidate.code().equals(entry.code()));
         Finding.Builder builder;
         List<String> notes = new ArrayList<>(entry.notes());
