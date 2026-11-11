@@ -21,7 +21,7 @@ Every milestone starts `pending` and is complete only when its gate is green on 
 | Milestone | Deliverable | Depends on | Gate | State |
 | --- | --- | --- | --- | --- |
 | P0 | Design revision (roadmap §10: designs 14/15, remedy/spi/adapter module updates, D-84…D-91, this plan) | — | `tools/spec-check.py` + `Documents/tools/kb_check.py` green; main-agent line review | **done at `1e050b6`** |
-| P1 | Kernel: `CatalogRegistrar.remedy`, the two built-in providers, `SolvePreferences` + `RemedyContext.preferences`, the D-91 declaration description port, kernel tests | P0 | `kernelTest` green (mapping/derivation/preference/determinism cases); `check` green | pending |
+| P1 | Kernel: `CatalogRegistrar.remedy`, the two built-in providers, `SolvePreferences` + `RemedyContext.preferences`, the D-91 declaration description port, kernel tests | P0 | `kernelTest` green (mapping/derivation/preference/determinism cases); `check` green | **done at `40ea891`** |
 | P2 | Adapter build core, single structure (design 14 §4–§12) | P1 | new GameTests (place/replace/removal gate/rollback/idempotence/shortage/undo) + `check` + `runGameTestServer` green | pending |
 | P3 | In-world preview (design 15 §3–§5, §7–§8) | P1 | uitest scenarios green (open/turn/flip/invalidate/confirm); isolation gates unchanged | pending |
 | P4 | JEI GUI preview (design 15 §6) | P3 | uitest JEI scenario + a no-JEI `check` green | pending |
