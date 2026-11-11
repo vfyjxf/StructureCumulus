@@ -938,7 +938,8 @@ incomplete rollback (WARNING), `0007` post-build re-check still not formed (ERRO
 session invalidated (WARNING). They register through `AdapterCodes` under the same law as the
 `SC-MC-*` codes: each entry carries its canonical severity and explanation, and no entry ever
 enters `Codes.all`. `BuildCodes` mints the family and its entries, and `AdapterCatalogs` feeds them
-into the code catalog.
+into the code catalog; the preview reads `SC-BLD-0008` as `BuildCodes.previewStale` and registers
+nothing (design 15 §10).
 
 ## 13. Structure sets
 
@@ -1097,8 +1098,8 @@ No schematic importer and no scheduler. No built-in nested source provider and n
 nested source registry. The document reader/writer is the only text format; capture/import tools
 are host tools, not kernel modules. The single-structure build executor and the
 `/cumulus build`/`/cumulus build undo` commands land at P2 (§16.1); the server-side preview session,
-the network payload, the client overlay renderer, the JEI GUI and the structure-set build are
-approved design (§16.2, §17, §18) and land with P3, P4 and P6 of
+the network payload and the client overlay renderer land at P3 (§17, design 15); the JEI GUI and the
+structure-set build are approved design (§16.2, §18) and land with P4 and P6 of
 [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md).
 
 ## 15. Signatures
@@ -1114,6 +1115,16 @@ with a reason. The block compares against `src/main/java` through `AdapterIndexT
 
 ```java
 package dev.vfyjxf.cumulus.mc;
+
+public final class LevelAccess {
+    public static @Nullable StructureKernel kernel();
+    public static @Nullable LevelCapture capture(ServerLevel level);
+    public static @Nullable ClaimLedger claims(ServerLevel level);
+    public static @Nullable StructureManager structures(ServerLevel level);
+    public static @Nullable World world(ServerLevel level);
+    public static @Nullable OwnerId owner();
+    public static long blockRevision(ServerLevel level, Cuboid region);
+}
 
 public final class StructureSetHost {
     public StructureSetHost(StructureKernel kernel);
@@ -1211,6 +1222,81 @@ public final class JsonReader implements DocumentReader {
 public final class JsonWriter implements DocumentWriter {
     @Override public String write(Document document);
 }
+
+package dev.vfyjxf.cumulus.mc.preview;
+
+public final class PreviewCommand {
+    public static LiteralArgumentBuilder<CommandSourceStack> literal();
+}
+
+public final class PreviewService {
+    public static int open(CommandSourceStack source, NamespacedId id, @Nullable LatticePoint origin);
+    public static void control(ServerPlayer player, PreviewControlPayload.Control control, @Nullable LatticePoint target);
+    public static void installConfirmHandler(PreviewConfirmHandler handler);
+}
+
+public interface PreviewConfirmHandler {
+    boolean confirm(ServerPlayer player, Request request);
+
+    record Request(NamespacedId blueprintId, Siting siting, java.util.List<String> codes) { }
+}
+
+public final class PreviewEvents { }
+
+package dev.vfyjxf.cumulus.mc.preview.net;
+
+public record PreviewSyncPayload(NamespacedId blueprintId, java.util.List<SitingCandidate> candidates, int current,
+                                 OverlayModel overlay, java.util.List<GhostCell> ghostCells,
+                                 java.util.List<Marker> markers) implements CustomPacketPayload {
+    public static final Type<PreviewSyncPayload> type;
+    @Override public Type<? extends CustomPacketPayload> type();
+}
+
+public record PreviewControlPayload(Control control, @Nullable LatticePoint target) implements CustomPacketPayload {
+    public static final Type<PreviewControlPayload> type;
+
+    public enum Control {
+        turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity, cyclePart, recall, confirm, cancel
+    }
+
+    public static PreviewControlPayload of(Control control);
+    @Override public Type<? extends CustomPacketPayload> type();
+}
+
+public record SitingCandidate(Siting siting, int score) { }
+
+public record GhostCell(LatticePoint cell, NamespacedId block, java.util.Map<String, String> properties) { }
+
+public final class PreviewPayloads {
+    public static void register(RegisterPayloadHandlersEvent event);
+}
+
+package dev.vfyjxf.cumulus.mc.preview.client;
+
+public final class PreviewClientState {
+    public static @Nullable PreviewSyncPayload session();
+    public static boolean problemsOnly();
+    public static int sliceY();
+    public static @Nullable String hoverTooltip();
+    public static boolean visible();
+    public static void toggleProblemsOnly();
+    public static java.util.List<String> hudLines();
+}
+
+public final class PreviewKeys {
+    public enum Action {
+        turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
+        confirm, cancel
+    }
+
+    public static @Nullable KeyMapping binding(Action action);
+}
+
+public final class PreviewClientBridge {
+    public static void accept(PreviewSyncPayload payload);
+}
+
+public final class PreviewClientEvents { }
 ```
 
 ## 16. Build (design 14, P2 landed the single structure; P6 adds the set build)
@@ -1269,11 +1355,54 @@ kernel.
 `...preview.jei` (a conditional built-in plugin, D-90) own the preview. A session is keyed by
 `(player, level)`, keeps its candidates, overlay and ghosts server-side, invalidates on the
 `LevelWatch` mark counter (`SC-BLD-0008`), retracts its ghosts on timeout and recalls (design 15
-§4), and never writes the world; CONFIRM is the build flow (§16). Design 15 owns the payload
+§4), and never writes the world; confirm is the build flow (§16). Design 15 owns the payload
 shapes, the client rendering, the JEI category and the orientation ergonomics: the expressibility
 filter (3.4), turn snap (3.1), support scoring (3.2), flip memory (3.6), reset (3.7) and the
 part-pin interaction (2.1, 2.2, 2.4). A lossy orientation fallback is explicitly rejected (3.5,
 D-88).
+
+The landed half (P3), with the wire facts a second implementation would need:
+
+- **Command.** `PreviewCommand.literal()` is the one node the command owner attaches inside
+  `CumulusCommand.register` (`.then(PreviewCommand.literal())`); the preview package owns no
+  dispatcher and no other `cumulus` child. `LevelAccess` is the sibling-package facade over the
+  level-scoped `ServerState` state, so the preview never uses reflection or package-private reach.
+  The dev composition registers `/cumuluspreview` (`PreviewDevCommand`) against the same
+  `PreviewService.open`, so the harness scenarios exercise the production service without depending
+  on the production command wiring; its probe blueprint ships under `src/uitest/resources` as a
+  datapack document, never in the production builtin source.
+- **Session.** `PreviewService` holds one `PreviewSession` per `(player, level)`; `tick` compares
+  `LevelAccess.blockRevision` (the `LevelWatch` per-chunk change counter) against the revision the
+  overlay was computed at and re-syncs or closes. A session re-syncs on every control and on a
+  20-tick heartbeat; the client drops it after 60 ticks without a sync. `SC-BLD-0008` is
+  `BuildCodes.previewStale`, read-only here — the build family owns it. A timeout retracts the
+  ghosts and keeps the plan (4.6); only `cancel` and a crashed level close a session.
+- **Cycle.** Origins are the command argument, or the crosshair hit plus its face neighbour (1.1).
+  The cycle is origins × the four upright turns snapped to the player's facing × both upright flips,
+  then the `OrientationPolicy.allowed` poses whose tilt is not level (7.3). A pose whose declared
+  states cannot express its orientation leaves the cycle and its `(block, property, value)` becomes
+  one WARNING `Marker` (3.4); the detail is the marker list, not a click target. A blueprint that
+  declares anchors resolves its siting from the formed anchor block at each origin instead
+  (`McAnchors`, 1.2): one pose per origin, no free turn or flip, and an origin that is not a formed
+  anchor yields no candidate rather than an invented pose (1.5).
+- **Caps.** `ghostCells` is capped at 512 and `markers` at 48, both counted per payload and both
+  code constants in v1 (config-izing them is P8 backlog); an overflow adds a WARNING marker naming
+  the shown and expected counts, so nothing is truncated silently. Markers travel as world cell sets:
+  a marker whose locus is not world-frame is re-anchored at the overlay bounds on the client, and no
+  source span crosses the wire.
+- **Controls.** `PreviewControlPayload.Control` carries the two resets and the part cycle the design's
+  key table needs but its enum omitted: `reset` (tap R, 3.7), `resetIdentity` (hold R, 3.7) and
+  `cyclePart`, whose optional `target` names the clicked ghost cell so the server resolves the bay
+  from its own blueprint (2.1); a control still never carries a siting.
+- **Confirm.** `PreviewConfirmHandler` is the one write path out of a session. P3 installs
+  `PreviewConfirms`, which reports the executor call and refuses, so a confirm keeps the plan in the
+  session for another try (5.1) until P5 installs the executor.
+- **Client.** `PreviewClientBridge` is the only common-side reference into `...preview.client`; the
+  handler body resolves it inside `enqueueWork`, so no client class loads on a dedicated server.
+  `PreviewClientState` is the read-only model the HUD, the renderers and the scenarios share;
+  `PreviewClientEvents` (a `Dist.CLIENT` `EventBusSubscriber`) owns the keys, the two render stages
+  and the HUD layer. Ghost models resolve through the block renderer with a forced-alpha translucent
+  pass; no block entity, capability or world read backs them.
 
 ## 18. Preferences (design 15 §9, approved, landing with P5)
 

@@ -19,7 +19,7 @@ the synchronization, the rendering and the ergonomics.
 - New packages: `dev.vfyjxf.cumulus.mc.preview` (server and network),
   `dev.vfyjxf.cumulus.mc.preview.client` (`Dist.CLIENT`) and `dev.vfyjxf.cumulus.mc.preview.jei`
   (conditionally loaded).
-- **A preview never writes the world.** The only write path out of a session is CONFIRM, which is
+- **A preview never writes the world.** The only write path out of a session is `confirm`, which is
   the build executor flow of design 14 §10.
 - The server holds the session and every deterministic decision; the client renders and sends
   control input. No candidate, score or mark is computed client-side.
@@ -45,16 +45,27 @@ public record SitingCandidate(Siting siting, int score) { }
 public record GhostCell(LatticePoint cell, NamespacedId block,
                         java.util.Map<String, String> properties) { }
 
-public record PreviewControlPayload(Control control) {
-    public enum Control { TURN_CW, TURN_CCW, FLIP, NEXT_ORIGIN, PREV_ORIGIN, CONFIRM, CANCEL }
+public record PreviewControlPayload(Control control, @Nullable LatticePoint target) {
+    public enum Control {
+        turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity, cyclePart, recall, confirm,
+        cancel
+    }
 }
 ```
 
 - `candidates` is generated deterministically server-side; `current` indexes it. A control payload
-  never carries a siting — the server recomputes and re-syncs.
+  never carries a siting — the server recomputes and re-syncs. `target` names the clicked ghost cell
+  for `cyclePart` only (2.1: the server resolves the bay from its own blueprint); `reset` and
+  `resetIdentity` are the tap and the long press of `R` (§5, 3.7), and `recall` is the recall key of
+  §4. The enum here is the P3 correction of the P0 draft, which omitted the three controls its own
+  key table requires.
 - `ghostCells` is the compressed, capped render description of the expected states (block id +
-  properties, no block-entity data); the cap is a server config and overflow is reported in the
-  HUD, never silently truncated.
+  properties, no block-entity data). The caps are code constants in v1 — 512 ghost cells and 48
+  markers per payload — and an overflow adds a WARNING marker that names the shown and expected
+  counts, so nothing is truncated silently; moving the caps into the server config is P8 backlog
+  ([the plan](../plan/autobuild-preview-plan.md)).
+- A marker whose locus is not world-frame re-anchors at the overlay bounds on the client: no source
+  span crosses the wire, and the client needs no document to render a label.
 
 ## 4. Sessions
 
@@ -74,11 +85,11 @@ A session is keyed by `(player, level)` and lives on the server.
   closes when no candidate survives.
 - **Timeout.** A timeout retracts the ghosts but does not kill the session; the recall key (P)
   brings it back, and a `SC-BLD-0008` invalidation recalls automatically after the recompute (4.6).
-- **Resume.** A refused or failed confirm leaves the plan in the session (5.1); the next CONFIRM
+- **Resume.** A refused or failed confirm leaves the plan in the session (5.1); the next `confirm`
   re-validates against a fresh capture without re-picking the siting, and the HUD says "can
   continue" once the shortage is resupplied (10.1).
-- **Confirm.** CONFIRM runs the build flow of design 14 §10 with the session's current siting and
-  item-source choice. CANCEL closes the session and writes nothing.
+- **Confirm.** `confirm` runs the build flow of design 14 §10 with the session's current siting and
+  item-source choice. `cancel` closes the session and writes nothing.
 
 ## 5. Client rendering
 

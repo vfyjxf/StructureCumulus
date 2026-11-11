@@ -41,6 +41,9 @@ stack, 5.4 per-layer delivery, 5.5 skeleton-first build, 5.6 rollback visibility
 ghost de-saturation, 7.3 named preference profiles, 7.4 server default profile, 8.2 quiet HUD
 mode, 8.3 command completion, 10.2 leave-the-last-block mode.
 
+Outside the ergonomics numbering: config-izing the preview payload caps (design 15 §3; v1 keeps
+the code constants, 512 ghost cells and 48 markers per payload).
+
 Explicitly not done: 3.5, a lossy orientation back door (D-88).
 
 ## Open questions for the main agent

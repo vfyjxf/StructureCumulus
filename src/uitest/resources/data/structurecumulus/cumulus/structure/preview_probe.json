@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:preview_probe",
+  "bounds": [0, 0, 0, 2, 1, 2],
+  "bays": [
+    {
+      "id": "shell",
+      "box": [0, 0, 0, 2, 1, 2],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared"
+    }
+  ],
+  "checks": [
+    {
+      "id": "wall",
+      "bay": "shell",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:oak_stairs"}}
+    }
+  ]
+}

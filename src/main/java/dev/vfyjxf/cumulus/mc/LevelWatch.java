@@ -77,6 +77,19 @@ final class LevelWatch {
         return levels.computeIfAbsent(level.dimension(), ignored -> new LevelWatch()).add(region, level);
     }
 
+    /** A monotone count of block changes in the region's chunks, for the preview's invalidation. */
+    static long revision(ServerLevel level, Set<Long> chunks) {
+        LevelWatch watch = levels.get(level.dimension());
+        if (watch == null) {
+            return 0L;
+        }
+        long total = 0L;
+        for (long chunk : chunks) {
+            total += watch.revisions.getOrDefault(chunk, 0L);
+        }
+        return total;
+    }
+
     static int refCount(ServerLevel level, long chunk) {
         LevelWatch watch = levels.get(level.dimension());
         if (watch == null) {
@@ -94,6 +107,7 @@ final class LevelWatch {
     }
 
     private final Map<Long, Set<WatchHandle>> chunks = new HashMap<>();
+    private final Map<Long, Long> revisions = new HashMap<>();
     private final Set<WatchHandle> handles = new LinkedHashSet<>();
     private final AtomicLong epoch = new AtomicLong();
 
@@ -108,6 +122,7 @@ final class LevelWatch {
     }
 
     private void markChunk(long chunk) {
+        revisions.merge(chunk, 1L, Long::sum);
         Set<WatchHandle> watchers = chunks.get(chunk);
         if (watchers == null) {
             return;

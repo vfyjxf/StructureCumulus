@@ -13,6 +13,7 @@ import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.mc.preview.PreviewCommand;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
@@ -61,15 +62,14 @@ public final class CumulusCommand {
                             .then(
                                 Commands.literal("build")
                                         .then(
-                                            Commands.literal("undo")
-                                                    .executes(
-                                                        context -> CommandSupport
-                                                                .guarded(context, "build undo", BuildCommand::undo)
-                                                    )
+                                            Commands.literal("undo").executes(
+                                                context -> CommandSupport
+                                                        .guarded(context, "build undo", BuildCommand::undo)
+                                            )
                                         ).then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(buildOrigin())
                                         )
-                            )
+                            ).then(PreviewCommand.literal())
                             .then(
                                 Commands.literal("compile")
                                         .then(

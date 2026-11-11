@@ -166,8 +166,11 @@ source and reloads). Do not ship fixture documents in the production builtin sou
 
 ## 6. Harness orchestration
 
-- `./gradlew runClientTests -PclTest=visual.* -PclTestGuiScale=2`
+- `./gradlew runClientTests -PclTest=group:visual -PclTestGuiScale=2`
 - `./gradlew runClientTests -PclTest=visual.set` for one scenario
+- the `-PclTest` selector takes comma-separated terms, and each term is one of `all`/`*`, an exact
+  scenario name, `tag:<tag>`, `group:<group>`, `mod:<modid>` or `regex:<expr>`; there is no glob, so
+  `visual.*` matches nothing and `group:preview` (not `preview.*`) is how a whole group runs;
 - output: `build/cloudlib-uitest/report.json`, `screenshots/visual.<name>/`,
   `timeline/visual.<name>.jsonl`
 - a `visualGallery` run boots the same composition with no selection, so a human can walk the
