@@ -27,7 +27,7 @@ Every milestone starts `pending` and is complete only when its gate is green on 
 | P4 | JEI GUI preview (design 15 §6) | P3 | uitest JEI scenario + a no-JEI `check` green | **done at `8b6ffcf`** |
 | P5 | Preferences (design 15 §9) | P2 + P3 | scoring determinism unit tests + memory GameTest + `/cumulus prefs` routing test | **done at `f3bbd64`** |
 | P6 | `/cumulus set build` (design 14 §13) | P2 + P5 | set-build GameTests (skip present/member-failure rollback/shared source) | **done at `298e6fd`** |
-| P7 | Plugin API + docs/count close-out (roadmap §9, §10 remainder) | P2–P6 | plugin parity test + all existing gates + count refresh | pending |
+| P7 | Plugin extension tables (`registerMaterializers`/`registerItemSources`), the command's `with <kind-id>` form, the single build's `--settle` chain, and the docs/count close-out (roadmap §9, §10 remainder) | P2–P6 | plugin parity test + all existing gates + count refresh | **done at `dd58b6c`** |
 
 Concurrency discipline (roadmap §11): at most two implementation subagents at a time; file
 ownership is unique (P2 owns `mc.build`, P3 owns `mc.preview`; the two may run in parallel). P1
