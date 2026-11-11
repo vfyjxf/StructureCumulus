@@ -459,7 +459,9 @@ final class PreviewSession {
             abort(draft);
         }
         planned = repair != null;
-        shortages = repair == null ? List.of() : BuildMaterials.shortages(repair, siting, level, source);
+        shortages = repair == null
+                ? List.of()
+                : BuildMaterials.shortages(repair, siting, level, source, LevelAccess.materializers());
         overlay = new OverlayModel(bounds, marks, List.of());
         ghosts = ghosts(marks, expected.states(), siting);
         markers = cap(sessionMarkers(built, marks, bounds), Locus.world(bounds.asSet()));

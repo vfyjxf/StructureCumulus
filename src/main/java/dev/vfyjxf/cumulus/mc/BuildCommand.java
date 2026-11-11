@@ -1,11 +1,14 @@
 package dev.vfyjxf.cumulus.mc;
 
 import com.mojang.brigadier.context.CommandContext;
+import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.mc.build.ApplyReport;
+import dev.vfyjxf.cumulus.mc.build.BuildCodes;
 import dev.vfyjxf.cumulus.mc.build.BuildConfig;
 import dev.vfyjxf.cumulus.mc.build.BuildExecutor;
 import dev.vfyjxf.cumulus.mc.build.BuildHistory;
@@ -14,6 +17,7 @@ import dev.vfyjxf.cumulus.mc.build.BuildRequest;
 import dev.vfyjxf.cumulus.mc.build.CreativeItemSource;
 import dev.vfyjxf.cumulus.mc.build.ItemHandlerSource;
 import dev.vfyjxf.cumulus.mc.build.ItemSource;
+import dev.vfyjxf.cumulus.mc.build.ItemSources;
 import dev.vfyjxf.cumulus.mc.build.PlayerInventorySource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
@@ -25,6 +29,7 @@ import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** The build subcommands: apply a plan to the world and undo the last apply. */
@@ -54,7 +59,15 @@ final class BuildCommand {
             return 0;
         }
         BlockPos container = options.kind() == Kind.container ? BlockPosArgument.getBlockPos(context, "pos") : null;
-        ItemSource items = items(source, level, player, options.kind(), container);
+        ItemSource items = items(
+            source,
+            state,
+            level,
+            player,
+            options.kind(),
+            container,
+            sourceId(context, options.kind())
+        );
         if (items == null) {
             return 0;
         }
@@ -64,11 +77,23 @@ final class BuildCommand {
         }
         BuildPolicy configured = BuildConfig.policy();
         BuildPolicy policy = configured.withAllowRemoval(configured.allowRemoval() || options.allowRemoval());
-        BuildExecutor executor = new BuildExecutor(state.capture(level), state.kernel(level), state.owner(), policy);
+        BuildExecutor executor = new BuildExecutor(
+            state.capture(level),
+            state.kernel(level),
+            state.owner(),
+            policy,
+            state.materializers()
+        );
         ApplyReport report = executor
                 .run(new BuildRequest(blueprint.id(), siting, items, policy, options.dry(), null, player));
         print(source, report, id, origin, options);
-        return report.status() == ApplyReport.Status.committed ? 1 : 0;
+        if (!options.settle() || options.dry()) {
+            return report.status() == ApplyReport.Status.committed ? 1 : 0;
+        }
+        boolean formed = report.status() == ApplyReport.Status.committed
+                && !hasCode(report, BuildCodes.recheckNotFormed)
+                && SettleCommand.settle(source, state, level, blueprint, origin) instanceof MatchResult.Formed;
+        return formed ? 1 : 0;
     }
 
     static int undo(CommandContext<CommandSourceStack> context) {
@@ -91,10 +116,12 @@ final class BuildCommand {
     /** The command line's source choice, resolved once for the single build and the set build. */
     static @Nullable ItemSource items(
         CommandSourceStack source,
+        ServerState state,
         ServerLevel level,
         ServerPlayer player,
         Kind kind,
-        @Nullable BlockPos container
+        @Nullable BlockPos container,
+        @Nullable NamespacedId registered
     ) {
         return switch (kind) {
             case creative -> new CreativeItemSource();
@@ -110,8 +137,38 @@ final class BuildCommand {
                 }
                 yield handler;
             }
+            case registered -> {
+                ItemSource plugin = registered == null ? null : state.itemSources().create(registered, player, level);
+                if (plugin == null) {
+                    source.sendFailure(
+                        Component.literal(
+                            "no item source " + (registered == null ? "named" : registered.text()) + " (available: "
+                                    + String.join(", ", available(state.itemSources())) + ")"
+                        )
+                    );
+                }
+                yield plugin;
+            }
             case defaultSource -> player.isCreative() ? new CreativeItemSource() : new PlayerInventorySource(player);
         };
+    }
+
+    /** The plugin source id the command names, or null for every built-in form. */
+    static @Nullable NamespacedId sourceId(CommandContext<CommandSourceStack> context, Kind kind) {
+        return kind == Kind.registered ? CommandSupport.id(context, "source") : null;
+    }
+
+    /** The three built-in forms and every registered kind, for the refusal message and completion. */
+    static List<String> available(ItemSources table) {
+        List<String> ids = new ArrayList<>(List.of("creative", "player", "container"));
+        for (NamespacedId id : table.ids()) {
+            ids.add(id.text());
+        }
+        return ids;
+    }
+
+    private static boolean hasCode(ApplyReport report, FindingCode code) {
+        return report.findings().findings().stream().anyMatch(finding -> finding.code().equals(code));
     }
 
     private static void print(
@@ -157,11 +214,11 @@ final class BuildCommand {
 
     /** Which source the command line asked for, before the player's game mode decides the default. */
     enum Kind {
-        defaultSource, creative, player, container
+        defaultSource, creative, player, container, registered
     }
 
     /** The leaf's effect flags and its source choice. */
-    record Options(boolean dry, boolean allowRemoval, Kind kind) {}
+    record Options(boolean dry, boolean allowRemoval, boolean settle, Kind kind) {}
 
     private BuildCommand() {}
 }

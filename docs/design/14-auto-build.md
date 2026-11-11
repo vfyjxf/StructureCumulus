@@ -1,10 +1,10 @@
 # 14. Host-side build: item sources, materialization, transactions and the executor
 
-> Status: approved, design first (P0). The code lands with milestones P2 and P6 of
-> [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md); until then this
-> document is specified, not implemented. It is the host-side half of D-16: the kernel keeps
-> describing remedies as values, and the adapter owns execution, its report and its codes. No type
-> here enters the kernel.
+> Status: approved, design first (P0). Implemented by milestones P2/P6 (the single build and the set
+> build) and P7 (the plugin materializer and item-source tables) of
+> [`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md); the code is the record
+> now. It is the host-side half of D-16: the kernel keeps describing remedies as values, and the
+> adapter owns execution, its report and its codes. No type here enters the kernel.
 
 ## 1. Problem
 
@@ -34,6 +34,11 @@ four are host concerns.
 | `ItemHandlerSource` | final class | wraps any `IItemHandler` |
 | `CompositeItemSource` | final class | ordered aggregate; earlier sources drain first |
 | `Materializer` | interface (SPI) | one `Edit` under one `Orientation` → `MaterializedEdit` or null |
+| `MaterializerRegistrar` | interface | collects materializer contributions until the chain freezes (P7) |
+| `Materializers` | final class | the frozen chain: plugin entries first, the vanilla materializer last (P7) |
+| `ItemSourceProvider` | interface (SPI) | one source kind: its id and a `(player, level)` factory (P7) |
+| `ItemSourceRegistrar` | interface | collects item-source kinds until the table freezes (P7) |
+| `ItemSources` | final class | the frozen kinds, resolved by id for `with <id>` (P7) |
 | `MaterializeContext` | record | the host facts a materializer may read |
 | `MaterializedEdit` | record | placements + item requirements + findings |
 | `BlockPlacement` | record | target `BlockState` + optional block-entity NBT |
@@ -67,6 +72,38 @@ public interface Materializer {
     NamespacedId id();
     @Nullable MaterializedEdit materialize(Edit edit, Orientation orientation,
                                            MaterializeContext context);
+}
+
+public interface MaterializerRegistrar {
+    MaterializerRegistrar materializer(Materializer materializer);
+    Materializers materializers();
+    static MaterializerRegistrar builtin();
+}
+
+public final class Materializers {
+    public static Materializers builtin();
+    public java.util.List<NamespacedId> ids();
+    public @Nullable Materializer get(NamespacedId id);
+    public @Nullable MaterializedEdit materialize(Edit edit, Orientation orientation,
+                                                  MaterializeContext context);
+}
+
+public interface ItemSourceProvider {
+    NamespacedId id();
+    @Nullable ItemSource create(ServerPlayer player, ServerLevel level);
+}
+
+public interface ItemSourceRegistrar {
+    ItemSourceRegistrar itemSource(ItemSourceProvider provider);
+    ItemSources itemSources();
+    static ItemSourceRegistrar empty();
+}
+
+public final class ItemSources {
+    public static ItemSources empty();
+    public java.util.List<NamespacedId> ids();
+    public boolean has(NamespacedId id);
+    public @Nullable ItemSource create(NamespacedId id, ServerPlayer player, ServerLevel level);
 }
 
 public record MaterializeContext(ServerLevel level) { }
@@ -115,6 +152,8 @@ public record BuildRequest(NamespacedId blueprint, Siting siting, ItemSource sou
 public final class BuildExecutor {
     public BuildExecutor(LevelCapture capture, StructureKernel kernel, OwnerId owner,
                          BuildPolicy configured);
+    public BuildExecutor(LevelCapture capture, StructureKernel kernel, OwnerId owner,
+                         BuildPolicy configured, Materializers materializers);
     public ApplyReport run(BuildRequest request);
 }
 ```
@@ -147,8 +186,12 @@ The shipped sources:
 | `ItemHandlerSource` | any `IItemHandler` | the container form (`with container <pos>`) |
 | `CompositeItemSource` | several sources | ordered; extraction drains earlier sources first, insertion fills them first |
 
-Plugins contribute custom sources through `ModPlugin.registerItemSources` (a new default method,
-P7); the same failure attribution law as every plugin contribution applies (adapter §7.5).
+Plugins contribute custom sources through `ModPlugin.registerItemSources` (P7); the same failure
+attribution law as every plugin contribution applies (adapter §7.5). A contribution is an
+`ItemSourceProvider`, not an instance: the source needs the requesting player and level, so the host
+builds it per run. The command's `with <id>` form resolves an id through the session's `ItemSources`
+(§12); the three shipped forms stay command literals, and an unknown id is refused with every
+available kind listed — the three built-in forms and the registered ids.
 
 ## 6. Materialization
 
@@ -164,8 +207,17 @@ P7); the same failure attribution law as every plugin contribution applies (adap
 - The item requirement is one of the block's item per placed cell.
 - `Edit.Remove` materializes to air placements with no item requirements; the removal gate is the
   policy's, not the materializer's (§9).
-- `Edit.SetTrait` is not materialized in v1: it stays advisory (`maybeIncorrect`, `remedy` §5).
-  Plugin materializers open it at P7.
+- `Edit.SetTrait` is not materialized by the built-in materializer: it stays advisory
+  (`maybeIncorrect`, `remedy` §5); a plugin materializer may open it (below).
+
+**The materializer chain (P7).** A session's `Materializers` is an ordered chain: plugin
+contributions in registration order, then the built-in vanilla materializer as the last resort. The
+first entry that answers non-null lowers the edit, so a plugin may take over an edit the built-in one
+cannot lower (a `SetTrait`, a block entity payload) without replacing it for every other edit. A
+materializer answers null for edits outside its concern; registering a different value under an id
+the chain already holds is `SC-SPI-0003` (the same duplicate law as every catalog). A materializer
+that throws fails the step — the chain never falls back past it — and the build refuses with
+`SC-BLD-0004` naming the materializer's id; a broken extension never takes the host down.
 
 ## 7. Transactions
 
@@ -239,11 +291,13 @@ Two report-text laws (expansion 6.3, 9.2):
 6. A committed transaction enters the undo history (§11).
 
 **Build is not settle.** A build never takes claims; claim semantics are unchanged by the build
-path. With `--settle`, a `Formed` re-check chains the existing settle path — a single structure
-settles through the kernel `settle` with a `StructureAttempt` (the adapter §11 path), a set through
-`StructureSetHost.run` (§13) — and only on that path does rollback cover both world writes and
-claims. A settle failure after a committed build writes no claim rows (the existing settle law: a
-failed check writes nothing) and the build stays committed; the report carries the settle findings.
+path. With `--settle`, a committed run — one whose own re-check did not report `SC-BLD-0007` —
+chains the existing settle path: a single structure re-captures and settles through the kernel
+`settle` with a `StructureAttempt` (the adapter §11 path, by re-entering the settle command's own
+flow on the same origin and siting), a set through `StructureSetHost.run` (§13). Only on that path
+does rollback cover both world writes and claims. A settle that fails after a committed build writes
+no claim rows (the existing settle law: a failed check writes nothing) and the world write stays
+committed; the settle findings are printed next to the build's. A dry run never settles.
 
 A refusal or a failed run leaves the session's plan in place (5.1): the confirm path re-enters at
 step 3 with a fresh capture and validation, without re-picking the siting. An item exhaustion is a
@@ -265,16 +319,21 @@ All three verbs inherit the `/cumulus` root permission gate and the `CommandSupp
 boundary (adapter §11); exit codes follow the existing convention — a mutating verb returns 1 only
 when its mutation succeeded.
 
-- `/cumulus build <id> <origin> [with creative|player|container <pos>] [--dry] [--allow-removal]
-  [--settle]` —
-  the default source is `creative` for a creative-mode player, else `player`. `--dry` runs steps
-  1–4 only and sends the preview payload (design 15 §3): zero writes, and the dry report feeds the
-  refusal visualisation. `--settle` chains the settle path after a `Formed` re-check (§10); a
-  default build takes no claims. Returns 1 on `committed` (or on a clean dry validation), 0 otherwise.
+- `/cumulus build <id> <origin> [with creative|player|container <pos>|<kind-id>] [--dry]
+  [--allow-removal] [--settle]` —
+  the default source is `creative` for a creative-mode player, else `player`. `with <kind-id>` (P7)
+  resolves a plugin-contributed `ItemSourceProvider` of the session's table (§5): the provider builds
+  the source for the invoking player and level, and an unknown id is refused with `creative, player,
+  container` and every registered id listed. `--dry` runs steps 1–4 only and sends the preview
+  payload (design 15 §3): zero writes, and the dry report feeds the refusal visualisation. `--settle`
+  chains the settle path after a committed, re-check-clean run (§10); a default build takes no
+  claims. Returns 1 on `committed` (or on a clean dry validation), 0 otherwise; with `--settle` and
+  no `--dry` it returns 1 only when the settle formed the structure.
   Chat prints a summary only; the detail lives in the preview HUD, not in chat spam.
 - `/cumulus build undo` — §11; same permission gate; returns 1 on a committed undo.
-- `/cumulus set build <id> <origin> [with creative|player|container <pos>] [--dry] [--allow-removal]
-  [--settle]` — §13 (P6). Its exit code is `built()` without `--settle` and `formed()` with it.
+- `/cumulus set build <id> <origin> [with creative|player|container <pos>|<kind-id>] [--dry]
+  [--allow-removal] [--settle]` — §13 (P6); the single build's `with <kind-id>` form is shared. Its
+  exit code is `built()` without `--settle` and `formed()` with it.
 
 ## 13. Structure-set build (P6)
 

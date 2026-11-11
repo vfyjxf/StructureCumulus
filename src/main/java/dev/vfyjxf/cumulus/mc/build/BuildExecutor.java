@@ -61,13 +61,25 @@ public final class BuildExecutor {
     private final StructureKernel kernel;
     private final OwnerId owner;
     private final BuildPolicy serverPolicy;
-    private final Materializer materializer = new VanillaMaterializer();
+    private final Materializers materializers;
 
+    /** The built-in chain: a caller with no session table lowers through the vanilla materializer. */
     public BuildExecutor(LevelCapture capture, StructureKernel kernel, OwnerId owner, BuildPolicy configured) {
+        this(capture, kernel, owner, configured, Materializers.builtin());
+    }
+
+    public BuildExecutor(
+        LevelCapture capture,
+        StructureKernel kernel,
+        OwnerId owner,
+        BuildPolicy configured,
+        Materializers materializers
+    ) {
         this.capture = Objects.requireNonNull(capture, "capture");
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.owner = Objects.requireNonNull(owner, "owner");
         this.serverPolicy = Objects.requireNonNull(configured, "configured");
+        this.materializers = Objects.requireNonNull(materializers, "materializers");
     }
 
     public ApplyReport run(BuildRequest request) {
@@ -180,8 +192,15 @@ public final class BuildExecutor {
                     findings.add(noMachineRepairStep(index));
                     return ApplyReport.refused(FindingBundle.of(findings));
                 }
-                MaterializedEdit materialized = materializer
-                        .materialize(step.edit(), request.siting().placement().orientation(), materializeContext());
+                MaterializedEdit materialized;
+                try {
+                    materialized = materializers
+                            .materialize(step.edit(), request.siting().placement().orientation(), materializeContext());
+                } catch (RuntimeException failure) {
+                    // a throwing materializer is the step's failure, never a fallback to the next one
+                    findings.add(materializerFailure(index, failure));
+                    return ApplyReport.refused(FindingBundle.of(findings));
+                }
                 if (materialized == null) {
                     findings.add(materializationFailure(index, step.edit()));
                     return ApplyReport.refused(FindingBundle.of(findings));
@@ -398,6 +417,16 @@ public final class BuildExecutor {
                 "plan step " + index + " (" + describe(edit) + ") cannot be materialized",
                 BuildGates.cellsOf(edit).bounds(),
                 "an unknown block, property or value, or a state that cannot express the siting orientation"
+            );
+        }
+
+        private Finding materializerFailure(int index, RuntimeException failure) {
+            return BuildFindings.at(
+                BuildCodes.materializationFailureEntry,
+                Phase.check,
+                "plan step " + index + " failed in a materializer: " + failure.getMessage(),
+                null,
+                "the throwing materializer is named in the message; nothing is written for that plan"
             );
         }
 

@@ -220,11 +220,17 @@ the anchor gesture is the same session object, and the same confirm path (§4) l
   payload handlers resolve client classes only inside their enqueued work (adapter §17), and the
   catalog payload itself is plain data any client can receive.
 
-### 6.5 Not in this milestone
+### 6.5 The GUI-plugin evaluation (P7)
 
-A GUI-integration plugin subtype (`GuiPlugin`, the shape a second renderer such as EMI copies) is
-P7's evaluation item: P4 keeps the conditional built-in as one `@JeiPlugin` + `@PluginMarker` class
-validated by the adapter's loader, and adds no public registrar for GUI contributions.
+A GUI-integration plugin subtype (`GuiPlugin`, the shape a second renderer such as EMI was supposed
+to copy) was P7's evaluation item; the ruling is **not to introduce it in v1**. There is one GUI
+integration, its interface is JEI's own `IModPlugin` rather than a renderer-neutral contract, and
+`ModPlugin` already supplies what a subtype would carry — the id, the dependency edges and the
+loader's failure attribution — so a `GuiPlugin` with one implementer and no second consumer would
+add a public type and no behaviour. P4's conditional built-in stays one `@JeiPlugin` +
+`@PluginMarker` class, and there is no public registrar for GUI contributions; the P7 extension
+points are the build tables (adapter §7.5/§7.6). A second renderer re-opens the question — its own
+plugin API and its own discovery pass are the parts that differ, not the subtype.
 
 ## 7. Orientation ergonomics
 

@@ -23,10 +23,16 @@ import dev.vfyjxf.cumulus.kernel.spi.CatalogRegistrar;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
+import dev.vfyjxf.cumulus.mc.build.ItemSourceRegistrar;
+import dev.vfyjxf.cumulus.mc.build.ItemSources;
+import dev.vfyjxf.cumulus.mc.build.MaterializerRegistrar;
+import dev.vfyjxf.cumulus.mc.build.Materializers;
 import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
 import dev.vfyjxf.cumulus.mc.plugin.AnnotationPluginLookup;
 import dev.vfyjxf.cumulus.mc.plugin.ModPlugin;
 import dev.vfyjxf.cumulus.mc.plugin.PluginLoader;
+import dev.vfyjxf.cumulus.mc.plugin.PluginLookup;
+import dev.vfyjxf.cumulus.mc.plugin.PluginPass;
 import dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import dev.vfyjxf.cumulus.mc.visual.VisualClaim;
@@ -62,6 +68,8 @@ public final class ServerState {
     private static volatile @Nullable ServerState current;
 
     private final Catalogs catalogs;
+    private Materializers materializers;
+    private ItemSources itemSources;
     private final StructureKernel kernel;
     private final DatapackBlueprints blueprints;
     private final DocumentSource documents;
@@ -71,7 +79,10 @@ public final class ServerState {
     private final Map<ResourceKey<Level>, LevelCapture> captures = new HashMap<>();
 
     private ServerState() {
-        this.catalogs = assembleCatalogs();
+        PluginTables tables = assemblePlugins();
+        this.catalogs = tables.catalogs();
+        this.materializers = tables.materializers();
+        this.itemSources = tables.itemSources();
         this.blueprints = DatapackBlueprints.attach();
         DocumentSource builtin = BuiltinDocuments.source();
         // A datapack document wins over the built-in document on an id collision.
@@ -92,14 +103,31 @@ public final class ServerState {
         this.traitLookup = TraitLookup.load(StructureCumulus.logger);
     }
 
-    /** The session's one assembly: built-ins, the adapter's host kinds, then plugin contributions. */
-    private static Catalogs assembleCatalogs() {
-        CatalogRegistrar registrar = CatalogRegistrar.builtin();
-        AdapterCatalogs.seed(registrar);
-        PluginLoader
-                .register(StructureCumulus.logger, "catalog", AnnotationPluginLookup.of(ModPlugin.class), registrar);
-        return registrar.catalogs();
+    /**
+     * The session's one plugin assembly: built-ins, the adapter's host kinds, then the catalog pass
+     * and the two extension passes over the same loaded plugin instances.
+     */
+    private static PluginTables assemblePlugins() {
+        CatalogRegistrar catalogs = CatalogRegistrar.builtin();
+        AdapterCatalogs.seed(catalogs);
+        PluginLookup<ModPlugin> lookup = AnnotationPluginLookup.of(ModPlugin.class);
+        List<ModPlugin> plugins = PluginLoader.register(StructureCumulus.logger, "catalog", lookup, catalogs);
+        MaterializerRegistrar materializers = MaterializerRegistrar.builtin();
+        ItemSourceRegistrar itemSources = ItemSourceRegistrar.empty();
+        PluginLoader.registerExtensions(
+            StructureCumulus.logger,
+            "extension",
+            plugins,
+            List.of(
+                new PluginPass<>("materializers", plugin -> plugin.registerMaterializers(materializers)),
+                new PluginPass<>("item sources", plugin -> plugin.registerItemSources(itemSources))
+            )
+        );
+        return new PluginTables(catalogs.catalogs(), materializers.materializers(), itemSources.itemSources());
     }
+
+    /** The three frozen tables one plugin assembly produced. */
+    private record PluginTables(Catalogs catalogs, Materializers materializers, ItemSources itemSources) {}
 
     public static void open(ServerAboutToStartEvent event) {
         ServerState previous = current;
@@ -163,6 +191,22 @@ public final class ServerState {
 
     StructureKernel kernel() {
         return kernel;
+    }
+
+    /** The session's materializer chain; the build and the preview both lower edits through it. */
+    Materializers materializers() {
+        return materializers;
+    }
+
+    /** The session's plugin item-source kinds, resolved by id when a command names one. */
+    ItemSources itemSources() {
+        return itemSources;
+    }
+
+    /** Test seam: the gametest composition installs the tables its plugin would have contributed. */
+    void installPluginTables(Materializers materializers, ItemSources itemSources) {
+        this.materializers = Objects.requireNonNull(materializers, "materializers");
+        this.itemSources = Objects.requireNonNull(itemSources, "itemSources");
     }
 
     DatapackBlueprints blueprints() {

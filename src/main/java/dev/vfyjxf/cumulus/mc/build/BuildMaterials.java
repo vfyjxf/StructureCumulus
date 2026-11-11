@@ -15,17 +15,29 @@ import java.util.Objects;
  */
 public final class BuildMaterials {
 
-    /** The missing items of a plan as {@code item: available/required}, in first-seen order. */
+    /** The built-in chain's view of a plan; a session with plugin materializers passes its own. */
     public static List<String> shortages(EditPlan plan, Siting siting, ServerLevel level, ItemSource source) {
+        return shortages(plan, siting, level, source, Materializers.builtin());
+    }
+
+    /** The missing items of a plan as {@code item: available/required}, in first-seen order. */
+    public static List<String> shortages(
+        EditPlan plan,
+        Siting siting,
+        ServerLevel level,
+        ItemSource source,
+        Materializers materializers
+    ) {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(siting, "siting");
         Objects.requireNonNull(level, "level");
         Objects.requireNonNull(source, "source");
-        Materializer materializer = new VanillaMaterializer();
+        Objects.requireNonNull(materializers, "materializers");
+        MaterializeContext context = new MaterializeContext(level);
         List<MaterializedEdit> steps = new ArrayList<>(plan.steps().size());
         for (EditStep step : plan.steps()) {
-            MaterializedEdit materialized = materializer
-                    .materialize(step.edit(), siting.placement().orientation(), new MaterializeContext(level));
+            MaterializedEdit materialized = materializers
+                    .materialize(step.edit(), siting.placement().orientation(), context);
             if (materialized != null) {
                 steps.add(materialized);
             }

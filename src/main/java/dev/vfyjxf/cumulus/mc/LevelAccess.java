@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.kernel.core.OwnerId;
 import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
+import dev.vfyjxf.cumulus.mc.build.Materializers;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import org.jspecify.annotations.NullMarked;
@@ -40,6 +41,12 @@ public final class LevelAccess {
     public static @Nullable LevelCapture capture(ServerLevel level) {
         ServerState state = ServerState.current();
         return state == null ? null : state.capture(level);
+    }
+
+    /** The session's materializer chain; the built-in chain before the server opened. */
+    public static Materializers materializers() {
+        ServerState state = ServerState.current();
+        return state == null ? Materializers.builtin() : state.materializers();
     }
 
     public static @Nullable ClaimLedger claims(ServerLevel level) {

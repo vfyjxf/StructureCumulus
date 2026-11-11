@@ -50,11 +50,18 @@ public final class SetBuildHost {
     private final LevelCapture capture;
     private final StructureKernel kernel;
     private final OwnerId owner;
+    private final Materializers materializers;
 
+    /** The built-in chain: a caller with no session table lowers through the vanilla materializer. */
     public SetBuildHost(LevelCapture capture, StructureKernel kernel, OwnerId owner) {
+        this(capture, kernel, owner, Materializers.builtin());
+    }
+
+    public SetBuildHost(LevelCapture capture, StructureKernel kernel, OwnerId owner, Materializers materializers) {
         this.capture = Objects.requireNonNull(capture, "capture");
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.owner = Objects.requireNonNull(owner, "owner");
+        this.materializers = Objects.requireNonNull(materializers, "materializers");
     }
 
     public StructureSetResult run(SetBuildRequest request, SnapshotLease lease, Budget budget) {
@@ -127,7 +134,7 @@ public final class SetBuildHost {
     }
 
     private ApplyReport buildOne(Member member, SetBuildRequest request, BuildJournal journal) {
-        BuildExecutor executor = new BuildExecutor(capture, kernel, owner, request.policy());
+        BuildExecutor executor = new BuildExecutor(capture, kernel, owner, request.policy(), materializers);
         BuildRequest build = new BuildRequest(
             member.blueprint().id(),
             member.siting(),

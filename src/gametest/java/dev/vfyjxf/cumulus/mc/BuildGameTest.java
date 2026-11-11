@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.Constants;
 import dev.vfyjxf.cumulus.kernel.core.FindingCode;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
+import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
@@ -324,6 +325,56 @@ public final class BuildGameTest {
         int empty = execute(helper, source, "cumulus build undo");
         helper.assertTrue(empty == 0, "a second undo has nothing to restore, exit " + empty);
         helper.succeed();
+    }
+
+    @GameTest(templateNamespace = Constants.modId, template = "empty", timeoutTicks = 100)
+    public void theSettleFlagChainsTheSingleStructureSettle(GameTestHelper helper) {
+        ServerState state = state(helper);
+        if (state == null) {
+            return;
+        }
+        ServerLevel level = helper.getLevel();
+        FakePlayer player = player(helper, playerId("settle_flag"));
+        NamespacedId claimDocument = NamespacedId.of(Constants.modId, "build_set_root");
+
+        BlockPos plainCell = at(helper, 2, 0);
+        CommandSourceStack plainSource = stack(helper, player, player, plainCell);
+        int plain = execute(
+            helper,
+            plainSource,
+            "cumulus build " + claimDocument.text() + " " + point(plainCell) + " with creative"
+        );
+        helper.assertValueEqual(1, plain, "the plain build commits");
+        helper.assertTrue(level.getBlockState(plainCell).is(Blocks.STONE), "the plain build wrote the cell");
+        helper.assertValueEqual(
+            0,
+            state.claims(level).read(cellBox(plainCell)).rows().size(),
+            "a plain build takes no claim"
+        );
+
+        BlockPos settleCell = at(helper, 0, 0);
+        CommandSourceStack settleSource = stack(helper, player, player, settleCell);
+        int settled = execute(
+            helper,
+            settleSource,
+            "cumulus build " + claimDocument.text() + " " + point(settleCell) + " with creative --settle"
+        );
+        helper.assertValueEqual(1, settled, "the settle flag forms the structure");
+        helper.assertTrue(level.getBlockState(settleCell).is(Blocks.STONE), "the settling build wrote the cell");
+        helper.assertValueEqual(
+            1,
+            state.claims(level).read(cellBox(settleCell)).rows().size(),
+            "the settle pass wrote the claim row"
+        );
+        helper.succeed();
+    }
+
+    private static String point(BlockPos pos) {
+        return pos.getX() + " " + pos.getY() + " " + pos.getZ();
+    }
+
+    private static Cuboid cellBox(BlockPos pos) {
+        return Cuboid.of(pos.getX(), pos.getY(), pos.getZ(), pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1);
     }
 
     private static ServerState state(GameTestHelper helper) {

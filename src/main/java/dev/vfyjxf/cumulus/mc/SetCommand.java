@@ -62,7 +62,15 @@ final class SetCommand {
         BlockPos container = options.kind() == BuildCommand.Kind.container
                 ? BlockPosArgument.getBlockPos(context, "pos")
                 : null;
-        ItemSource items = BuildCommand.items(source, level, player, options.kind(), container);
+        ItemSource items = BuildCommand.items(
+            source,
+            planned.state(),
+            level,
+            player,
+            options.kind(),
+            container,
+            BuildCommand.sourceId(context, options.kind())
+        );
         if (items == null) {
             return 0;
         }
@@ -79,7 +87,8 @@ final class SetCommand {
             SetBuildHost host = new SetBuildHost(
                 planned.state().capture(level),
                 planned.state().kernel(level),
-                planned.state().owner()
+                planned.state().owner(),
+                planned.state().materializers()
             );
             StructureSetResult result = host.run(
                 new SetBuildRequest(plan, items, policy, player, options.dry(), options.settle()),

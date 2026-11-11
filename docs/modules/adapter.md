@@ -453,24 +453,52 @@ build time and a wrong-type `get` throws `IllegalArgumentException`. `LevelCaptu
 `LevelCapture(ServerLevel, TraitLookup, TraitCaptureContext)` injects both, and the existing
 constructors are preserved.
 
-### 7.5 Catalog contributions (X05, D-72)
+### 7.5 Plugin contributions (X05, D-72, P7)
 
-`ModPlugin` gains one default method, `register(CatalogRegistrar)`; a plugin that contributes
-document kinds overrides it, every other plugin inherits the no-op, so trait plugins load unchanged.
-`ServerState` assembles the catalogs once per session while it opens: `CatalogRegistrar.builtin()`
-(the kernel's six tables), `AdapterCatalogs.seed` (the `property`/`state`/`tag`/`fluid` factories
-and the `SC-MC-*` code entries), then `PluginLoader.register(logger, "catalog",
-AnnotationPluginLookup.of(ModPlugin.class), registrar)` — every loaded plugin's `register`, once, in
-the loader's resolved order. `registrar.catalogs()` freezes the snapshot every compile reads; there
-is no runtime contribution and no second assembly.
+`ModPlugin` carries three default methods, one per contribution pass: `register(CatalogRegistrar)`
+(document kinds), `registerMaterializers(MaterializerRegistrar)` and
+`registerItemSources(ItemSourceRegistrar)`. A plugin overrides the passes it contributes to, every
+other plugin inherits the no-op, so trait plugins and the JEI plugin load unchanged.
+`ServerState` assembles them once per session while it opens: `CatalogRegistrar.builtin()` (the
+kernel's six tables), `AdapterCatalogs.seed` (the `property`/`state`/`tag`/`fluid` factories and the
+`SC-MC-*`/`SC-BLD-*` code entries), then the catalog pass
+`PluginLoader.register(logger, "catalog", AnnotationPluginLookup.of(ModPlugin.class), registrar)` and
+the extension passes over the same loaded instances
+`PluginLoader.registerExtensions(logger, "extension", plugins, List.of(new PluginPass<>(
+"materializers", p -> p.registerMaterializers(materializers)), new PluginPass<>("item sources",
+p -> p.registerItemSources(itemSources))))`. The catalog pass returns the loaded plugins so the
+extension passes never re-discover the annotations. Each registrar freezes its snapshot
+(`Catalogs`, `Materializers`, `ItemSources`) and the session reads those; there is no runtime
+contribution and no second assembly.
 
 Failures use the loader's existing policy, not a new one. A plugin that throws while registering —
 a `RuntimeException` or a `LinkageError` from a class it cannot resolve, including the
-`SC-SPI-0003` the registrar raises when a contribution would replace an id that is
-already registered — is a fatal failure named by its plugin id, and a plugin that depends on it
-through a non-optional constraint is skipped with the same fatal/warning split a missing dependency
-produces; warnings log, fatals throw `PluginLoadingException` out of `ServerState.open`. The
-registrar's `fail`/`failures` carry the same attribution for a host that assembles by hand.
+`SC-SPI-0003` a registrar raises when a contribution would replace an id that is already
+registered — is attributed to its plugin id. The catalog pass is fatal: warnings log, fatals throw
+`PluginLoadingException` out of `ServerState.open`, and the registrar's `fail`/`failures` carry the
+same attribution for a host that assembles by hand. An extension pass is not fatal: the plugin's
+remaining passes are skipped, the failure is logged with the plugin id and the pass name, and a
+plugin that depends on it through a non-optional constraint is skipped too, so a broken extension
+never takes the host down. A contribution a plugin registered before its throw stays, exactly as
+the catalog pass behaves.
+
+### 7.6 Materializer and item-source tables (P7)
+
+`mc.build` owns the two extension tables. `Materializers` is an ordered chain — plugin contributions
+in registration order, then the built-in `structurecumulus:vanilla`, which is always last — and the
+first entry that answers non-null lowers the edit; a materializer answers null for edits outside its
+concern, and a throwing one fails the step with `SC-BLD-0004` naming its id (design 14 §6).
+`ItemSources` holds `ItemSourceProvider`s, not instances: the source needs the requesting player and
+level, so `ItemSources.create(id, player, level)` builds it per run for the command's
+`with <kind-id>` form (design 14 §5/§12). Both registrars apply the catalog duplicate law: the same
+value twice collapses, a different value under a taken id is `SC-SPI-0003`.
+
+`BuildExecutor` and `SetBuildHost` take the session's `Materializers` (a no-arg form defaults to
+`Materializers.builtin()`, the vanilla chain); the command path passes `ServerState.materializers()`,
+the preview confirm path `LevelAccess.materializers()`, so a plugin materializer lowers the real
+build and the materials HUD alike. `ServerState.installPluginTables` is a package-private gametest
+seam (the gametest composition is in the same package) that swaps both tables for a test and restores
+them; it is not part of the public API.
 
 ## 8. Nested capability
 
@@ -937,11 +965,12 @@ a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (
 The capture report never enters a `MatchResult` bundle; the commands print it as their own block
 before the attempt's findings (§11).
 
-`SC-BLD-0001`…`0008` are the adapter's build family (design 14 §14, approved, landing with P2/P3):
+`SC-BLD-0001`…`0008` are the adapter's build family (design 14 §14, landed with P2/P3/P7):
 `0001` no `machineApplicable` remedy (WARNING), `0002` policy refusal (ERROR), `0003` item shortage
-(ERROR), `0004` materialization failure (ERROR), `0005` transaction step failure (ERROR), `0006`
-incomplete rollback (WARNING), `0007` post-build re-check still not formed (ERROR), `0008` preview
-session invalidated (WARNING). They register through `AdapterCodes` under the same law as the
+(ERROR), `0004` materialization failure — an unknown block/property/value, an unrepresentable pose,
+or a throwing materializer (ERROR), `0005` transaction step failure (ERROR), `0006` incomplete
+rollback (WARNING), `0007` post-build re-check still not formed (ERROR), `0008` preview session
+invalidated (WARNING). They register through `AdapterCodes` under the same law as the
 `SC-MC-*` codes: each entry carries its canonical severity and explanation, and no entry ever
 enters `Codes.all`. `BuildCodes` mints the family and its entries, and `AdapterCatalogs` feeds them
 into the code catalog; the preview reads `SC-BLD-0008` as `BuildCodes.previewStale` and registers
@@ -1105,9 +1134,9 @@ nested source registry. The document reader/writer is the only text format; capt
 are host tools, not kernel modules. The single-structure build executor and the
 `/cumulus build`/`/cumulus build undo` commands landed at P2 (§16.1); the server-side preview
 session, the network payloads, the client overlay renderer and the JEI category landed at P3 and P4
-(§17, design 15); the structure-set build is the set layer's own build (§16.3, design 14 §13). What
-stays absent is the single structure's `--settle` flag: design 14 §12 lists it, and only the set
-build chains the settle pass today.
+(§17, design 15); the structure-set build is the set layer's own build (§16.3, design 14 §13). The
+single structure's `--settle` flag is no longer absent: P7 chains the settle path after a committed,
+re-check-clean run (§16.2).
 
 ## 15. Signatures
 
@@ -1115,10 +1144,10 @@ The adapter's public types join the spec gate in batches (D-74). A type is eithe
 listed in `tools/spec-uncovered.txt` with a reason; the gate fails when a documented signature
 drifts, when a public type is in neither place, and when a listed type no longer exists — so the list
 only shrinks. Batch 1 covers the set host, the snapshot pair, the host tokens and the document
-family. The build, preview and preference types specified in §16–§18 join the same rule when their
-milestones land: each is either documented in this section or listed in `tools/spec-uncovered.txt`
-with a reason. The block compares against `src/main/java` through `AdapterIndexTest` (member-level) and
-`tools/spec-check.py` (name-level).
+family; P7 lands the plugin (batch 2), build (batches 7 and 9), preference (batch 8) and preview
+types, so `tools/spec-uncovered.txt` keeps only the remaining core/trait/capability batches and the
+non-API entries. The block compares against `src/main/java` through `AdapterIndexTest` (member-level)
+and `tools/spec-check.py` (name-level).
 
 ```java
 package dev.vfyjxf.cumulus.mc;
@@ -1126,6 +1155,7 @@ package dev.vfyjxf.cumulus.mc;
 public final class LevelAccess {
     public static @Nullable StructureKernel kernel();
     public static @Nullable LevelCapture capture(ServerLevel level);
+    public static Materializers materializers();
     public static @Nullable ClaimLedger claims(ServerLevel level);
     public static @Nullable StructureManager structures(ServerLevel level);
     public static @Nullable World world(ServerLevel level);
@@ -1352,6 +1382,347 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
 }
 
 public final class JeiPreviewClientEvents { }
+
+package dev.vfyjxf.cumulus.mc.plugin;
+
+public interface ModPlugin {
+    NamespacedId pluginId();
+    default Set<PluginDependency> dependencies();
+    default void register(CatalogRegistrar registrar);
+    default void registerMaterializers(MaterializerRegistrar registrar);
+    default void registerItemSources(ItemSourceRegistrar registrar);
+}
+public record PluginDependency(NamespacedId pluginId, Order order, Constraint constraint) {
+    public enum Order {
+        before, after, none
+    }
+    public enum Constraint {
+        required, optional, optionalRequired
+    }
+    public boolean required();
+    public boolean optional();
+    public boolean optionalRequired();
+}
+public final class PluginLoader {
+    public static <T extends ModPlugin> LoadingResult<T> load(PluginLookup<T> lookup);
+    public static <T extends ModPlugin> List<T> loadPlugin(Logger logger, String pluginCategory, PluginLookup<T> lookup);
+    public static <T extends ModPlugin> List<T> register(Logger logger, String pluginCategory, PluginLookup<T> lookup, CatalogRegistrar registrar);
+    public static <T extends ModPlugin> List<LoadingFailure<T>> registerExtensions(Logger logger, String pluginCategory, List<T> plugins, List<PluginPass<T>> passes);
+    public record LoadingResult<T extends ModPlugin>(List<T> plugins, List<LoadingFailure<T>> failures) {
+    }
+    public record LoadingFailure<T extends ModPlugin>(T instance, FailureType type, String reason) {
+    }
+    public enum FailureType {
+        fatal, warning
+    }
+}
+public class PluginLoadingException extends RuntimeException {
+    public PluginLoadingException(List<Failure> failures);
+    public List<Failure> failures();
+    public record Failure(NamespacedId pluginId, Throwable cause) {
+    }
+}
+public interface PluginLookup<T extends ModPlugin> {
+    Collection<T> findPlugins();
+    default PluginLookup<T> combine(PluginLookup<T> other);
+}
+public final class AnnotationPluginLookup<T extends ModPlugin> implements PluginLookup<T> {
+    public static <T extends ModPlugin> AnnotationPluginLookup<T> of(Class<T> pluginClass);
+    public static <T extends ModPlugin> AnnotationPluginLookup<T> of(Class<T> pluginClass, Class<? extends Annotation> annotation);
+    @Override public Collection<T> findPlugins();
+}
+public final class SpiPluginLookup<T extends ModPlugin> implements PluginLookup<T> {
+    public static <T extends ModPlugin> SpiPluginLookup<T> of(Class<T> pluginClass);
+    public static <T extends ModPlugin> SpiPluginLookup<T> of(Class<T> pluginClass, ClassLoader classLoader);
+    @Override public Collection<T> findPlugins();
+}
+public record PluginPass<T extends ModPlugin>(String name, Consumer<T> action) {
+}
+
+package dev.vfyjxf.cumulus.mc.build;
+
+public record ApplyReport(Status status, List<Step> steps, List<ItemStack> itemsConsumed, FindingBundle findings) {
+    public static ApplyReport refused(FindingBundle findings);
+    public static ApplyReport formed();
+    public enum Status {
+        committed, rolledBack, partiallyRolledBack, refused
+    }
+    public record Step(int index, Outcome outcome, @Nullable String reason) {
+        public boolean failed();
+    }
+    public enum Outcome {
+        applied, skipped, failed, restored
+    }
+}
+public record BlockPlacement(BlockState state, @Nullable CompoundTag blockEntityData) {
+    public boolean isAir();
+}
+public final class BuildCodes {
+    public static final FindingCode noMachineRepair;
+    public static final FindingCode policyRefusal;
+    public static final FindingCode itemShortage;
+    public static final FindingCode materializationFailure;
+    public static final FindingCode stepFailure;
+    public static final FindingCode incompleteRollback;
+    public static final FindingCode recheckNotFormed;
+    public static final FindingCode previewStale;
+    public static final CodeEntry noMachineRepairEntry;
+    public static final CodeEntry policyRefusalEntry;
+    public static final CodeEntry itemShortageEntry;
+    public static final CodeEntry materializationFailureEntry;
+    public static final CodeEntry stepFailureEntry;
+    public static final CodeEntry incompleteRollbackEntry;
+    public static final CodeEntry recheckNotFormedEntry;
+    public static final CodeEntry previewStaleEntry;
+    public static List<CodeEntry> entries();
+}
+public final class BuildConfig {
+    public static final ModConfigSpec.IntValue maxTouchedVolume;
+    public static final ModConfigSpec.BooleanValue allowRemoval;
+    public static final ModConfigSpec spec;
+    public static BuildPolicy policy();
+}
+public final class BuildExecutor {
+    public BuildExecutor(LevelCapture capture, StructureKernel kernel, OwnerId owner, BuildPolicy configured);
+    public BuildExecutor(LevelCapture capture, StructureKernel kernel, OwnerId owner, BuildPolicy configured, Materializers materializers);
+    public ApplyReport run(BuildRequest request);
+    public ApplyReport run(Blueprint blueprint, BuildRequest request, BuildJournal journal);
+}
+public final class BuildHistory {
+    public static void record(ServerLevel level, UUID player, Map<LatticePoint, BlockPlacement> preImage);
+    public static boolean has(ServerLevel level, UUID player);
+    public static void forget(ServerLevel level, UUID player);
+    public static @Nullable ApplyReport undo(ServerLevel level, UUID player);
+    public static void levelUnloaded(LevelEvent.Unload event);
+    public static void forgetAll();
+}
+public final class BuildJournal {
+    public BuildJournal(ServerLevel level, UUID player);
+    public void record(Map<LatticePoint, BlockPlacement> preImage);
+    public List<Map<LatticePoint, BlockPlacement>> commitOrder();
+    public void forget();
+}
+public final class BuildMaterials {
+    public static List<String> shortages(EditPlan plan, Siting siting, ServerLevel level, ItemSource source);
+    public static List<String> shortages(EditPlan plan, Siting siting, ServerLevel level, ItemSource source, Materializers materializers);
+}
+public record BuildPolicy(int permissionLevel, long maxTouchedVolume, boolean allowRemoval) {
+    public static final int defaultPermissionLevel;
+    public static final long defaultMaxTouchedVolume;
+    public static final boolean defaultAllowRemoval;
+    public static BuildPolicy defaults();
+    public BuildPolicy withAllowRemoval(boolean allowed);
+    public BuildPolicy withMaxTouchedVolume(long volume);
+}
+public record BuildRequest( NamespacedId blueprint, Siting siting, ItemSource source, BuildPolicy policy, boolean dry, @Nullable SolvePreferences preferences, ServerPlayer player ) {
+}
+public final class CompositeItemSource implements ItemSource {
+    public CompositeItemSource(List<ItemSource> sources);
+    public static ItemSource of(List<ItemSource> sources);
+    public List<ItemSource> sources();
+    @Override public NamespacedId id();
+    @Override public int available(ItemStack template);
+    @Override public ItemStack extract(ItemStack template, int count, ExtractionMode mode);
+    @Override public ItemStack insert(ItemStack stack, ExtractionMode mode);
+}
+public final class CreativeItemSource implements ItemSource {
+    @Override public NamespacedId id();
+    @Override public int available(ItemStack template);
+    @Override public ItemStack extract(ItemStack template, int count, ExtractionMode mode);
+    @Override public ItemStack insert(ItemStack stack, ExtractionMode mode);
+}
+public final class EditTransaction implements AutoCloseable {
+    public static EditTransaction open(ServerLevel level, CuboidSet touchedCells);
+    public ApplyReport.Step apply(int stepIndex, Map<LatticePoint, BlockPlacement> writes);
+    public List<ApplyReport.Step> rollback(List<ApplyReport.Step> steps);
+    public Map<LatticePoint, BlockPlacement> preImage();
+    @Override public void close();
+}
+public enum ExtractionMode {
+    simulate, execute;
+    public boolean simulated();
+}
+public final class ItemHandlerSource implements ItemSource {
+    public ItemHandlerSource(IItemHandler handler);
+    public static @Nullable ItemHandlerSource at(ServerLevel level, BlockPos pos, @Nullable Direction side);
+    public IItemHandler handler();
+    @Override public NamespacedId id();
+    @Override public int available(ItemStack template);
+    @Override public ItemStack extract(ItemStack template, int count, ExtractionMode mode);
+    @Override public ItemStack insert(ItemStack stack, ExtractionMode mode);
+}
+public record ItemRequirement(ItemStack template, int count) {
+}
+public interface ItemSource {
+    NamespacedId id();
+    int available(ItemStack template);
+    ItemStack extract(ItemStack template, int count, ExtractionMode mode);
+    ItemStack insert(ItemStack stack, ExtractionMode mode);
+}
+public interface ItemSourceProvider {
+    NamespacedId id();
+    @Nullable ItemSource create(ServerPlayer player, ServerLevel level);
+}
+public interface ItemSourceRegistrar {
+    ItemSourceRegistrar itemSource(ItemSourceProvider provider);
+    ItemSources itemSources();
+    static ItemSourceRegistrar empty();
+}
+public final class ItemSources {
+    public static ItemSources empty();
+    public List<NamespacedId> ids();
+    public boolean has(NamespacedId id);
+    public @Nullable ItemSource create(NamespacedId id, ServerPlayer player, ServerLevel level);
+}
+public record MaterializeContext(ServerLevel level) {
+}
+public record MaterializedEdit( Map<LatticePoint, BlockPlacement> placements, List<ItemRequirement> items, List<Finding> findings ) {
+}
+public interface Materializer {
+    NamespacedId id();
+    @Nullable MaterializedEdit materialize(Edit edit, Orientation orientation, MaterializeContext context);
+}
+public interface MaterializerRegistrar {
+    MaterializerRegistrar materializer(Materializer materializer);
+    Materializers materializers();
+    static MaterializerRegistrar builtin();
+}
+public final class Materializers {
+    public static Materializers builtin();
+    public List<NamespacedId> ids();
+    public @Nullable Materializer get(NamespacedId id);
+    public @Nullable MaterializedEdit materialize(Edit edit, Orientation orientation, MaterializeContext context);
+}
+public final class PlayerInventorySource implements ItemSource {
+    public PlayerInventorySource(ServerPlayer player);
+    public ServerPlayer player();
+    @Override public NamespacedId id();
+    @Override public int available(ItemStack template);
+    @Override public ItemStack extract(ItemStack template, int count, ExtractionMode mode);
+    @Override public ItemStack insert(ItemStack stack, ExtractionMode mode);
+}
+public final class SetBuildHost {
+    public SetBuildHost(LevelCapture capture, StructureKernel kernel, OwnerId owner);
+    public SetBuildHost(LevelCapture capture, StructureKernel kernel, OwnerId owner, Materializers materializers);
+    public StructureSetResult run(SetBuildRequest request, SnapshotLease lease, Budget budget);
+}
+public record SetBuildRequest( StructureSet set, ItemSource source, BuildPolicy policy, ServerPlayer player, boolean dry, boolean settle ) {
+}
+public final class VanillaMaterializer implements Materializer {
+    @Override public NamespacedId id();
+    @Override public @Nullable MaterializedEdit materialize(Edit edit, Orientation orientation, MaterializeContext context);
+}
+
+package dev.vfyjxf.cumulus.mc.pref;
+
+public record BuildPreferences( OrientationMode orientationMode, @Nullable Heading fixedHeading, RemovalPolicy removalPolicy, List<PlacementWeight> weights, Map<NamespacedId, ChoiceHistory> remembered ) {
+    public static final int defaultRememberedCapacity;
+    public static BuildPreferences of(OrientationMode mode, @Nullable Heading heading, RemovalPolicy removal, List<PlacementWeight> weights);
+    public @Nullable ChoiceHistory history(NamespacedId blueprint);
+    public @Nullable Siting preferred(NamespacedId blueprint);
+    public BuildPreferences remember(NamespacedId blueprint, Siting choice, int capacity);
+    public static Map<NamespacedId, ChoiceHistory> remember(Map<NamespacedId, ChoiceHistory> remembered, NamespacedId blueprint, Siting choice, int capacity);
+    public BuildPreferences forget(@Nullable NamespacedId blueprint);
+    public BuildPreferences withRemembered(Map<NamespacedId, ChoiceHistory> next);
+    public BuildPreferences withOrientationMode(OrientationMode mode);
+    public BuildPreferences withFixedHeading(@Nullable Heading heading);
+    public BuildPreferences withRemovalPolicy(RemovalPolicy policy);
+    public BuildPreferences withWeights(List<PlacementWeight> next);
+    public Heading startHeading(Heading playerFacing);
+    public List<String> weightKeys();
+}
+public record ChoiceHistory(List<Siting> recent) {
+    public static final int capacity;
+    public static ChoiceHistory empty();
+    public ChoiceHistory append(Siting choice);
+    public @Nullable Siting preferred();
+    public boolean isEmpty();
+}
+public enum OrientationMode {
+    autoAnchor, facePlayer, fixedHeading;
+    public static @Nullable OrientationMode parse(String name);
+    public String key();
+}
+public enum PlacementWeight {
+    facingPlayer, fewestRemovals, mostProgress, nearestToPlayer, remembered, support, align;
+    public int magnitude();
+    public static @Nullable PlacementWeight parse(String name);
+    public String key();
+}
+public final class PrefConfig {
+    public static final List<String> defaultWeightKeys;
+    public static final ModConfigSpec spec;
+    public static BuildPreferences defaults();
+    public static int rememberedCapacity();
+}
+public final class PreferencesCommand {
+    public static LiteralArgumentBuilder<CommandSourceStack> literal();
+}
+public final class PreferencesSavedData extends SavedData {
+    public static final String fileId;
+    public static final int formatVersion;
+    public static PreferencesSavedData get(ServerLevel level);
+    public BuildPreferences preferences(UUID player);
+    public void set(UUID player, BuildPreferences settings);
+    public void remember(UUID player, NamespacedId blueprint, Siting choice);
+    public void remember(UUID player, NamespacedId blueprint, Siting choice, int capacity);
+    public void rememberPart(UUID player, NamespacedId blueprint, NamespacedId part, LatticePoint cell);
+    public @Nullable LatticePoint partPin(UUID player, NamespacedId blueprint, NamespacedId part);
+    public Map<NamespacedId, Map<NamespacedId, LatticePoint>> partPins(UUID player);
+    public Map<NamespacedId, LatticePoint> partPins(UUID player, NamespacedId blueprint);
+    public void forget(UUID player, @Nullable NamespacedId blueprint);
+    public int rememberedBlueprints(UUID player);
+    public int partPinCount(UUID player);
+    @Override public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries);
+}
+public enum RemovalPolicy {
+    forbid, ask, allow;
+    public static @Nullable RemovalPolicy parse(String name);
+    public String key();
+}
+public final class SitingCandidateScorer {
+    public static final int facingBonus;
+    public static final int removalPenalty;
+    public static final int progressBonus;
+    public static final int distanceStep;
+    public static final int maxDistance;
+    public static final int rememberedBonus;
+    public record Candidate(Siting siting, int order, int satisfied, int removals, int supportBelow, int supportAbove) {
+    }
+    public record View( LatticePoint player, Heading playerFacing, Heading front, @Nullable ChoiceHistory memory, boolean hanging ) {
+    }
+    public record Scored(Siting siting, int score, int order) {
+    }
+    public SitingCandidateScorer();
+    public List<Scored> rank(List<Candidate> candidates, View view, @Nullable List<PlacementWeight> weights);
+    public int score(Candidate candidate, View view, @Nullable List<PlacementWeight> weights);
+    public static Heading frontOf(Blueprint blueprint);
+}
+public final class SolvePreferenceAssembler {
+    public static final int maxPreferredCells;
+    public static SolvePreferences assemble(@Nullable List<LatticePoint> pending, @Nullable Map<NamespacedId, LatticePoint> partPins, Siting siting);
+}
+
+package dev.vfyjxf.cumulus.mc;
+
+public final class CaptureReports {
+    public static FindingBundle relay(CaptureReport report, Catalog<CodeEntry> codes);
+    public static Finding relay(CaptureReport.Entry entry, Catalog<CodeEntry> codes);
+}
+public final class SetPresence {
+    public enum State {
+        present, absent, unknown
+    }
+    public record Probe(State state, @Nullable LatticePoint cell, boolean budgetExhausted) {
+    }
+    public static final class Budget {
+        public Budget(dev.vfyjxf.cumulus.kernel.core.Budget budget);
+        public dev.vfyjxf.cumulus.kernel.core.Budget remaining();
+    }
+    public static List<StructureSet.Satellite> requiredFirst(List<StructureSet.Satellite> satellites);
+    public static Probe probe(StructureSet.Satellite satellite, WorldView view, Budget budget);
+    public static Finding unreadable(StructureSet.Satellite satellite, Probe probe);
+}
 ```
 
 ## 16. Build (design 14, P2 landed the single structure; P6 adds the set build)
@@ -1372,8 +1743,10 @@ draft for the check and cannot reach `ServerState.owner()` from a subpackage; cl
 `StructureKernel.ledger()` rather than a constructor argument; `run(Blueprint, BuildRequest,
 BuildJournal)` lets a caller that already holds the compiled blueprint (the set build does) skip the
 document lookup, which a hand-built set cannot satisfy; and `--dry` runs steps 1–4 and prints the
-summary without a preview payload (the payload belongs to §17). The single build's `--settle` is still
-open; only the set build has the flag (§16.3).
+summary without a preview payload (the payload belongs to §17). P7 adds the materializer argument:
+`BuildExecutor(..., Materializers)` takes the session's chain and the four-argument form keeps the
+built-in vanilla chain, so a hand-built executor and every existing call site stay source-compatible.
+The single build and the set build both carry `--settle` now (§16.2/§16.3).
 
 `BuildPolicy` is the host gate. `config/structurecumulus-server.toml` carries `maxTouchedVolume`
 (default 4096) and `allowRemoval` (default false); `BuildConfig.policy()` reads them, the permission
@@ -1393,18 +1766,21 @@ names the remaining cells when a restore fails. A commit records one entry per p
 in `BuildHistory`; `/cumulus build undo` replays it in reverse as its own transaction, and the entry
 is dropped on `LevelEvent.Unload` and on server stop (in memory only, never persisted).
 
-The signatures are the ones in design 14 §4 with the owner argument added; the types join the
-§15 signature batch at P7 (D-74), so §16 states the contracts in prose and `tools/spec-uncovered.txt`
-carries the list until then.
+The signatures are the ones in design 14 §4 with the owner and materializer arguments added; the
+build types are documented in §15 (the P7 batch, D-74).
 
 ### 16.2 Build is not settle
 
-Build takes no claims; `--settle` chains the existing settle path after the formed re-check, and only
-then does rollback cover claims (design 14 §10). The set build landed that flag (§16.3); the single
-build's own `--settle` is still open. Design 14 owns the remaining contracts: two-phase item handling,
-pre-image transactions with reverse restore, refusal as a finding-carrying report with zero writes,
-idempotence as a verifier property and the `SC-BLD` code family (§12). D-16 stands: no executor,
-transaction, validator or report enters the kernel.
+Build takes no claims; `--settle` chains the existing settle path after the re-check, and only then
+does rollback cover claims (design 14 §10). Both builds have the flag. The single build chains the
+settle command's own flow on the same origin and siting (`SettleCommand.settle` — a fresh capture,
+`check`, then the kernel `settle` with a `StructureAttempt`), only after a `committed` run whose
+re-check did not report `SC-BLD-0007`, and never on a dry run; its exit code is then `formed`, not
+`committed` (design 14 §12). The set build chains `StructureSetHost.run` (§16.3). A failed settle
+writes no claim rows and leaves the committed world write in place. Design 14 owns the remaining
+contracts: two-phase item handling, pre-image transactions with reverse restore, refusal as a
+finding-carrying report with zero writes, idempotence as a verifier property and the `SC-BLD` code
+family (§12). D-16 stands: no executor, transaction, validator or report enters the kernel.
 
 ### 16.3 The set build (P6, design 14 §13)
 
@@ -1434,9 +1810,11 @@ and the build then tears its world writes down in reverse. The report is the `St
 §13.5 with `builds` filled: per-member `ApplyReport` in build order, `itemsConsumed()` summing them,
 `rolledBack` naming the torn-down members before the settle releases, and `built()` as the plain
 build's success criterion. `SetBuildHost` is constructed as
-`new SetBuildHost(LevelCapture, StructureKernel, OwnerId)` and run as
-`run(SetBuildRequest, SnapshotLease lease, Budget budget)`; `SetBuildRequest(StructureSet, ItemSource,
-BuildPolicy, ServerPlayer, boolean dry, boolean settle)`.
+`new SetBuildHost(LevelCapture, StructureKernel, OwnerId, Materializers)` (the three-argument form
+keeps the vanilla chain) and run as `run(SetBuildRequest, SnapshotLease lease, Budget budget)`;
+`SetBuildRequest(StructureSet, ItemSource, BuildPolicy, ServerPlayer, boolean dry, boolean settle)`.
+The command's source forms are the single build's (§16.1), `with <kind-id>` included, and the shared
+`ItemSource` is resolved once before the members run.
 
 ## 17. Preview (design 15, approved, landing with P3/P4)
 
@@ -1503,8 +1881,12 @@ The JEI half (P4), with the same kind of wire and lifecycle facts:
   `ModList` does not list JEI, otherwise it runs `PluginLoader.load(AnnotationPluginLookup.of(
   ModPlugin.class, JeiPlugin.class))` and logs each failure (fatal ones logged, never thrown, D-81);
   the category itself is a singleton both instances share. JEI's own instances do the registration —
-  the adapter's instance is the validation copy. A GUI-integration plugin subtype for a second
-  renderer is P7's evaluation item; P4 adds no public registrar for GUI contributions.
+  the adapter's instance is the validation copy. The `GuiPlugin` evaluation (P7, design 15 §6.5)
+  concluded **not to introduce the subtype**: there is one GUI integration, its plugin API is JEI's
+  own `IModPlugin` rather than a renderer-neutral contract, and `ModPlugin` already gives it the
+  loader's id, dependency and failure handling — so a `GuiPlugin` with one implementer and no second
+  consumer would add a public type and no behaviour. The item-source and materializer tables are the
+  P7 extension points; a second renderer re-opens the question when it lands.
 - **Catalog.** `PreviewCatalog` builds one payload from `LevelAccess.documentIds()` (the merged
   built-in plus datapack ids) and `kernel.compile`; it keeps the identity-orientation projection only.
   `PreviewCatalogSync` pushes it from `PreviewEvents`' `OnDatapackSyncEvent` handler, which fires on

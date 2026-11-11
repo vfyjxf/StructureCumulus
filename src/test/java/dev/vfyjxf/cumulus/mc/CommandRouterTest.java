@@ -40,6 +40,23 @@ class CommandRouterTest {
             assertNotNull(verb.getChild("id"), path + " takes an id");
             assertNotNull(verb.getChild("id").getChild("origin"), path + " takes an origin");
         }
+        CommandNode<CommandSourceStack> build = cumulus.getChild("build");
+        assertNotNull(build, "the build subcommand");
+        assertNotNull(build.getChild("undo"), "build takes undo");
+        CommandNode<CommandSourceStack> source = build.getChild("id").getChild("origin").getChild("with");
+        assertNotNull(source, "build takes a with form");
+        for (String form : new String[]{"creative", "player", "container", "source"}) {
+            assertNotNull(source.getChild(form), "with takes " + form);
+        }
+        assertNotNull(
+            source.getChild("source").getChild("--settle"),
+            "the registered source form chains the settle flag"
+        );
+        assertNotNull(build.getChild("id").getChild("origin").getChild("--settle"), "the single build takes --settle");
+        assertNotNull(
+            set.getChild("build").getChild("id").getChild("origin").getChild("with").getChild("source"),
+            "the set build shares the registered source form"
+        );
         CommandNode<CommandSourceStack> prefs = cumulus.getChild("prefs");
         assertNotNull(prefs, "the prefs subcommand");
         assertNotNull(prefs.getChild("show"), "prefs takes show");

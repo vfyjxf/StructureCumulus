@@ -37,14 +37,6 @@ dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup  # batch 6: nested-extent ca
 dev.vfyjxf.cumulus.mc.capability.NestedExtentProviders  # batch 6: nested-extent capability family
 dev.vfyjxf.cumulus.mc.capability.NestedExtents  # batch 6: nested-extent capability family
 dev.vfyjxf.cumulus.mc.mixin.ChunkSetBlockStateMixin  # not API: mixin wiring
-dev.vfyjxf.cumulus.mc.plugin.AnnotationPluginLookup  # batch 2: plugin loading
-dev.vfyjxf.cumulus.mc.plugin.ModPlugin  # batch 2: plugin loading
-dev.vfyjxf.cumulus.mc.plugin.PluginDependency  # batch 2: plugin loading
-dev.vfyjxf.cumulus.mc.plugin.PluginLoader  # batch 2: plugin loading
-dev.vfyjxf.cumulus.mc.plugin.PluginLoadingException  # batch 2: plugin loading
-dev.vfyjxf.cumulus.mc.plugin.PluginLookup  # batch 2: plugin loading
-dev.vfyjxf.cumulus.mc.plugin.PluginMarker  # batch 2: plugin loading
-dev.vfyjxf.cumulus.mc.plugin.SpiPluginLookup  # batch 2: plugin loading
 dev.vfyjxf.cumulus.mc.trait.BlockTraitContext  # batch 3: trait providers
 dev.vfyjxf.cumulus.mc.trait.BlockTraitProviders  # batch 3: trait providers
 dev.vfyjxf.cumulus.mc.trait.BuiltinTraitPlugin  # batch 3: trait providers
@@ -65,39 +57,4 @@ dev.vfyjxf.cumulus.mc.trait.TraitRegister  # batch 3: trait providers
 dev.vfyjxf.cumulus.mc.visual.VisualClaim  # not API: dev-only visual scenarios
 dev.vfyjxf.cumulus.mc.visual.VisualInstance  # not API: dev-only visual scenarios
 dev.vfyjxf.cumulus.mc.visual.VisualSnapshot  # not API: dev-only visual scenarios
-dev.vfyjxf.cumulus.mc.CaptureReports  # batch 7: build/capture report relay
-dev.vfyjxf.cumulus.mc.build.ApplyReport  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BlockPlacement  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BuildCodes  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BuildConfig  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BuildExecutor  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BuildHistory  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BuildPolicy  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BuildRequest  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.CompositeItemSource  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.CreativeItemSource  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.EditTransaction  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.ExtractionMode  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.ItemHandlerSource  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.ItemRequirement  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.ItemSource  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.MaterializeContext  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.MaterializedEdit  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.Materializer  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.PlayerInventorySource  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.VanillaMaterializer  # batch 7: build
-dev.vfyjxf.cumulus.mc.build.BuildMaterials  # batch 7: build
-dev.vfyjxf.cumulus.mc.SetPresence  # batch 9: set build
-dev.vfyjxf.cumulus.mc.build.BuildJournal  # batch 9: set build
-dev.vfyjxf.cumulus.mc.build.SetBuildHost  # batch 9: set build
-dev.vfyjxf.cumulus.mc.build.SetBuildRequest  # batch 9: set build
-dev.vfyjxf.cumulus.mc.pref.BuildPreferences  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.ChoiceHistory  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.OrientationMode  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.PlacementWeight  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.PrefConfig  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.PreferencesCommand  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.RemovalPolicy  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.SitingCandidateScorer  # batch 8: preferences
-dev.vfyjxf.cumulus.mc.pref.SolvePreferenceAssembler  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.plugin.PluginMarker  # annotation type: the name-level gate parses no @interface

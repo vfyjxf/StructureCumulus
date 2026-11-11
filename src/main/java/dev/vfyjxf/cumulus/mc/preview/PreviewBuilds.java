@@ -45,7 +45,7 @@ final class PreviewBuilds implements PreviewConfirmHandler {
             case ask -> configured;
             case allow -> configured.withAllowRemoval(true);
         };
-        ApplyReport report = new BuildExecutor(capture, kernel, owner, policy).run(
+        ApplyReport report = new BuildExecutor(capture, kernel, owner, policy, LevelAccess.materializers()).run(
             new BuildRequest(
                 request.blueprintId(),
                 request.siting(),

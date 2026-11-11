@@ -4,6 +4,8 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
 import dev.vfyjxf.cumulus.kernel.context.StructureAttempt;
 import dev.vfyjxf.cumulus.kernel.context.StructureSpec;
@@ -29,6 +31,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 
 /**
@@ -140,7 +143,7 @@ public final class CumulusCommand {
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> buildOrigin() {
-        return origin(EnumSet.of(BuildFlag.dry, BuildFlag.allowRemoval), CumulusCommand::buildBody);
+        return origin(EnumSet.allOf(BuildFlag.class), CumulusCommand::buildBody);
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> setOrigin() {
@@ -188,8 +191,33 @@ public final class CumulusCommand {
                             body
                         )
                     )
+                    // a registered kind is an argument, added after the literals so it never shadows them
+                    .then(
+                        flags(
+                            Commands.argument("source", ResourceLocationArgument.id())
+                                    .suggests(CumulusCommand::suggestSources),
+                            BuildCommand.Kind.registered,
+                            EnumSet.noneOf(BuildFlag.class),
+                            flags,
+                            body
+                        )
+                    )
         );
         return node;
+    }
+
+    /** The registered item-source kinds, after the three built-in forms the parser already knows. */
+    private static CompletableFuture<Suggestions> suggestSources(
+        CommandContext<CommandSourceStack> context,
+        SuggestionsBuilder builder
+    ) {
+        ServerState state = ServerState.current();
+        if (state != null) {
+            for (NamespacedId id : state.itemSources().ids()) {
+                builder.suggest(id.text());
+            }
+        }
+        return builder.buildFuture();
     }
 
     /** Every flag subset in every order, each node executable, so the flags nest either way. */
@@ -217,7 +245,12 @@ public final class CumulusCommand {
             "build",
             command -> BuildCommand.run(
                 command,
-                new BuildCommand.Options(flags.contains(BuildFlag.dry), flags.contains(BuildFlag.allowRemoval), kind)
+                new BuildCommand.Options(
+                    flags.contains(BuildFlag.dry),
+                    flags.contains(BuildFlag.allowRemoval),
+                    flags.contains(BuildFlag.settle),
+                    kind
+                )
             )
         );
     }

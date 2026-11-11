@@ -164,9 +164,10 @@ public final class PluginLoader {
     /**
      * Registers every loaded plugin's catalog contributions into {@code registrar}, in the loader's
      * resolved order. A plugin that throws while registering is a fatal failure named by its id, and
-     * a plugin that depends on a failed one through a non-optional constraint is skipped.
+     * a plugin that depends on a failed one through a non-optional constraint is skipped. Returns the
+     * loaded instances so a later pass reuses them instead of re-discovering the annotations.
      */
-    public static <T extends ModPlugin> void register(
+    public static <T extends ModPlugin> List<T> register(
         Logger logger,
         String pluginCategory,
         PluginLookup<T> lookup,
@@ -206,6 +207,65 @@ public final class PluginLoader {
                     .thenComparing(LoadingFailure::type).thenComparing(LoadingFailure::reason)
         );
         enforce(logger, pluginCategory, failures);
+        return List.copyOf(result.plugins());
+    }
+
+    /**
+     * Runs every extension pass for every loaded plugin, in the given order, over the instances the
+     * catalog pass already loaded. A plugin that throws in a pass — a {@code RuntimeException} or a
+     * {@code LinkageError} — stops contributing: its remaining passes are skipped, the failure is
+     * logged with the plugin id and the pass name, and a plugin depending on it through a non-optional
+     * constraint is skipped too. Unlike the catalog pass, an extension failure is logged, never thrown:
+     * a broken extension must not take the host down.
+     */
+    public static <T extends ModPlugin> List<LoadingFailure<T>> registerExtensions(
+        Logger logger,
+        String pluginCategory,
+        List<T> plugins,
+        List<PluginPass<T>> passes
+    ) {
+        Objects.requireNonNull(logger, "logger");
+        Objects.requireNonNull(pluginCategory, "pluginCategory");
+        Objects.requireNonNull(plugins, "plugins");
+        Objects.requireNonNull(passes, "passes");
+        List<LoadingFailure<T>> failures = new ArrayList<>();
+        Set<NamespacedId> broken = new TreeSet<>(idOrder);
+        for (T plugin : plugins) {
+            Objects.requireNonNull(plugin, "plugin");
+            PluginDependency failed = failedDependency(plugin, broken);
+            if (failed != null) {
+                String reason = "dependency " + failed.pluginId() + " failed to register";
+                failures.add(
+                    new LoadingFailure<>(plugin, failed.required() ? FailureType.fatal : FailureType.warning, reason)
+                );
+                logger.warn("{}: {} is skipped because: {}", pluginCategory, plugin.pluginId(), reason);
+                broken.add(plugin.pluginId());
+                continue;
+            }
+            for (PluginPass<T> pass : passes) {
+                try {
+                    pass.action().accept(plugin);
+                } catch (RuntimeException | LinkageError failure) {
+                    failures.add(
+                        new LoadingFailure<>(plugin, FailureType.fatal, pass.name() + " pass failed: " + failure)
+                    );
+                    logger.error(
+                        "{}: {} failed the {} pass: {}",
+                        pluginCategory,
+                        plugin.pluginId(),
+                        pass.name(),
+                        failure.toString()
+                    );
+                    broken.add(plugin.pluginId());
+                    break;
+                }
+            }
+        }
+        failures.sort(
+            Comparator.<LoadingFailure<T>, NamespacedId>comparing(failure -> failure.instance().pluginId(), idOrder)
+                    .thenComparing(LoadingFailure::type).thenComparing(LoadingFailure::reason)
+        );
+        return List.copyOf(failures);
     }
 
     private static <T extends ModPlugin> @Nullable PluginDependency failedDependency(
