@@ -675,7 +675,7 @@ public final class Codes {
             case rmd -> "remedy";
             case spi -> "spi";
             case set -> "structure";
-            case mc -> "adapter";
+            case mc, bld -> "adapter";
         };
     }
 }

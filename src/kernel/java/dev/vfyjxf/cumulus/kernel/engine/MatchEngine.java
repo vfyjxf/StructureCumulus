@@ -302,7 +302,7 @@ public final class MatchEngine {
         }
         MatchOutcome outcome = session.outcome();
         if (mismatched) {
-            return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
+            return new MatchResult.Failed(phase, FindingBundle.of(session.findings), outcome);
         }
         if (unreadable) {
             return new MatchResult.Undecided(
@@ -328,7 +328,7 @@ public final class MatchEngine {
         Finding nested = nestedSubject(outcome.bindings(), phase);
         if (nested != null) {
             session.findings.add(nested);
-            return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
+            return new MatchResult.Failed(phase, FindingBundle.of(session.findings), outcome);
         }
         if (!needsLedger) {
             return new MatchResult.Admitted(
@@ -360,7 +360,7 @@ public final class MatchEngine {
         Finding invalid = validateBindings(request, phase, outcome.bindings());
         if (invalid != null) {
             session.findings.add(invalid);
-            return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
+            return new MatchResult.Failed(phase, FindingBundle.of(session.findings), outcome);
         }
         ClaimPlanner.Derived derived;
         try {
@@ -368,7 +368,7 @@ public final class MatchEngine {
                     .derive(request.blueprint(), request.siting(), request.instance(), outcome.bindings());
         } catch (PlanRejected rejected) {
             session.findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
-            return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
+            return new MatchResult.Failed(phase, FindingBundle.of(session.findings), outcome);
         }
         List<Finding> conflicts = conflicts(phase, derived.rows(), claims.rows(), request.cancel());
         if (conflicts == null) {
@@ -377,7 +377,7 @@ public final class MatchEngine {
         }
         if (!conflicts.isEmpty()) {
             session.findings.addAll(conflicts);
-            return new MatchResult.Failed(phase, FindingBundle.of(session.findings));
+            return new MatchResult.Failed(phase, FindingBundle.of(session.findings), outcome);
         }
         return new MatchResult.Admitted(
             phase,
@@ -432,7 +432,7 @@ public final class MatchEngine {
         Finding invalid = validateBindings(request, phase, admitted.outcome().bindings());
         if (invalid != null) {
             findings.add(invalid);
-            return new MatchResult.Failed(phase, FindingBundle.of(findings));
+            return new MatchResult.Failed(phase, FindingBundle.of(findings), admitted.outcome());
         }
         ClaimPlanner.Derived derived;
         try {
@@ -440,7 +440,7 @@ public final class MatchEngine {
                     .derive(request.blueprint(), request.siting(), request.instance(), admitted.outcome().bindings());
         } catch (PlanRejected rejected) {
             findings.add(plannerFailure(phase, rejected, Locus.local(request.blueprint().bayCells())));
-            return new MatchResult.Failed(phase, FindingBundle.of(findings));
+            return new MatchResult.Failed(phase, FindingBundle.of(findings), admitted.outcome());
         }
         long revision;
         if (derived.rows().isEmpty()) {
@@ -504,7 +504,7 @@ public final class MatchEngine {
                 }
                 if (!retryConflicts.isEmpty()) {
                     findings.addAll(retryConflicts);
-                    return new MatchResult.Failed(phase, FindingBundle.of(findings));
+                    return new MatchResult.Failed(phase, FindingBundle.of(findings), admitted.outcome());
                 }
                 verdict = ledger.settle(new SettleRequest(request.instance(), derived.rows(), fresh.revision()));
             }
@@ -541,7 +541,7 @@ public final class MatchEngine {
                     );
                 }
                 findings.addAll(settleConflicts);
-                return new MatchResult.Failed(phase, FindingBundle.of(findings));
+                return new MatchResult.Failed(phase, FindingBundle.of(findings), admitted.outcome());
             }
             ClaimVerdict.Settled settled = (ClaimVerdict.Settled) verdict;
             revision = settled.revision();

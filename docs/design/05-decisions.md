@@ -2014,6 +2014,25 @@ expects, so it must not fabricate an edit.
 **Why in `structure`.** The port describes this module's own values; `remedy` consumes it across
 the existing `structure` → `remedy` edge (`03-modules.md`), and no kernel package gains a new edge.
 
+### D-92 — A failed attempt carries its outcome, and the build family is `SC-BLD`
+
+`MatchResult.Failed` gains a nullable third component, `MatchOutcome outcome`: the check path always
+attaches the session's outcome, the settle path attaches the admitted attempt's, and a failure that
+precedes any outcome leaves it null. `FindingCode.Family` gains `bld("BLD")` ("the host build
+executor"), the fifteenth family; `SC-BLD-*` entries live in the adapter's own code catalog beside
+`SC-MC-*` and never enter `Codes.all` (`finding` §4.1).
+
+**Why the outcome on `Failed`.** The remedy providers read a failed attempt's evidence from
+`RemedyContext.outcome` — the captured snapshot the attempt already paid for — and a build repairs
+exactly the mismatch case, which is `Failed`. Without the component the host either fabricates a
+`MatchOutcome` with fake bindings (dishonest values) or every build degrades to advisory; both were
+rejected, and the session already holds the outcome at every failure point (`engine` §3, §4).
+
+**Why a family, not an `mc` overflow.** `SC-BLD-0001`…`0008` are the build executor's codes (design
+14 §14), a second host concern beside the capture/expectation codes; one family per concern keeps
+`/cumulus explain` and the code tables readable, and the family's tag is the only place the kernel
+mints the letters — the entries themselves stay host-registered (D-87).
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is

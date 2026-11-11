@@ -235,7 +235,7 @@ public final class Codes {
 
 ### 4.1 The code
 
-`SC-<FAMILY>-<NNNN>`, family one of the 14, number `1..9999` zero-padded. `parse` returns `null`
+`SC-<FAMILY>-<NNNN>`, family one of the 15, number `1..9999` zero-padded. `parse` returns `null`
 for a malformed string; `text()` and `parse` are inverse on well-formed input. The `Family` constants
 are lowerCamel and each carries an explicit uppercase tag: `text()` renders that tag and `parse`
 accepts only an uppercase tag from the table, so the wire text stays `SC-SPC-0001`, never
@@ -245,7 +245,8 @@ well-formed code still constructs, orders and renders; the registry has no entry
 returns `null` and `explainOrFallback` synthesises the family text.
 
 `Codes.all` is the kernel's table. An adapter or addon code is a `FindingCode` outside it and never
-enters `Codes.all`; `SC-MC-*` is the adapter family. A host may give such a code a `CodeEntry` in
+enters `Codes.all`; `SC-MC-*` and `SC-BLD-*` (the build executor, design 14 §14) are the adapter
+families. A host may give such a code a `CodeEntry` in
 its own code catalog (§4.5), which is where its severity and explanation live; the kernel's table is
 untouched. A `ReadRefusal` or a `CaptureReport` entry may carry an opaque host code; the kernel
 relays it at the report site (it never branches on it, mints it or allocates it) unless the code is

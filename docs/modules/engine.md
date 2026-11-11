@@ -80,7 +80,8 @@ public sealed interface MatchResult {
                   ClaimSet claims, long contextRevision, long ledgerRevision,
                   FindingBundle findings) implements MatchResult { }
 
-    record Failed(Phase phase, FindingBundle findings) implements MatchResult { }
+    record Failed(Phase phase, FindingBundle findings,
+                  @Nullable MatchOutcome outcome) implements MatchResult { }
 
     record Undecided(Phase phase, UndecidedReason reason, FindingBundle findings,
                      @Nullable MatchOutcome partial) implements MatchResult { }
@@ -254,7 +255,10 @@ ledger answered — a `Settled` (a settle whose content matched counts, and keep
 at all — and carries the claims, the context revision and the ledger revision; the ledger revision
 may equal the one the check read. Every publish — settle or derive — stores a whole replacement
 table in a new `StructureContext`, so the context revision names an immutable snapshot, not a
-mutation of the previous one. `Failed` has at least one `error` finding. `Undecided` carries a
+mutation of the previous one. `Failed` has at least one `error` finding and carries the attempt's
+outcome whenever the failure happened after the session produced one (D-92): the check path always
+attaches it, the settle path attaches the admitted attempt's — a remedy solve reads a failed
+attempt's evidence from here, never from a live world. `Undecided` carries a
 reason and, when available, a partial outcome. `Dropped` means the snapshot was no longer current;
 the attempt read nothing that can be trusted. A `Partial` section does not make an attempt
 `Undecided` by itself: the computation's `Missing` propagates through the normal fold, and the

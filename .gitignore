@@ -1,7 +1,10 @@
 # gradle
 
 .gradle/
-build/
+# anchored: the adapter's own package is src/main/java/dev/vfyjxf/cumulus/mc/build
+/build/
+/build-logic/build/
+/build-logic/cloudpmd/build/
 out/
 classes/
 

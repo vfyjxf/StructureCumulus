@@ -148,7 +148,7 @@ Then the module files, in dependency order:
   `./gradlew check` passes at this revision (643 kernel tests, 449 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` last passed with 140/140 GameTests
   before the kernel-only P1 slice. `Codes.all` has 67 entries
-  and the decision record has 90 decisions (D-91; D-29 and D-36 superseded, D-78 withdrawn).
+  and the decision record has 91 decisions (D-92; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 

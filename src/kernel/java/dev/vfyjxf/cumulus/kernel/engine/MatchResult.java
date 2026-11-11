@@ -60,7 +60,7 @@ public sealed interface MatchResult {
         }
     }
 
-    record Failed(Phase phase, FindingBundle findings) implements MatchResult {
+    record Failed(Phase phase, FindingBundle findings, @Nullable MatchOutcome outcome) implements MatchResult {
         public Failed {
             Objects.requireNonNull(phase, "phase");
             Objects.requireNonNull(findings, "findings");
