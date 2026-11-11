@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc.preview;
 
+import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimLedger;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimRow;
 import dev.vfyjxf.cumulus.kernel.claim.ClaimView;
@@ -14,7 +15,9 @@ import dev.vfyjxf.cumulus.kernel.core.World;
 import dev.vfyjxf.cumulus.kernel.engine.MatchOutcome;
 import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
+import dev.vfyjxf.cumulus.kernel.finding.Applicability;
 import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
+import dev.vfyjxf.cumulus.kernel.remedy.EditPlan;
 import dev.vfyjxf.cumulus.kernel.remedy.Marker;
 import dev.vfyjxf.cumulus.kernel.remedy.MarkerKind;
 import dev.vfyjxf.cumulus.kernel.remedy.OverlayModel;
@@ -23,15 +26,18 @@ import dev.vfyjxf.cumulus.kernel.remedy.RemedyContext;
 import dev.vfyjxf.cumulus.kernel.remedy.SolvePreferences;
 import dev.vfyjxf.cumulus.kernel.remedy.SolveResult;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
-import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Heading;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
+import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
+import dev.vfyjxf.cumulus.kernel.space.Tilt;
 import dev.vfyjxf.cumulus.kernel.space.Turn;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.world.CaptureRequest;
 import dev.vfyjxf.cumulus.kernel.world.CaptureResult;
 import dev.vfyjxf.cumulus.kernel.world.EntityWindow;
@@ -39,6 +45,14 @@ import dev.vfyjxf.cumulus.kernel.world.SnapshotLease;
 import dev.vfyjxf.cumulus.kernel.world.SnapshotPolicy;
 import dev.vfyjxf.cumulus.mc.LevelAccess;
 import dev.vfyjxf.cumulus.mc.LevelCapture;
+import dev.vfyjxf.cumulus.mc.build.BuildMaterials;
+import dev.vfyjxf.cumulus.mc.build.CreativeItemSource;
+import dev.vfyjxf.cumulus.mc.build.ItemSource;
+import dev.vfyjxf.cumulus.mc.build.PlayerInventorySource;
+import dev.vfyjxf.cumulus.mc.pref.BuildPreferences;
+import dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData;
+import dev.vfyjxf.cumulus.mc.pref.SitingCandidateScorer;
+import dev.vfyjxf.cumulus.mc.pref.SolvePreferenceAssembler;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewControlPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
@@ -51,6 +65,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,8 +73,9 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * One server-side preview: the cycle, the current overlay marks and ghosts, the last block revision
- * it saw and its lifetime. Everything here runs on the server thread and never writes the world.
+ * One server-side preview: the ranked cycle, the current overlay marks and ghosts, the last block
+ * revision it saw and its lifetime. Everything here runs on the server thread and never writes the
+ * world; the one exit is confirm, which runs the build executor of design 14 §10.
  */
 final class PreviewSession {
 
@@ -71,8 +87,8 @@ final class PreviewSession {
     static final long retractAfterTicks = 1_200L;
     private static final int maxRemedies = 8;
     private static final int nextGroupSize = 8;
-    private static final int maxPreferredCells = 16;
     private static final int maxElements = 1_000_000;
+    private static final int maxShownShortages = 3;
 
     /** The open outcome: a live session, or the reason a command should report. */
     record OpenResult(@Nullable PreviewSession session, @Nullable String failure) {
@@ -91,38 +107,56 @@ final class PreviewSession {
     private final NamespacedId blueprintId;
     private final Blueprint blueprint;
     private final PreviewCycle cycle;
+    private final BuildPreferences preferences;
+    private final ItemSource source;
     private final Map<NamespacedId, LatticePoint> pinChoice = new TreeMap<>();
 
     private @Nullable SnapshotLease lease;
     private @Nullable OverlayModel overlay;
     private List<GhostCell> ghosts = List.of();
     private List<Marker> markers = List.of();
+    private List<LatticePoint> pending = List.of();
+    private List<String> shortages = List.of();
+    private boolean planned;
     private @Nullable ClaimView claims;
     private List<String> findings = List.of();
     private long revision;
     private long syncedAt;
     private boolean retracted;
     private boolean invalidated;
-    private boolean materialsNoted;
     private @Nullable String lastNote;
     private boolean cancelled;
 
-    private PreviewSession(ServerPlayer player, Blueprint blueprint, PreviewCycle cycle) {
+    private PreviewSession(
+        ServerPlayer player,
+        Blueprint blueprint,
+        PreviewCycle cycle,
+        BuildPreferences preferences,
+        ItemSource source
+    ) {
         this.playerId = player.getUUID();
         this.level = player.serverLevel();
         this.blueprintId = blueprint.id();
         this.blueprint = blueprint;
         this.cycle = cycle;
+        this.preferences = preferences;
+        this.source = source;
         this.syncedAt = level.getGameTime();
     }
 
     static OpenResult open(ServerPlayer player, Blueprint blueprint, List<LatticePoint> origins, Direction facing) {
-        Direction horizontal = facing.getAxis().isHorizontal() ? facing : Direction.NORTH;
-        Turn facingTurn = PreviewCycle.turnOf(horizontal);
-        if (facingTurn == null) {
-            facingTurn = Turn.none;
+        ServerLevel level = player.serverLevel();
+        PreferencesSavedData store = PreferencesSavedData.get(level);
+        BuildPreferences preferences = store.preferences(player.getUUID());
+        Heading playerFacing = PreviewCycle.headingOf(facing);
+        if (playerFacing == null) {
+            playerFacing = Heading.north;
         }
-        PreviewCycle cycle = cycle(blueprint, origins, facingTurn, player.serverLevel());
+        Turn start = PreviewCycle.turnOf(preferences.startHeading(playerFacing));
+        if (start == null) {
+            start = Turn.none;
+        }
+        PreviewCycle cycle = cycle(blueprint, origins, start, level);
         if (cycle.isEmpty()) {
             return OpenResult.failed(
                 blueprint.anchors().isEmpty()
@@ -130,7 +164,16 @@ final class PreviewSession {
                         : "no formed anchor of " + blueprint.id().text() + " at the origin"
             );
         }
-        PreviewSession session = new PreviewSession(player, blueprint, cycle);
+        PreviewSession session = new PreviewSession(
+            player,
+            blueprint,
+            cycle,
+            preferences,
+            player.isCreative() ? new CreativeItemSource() : new PlayerInventorySource(player)
+        );
+        session.seedPins(store);
+        session.rank(player, playerFacing);
+        cycle.lockProgress();
         String failure = session.compute();
         if (failure != null) {
             session.close();
@@ -140,10 +183,10 @@ final class PreviewSession {
         return OpenResult.opened(session);
     }
 
-    private static PreviewCycle cycle(Blueprint blueprint, List<LatticePoint> origins, Turn facing, ServerLevel level) {
+    private static PreviewCycle cycle(Blueprint blueprint, List<LatticePoint> origins, Turn start, ServerLevel level) {
         List<Siting> anchored = PreviewAnchors.resolve(level, blueprint, origins);
         return anchored.isEmpty()
-                ? PreviewCycle.build(blueprint, origins, facing, level)
+                ? PreviewCycle.build(blueprint, origins, start, level)
                 : PreviewCycle.ofSittings(blueprint, anchored, level);
     }
 
@@ -180,9 +223,23 @@ final class PreviewSession {
         return markers;
     }
 
-    /** Applies one control; false means the session is over. */
-    boolean apply(PreviewControlPayload.Control control, @Nullable LatticePoint target) {
+    /** The part cells this session holds, keyed by part id in the declaration frame. */
+    Map<NamespacedId, LatticePoint> pins() {
+        return Collections.unmodifiableMap(new TreeMap<>(pinChoice));
+    }
+
+    /** Applies one control from the player who sent it; false means the session is over. */
+    boolean apply(ServerPlayer player, PreviewControlPayload.Control control, @Nullable LatticePoint target) {
         invalidated = false;
+        if (cycles(control) && cycle.locked()) {
+            lastNote = "the built cells fix this siting; cycling is off (1.5)";
+            retracted = false;
+            if (compute() != null) {
+                return false;
+            }
+            sync();
+            return true;
+        }
         switch (control) {
             case turnCw -> note(cycle.turn(true), "no other turn is expressible at this origin");
             case turnCcw -> note(cycle.turn(false), "no other turn is expressible at this origin");
@@ -197,7 +254,7 @@ final class PreviewSession {
             }
             case cyclePart -> cyclePart(target);
             case confirm -> {
-                return confirm();
+                return confirm(player);
             }
             case cancel -> {
                 cancelled = true;
@@ -205,7 +262,9 @@ final class PreviewSession {
             }
         }
         retracted = false;
-        if (compute() != null) {
+        String failure = compute();
+        if (failure != null) {
+            StructureCumulus.logger.info("preview {} ended: {}", blueprintId.text(), failure);
             return false;
         }
         sync();
@@ -216,7 +275,9 @@ final class PreviewSession {
     boolean refresh(boolean invalidated) {
         this.invalidated = invalidated;
         retracted = false;
-        if (compute() != null) {
+        String failure = compute();
+        if (failure != null) {
+            StructureCumulus.logger.info("preview {} ended: {}", blueprintId.text(), failure);
             return false;
         }
         sync();
@@ -274,25 +335,44 @@ final class PreviewSession {
         overlay = null;
     }
 
-    private boolean confirm() {
-        ServerPlayer player = player();
-        if (player == null) {
-            return false;
-        }
+    private boolean confirm(ServerPlayer player) {
         if (compute() != null) {
             return false;
         }
+        if (lease != null) {
+            lease.close();
+            lease = null;
+        }
+        SolvePreferences solvePreferences = SolvePreferenceAssembler
+                .assemble(pending, pinChoice, cycle.slot().siting());
         PreviewConfirmHandler handler = PreviewService.confirmHandler();
-        boolean accepted = handler
-                .confirm(player, new PreviewConfirmHandler.Request(blueprintId, cycle.slot().siting(), findings));
+        boolean accepted = handler.confirm(
+            player,
+            new PreviewConfirmHandler.Request(blueprintId, cycle.slot().siting(), findings, source, solvePreferences)
+        );
         if (accepted) {
             cancelled = true;
+            // the built world is the answer: recount it before the session goes away
+            if (compute() == null) {
+                ghosts = List.of();
+                List<Marker> closing = new ArrayList<>(markers);
+                closing.add(0, new Marker(boundsLocus(), "build committed; the session closes", MarkerKind.info));
+                markers = cap(closing, boundsLocus());
+                sync();
+            }
             return false;
         }
-        lastNote = "the build refused; the plan stays here — confirm again once the shortage is supplied";
+        lastNote = "the build did not form; the plan stays here — confirm again to continue (5.1)";
         compute();
         sync();
         return true;
+    }
+
+    private static boolean cycles(PreviewControlPayload.Control control) {
+        return switch (control) {
+            case turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity -> true;
+            default -> false;
+        };
     }
 
     private void note(boolean applied, String why) {
@@ -338,7 +418,9 @@ final class PreviewSession {
         ClaimView view = remainingClaims(ledger, bounds, siting);
         claims = view;
         Map<LatticeKey, CellMark> marks = derivedMarks(expected.states(), siting);
+        pending = pendingCells(marks, expected.states(), siting);
         List<Marker> built = new ArrayList<>();
+        EditPlan repair = null;
         StructureAttempt draft = structures.begin(world, new StructureSpec(owner, siting, blueprintId));
         try {
             MatchRequest request = MatchRequest
@@ -355,7 +437,7 @@ final class PreviewSession {
                     outcomeOf(checked),
                     null,
                     maxRemedies,
-                    new SolvePreferences(preferredCells(marks), pins(siting))
+                    SolvePreferenceAssembler.assemble(pending, pinChoice, siting)
                 )
             );
             for (Remedy remedy : solved.remedies()) {
@@ -366,12 +448,18 @@ final class PreviewSession {
                         marks.merge(mark.getKey(), mark.getValue(), CellMark::louder);
                     }
                     built.addAll(preview.overlay().markers());
-                    break;
+                }
+                if (repair == null
+                        && remedy instanceof Remedy.Repair candidate
+                        && candidate.applicability() == Applicability.machineApplicable) {
+                    repair = candidate.plan();
                 }
             }
         } finally {
             abort(draft);
         }
+        planned = repair != null;
+        shortages = repair == null ? List.of() : BuildMaterials.shortages(repair, siting, level, source);
         overlay = new OverlayModel(bounds, marks, List.of());
         ghosts = ghosts(marks, expected.states(), siting);
         markers = cap(sessionMarkers(built, marks, bounds), Locus.world(bounds.asSet()));
@@ -402,6 +490,9 @@ final class PreviewSession {
         if (cycle.anchored()) {
             built.add(new Marker(locus, "anchored pose: the formed anchor fixes the siting (1.5)", MarkerKind.info));
         }
+        if (cycle.locked()) {
+            built.add(new Marker(locus, "locked: the built cells agree with one siting only (1.5)", MarkerKind.info));
+        }
         for (Map.Entry<String, Integer> entry : filtered.entrySet()) {
             built.add(
                 new Marker(locus, entry.getValue() + " orientation(s) filtered: " + entry.getKey(), MarkerKind.warning)
@@ -424,6 +515,7 @@ final class PreviewSession {
             );
         }
         built.addAll(blockedMarkers(marks));
+        built.add(materialsMarker(locus));
         List<LatticePoint> next = nextGroup(marks);
         if (!next.isEmpty()) {
             built.add(new Marker(locus, "next: " + describe(next), MarkerKind.anchor));
@@ -438,21 +530,35 @@ final class PreviewSession {
                 )
             );
         }
-        if (!materialsNoted) {
-            materialsNoted = true;
-            built.add(
-                new Marker(
-                    locus,
-                    "materials: no item source is bound to a session yet, so there is no shortage list",
-                    MarkerKind.info
-                )
-            );
-        }
         if (lastNote != null) {
             built.add(new Marker(locus, lastNote, MarkerKind.info));
             lastNote = null;
         }
         return built;
+    }
+
+    /** 4.4: the materials list of the current plan, read from the dry run's item simulation. */
+    private Marker materialsMarker(Locus locus) {
+        if (!planned) {
+            return new Marker(locus, "materials: nothing left to place", MarkerKind.info);
+        }
+        if (source instanceof CreativeItemSource) {
+            return new Marker(locus, "materials: the creative source covers the plan", MarkerKind.info);
+        }
+        if (shortages.isEmpty()) {
+            return new Marker(locus, "materials: " + source.id().text() + " covers the plan", MarkerKind.info);
+        }
+        StringBuilder text = new StringBuilder("materials: ");
+        for (int index = 0; index < shortages.size() && index < maxShownShortages; index++) {
+            if (index > 0) {
+                text.append("; ");
+            }
+            text.append(shortages.get(index));
+        }
+        if (shortages.size() > maxShownShortages) {
+            text.append("; +").append(shortages.size() - maxShownShortages).append(" more");
+        }
+        return new Marker(locus, text.toString(), MarkerKind.warning);
     }
 
     /** 6.2: a blocked cell names its claim's owner and structure, and offers no force-break. */
@@ -551,30 +657,28 @@ final class PreviewSession {
         return marks;
     }
 
-    private List<CuboidSet> preferredCells(Map<LatticeKey, CellMark> marks) {
-        List<LatticePoint> ordered = nextGroup(marks);
-        List<CuboidSet> preferred = new ArrayList<>();
-        for (LatticePoint cell : ordered) {
-            if (preferred.size() >= maxPreferredCells) {
-                break;
+    /** The declaration-frame cells the current pose still needs, in canonical order. */
+    private List<LatticePoint> pendingCells(
+        Map<LatticeKey, CellMark> marks,
+        Map<LatticePoint, BlockState> expected,
+        Siting siting
+    ) {
+        List<LatticePoint> pendingCells = new ArrayList<>();
+        for (LatticePoint local : expected.keySet()) {
+            LatticePoint world = siting.toWorld(local);
+            if (world == null) {
+                continue;
             }
-            preferred.add(Cuboid.of(cell).asSet());
-        }
-        return preferred;
-    }
-
-    private Map<NamespacedId, CuboidSet> pins(Siting siting) {
-        Map<NamespacedId, CuboidSet> world = new TreeMap<>();
-        for (Map.Entry<NamespacedId, LatticePoint> pin : pinChoice.entrySet()) {
-            CuboidSet cells = siting.toWorld(Cuboid.of(pin.getValue()).asSet());
-            if (cells != null) {
-                world.put(pin.getKey(), cells);
+            CellMark mark = marks.get(world.key());
+            if (mark == CellMark.missing || mark == CellMark.expected) {
+                pendingCells.add(local);
             }
         }
-        return world;
+        pendingCells.sort(LatticePoint::compareTo);
+        return List.copyOf(pendingCells);
     }
 
-    /** 2.1: picks the next legal cell of the clicked part; the pin reaches the kernel as a preference. */
+    /** 2.1: picks the next legal cell of the clicked part and remembers it as an implicit signal (7.2). */
     private void cyclePart(@Nullable LatticePoint target) {
         if (target == null) {
             lastNote = "no ghost part under the crosshair";
@@ -597,11 +701,51 @@ final class PreviewSession {
             }
             LatticePoint chosen = pinChoice.get(bay.id());
             int index = chosen == null ? 0 : Math.floorMod(legal.indexOf(chosen) + 1, legal.size());
-            pinChoice.put(bay.id(), legal.get(index));
-            lastNote = "part " + bay.id().text() + " pinned to " + describe(List.of(legal.get(index)));
+            LatticePoint pinned = legal.get(index);
+            pinChoice.put(bay.id(), pinned);
+            PreferencesSavedData.get(level).rememberPart(playerId, blueprintId, bay.id(), pinned);
+            lastNote = "part " + bay.id().text() + " pinned to " + describe(List.of(pinned));
             return;
         }
         lastNote = "no bay covers the clicked cell";
+    }
+
+    private void seedPins(PreferencesSavedData store) {
+        for (Bay bay : blueprint.bays()) {
+            LatticePoint remembered = store.partPin(playerId, blueprintId, bay.id());
+            if (remembered != null) {
+                pinChoice.put(bay.id(), remembered);
+            }
+        }
+    }
+
+    private void rank(ServerPlayer player, Heading playerFacing) {
+        BlockPos pos = player.blockPosition();
+        LatticePoint position = LatticePoint.inLattice(pos.getX(), pos.getY(), pos.getZ())
+                ? LatticePoint.of(pos.getX(), pos.getY(), pos.getZ())
+                : cycle.slot().origin();
+        SitingCandidateScorer.View view = new SitingCandidateScorer.View(
+            position,
+            playerFacing,
+            SitingCandidateScorer.frontOf(blueprint),
+            preferences.history(blueprintId),
+            hanging(blueprint)
+        );
+        cycle.rank(new SitingCandidateScorer(), preferences.weights(), view);
+    }
+
+    /** 3.2: a blueprint that declares an inverted pose is a hanging one, so its support is above. */
+    private static boolean hanging(Blueprint blueprint) {
+        OrientationPolicy policy = blueprint.orientation();
+        if (policy == null) {
+            return false;
+        }
+        for (Orientation allowed : policy.allowed()) {
+            if (allowed.tilt() == Tilt.inverted) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private SnapshotPolicy policy(Siting siting) {

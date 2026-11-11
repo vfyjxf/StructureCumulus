@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.mc.ServerState;
 import dev.vfyjxf.cumulus.mc.WatchEvents;
 import dev.vfyjxf.cumulus.mc.build.BuildConfig;
 import dev.vfyjxf.cumulus.mc.build.BuildHistory;
+import dev.vfyjxf.cumulus.mc.pref.PrefConfig;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -39,6 +40,8 @@ public final class StructureCumulus {
         NeoForge.EVENT_BUS.addListener((ServerStoppingEvent event) -> BuildHistory.forgetAll());
         NeoForge.EVENT_BUS.addListener((ServerStoppedEvent event) -> BuildHistory.forgetAll());
         container.registerConfig(ModConfig.Type.SERVER, BuildConfig.spec);
+        // the preference defaults live in their own server file; the memory is per-level SavedData
+        container.registerConfig(ModConfig.Type.SERVER, PrefConfig.spec, "structurecumulus-preferences.toml");
         WatchEvents.register();
         logger.info("{} loading", Constants.modId);
     }

@@ -75,9 +75,9 @@ A session is keyed by `(player, level)` and lives on the server.
   anchor-block gesture. Without an origin the server ray-traces the crosshair block (with face) and
   takes the hit as the origin candidate (1.1). Right-clicking (or sneak-right-clicking) a formed
   anchor block infers the blueprint candidates and the siting from that cell — the
-  place-controller-first flow (1.2). If
-  the already-built cells are consistent with exactly one candidate siting, the session locks to it
-  and offers no cycling (1.5).
+  place-controller-first flow (1.2). If exactly one candidate siting satisfies strictly more of the
+  already-built cells than every other candidate, the session locks to it and offers no cycling
+  (1.5).
 - **Open flow.** Capture → check → solve (design 14 §10 steps 1–2) →
   `PreviewSyncPayload`.
 - **Invalidation.** A world change inside the footprint (the M5a `LevelWatch` mark counter,
@@ -205,10 +205,10 @@ public record BuildPreferences(
     public BuildPreferences { /* immutable; remembered is a bounded LRU, capacity 64 */ }
 }
 
-public enum OrientationMode { AUTO_ANCHOR, FACE_PLAYER, FIXED_HEADING }
-public enum RemovalPolicy { FORBID, ASK, ALLOW } // ASK allows removal only with --allow-removal.
-public enum PlacementWeight { FACING_PLAYER, FEWEST_REMOVALS, MOST_PROGRESS,
-                              NEAREST_TO_PLAYER, REMEMBERED, SUPPORT, ALIGN /* P8 backlog */ }
+public enum OrientationMode { autoAnchor, facePlayer, fixedHeading }
+public enum RemovalPolicy { forbid, ask, allow } // ask allows removal only with --allow-removal.
+public enum PlacementWeight { facingPlayer, fewestRemovals, mostProgress,
+                              nearestToPlayer, remembered, support, align /* P8 backlog */ }
 
 // The frequency-weighted memory (7.1): the last eight choices, mode wins, ties break recent.
 public record ChoiceHistory(java.util.List<Siting> recent) {
@@ -217,21 +217,68 @@ public record ChoiceHistory(java.util.List<Siting> recent) {
 }
 ```
 
-- **Scoring.** `SitingCandidateScorer` sums the ordered weights over the enumerated candidates;
-  `MOST_PROGRESS` counts the cells already satisfied under a siting, read from the dry-run capture
-  (never a second world walk); `REMEMBERED` pins the remembered choice to the top. Ties fall back
-  to the canonical order — scoring is deterministic.
+- **Scoring.** `SitingCandidateScorer` sums the ordered weights over the enumerated candidates and
+  ranks by descending score; a tie falls back to the candidate's canonical enumeration index, so an
+  unchanged input ranks identically and even a scrambled input list ranks identically.
+  `mostProgress` and `fewestRemovals` read the live cells under the pose (already satisfied; occupied
+  but wrong); `remembered` outranks every other term. The magnitudes are adapter constants:
+
+  | Weight | Term |
+  | --- | --- |
+  | `facingPlayer` | `+100` when the pose's front heading is the player's horizontal facing |
+  | `fewestRemovals` | `-10` per cell the pose has to clear first |
+  | `mostProgress` | `+10` per cell the pose already satisfies |
+  | `nearestToPlayer` | `-10` per block of horizontal distance, capped at 1000 blocks |
+  | `remembered` | `+1_000_000` when the pose is the mode of the blueprint's history |
+  | `support` | the percentage of the pose's support face that has a neighbour |
+  | `align` | declared for P8; it contributes nothing yet |
+
+- **The front heading.** A pose's front is its declaration frame's front side carried by the
+  orientation. A blueprint that declares a door (a check whose focus subject is `DoorView`) puts its
+  front on the side its door cells sit on; otherwise the front is the identity `-Z` face. This is the
+  same convention the turn snap uses (§7), so the facing weight and the snap agree, and no kernel
+  focus-id port is needed.
+- **Support face (3.2).** `support` measures the world underside of the sited bounds by default and
+  the world top side when the blueprint declares an inverted pose (`OrientationPolicy.allowed()`
+  contains an `inverted` tilt): a hanging structure is scored on its ceiling side, not with a
+  negated weight.
+- **Progress lock (1.5).** When exactly one pose satisfies strictly more built cells than every other
+  candidate, the session opens locked to it, says so in the HUD, and refuses every cycling control
+  (`turn`, `flip`, `origin`, `reset`, `resetIdentity`). The lock is recomputed on each recompute, so a
+  world change can release it.
 - **Memory.** The remembered history replaces single-value memory (7.1): each key keeps the last
   eight choices, the mode wins, ties break to the most recent; both the single-value and the mode
-  rule are deterministic. Writing is implicit (7.2): confirming a siting or pinning a part is the
-  memory write; there is no explicit "save". `/cumulus prefs forget` clears.
-- **Persistence.** `PreferencesSavedData` is a per-level `SavedData` keyed by player UUID with the
-  claims lifecycle law (adapter §5); the server config supplies the defaults. The store also keeps
-  the per-part pin memories of §8.
-- **Command.** `/cumulus prefs` views, sets and clears preferences and memories.
+  rule are deterministic. The remembered value is the whole `Siting`, so the flip and the turn of the
+  remembered choice come back with it (3.6). Writing is implicit (7.2): a confirm that forms the
+  structure writes the siting and a part cycle writes the part pin; there is no explicit "save".
+  A confirm that applies one repair without forming the structure keeps the plan in the session, so
+  the next confirm continues it (5.1). `/cumulus prefs
+  forget` clears. Per-part memory is the `(player, blueprintId, partId)` key of §8 and never migrates
+  to another blueprint.
+- **Persistence.** `PreferencesSavedData` is a per-level `SavedData` (file id
+  `structurecumulus_preferences`) keyed by player UUID, warmed by `ServerState.openLevel` at
+  `LevelEvent.Load` and read through `level.getDataStorage()` on every access, so nothing holds a
+  store across an unload (adapter §18). The file carries a format version; an unknown version is
+  dropped with a WARNING rather than guessed at. The store keeps the explicit settings apart from the
+  memory, so a config default that changes later still reaches a player who never ran `set`. The
+  blueprint LRU capacity and the part-pin capacity are one number,
+  `rememberedCapacity` (default 64) in `config/structurecumulus-preferences.toml`; the same file
+  supplies `defaults.orientationMode`, `defaults.fixedHeading`, `defaults.removalPolicy` and
+  `defaults.weights` (the weight list uses the snake_case spelling; a value is read either way).
+- **Command.** `/cumulus prefs` views the effective preferences, `show` does the same explicitly,
+  `set <key> <value>` writes one setting with `key` in `orientation | heading | removal | weights | all`
+  (values are `auto|face|fixed`, a heading or `none`, `forbid|ask|allow`, a comma-ordered weight
+  list or `default`, and `all` resets every setting to the config), and `forget [id]` clears the
+  memory of one blueprint or of all of them. Exit code 1 on success, 0 on an unknown key or value or
+  without a player.
 - **Kernel bridge.** The only preference value that crosses into the kernel is `SolvePreferences`
   (D-86): cell-level ordering enters `RemedyContext`; siting-level ordering stays in the adapter —
-  the kernel does not know players.
+  the kernel does not know players. `SolvePreferenceAssembler` maps the current pose's still-needed
+  declaration cells (canonical order, capped at 64) to world-frame cell preferences and the live part
+  pins plus the remembered part pins to world-frame box pins; a pin the siting cannot place is
+  dropped, so the adapter never invents a cell. The player's `RemovalPolicy` narrows or widens the
+  server gate (`FORBID` forces removal off, `ASK` leaves the server gate, `ALLOW` lifts it); it never
+  turns a plan into one the policy would otherwise refuse on another ground.
 
 ## 10. Codes
 

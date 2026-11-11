@@ -1238,7 +1238,8 @@ public final class PreviewService {
 public interface PreviewConfirmHandler {
     boolean confirm(ServerPlayer player, Request request);
 
-    record Request(NamespacedId blueprintId, Siting siting, java.util.List<String> codes) { }
+    record Request(NamespacedId blueprintId, Siting siting, java.util.List<String> codes,
+                   ItemSource source, SolvePreferences preferences) { }
 }
 
 public final class PreviewEvents { }
@@ -1394,9 +1395,10 @@ The landed half (P3), with the wire facts a second implementation would need:
   key table needs but its enum omitted: `reset` (tap R, 3.7), `resetIdentity` (hold R, 3.7) and
   `cyclePart`, whose optional `target` names the clicked ghost cell so the server resolves the bay
   from its own blueprint (2.1); a control still never carries a siting.
-- **Confirm.** `PreviewConfirmHandler` is the one write path out of a session. P3 installs
-  `PreviewConfirms`, which reports the executor call and refuses, so a confirm keeps the plan in the
-  session for another try (5.1) until P5 installs the executor.
+- **Confirm.** `PreviewConfirmHandler` is the one write path out of a session. P5 installs
+  `PreviewBuilds`, the real executor flow of §18: the session hands over its siting, its item source
+  and the assembled `SolvePreferences`, and a refusal keeps the plan in the session for another try
+  (5.1).
 - **Client.** `PreviewClientBridge` is the only common-side reference into `...preview.client`; the
   handler body resolves it inside `enqueueWork`, so no client class loads on a dedicated server.
   `PreviewClientState` is the read-only model the HUD, the renderers and the scenarios share;
@@ -1404,11 +1406,52 @@ The landed half (P3), with the wire facts a second implementation would need:
   and the HUD layer. Ghost models resolve through the block renderer with a forced-alpha translucent
   pass; no block entity, capability or world read backs them.
 
-## 18. Preferences (design 15 §9, approved, landing with P5)
+## 18. Preferences (design 15 §9, landed with P5)
 
-`dev.vfyjxf.cumulus.mc.pref` owns `BuildPreferences`, the frequency-weighted `ChoiceHistory` memory
-(7.1: last eight choices, mode wins, ties break recent), `SitingCandidateScorer` with its
-deterministic canonical-order fallback, `PreferencesSavedData` (per-level, keyed by player UUID,
-the claims lifecycle law of §5) and `/cumulus prefs`. The only preference value that crosses into
-the kernel is `SolvePreferences` (D-86, `remedy` §5): cell-level ordering enters `RemedyContext`;
-siting-level ordering stays here — the kernel does not know players.
+`dev.vfyjxf.cumulus.mc.pref` owns the siting preferences and their memory. The public values are
+`BuildPreferences` (the mode, the fixed heading, the removal policy, the ordered weights and the
+per-blueprint `ChoiceHistory`), `OrientationMode`, `RemovalPolicy` and `PlacementWeight`;
+`ChoiceHistory` is design 15 §9's frequency window (most recent last, eight choices, the mode wins,
+a tie goes to the choice whose latest occurrence is the most recent). Every write returns a new
+`BuildPreferences`, and `remember` is the bounded LRU rule with the capacity the caller passes.
+
+- **Scorer.** `SitingCandidateScorer` is pure and deterministic: it ranks the measured candidates by
+  descending score and breaks a tie by the candidate's canonical enumeration index, so a scrambled
+  input list ranks identically. The weights and their magnitudes are design 15 §9's table.
+  `frontOf(Blueprint)` derives the declaration frame's front: the side the blueprint's door cells
+  sit on when a check's focus subject is `DoorView` (the kernel publishes the subject type, not a
+  focus id, so this is the reachable test), otherwise the identity `-Z` face.
+- **Assembly.** `SolvePreferenceAssembler` is the one translation into the kernel (D-86): the
+  current pose's still-needed declaration cells become ordered world-frame cell preferences, and the
+  live plus remembered part pins become world-frame box pins; a pin or cell the pose cannot place is
+  dropped, so the adapter never invents a cell.
+- **Store.** `PreferencesSavedData` is a per-level `SavedData` at file id
+  `structurecumulus_preferences`, keyed by player UUID. `ServerState.openLevel` — the
+  `LevelEvent.Load` handler — warms it, and every access re-reads `level.getDataStorage()`, so no
+  reference survives a level unload and a reloaded dimension reads its own file: the KB's level
+  identity rule with the persistence a preference needs. A row keeps the explicit settings apart
+  from the memory, so a changed config default still reaches a player who never ran `set`. The file
+  carries `Version`, and a version this build does not know is dropped with a WARNING; a malformed
+  player row is dropped and a malformed choice inside a row is skipped.
+- **Config.** `config/structurecumulus-preferences.toml` is a second registered server file:
+  `defaults.orientationMode`, `defaults.fixedHeading`, `defaults.removalPolicy`, `defaults.weights`
+  and `rememberedCapacity` (default 64, range 1..4096). One capacity bounds both the blueprint LRU
+  and the part-pin memory. A config that has not loaded yet answers the shipped defaults.
+- **Command.** `PreferencesCommand.literal()` is the one node the command owner attaches inside
+  `CumulusCommand.register` (`.then(PreferencesCommand.literal())`); `prefs` and `prefs show` print
+  the effective preferences, the memory and the part pins, `prefs set <key> <value>` writes one
+  setting (keys `orientation | heading | removal | weights | all`) and `prefs forget [id]` clears one
+  blueprint's memory or all of it. Exit code 1 on success and 0 on an unknown key or value, a bad
+  heading or no player. No command writes a choice: a committed confirm and a part cycle are the
+  implicit writes (7.2).
+- **Wiring.** `PreviewSession.open` ranks the candidate cycle with the player's effective
+  preferences, seeds the part pins from the store and locks to a pose when exactly one satisfies
+  strictly more built cells than every other (1.5). `PreviewBuilds` is the installed
+  `PreviewConfirmHandler`: it narrows or widens the server gate by the player's `RemovalPolicy`, runs
+  `BuildExecutor` on the session's siting and item source with the assembled `SolvePreferences`, and
+  on a commit writes the siting memory and sends one closing sync. The session's source is the
+  creative source for a creative player and the player inventory otherwise; the materials marker
+  (4.4) reads `BuildMaterials.shortages` from the same dry run's item simulation, so a shortage list
+  is never invented.
+- **Not persisted.** The build undo history stays in-memory (D-87); only the preferences and their
+  memory are durable.

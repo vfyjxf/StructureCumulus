@@ -40,5 +40,20 @@ class CommandRouterTest {
             assertNotNull(verb.getChild("id"), path + " takes an id");
             assertNotNull(verb.getChild("id").getChild("origin"), path + " takes an origin");
         }
+        CommandNode<CommandSourceStack> prefs = cumulus.getChild("prefs");
+        assertNotNull(prefs, "the prefs subcommand");
+        assertNotNull(prefs.getChild("show"), "prefs takes show");
+        CommandNode<CommandSourceStack> setPref = prefs.getChild("set");
+        assertNotNull(setPref, "prefs takes set");
+        CommandNode<CommandSourceStack> key = setPref.getChild("key");
+        assertNotNull(key, "prefs set takes a key");
+        CommandNode<CommandSourceStack> value = key.getChild("value");
+        assertNotNull(value, "prefs set takes a value");
+        assertNotNull(value.getCommand(), "prefs set <key> <value> runs");
+        CommandNode<CommandSourceStack> forget = prefs.getChild("forget");
+        assertNotNull(forget, "prefs takes forget");
+        assertNotNull(forget.getCommand(), "prefs forget runs without an id");
+        assertNotNull(forget.getChild("id"), "prefs forget takes an optional id");
+        assertNotNull(forget.getChild("id").getCommand(), "prefs forget <id> runs");
     }
 }

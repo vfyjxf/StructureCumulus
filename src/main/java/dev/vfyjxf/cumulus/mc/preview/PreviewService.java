@@ -41,11 +41,11 @@ public final class PreviewService {
     private static final long heartbeatTicks = 20L;
 
     private static final Map<Key, PreviewSession> sessions = new HashMap<>();
-    private static PreviewConfirmHandler confirmHandler = new PreviewConfirms();
+    private static PreviewConfirmHandler confirmHandler = new PreviewBuilds();
 
     private PreviewService() {}
 
-    /** P5 replaces the placeholder; until then a confirm reports and accepts nothing. */
+    /** Replaces the built-in build handler; a host installs its own executor here. */
     public static void installConfirmHandler(PreviewConfirmHandler handler) {
         confirmHandler = handler;
     }
@@ -117,7 +117,7 @@ public final class PreviewService {
         if (session == null) {
             return;
         }
-        if (!session.apply(control, target)) {
+        if (!session.apply(player, control, target)) {
             sessions.remove(key(player));
             session.close();
         }

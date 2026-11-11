@@ -8,8 +8,8 @@ import dev.vfyjxf.cumulus.mc.preview.client.PreviewKeys;
 
 /**
  * An originless open ray-traces the crosshair block (1.1): the hit and the face-against cell are the
- * two origin candidates, so the cycle doubles; the hit origin sits on the floor, so its cells are
- * occupied and draw frames only, while the face origin above it draws the ghost models.
+ * two origin candidates, so the cycle doubles. Scoring leads with the supported face origin, which
+ * draws the ghost models; the hit origin sits inside the stone floor, so its cells draw frames only.
  */
 @ClientScenario(
     name = "preview.origin",
@@ -35,8 +35,8 @@ public final class PreviewOriginScenario {
                     () -> PreviewProbe.hasSession() && PreviewProbe.candidateCount() == 16
                 ).check("the ray-traced siting starts at one of the hit cells", () -> PreviewProbe.siting() != null)
                 .check(
-                    "the hit cells hold the stone floor, so they are wrong marks and no ghost is drawn (4.1)",
-                    () -> PreviewProbe.cells(CellMark.wrong) == 4 && PreviewProbe.ghostCount() == 0,
+                    "the supported face origin has the higher score, so it draws the ghost models (3.2)",
+                    () -> PreviewProbe.cells(CellMark.wrong) == 0 && PreviewProbe.ghostCount() == 4,
                     PreviewOriginScenario::marks
                 ).action("record the opening origin", context -> before[0] = PreviewProbe.siting().origin())
                 .pressBind(options -> PreviewKeys.binding(PreviewKeys.Action.nextOrigin))
@@ -50,8 +50,8 @@ public final class PreviewOriginScenario {
                                     == 1
                 )
                 .check(
-                    "the cells above the floor are empty, so the ghost set is four models",
-                    () -> PreviewProbe.ghostCount() == 4 && PreviewProbe.cells(CellMark.wrong) == 0,
+                    "the hit cells hold the stone floor, so they are wrong marks and no ghost is drawn (4.1)",
+                    () -> PreviewProbe.ghostCount() == 0 && PreviewProbe.cells(CellMark.wrong) == 4,
                     PreviewOriginScenario::marks
                 )
                 .timelineRecord(

@@ -27,6 +27,7 @@ import dev.vfyjxf.cumulus.mc.capability.NestedExtentLookup;
 import dev.vfyjxf.cumulus.mc.plugin.AnnotationPluginLookup;
 import dev.vfyjxf.cumulus.mc.plugin.ModPlugin;
 import dev.vfyjxf.cumulus.mc.plugin.PluginLoader;
+import dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData;
 import dev.vfyjxf.cumulus.mc.trait.TraitLookup;
 import dev.vfyjxf.cumulus.mc.visual.VisualClaim;
 import dev.vfyjxf.cumulus.mc.visual.VisualInstance;
@@ -234,6 +235,8 @@ public final class ServerState {
 
     /** Creates this level's state; the only creation point, driven by {@code LevelEvent.Load}. */
     void openLevel(ServerLevel level) {
+        // the preference store lives in the level's data storage: warm it inside this lifecycle
+        PreferencesSavedData.get(level);
         LevelStore store = levels.computeIfAbsent(level.dimension(), ignored -> {
             World world = World.of(worldId(level));
             ClaimLedger claims = ClaimLedger.inMemory(world);

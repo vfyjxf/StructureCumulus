@@ -13,6 +13,7 @@ import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
+import dev.vfyjxf.cumulus.mc.pref.PreferencesCommand;
 import dev.vfyjxf.cumulus.mc.preview.PreviewCommand;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -27,7 +28,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The command surface: {@code check}, {@code compile}, {@code settle}, {@code build}, {@code explain},
- * {@code claims} and the structure-set pair {@code set check}/{@code set settle}.
+ * {@code claims}, {@code preview}, {@code prefs} and the structure-set pair {@code set check}/{@code set
+ * settle}.
  */
 @NullMarked
 public final class CumulusCommand {
@@ -69,7 +71,7 @@ public final class CumulusCommand {
                                         ).then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(buildOrigin())
                                         )
-                            ).then(PreviewCommand.literal())
+                            ).then(PreviewCommand.literal()).then(PreferencesCommand.literal())
                             .then(
                                 Commands.literal("compile")
                                         .then(

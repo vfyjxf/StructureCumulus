@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:build_stone_l",
+  "bounds": [0, 0, 0, 3, 1, 2],
+  "bays": [
+    {
+      "id": "a",
+      "box": [0, 0, 0, 1, 1, 1],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared"
+    },
+    {
+      "id": "b",
+      "box": [2, 0, 0, 1, 1, 1],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared"
+    },
+    {
+      "id": "c",
+      "box": [0, 0, 1, 1, 1, 1],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared"
+    }
+  ],
+  "checks": [
+    {
+      "id": "a_check",
+      "bay": "a",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone"}}
+    },
+    {
+      "id": "b_check",
+      "bay": "b",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone"}}
+    },
+    {
+      "id": "c_check",
+      "bay": "c",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone"}}
+    }
+  ]
+}

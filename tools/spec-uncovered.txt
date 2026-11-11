@@ -86,3 +86,14 @@ dev.vfyjxf.cumulus.mc.build.MaterializedEdit  # batch 7: build
 dev.vfyjxf.cumulus.mc.build.Materializer  # batch 7: build
 dev.vfyjxf.cumulus.mc.build.PlayerInventorySource  # batch 7: build
 dev.vfyjxf.cumulus.mc.build.VanillaMaterializer  # batch 7: build
+dev.vfyjxf.cumulus.mc.build.BuildMaterials  # batch 7: build
+dev.vfyjxf.cumulus.mc.pref.BuildPreferences  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.ChoiceHistory  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.OrientationMode  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.PlacementWeight  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.PrefConfig  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.PreferencesCommand  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.RemovalPolicy  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.SitingCandidateScorer  # batch 8: preferences
+dev.vfyjxf.cumulus.mc.pref.SolvePreferenceAssembler  # batch 8: preferences
