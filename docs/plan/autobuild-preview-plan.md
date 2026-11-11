@@ -26,7 +26,7 @@ Every milestone starts `pending` and is complete only when its gate is green on 
 | P3 | In-world preview (design 15 §3–§5, §7–§8) | P1 | uitest scenarios green (open/turn/flip/invalidate/confirm); isolation gates unchanged | **done at `3bf6a23`** |
 | P4 | JEI GUI preview (design 15 §6) | P3 | uitest JEI scenario + a no-JEI `check` green | **done at `8b6ffcf`** |
 | P5 | Preferences (design 15 §9) | P2 + P3 | scoring determinism unit tests + memory GameTest + `/cumulus prefs` routing test | **done at `f3bbd64`** |
-| P6 | `/cumulus set build` (design 14 §13) | P2 + P5 | set-build GameTests (skip present/member-failure rollback/shared source) | pending |
+| P6 | `/cumulus set build` (design 14 §13) | P2 + P5 | set-build GameTests (skip present/member-failure rollback/shared source) | **done at `298e6fd`** |
 | P7 | Plugin API + docs/count close-out (roadmap §9, §10 remainder) | P2–P6 | plugin parity test + all existing gates + count refresh | pending |
 
 Concurrency discipline (roadmap §11): at most two implementation subagents at a time; file
