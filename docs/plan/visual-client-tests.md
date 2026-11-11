@@ -1,8 +1,10 @@
 # Visual client-test plan for StructureCumulus multiblocks
 
-> Status: planning only. No implementation yet. This plan borrows the client-test architecture
-> from CloudLib-InworldUI / NimbusProjection and defines the HUD + world-highlight delivery for
-> StructureCumulus multiblock scenarios.
+> Status: the harness and the HUD/highlight scenarios are implemented (V0–V4, `group:visual`);
+> the preview and JEI scenario groups landed with the in-world preview (P3) and the JEI category
+> (P4) — see §10. This plan borrows the client-test architecture from CloudLib-InworldUI /
+> NimbusProjection and defines the HUD + world-highlight delivery for StructureCumulus multiblock
+> scenarios.
 
 ## 1. Goal
 
@@ -195,7 +197,23 @@ source and reloads). Do not ship fixture documents in the production builtin sou
 - `verifyHarnessIsolation` and `verifyRunIsolation` green; production `check`/jar unchanged;
 - visual suite does not require a server GameTest and does not add harness classes to the jar.
 
-## 9. Approved decisions
+## 9. The preview scenario groups (landed with P3/P4)
+
+The in-world preview and the JEI category ship their own scenario groups in `src/uitest`; they are
+data-driven over the dev-only `structurecumulus:preview_probe` datapack document (never a production
+builtin) and drive the production `PreviewService` through the dev command `/cumuluspreview`.
+
+| Group | Scenarios | What they assert |
+| --- | --- | --- |
+| `preview` | `preview.open`, `preview.turn`, `preview.flip`, `preview.origin`, `preview.reset`, `preview.invalidated`, `preview.confirm` | the session opens with its overlay and ghosts, a turn/flip/origin/reset control re-syncs the pose, a world change inside the footprint invalidates the session (`SC-BLD-0008`), and a confirm runs the build path and leaves the session |
+| `jei` | `jei.preview` | the category lists the merged blueprint ids, the scene draws its frames, and "ghost to world" opens the same in-world session |
+
+Run them with `./gradlew runClientTests -PclTest=group:preview` and
+`./gradlew runClientTests -PclTest=group:jei` (the selector takes `group:`, not a glob); the
+scenario-harness rules of §6 apply unchanged, and `verifyHarnessIsolation`/`verifyRunIsolation`
+cover the harness staging.
+
+## 10. Approved decisions
 
 - **Harness dependency**: consume CloudLib-InworldUI's official `cloudlib-uitest` harness as a
   development prerequisite; do not build a parallel harness. CloudLib's widget/scene stack is also

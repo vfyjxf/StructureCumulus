@@ -314,6 +314,20 @@ class AdapterExpectationsTest {
     }
 
     @Test
+    void anUnknownBlockIsRejectedBeforeItsPropertiesAreParsed() {
+        List<Finding> findings = compileExpect(
+            "{\"kind\":\"state\",\"block\":\"minecraft:stonee\",\"properties\":{\"facing\":\"north\"}}"
+        );
+        assertTrue(
+            findings.stream().anyMatch(
+                finding -> finding.code().equals(Codes.factoryBad.code())
+                        && finding.message().contains("unknown block minecraft:stonee")
+            ),
+            () -> findings.toString()
+        );
+    }
+
+    @Test
     void fluidRejectsAnUnknownFluid() {
         List<Finding> findings = compileExpect("{\"kind\":\"fluid\",\"id\":\"minecraft:watr\"}");
         assertTrue(anyFactoryBad(findings), () -> findings.toString());

@@ -1144,9 +1144,9 @@ The adapter's public types join the spec gate in batches (D-74). A type is eithe
 listed in `tools/spec-uncovered.txt` with a reason; the gate fails when a documented signature
 drifts, when a public type is in neither place, and when a listed type no longer exists — so the list
 only shrinks. Batch 1 covers the set host, the snapshot pair, the host tokens and the document
-family; P7 lands the plugin (batch 2), build (batches 7 and 9), preference (batch 8) and preview
-types, so `tools/spec-uncovered.txt` keeps only the remaining core/trait/capability batches and the
-non-API entries. The block compares against `src/main/java` through `AdapterIndexTest` (member-level)
+family; the preview types landed with P3/P4, and P7 lands the plugin (batch 2), build (batches 7
+and 9) and preference (batch 8) types, so `tools/spec-uncovered.txt` keeps only the remaining
+core/trait/capability batches and the non-API entries. The block compares against `src/main/java` through `AdapterIndexTest` (member-level)
 and `tools/spec-check.py` (name-level).
 
 ```java

@@ -30,9 +30,9 @@ table defines who may emit each finding code.
 14. [design/13-nested-extent-access.md](design/13-nested-extent-access.md) — the capability and
     attachment sources of a nested extent.
 15. [design/14-auto-build.md](design/14-auto-build.md) — the host-side build: item sources,
-    materialization, transactions and the executor (approved, pending P2/P6).
+    materialization, transactions, the executor and the plugin tables (implemented, P2/P6/P7).
 16. [design/15-preview.md](design/15-preview.md) — preview sessions, payloads, rendering,
-    orientation ergonomics and preferences (approved, pending P3–P5).
+    orientation ergonomics and preferences (implemented, P3–P5).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -127,14 +127,15 @@ Then the module files, in dependency order:
   (designs 14/15, D-84…D-91) landed at `1e050b6`; its P1 kernel slice adds the remedy registrar
   contribution, the two built-in remedy providers with the finding→remedy mapping and overlay
   derivation, `SolvePreferences` with part pins, the D-91 declaration description port and the
-  per-provider preview merge in `solve`. The tree registers 643
-  kernel tests in 73 containers, 449 adapter unit tests in 47 containers and 140 `@GameTest` methods;
-  a full `./gradlew check` is green on this tree (643 kernel tests, 449 adapter tests), and
-  `runGameTestServer` last passed at the P1 boundary (140/140 GameTests, kernel-only changes).
-  Pending only: acting on the measured
-  kernel-side cost debts and the live-level review items (`07` §7), the auto-build/preview
-  milestones P2–P7 (`docs/plan/autobuild-preview-plan.md`), and fresh visual review
-  screenshots.
+  per-provider preview merge in `solve`. The auto-build/preview milestones P2–P7 are implemented:
+  the build executor with its single and set commands, the in-world preview with its payloads and
+  renderers, the JEI category, the preference store and scorer, the structure-set build, and the
+  plugin extension tables (`registerMaterializers`/`registerItemSources` over the loader's one
+  ordering and failure policy, plus the command's `with <kind-id>` source form). The tree registers
+  643 kernel tests in 73 containers, 548 adapter unit tests in 58 containers and 168 `@GameTest`
+  methods; a full `./gradlew check` is green on this tree (643 kernel tests, 548 adapter tests) and
+  `runGameTestServer` passes 168/168. Pending only: acting on the measured kernel-side cost debts
+  and the live-level review items (`07` §7), and fresh visual review screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
 - Language: English only. There is no mirrored translation. A Chinese quick-start may cite this
   set, but the English files are the design of record.
@@ -142,13 +143,13 @@ Then the module files, in dependency order:
   mod entry and the adapter. The adapter is the only place allowed to name Minecraft. The `@GameTest`
   classes and their GameTest structure templates live in `src/gametest`, folded into the mod for
   every run and kept out of the published jar (D-77).
-- Verification (2026-11-11): the kernel compiles with
+- Verification (2026-11-12): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 643 kernel JUnit 5 tests (73 test
-  containers), 449 adapter unit tests (47 containers) and 140 `@GameTest` methods; a full
-  `./gradlew check` passes at this revision (643 kernel tests, 449 adapter
-  tests, 0 failures, 0 skipped), and `runGameTestServer` last passed with 140/140 GameTests
-  before the kernel-only P1 slice. `Codes.all` has 67 entries
-  and the decision record has 91 decisions (D-92; D-29 and D-36 superseded, D-78 withdrawn).
+  containers), 548 adapter unit tests (58 containers) and 168 `@GameTest` methods; a full
+  `./gradlew check` passes at this revision (643 kernel tests, 548 adapter
+  tests, 0 failures, 0 skipped), and `runGameTestServer` passes 168/168 GameTests.
+  `Codes.all` has 67 entries and the decision record has 91 decisions
+  (D-92; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 
