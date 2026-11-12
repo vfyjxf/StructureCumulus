@@ -78,12 +78,12 @@ Then the module files, in dependency order:
   [plan/autobuild-preview-plan.md](plan/autobuild-preview-plan.md); they were specified before they
   were built, and their milestones carry the implementation status (P2–P7 landed, below).
   The presentation pack is the next such extension: [16 presentation](design/16-presentation.md)
-  (D-93…D-97) tracked by [plan/presentation-plan.md](plan/presentation-plan.md), specified at E0 and
+  (D-93…D-98) tracked by [plan/presentation-plan.md](plan/presentation-plan.md), specified at E0 and
   landed one milestone at a time — E1 (the stage model, staged playback and stage switching, the
   layered ghosts, the three HUD tiers, the stage banner, the client config), E2 (the commit feedback
   payload, the pop-in, the rollback and undo fade, the cues, the formed celebration), E3 (the carried
-  part text and its display points), E4 (the JEI view modes) and E5 (the guided build) are on the
-  tree.
+  part text and its display points), E4 (the JEI view modes), E5 (the guided build) and E6 (the
+  variant groups) are on the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -144,8 +144,8 @@ Then the module files, in dependency order:
   renderers, the JEI category, the preference store and scorer, the structure-set build, and the
   plugin extension tables (`registerMaterializers`/`registerItemSources` over the loader's one
   ordering and failure policy, plus the command's `with <kind-id>` source form). The tree registers
-  648 kernel tests in 74 containers, 584 adapter unit tests in 62 containers and 168 `@GameTest`
-  methods; a full `./gradlew check` is green on this tree (648 kernel tests, 584 adapter tests) and
+  657 kernel tests in 75 containers, 587 adapter unit tests in 62 containers and 168 `@GameTest`
+  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 587 adapter tests) and
   `runGameTestServer` passes 168/168. Pending only: acting on the measured kernel-side cost debts
   and the live-level review items (`07` §7), and fresh visual review screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
@@ -156,12 +156,12 @@ Then the module files, in dependency order:
   classes and their GameTest structure templates live in `src/gametest`, folded into the mod for
   every run and kept out of the published jar (D-77).
 - Verification (2026-11-12): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 648 kernel JUnit 5 tests (74 test
-  containers), 584 adapter unit tests (62 containers) and 168 `@GameTest` methods; a full
-  `./gradlew check` passes at this revision (648 kernel tests, 584 adapter
+  `javac --release 21` and JSpecify only. The tree registers 657 kernel JUnit 5 tests (75 test
+  containers), 587 adapter unit tests (62 containers) and 168 `@GameTest` methods; a full
+  `./gradlew check` passes at this revision (657 kernel tests, 587 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 168/168 GameTests.
-  `Codes.all` has 67 entries and the decision record has 96 decisions
-  (D-97; D-29 and D-36 superseded, D-78 withdrawn).
+  `Codes.all` has 69 entries and the decision record has 97 decisions
+  (D-98; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 

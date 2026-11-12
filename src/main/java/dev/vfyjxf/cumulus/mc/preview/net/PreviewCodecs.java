@@ -65,6 +65,7 @@ final class PreviewCodecs {
         }
         writeMarkers(buffer, payload.markers());
         writePresentation(buffer, payload.presentation());
+        writeVariants(buffer, payload.variants());
     }
 
     private static PreviewSyncPayload decodeSync(RegistryFriendlyByteBuf buffer) {
@@ -91,6 +92,7 @@ final class PreviewCodecs {
         }
         List<Marker> markers = readMarkers(buffer, bounds);
         PreviewPresentation presentation = readPresentation(buffer);
+        VariantSummary variants = readVariants(buffer);
         return new PreviewSyncPayload(
             blueprintId,
             candidates,
@@ -98,7 +100,8 @@ final class PreviewCodecs {
             new OverlayModel(bounds, cells, overlayMarkers),
             ghosts,
             markers,
-            presentation
+            presentation,
+            variants
         );
     }
 
@@ -131,6 +134,7 @@ final class PreviewCodecs {
                 buffer.writeVarInt(line.count());
             }
             writePresentation(buffer, entry.presentation());
+            writeVariants(buffer, entry.variants());
         }
     }
 
@@ -149,7 +153,15 @@ final class PreviewCodecs {
             for (int material = 0; material < materialCount; material++) {
                 materials.add(new PreviewCatalogPayload.MaterialLine(readId(buffer), buffer.readVarInt()));
             }
-            entries.add(new PreviewCatalogPayload.Entry(blueprintId, cells, materials, readPresentation(buffer)));
+            entries.add(
+                new PreviewCatalogPayload.Entry(
+                    blueprintId,
+                    cells,
+                    materials,
+                    readPresentation(buffer),
+                    readVariants(buffer)
+                )
+            );
         }
         return new PreviewCatalogPayload(entries);
     }
@@ -260,6 +272,36 @@ final class PreviewCodecs {
         }
         int moreMaterials = buffer.readVarInt();
         return new PreviewPresentation(description, stages, currentStage, materials, moreMaterials);
+    }
+
+    /**
+     * The variant summary: the group id and its members in order. The declaration is capped at compile
+     * time (16 members, 128-character labels), so a summary never needs a wire cap of its own.
+     */
+    private static void writeVariants(RegistryFriendlyByteBuf buffer, @Nullable VariantSummary variants) {
+        buffer.writeBoolean(variants != null);
+        if (variants == null) {
+            return;
+        }
+        writeId(buffer, variants.group());
+        buffer.writeVarInt(variants.members().size());
+        for (VariantSummary.Member member : variants.members()) {
+            writeId(buffer, member.id());
+            writeOptional(buffer, member.label());
+        }
+    }
+
+    private static @Nullable VariantSummary readVariants(RegistryFriendlyByteBuf buffer) {
+        if (!buffer.readBoolean()) {
+            return null;
+        }
+        NamespacedId group = readId(buffer);
+        int count = buffer.readVarInt();
+        List<VariantSummary.Member> members = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            members.add(new VariantSummary.Member(readId(buffer), readOptional(buffer)));
+        }
+        return new VariantSummary(group, members);
     }
 
     private static void writeOptional(RegistryFriendlyByteBuf buffer, @Nullable String text) {

@@ -2,18 +2,20 @@ package dev.vfyjxf.cumulus.kernel.document;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.core.Value;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 
-/** The data form of one blueprint and its reusable definitions. */
+/** The data form of one blueprint, its reusable definitions and its document-level declarations. */
 public record Document(
     int schemaVersion,
     BlueprintSpec root,
     Map<NamespacedId, BlueprintSpec> definitions,
-    Map<String, Value> extensions
+    Map<String, Value> extensions,
+    @Nullable VariantGroupSpec variants
 ) {
 
     public static final int currentVersion = 1;

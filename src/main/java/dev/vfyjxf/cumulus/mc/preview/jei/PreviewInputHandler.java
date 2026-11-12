@@ -13,7 +13,7 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 final class PreviewInputHandler implements IJeiInputHandler {
 
     private enum Mode {
-        none, rotate, slice, button, view
+        none, rotate, slice, button, view, variantPrev, variantNext
     }
 
     private static final float degreesPerPixel = 1.6F;
@@ -44,11 +44,20 @@ final class PreviewInputHandler implements IJeiInputHandler {
         Mode pressed = mode;
         mode = Mode.none;
         if (pressed == Mode.button && hit == Mode.button) {
-            JeiPreview.openWorld(recipe.blueprintId());
+            // the selected variant is the blueprint the session opens (design 15 §12.4)
+            JeiPreview.openSelected(recipe.blueprintId());
             return true;
         }
         if (pressed == Mode.view && hit == Mode.view) {
             recipe.cycleViewMode();
+            return true;
+        }
+        if (pressed == Mode.variantPrev && hit == Mode.variantPrev) {
+            recipe.cycleVariant(-1);
+            return true;
+        }
+        if (pressed == Mode.variantNext && hit == Mode.variantNext) {
+            recipe.cycleVariant(1);
             return true;
         }
         if (pressed == Mode.slice || hit == Mode.slice) {
@@ -106,6 +115,28 @@ final class PreviewInputHandler implements IJeiInputHandler {
     }
 
     private Mode modeAt(double mouseX, double mouseY) {
+        if (recipe.variantCount() > 1
+                && BlueprintPreviewCategory.inside(
+                    mouseX,
+                    mouseY,
+                    BlueprintPreviewCategory.variantX,
+                    BlueprintPreviewCategory.variantY,
+                    BlueprintPreviewCategory.variantWidth,
+                    BlueprintPreviewCategory.variantHeight
+                )) {
+            boolean left = mouseX < BlueprintPreviewCategory.variantX + BlueprintPreviewCategory.variantArrowWidth;
+            boolean right = mouseX
+                    >= BlueprintPreviewCategory.variantX
+                            + BlueprintPreviewCategory.variantWidth
+                            - BlueprintPreviewCategory.variantArrowWidth;
+            if (left) {
+                return Mode.variantPrev;
+            }
+            if (right) {
+                return Mode.variantNext;
+            }
+            return left ? Mode.variantPrev : Mode.none;
+        }
         if (BlueprintPreviewCategory.inside(
             mouseX,
             mouseY,

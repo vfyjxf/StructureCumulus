@@ -68,14 +68,14 @@ invalidation, and one set budget shared by presence and every member attempt (§
 observation into the funnel. The auto-build/preview round (designs 14/15, D-84…D-91) then lands the
 kernel remedy providers and `SolvePreferences`, the single and set build with their commands, the
 preview and JEI halves, the preference store and the plugin extension tables. The current
-suites total 643 kernel tests (73 containers), 548 adapter unit tests (58 containers) and 168
-`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (643 kernel / 73 containers, 548 adapter / 58 containers, 168/168 GameTests; check exit 0). `tools/spec-check.py` is clean.
+suites total 657 kernel tests (75 containers), 587 adapter unit tests (62 containers) and 168
+`@GameTest` methods. `./gradlew check` and `runGameTestServer` are green on this tree (657 kernel / 75 containers, 587 adapter / 62 containers, 168/168 GameTests; check exit 0). `tools/spec-check.py` is clean.
 The product-fix round adds the settle-throw characterization (`SettleThrowScenarioTest`: a publish
 failure after the ledger write propagates and keeps the written rows with the caller, which
 `SettleCommand.settle` now releases whenever the kernel settle was attempted), the D-48 claims view
 for `/cumulus check` (§3.8), and the chat output caps — fifty claim rows and fifty finding lines per
 print, each ending with a summary of what was held back.
-`Codes.all` has 67 entries and the decision record has 96 decisions (D-97; D-29 and D-36 superseded, D-78 withdrawn). Model C, body identity,
+`Codes.all` has 69 entries and the decision record has 97 decisions (D-98; D-29 and D-36 superseded, D-78 withdrawn). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The
@@ -516,7 +516,7 @@ modules; they are listed in their sections and in `adapter.md` §13/§3.2, not i
 ## 5. Code producers
 
 The authoritative table is `finding.md` §6: one row per code with its severity, label policy
-(`P`/`–`/`T`), meaning, owning module and every emit site (D-69). `Codes.all` has 67 entries in this
+(`P`/`–`/`T`), meaning, owning module and every emit site (D-69). `Codes.all` has 69 entries in this
 revision, matching the registry. A test reads `Codes.all` and asserts:
 
 - every entry has a non-blank summary and body;
@@ -610,7 +610,7 @@ latency for one operation, and the numbers are compared by a person looking at t
 
 ## 8. What is not verified in this round
 
-- The rest of the NeoForge adapter and its GameTests. The tree registers 168 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (643 kernel / 73 containers, 548 adapter / 58 containers, 168/168 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
+- The rest of the NeoForge adapter and its GameTests. The tree registers 168 `@GameTest` methods; `./gradlew check` and `runGameTestServer` are green on this tree (657 kernel / 75 containers, 587 adapter / 62 containers, 168/168 GameTests; check exit 0). The registered set covers M1 capture/host, M2a entity precedence,
   M2b orientation, M3 claims, the M2c trait slots with the T1–T3 direct capability handles
   (`TraitCaptureGameTest`), M2d nested frames/cuts, capture-revision lease invalidation
   (`LeaseLifecycleGameTest`), the watched-region mark counter (`LeaseMarkCounterGameTest`), the

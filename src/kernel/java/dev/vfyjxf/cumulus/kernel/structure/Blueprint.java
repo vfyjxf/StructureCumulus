@@ -25,6 +25,7 @@ public final class Blueprint {
     private final List<DerivationSpec> derivations;
     private final Value arguments;
     private final @Nullable String description;
+    private final @Nullable VariantGroup variants;
     private final @Nullable SourceSpan source;
     private final Plan plan;
     private final CuboidSet bayCells;
@@ -42,6 +43,7 @@ public final class Blueprint {
         List<DerivationSpec> derivations,
         Value arguments,
         @Nullable String description,
+        @Nullable VariantGroup variants,
         @Nullable SourceSpan source,
         Plan plan,
         CuboidSet bayCells
@@ -57,6 +59,7 @@ public final class Blueprint {
         this.derivations = List.copyOf(derivations);
         this.arguments = arguments;
         this.description = description;
+        this.variants = variants;
         this.source = source;
         this.plan = plan;
         this.bayCells = bayCells;
@@ -110,6 +113,11 @@ public final class Blueprint {
     /** The root's carried text, or null when the document declares none (design 16 §3). */
     public @Nullable String description() {
         return description;
+    }
+
+    /** The variant group this blueprint is a member of, or null (design 15 §12). */
+    public @Nullable VariantGroup variants() {
+        return variants;
     }
 
     public @Nullable SourceSpan source() {
@@ -182,7 +190,8 @@ public final class Blueprint {
                 && Objects.equals(orientation, blueprint.orientation)
                 && derivations.equals(blueprint.derivations)
                 && arguments.equals(blueprint.arguments)
-                && Objects.equals(description, blueprint.description);
+                && Objects.equals(description, blueprint.description)
+                && Objects.equals(variants, blueprint.variants);
     }
 
     @Override
@@ -198,7 +207,8 @@ public final class Blueprint {
             orientation,
             derivations,
             arguments,
-            description
+            description,
+            variants
         );
     }
 

@@ -41,6 +41,7 @@ public final class BlueprintBuilder {
     private @Nullable OrientationPolicy orientation;
     private Value arguments = Value.object();
     private @Nullable String description;
+    private @Nullable VariantGroup variants;
     private @Nullable SourceSpan source;
     private boolean envelope;
     private boolean envelopeEntities;
@@ -145,6 +146,11 @@ public final class BlueprintBuilder {
 
     public BlueprintBuilder description(@Nullable String description) {
         this.description = description;
+        return this;
+    }
+
+    public BlueprintBuilder variants(@Nullable VariantGroup variants) {
+        this.variants = variants;
         return this;
     }
 
@@ -438,6 +444,7 @@ public final class BlueprintBuilder {
             List.copyOf(derivations),
             arguments,
             description,
+            variants,
             source,
             new Plan(sections, orderedAggregates, checkList),
             bayCells

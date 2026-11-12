@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.kernel.remedy.Marker;
 import dev.vfyjxf.cumulus.kernel.remedy.OverlayModel;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -13,7 +14,8 @@ import java.util.Objects;
 /**
  * The server's whole answer for one preview session: the expressible cycle, the current pick, the
  * overlay marks, the expected states to draw, the session's own markers and the presentation block.
- * A capped ghost list carries an overflow marker, so a truncation is never silent.
+ * A capped ghost list carries an overflow marker, so a truncation is never silent. The variant
+ * summary is present when the session's blueprint is a member of a group (design 15 §12).
  */
 public record PreviewSyncPayload(
     NamespacedId blueprintId,
@@ -22,7 +24,8 @@ public record PreviewSyncPayload(
     OverlayModel overlay,
     List<GhostCell> ghostCells,
     List<Marker> markers,
-    PreviewPresentation presentation
+    PreviewPresentation presentation,
+    @Nullable VariantSummary variants
 ) implements CustomPacketPayload {
 
     public static final Type<PreviewSyncPayload> type = new Type<>(

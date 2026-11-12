@@ -1,9 +1,11 @@
 package dev.vfyjxf.cumulus.uitest;
 
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewClientState;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -36,6 +38,16 @@ final class PreviewProbe {
             }
         }
         return false;
+    }
+
+    static @Nullable NamespacedId blueprintId() {
+        PreviewSyncPayload session = session();
+        return session == null ? null : session.blueprintId();
+    }
+
+    static @Nullable VariantSummary variants() {
+        PreviewSyncPayload session = session();
+        return session == null ? null : session.variants();
     }
 
     static int candidateCount() {

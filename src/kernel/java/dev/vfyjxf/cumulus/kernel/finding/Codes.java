@@ -350,8 +350,9 @@ public final class Codes {
         FindingCode.Family.doc,
         11,
         Severity.error,
-        "A placement names a missing definition.",
-        "The placement refers to an undeclared definition. Add it or fix the id."
+        "A reference names a missing document.",
+        "A placement, a set member or a variant group member refers to a document that does not exist. "
+                + "Add it or fix the id."
     );
 
     public static final CodeEntry noPositions = entry(
@@ -385,6 +386,24 @@ public final class Codes {
         Severity.error,
         "The document expands beyond the compile budget.",
         "The placements expand to more than 100,000 declarations. Split the document or place the parts separately."
+    );
+
+    public static final CodeEntry variantMember = entry(
+        FindingCode.Family.doc,
+        16,
+        Severity.error,
+        "A variant group member is not a usable blueprint document.",
+        "The member names a document whose root id is the member id, and that document compiles on "
+                + "its own. A member is a static blueprint, never a parameterized form; fix the id or the document."
+    );
+
+    public static final CodeEntry variantGroupMismatch = entry(
+        FindingCode.Family.doc,
+        17,
+        Severity.error,
+        "A variant group member declares a different variant group.",
+        "Every member repeats the group declaration verbatim: the same group id and the same members in "
+                + "the same order. A member declaring none or another group is refused, not repaired."
     );
 
     public static final CodeEntry computationFailed = entry(
@@ -619,6 +638,8 @@ public final class Codes {
         readerFailed,
         documentDeclared,
         documentTooLarge,
+        variantMember,
+        variantGroupMismatch,
         computationFailed,
         deriverMissing,
         deriverFailed,

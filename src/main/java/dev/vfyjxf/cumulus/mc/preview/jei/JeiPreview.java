@@ -71,6 +71,30 @@ public final class JeiPreview {
         return true;
     }
 
+    /** The page's group members in declaration order; a standalone page answers with one id. */
+    public static List<NamespacedId> variants(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null ? List.of() : recipe.variantIds();
+    }
+
+    /** The selected member's index on the page, or -1 when the category does not list the page. */
+    public static int variantIndex(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null ? -1 : recipe.variantIndex();
+    }
+
+    /** The member the page shows and the button opens; null when the category does not list the page. */
+    public static @Nullable NamespacedId selectedBlueprintId(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null ? null : recipe.selectedBlueprintId();
+    }
+
+    /** Switches the page one member left ({@code -1}) or right ({@code +1}); false on a lone page. */
+    public static boolean cycleVariant(NamespacedId blueprintId, int step) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe != null && recipe.cycleVariant(step);
+    }
+
     /** The Y layer the page shows; the slider, the wheel and every panel read this one value. */
     public static int slice(NamespacedId blueprintId) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
@@ -102,6 +126,12 @@ public final class JeiPreview {
     /** The "Ghost to world" action: the server opens the ordinary session at the crosshair. */
     public static void openWorld(NamespacedId blueprintId) {
         PacketDistributor.sendToServer(new PreviewOpenPayload(blueprintId));
+    }
+
+    /** The page's "Ghost to world" button: the member the page shows is the blueprint it opens. */
+    public static void openSelected(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        openWorld(recipe == null ? blueprintId : recipe.selectedBlueprintId());
     }
 
     /** Pages the category to one blueprint; false when JEI or the entry is not available. */

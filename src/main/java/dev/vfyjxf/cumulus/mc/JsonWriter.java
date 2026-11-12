@@ -18,6 +18,8 @@ import dev.vfyjxf.cumulus.kernel.document.DocumentWriter;
 import dev.vfyjxf.cumulus.kernel.document.KeySpec;
 import dev.vfyjxf.cumulus.kernel.document.PlacementSpec;
 import dev.vfyjxf.cumulus.kernel.document.SeamSpec;
+import dev.vfyjxf.cumulus.kernel.document.VariantGroupSpec;
+import dev.vfyjxf.cumulus.kernel.document.VariantMemberSpec;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
 import dev.vfyjxf.cumulus.kernel.space.Orientation;
 import dev.vfyjxf.cumulus.kernel.structure.AnchorSpec;
@@ -73,6 +75,9 @@ public final class JsonWriter implements DocumentWriter {
         if (root.description() != null) {
             out.addProperty("description", root.description());
         }
+        if (document.variants() != null) {
+            out.add("variants", variants(document.variants()));
+        }
         if (!document.definitions().isEmpty()) {
             JsonObject definitions = new JsonObject();
             for (Map.Entry<NamespacedId, BlueprintSpec> entry : document.definitions().entrySet()) {
@@ -107,6 +112,22 @@ public final class JsonWriter implements DocumentWriter {
         JsonValues.addArguments(out, root.arguments());
         JsonValues.addExtensions(out, document.extensions());
         return gson.toJson(out);
+    }
+
+    private static JsonObject variants(VariantGroupSpec variants) {
+        JsonObject out = new JsonObject();
+        out.addProperty("group", JsonVocabulary.idText(variants.group()));
+        JsonArray members = new JsonArray();
+        for (VariantMemberSpec member : variants.members()) {
+            JsonObject json = new JsonObject();
+            json.addProperty("id", JsonVocabulary.idText(member.id()));
+            if (member.label() != null) {
+                json.addProperty("label", member.label());
+            }
+            members.add(json);
+        }
+        out.add("members", members);
+        return out;
     }
 
     private static JsonObject definition(BlueprintSpec spec) {

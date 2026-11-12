@@ -259,7 +259,7 @@ class StructureSetCompilerTest {
     }
 
     private static Document document(BlueprintSpec root) {
-        return new Document(Document.currentVersion, root, Map.of(), Map.of());
+        return new Document(Document.currentVersion, root, Map.of(), Map.of(), null);
     }
 
     private static BaySpec bay(

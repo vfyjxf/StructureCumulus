@@ -52,8 +52,9 @@ public final class PreviewJeiScenario {
                     () -> PreviewJeiProbe.catalogCells(PreviewScenarioSupport.probe) == 4
                 )
                 .check(
-                    "the category lists exactly the ids the catalog carries",
-                    () -> Set.copyOf(JeiPreview.blueprintIds()).equals(Set.copyOf(PreviewJeiProbe.catalogIds()))
+                    "the category lists exactly the pages the catalog implies, never one page per variant",
+                    () -> Set.copyOf(JeiPreview.blueprintIds()).equals(Set.copyOf(PreviewJeiProbe.pageIds())),
+                    () -> "listed=" + JeiPreview.blueprintIds() + " pages=" + PreviewJeiProbe.pageIds()
                 ).check("the catalog entry carries the document's description and each part's hint", () -> {
                     PreviewPresentation presentation = PreviewJeiProbe.presentation(staged);
                     return presentation != null
@@ -93,9 +94,8 @@ public final class PreviewJeiScenario {
                 .waitUntil("JEI restarted and holds the synced entries again", PreviewJeiProbe::categoryHasRecipes)
                 .check(
                     "the reload did not duplicate a recipe page",
-                    () -> PreviewJeiProbe.recipeCount() == PreviewJeiProbe.catalogIds().size(),
-                    () -> PreviewJeiProbe.recipeCount() + " recipes for " + PreviewJeiProbe.catalogIds().size()
-                            + " entries"
+                    () -> PreviewJeiProbe.recipeCount() == PreviewJeiProbe.pageIds().size(),
+                    () -> PreviewJeiProbe.recipeCount() + " recipes for " + PreviewJeiProbe.pageIds().size() + " pages"
                 )
                 .action(
                     "page the restarted category to the probe blueprint",

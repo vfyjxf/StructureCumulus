@@ -22,6 +22,8 @@ import dev.vfyjxf.cumulus.kernel.document.DocumentReader;
 import dev.vfyjxf.cumulus.kernel.document.KeySpec;
 import dev.vfyjxf.cumulus.kernel.document.PlacementSpec;
 import dev.vfyjxf.cumulus.kernel.document.SeamSpec;
+import dev.vfyjxf.cumulus.kernel.document.VariantGroupSpec;
+import dev.vfyjxf.cumulus.kernel.document.VariantMemberSpec;
 import dev.vfyjxf.cumulus.kernel.finding.CodeEntry;
 import dev.vfyjxf.cumulus.kernel.finding.Codes;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
@@ -63,6 +65,7 @@ public final class JsonReader implements DocumentReader {
         "envelope",
         "envelopeEntities",
         "description",
+        "variants",
         "definitions",
         "placements",
         "bays",
@@ -88,6 +91,10 @@ public final class JsonReader implements DocumentReader {
         "orientation",
         "placements"
     );
+
+    private static final Set<String> variantGroupMembers = Set.of("group", "members");
+
+    private static final Set<String> variantMemberMembers = Set.of("id", "label");
 
     private static final Set<String> bayMembers = Set
             .of("id", "box", "boxes", "minus", "coverage", "footprint", "sharing", "description", "hint");
@@ -247,6 +254,7 @@ public final class JsonReader implements DocumentReader {
             Boolean envelope = optionalBoolean(object, "envelope", "$");
             Boolean envelopeEntities = optionalBoolean(object, "envelopeEntities", "$");
             String description = optionalString(object, "description", "$");
+            VariantGroupSpec variants = variants(object);
             Map<NamespacedId, BlueprintSpec> definitions = definitions(object);
             List<PlacementSpec> placements = placements(object, "$");
             List<BaySpec> bays = bays(object, "$", true);
@@ -283,7 +291,43 @@ public final class JsonReader implements DocumentReader {
             if (failed) {
                 return null;
             }
-            return new Document(version.intValue(), root, definitions, extensions);
+            return new Document(version.intValue(), root, definitions, extensions, variants);
+        }
+
+        private @Nullable VariantGroupSpec variants(JsonObject object) {
+            @Nullable
+            JsonElement element = object.get("variants");
+            if (element == null) {
+                return null;
+            }
+            String path = field("$", "variants");
+            JsonObject group = object(element, path);
+            if (group == null) {
+                return null;
+            }
+            rejectUnknown(group, path, variantGroupMembers);
+            NamespacedId id = id(group, "group", path);
+            JsonArray array = requiredArray(group, "members", path);
+            if (id == null || array == null) {
+                return null;
+            }
+            String membersPath = field(path, "members");
+            List<VariantMemberSpec> members = new ArrayList<>(array.size());
+            for (int index = 0; index < array.size(); index++) {
+                String memberPath = element(membersPath, index);
+                JsonObject member = object(array.get(index), memberPath);
+                if (member == null) {
+                    continue;
+                }
+                rejectUnknown(member, memberPath, variantMemberMembers);
+                NamespacedId memberId = id(member, "id", memberPath);
+                String label = optionalString(member, "label", memberPath);
+                if (memberId == null) {
+                    continue;
+                }
+                members.add(new VariantMemberSpec(memberId, label, span(memberPath)));
+            }
+            return new VariantGroupSpec(id, members, span(path));
         }
 
         private Map<NamespacedId, BlueprintSpec> definitions(JsonObject root) {

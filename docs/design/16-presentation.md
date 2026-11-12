@@ -2,9 +2,10 @@
 
 > Status: approved, design first (E0, 2026-11-12). It specifies the presentation pack on top of the
 > preview of [15](15-preview.md) and the build of [14](14-auto-build.md), and lands with milestones
-> E1–E5 of [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md). The rulings are D-93…D-97;
-> the document members are §3 (D-94). Nothing here is implemented yet: a milestone's gate is its
-> statement of done, and no section of this file is written as if it had landed. A "roadmap" citation
+> E1–E6 of [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md). The rulings are D-93…D-98;
+> the document members are §3 (D-94), and E6's variant groups are design 15 §12 (D-98), not this file.
+> A milestone's gate is its statement of done; which sections landed at which milestone is the plan's
+> state column and adapter §19. A "roadmap" citation
 > names the source plan's roadmap,
 > `Data/StructureCumulus/plan-2026-11-12-presentation/00-roadmap.md`, and the item tags it uses
 > (A.1, B.3, E.2, G.3 …) are that document's.
@@ -280,6 +281,10 @@ public record GhostCell(LatticePoint cell, NamespacedId block,
   empty (§6.1). The server computes it from the marks it ships in the same payload, so the client
   derives nothing (§15). It is A.3's "already built + buildable now" stage, and it is what the
   banner announces when it moves (§8, §12.5).
+- **The variant summary is design 15's, not part of this block.** When the blueprint is a member of
+  a static variant group, the same payloads also carry its `VariantSummary`
+  ([15](15-preview.md) §12.1, D-98) beside the presentation block. The summary is a separate carried
+  value; it changes nothing above and the presentation block keeps its shape.
 - **The catalog entry carries the same records.** `PreviewCatalogPayload.Entry` ships the same
   `PreviewPresentation`, the same `Stage` and the same `GhostCell`, because one cell type must mean
   one thing (§11's tooltips and stage grouping read it). A catalog is not a session: there is no live world under it,
@@ -364,14 +369,16 @@ not hide the blueprint.
 | `V` | play / pause the staged playback | E1 |
 | `B` | one cell step: reveals the next unrevealed cell of the cursor's stage; past its end, moves to the next stage and reveals its first cell | E1 |
 | `G` | guided mode on / off (§12) | E5 |
+| `N` | next variant of the group: re-opens the session on the next member at the same origin (15 §12.2) | E6 |
 
 The keys of 15 §5 are unchanged and keep their meanings: `[` `]` turn, `;` flip, `,` `.` the origin
 cycle, `R` reset, `P` recall, `PgUp`/`PgDn` the Y slice, `T` all/problems, `Enter` confirm, `Esc`
-cancel. `↑`/`↓`, `V`, `B` and `G` were all unbound in the mod; the uitest conflict check
+cancel. `↑`/`↓`, `V`, `B`, `G` and `N` were all unbound in the mod; the uitest conflict check
 (roadmap §5) asserts the combination rather than trusting this paragraph.
 
 - **A key is a view move, never a control payload.** No stage key reaches the server, and no stage
-  key changes a candidate, a mark or a plan.
+  key changes a candidate, a mark or a plan. `N` is the one control key of this file: a variant
+  switch is a server-side re-open (15 §12.2), so it sends the existing control payload.
 - **Input is never locked.** Playback is a render-time state: the keys are read before the animation
   update, and every existing key — turn, flip, slice, confirm, cancel — responds during an
   animation (roadmap §5). An animation may not delay a packet, a plan or a write.
@@ -648,6 +655,10 @@ carries it.
 - **The switching control is a button in the category's own face** that names the current mode and
   cycles isometric → three-view → slice grid. No key is added: a global `KeyMapping` would fire
   outside the GUI, and JEI's own conventions are buttons and tooltips.
+- **A variant group is one page with a second row of controls.** E6's row under the mode button
+  switches the page's member in place; it is per-recipe view state on the same terms as the mode, and
+  the page's scene, materials, tooltip and "Ghost to world" follow the selection
+  ([15](15-preview.md) §12.3).
 - **The three planes come from the front law of 15 §9**: front looks along +Z at the X/Y plane, side
   looks along +X at the Z/Y plane, top looks along −Y at the X/Z plane. Each panel is fitted to the
   blueprint's bounds by 15 §6.2's fit rule and labelled with its view name, so a 1×1×1 cell and a
@@ -768,11 +779,18 @@ No second client config file is ever registered.
 
 ## 14. Codes
 
-The pack allocates **no code family and no code**. What it shows is a finding, a mark, a stage name or
-a document string that already exists; a session invalidation stays `SC-BLD-0008` (14 §14, 15 §10); a
-cap overflow is a WARNING marker (15 §3) or, for a non-session payload, a note on the animator's own
-overlay naming the shown and expected counts (§9.1) — never a new code. A milestone that believes it
-needs a code has found a defect in this document and reports it.
+The pack allocates **no presentation code and no presentation code family**. What its surfaces show is
+a finding, a mark, a stage name or a document string that already exists; a session invalidation stays
+`SC-BLD-0008` (14 §14, 15 §10); a cap overflow is a WARNING marker (15 §3) or, for a non-session
+payload, a note on the animator's own overlay naming the shown and expected counts (§9.1) — never a
+new presentation code. A milestone that believes it needs a presentation code has found a defect in
+this document and reports it.
+
+The one exception is a *document-format* code: E6's `variants` declaration owns its own validity codes
+in the `document` module (`SC-DOC-0016` a member that is not a usable blueprint document,
+`SC-DOC-0017` a member that does not repeat the declaration; design 15 §12). They read the document,
+never a presentation surface, and belong to the module whose schema they check — the same split as
+§3's carried text, where the code that reports a bad `description` field is a document code too.
 
 ## 15. Determinism, isolation and what a reviewer attacks
 
@@ -818,6 +836,9 @@ playback into the web `visual/` traces (roadmap §6).
 | E3 | §3 the document members and the carry law, §10 the display points |
 | E4 | §11 the view modes |
 | E5 | §12 guided mode, plus the count and plan close-out |
+
+E6 lands [15](15-preview.md) §12's variant groups; this file contributes no section of its own, and
+the summary it puts on both payloads is described there.
 
 The gates are the milestone table of [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md);
 this file owns the contracts they test.

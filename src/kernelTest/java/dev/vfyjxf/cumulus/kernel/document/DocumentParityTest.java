@@ -187,7 +187,7 @@ class DocumentParityTest {
         );
 
         CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(), Map.of()), context(List.of(), List.of(doorFactory())));
+                .compile(new Document(1, root, Map.of(), Map.of(), null), context(List.of(), List.of(doorFactory())));
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint compiled = result.blueprint();
         assertNotNull(compiled);
@@ -364,8 +364,10 @@ class DocumentParityTest {
             null
         );
 
-        CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(id("unit"), unit), Map.of()), context(List.of(), List.of()));
+        CompileResult result = DocumentCompiler.compile(
+            new Document(1, root, Map.of(id("unit"), unit), Map.of(), null),
+            context(List.of(), List.of())
+        );
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint compiled = result.blueprint();
         assertNotNull(compiled);
@@ -458,8 +460,10 @@ class DocumentParityTest {
             null
         );
 
-        CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(), Map.of()), context(List.of(), List.of(nestedProbeFactory())));
+        CompileResult result = DocumentCompiler.compile(
+            new Document(1, root, Map.of(), Map.of(), null),
+            context(List.of(), List.of(nestedProbeFactory()))
+        );
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint compiled = result.blueprint();
         assertNotNull(compiled);
@@ -486,7 +490,7 @@ class DocumentParityTest {
             List.of(new PlacementSpec(id("def_a"), LatticePoint.origin, id("root_a"), null))
         );
         CompileResult result = DocumentCompiler.compile(
-            new Document(1, root, Map.of(id("def_a"), a, id("def_b"), b), Map.of()),
+            new Document(1, root, Map.of(id("def_a"), a, id("def_b"), b), Map.of(), null),
             context(List.of(), List.of())
         );
         assertNull(result.blueprint());
@@ -504,7 +508,7 @@ class DocumentParityTest {
             List.of(new PlacementSpec(id("ghost"), LatticePoint.origin, id("g"), null))
         );
         CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(), Map.of()), context(List.of(), List.of()));
+                .compile(new Document(1, root, Map.of(), Map.of(), null), context(List.of(), List.of()));
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(Codes.definitionMissing.code());
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -538,8 +542,10 @@ class DocumentParityTest {
             List.of(airCheck(id("east_check"), id("east/cell"))),
             List.of(new PlacementSpec(id("unit"), LatticePoint.of(2, 0, 0), id("east"), null))
         );
-        CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(id("unit"), unit), Map.of()), context(List.of(), List.of()));
+        CompileResult result = DocumentCompiler.compile(
+            new Document(1, root, Map.of(id("unit"), unit), Map.of(), null),
+            context(List.of(), List.of())
+        );
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(Codes.placementOutside.code());
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -800,7 +806,8 @@ class DocumentParityTest {
                     List.of()
                 ),
                 Map.of(),
-                Map.of()
+                Map.of(),
+                null
             ),
             context(List.of(throwingFocusFactory()), List.of())
         );
@@ -829,7 +836,8 @@ class DocumentParityTest {
                     List.of()
                 ),
                 Map.of(),
-                Map.of()
+                Map.of(),
+                null
             ),
             context(List.of(), List.of(nullExpectationFactory()))
         );
@@ -843,7 +851,7 @@ class DocumentParityTest {
     }
 
     private static CompileResult compile(BlueprintSpec root) {
-        return DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context(List.of(), List.of()));
+        return DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context(List.of(), List.of()));
     }
 
     private static CompilerContext context(List<FocusFactory> focusExtras, List<ExpectationFactory> expectationExtras) {

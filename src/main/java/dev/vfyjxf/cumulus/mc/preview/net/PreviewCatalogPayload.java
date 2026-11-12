@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.Constants;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -33,7 +34,8 @@ public record PreviewCatalogPayload(List<Entry> entries) implements CustomPacket
         NamespacedId blueprintId,
         List<GhostCell> cells,
         List<MaterialLine> materials,
-        PreviewPresentation presentation
+        PreviewPresentation presentation,
+        @Nullable VariantSummary variants
     ) {
 
         public Entry {

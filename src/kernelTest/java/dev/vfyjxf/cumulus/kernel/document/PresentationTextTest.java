@@ -118,7 +118,7 @@ class PresentationTextTest {
             null
         );
         CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(id("unit"), definition), Map.of()), context());
+                .compile(new Document(1, root, Map.of(id("unit"), definition), Map.of(), null), context());
         assertNull(result.blueprint());
         assertEquals(1, result.findings().ofCode(Codes.documentField.code()).size());
         assertTrue(
@@ -139,7 +139,7 @@ class PresentationTextTest {
             null
         );
         CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(id("unit"), definition), Map.of()), context());
+                .compile(new Document(1, root, Map.of(id("unit"), definition), Map.of(), null), context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint blueprint = result.blueprint();
         assertNotNull(blueprint);
@@ -189,7 +189,7 @@ class PresentationTextTest {
             List.of(),
             description
         );
-        return DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        return DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
     }
 
     private static BlueprintSpec root(

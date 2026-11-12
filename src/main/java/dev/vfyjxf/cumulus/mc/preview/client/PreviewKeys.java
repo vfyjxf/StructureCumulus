@@ -14,7 +14,7 @@ public final class PreviewKeys {
 
     /** One bindable preview action. */
     public enum Action {
-        turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems, confirm, cancel, prevStage, nextStage, playPause, stepCell, guide
+        turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems, confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant
     }
 
     private static final String category = "key.categories.structurecumulus.preview";
@@ -45,6 +45,7 @@ public final class PreviewKeys {
         bind(Action.playPause, "key.structurecumulus.preview.play_pause", GLFW.GLFW_KEY_V, event);
         bind(Action.stepCell, "key.structurecumulus.preview.step_cell", GLFW.GLFW_KEY_B, event);
         bind(Action.guide, "key.structurecumulus.preview.guide", GLFW.GLFW_KEY_G, event);
+        bind(Action.nextVariant, "key.structurecumulus.preview.next_variant", GLFW.GLFW_KEY_N, event);
     }
 
     private static void bind(Action action, String description, int code, RegisterKeyMappingsEvent event) {

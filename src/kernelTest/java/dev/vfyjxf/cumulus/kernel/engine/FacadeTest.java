@@ -409,7 +409,7 @@ class FacadeTest {
             null,
             null
         );
-        CompileResult compiled = kernel.compile(new Document(1, root, Map.of(), Map.of()));
+        CompileResult compiled = kernel.compile(new Document(1, root, Map.of(), Map.of(), null));
         assertTrue(compiled.findings().isEmpty(), () -> compiled.findings().findings().toString());
         Blueprint blueprint = Objects.requireNonNull(compiled.blueprint(), "blueprint");
 

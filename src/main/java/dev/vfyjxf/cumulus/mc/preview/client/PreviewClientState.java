@@ -13,6 +13,7 @@ import dev.vfyjxf.cumulus.mc.preview.net.PreviewControlPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
+import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.BlockHitResult;
@@ -110,6 +111,16 @@ public final class PreviewClientState {
         }
         lines.add(title);
         lines.add("progress " + present + "/" + total + " (" + percent(present, total) + "%)");
+        VariantSummary variants = current.variants();
+        if (variants != null) {
+            int index = variants.indexOf(current.blueprintId());
+            VariantSummary.Member member = variants.member(current.blueprintId());
+            lines.add(
+                "variant " + (index + 1) + "/" + variants.members().size() + ": "
+                        + (member == null ? current.blueprintId().text() : member.text()) + " · group "
+                        + variants.group().text()
+            );
+        }
         if (!stages.isEmpty() && selected >= 0 && selected < stages.size()) {
             Stage stage = stages.get(selected);
             String stageLine = "stage " + (selected + 1) + "/" + stages.size() + ": " + stage.name();
@@ -156,7 +167,7 @@ public final class PreviewClientState {
         }
         lines.add(
             "keys: [ ] turn · ; flip · , . origin · R reset (hold = identity) · P recall · PgUp/PgDn slice · T all/problems"
-                    + " · Up/Down stage · V play · B step · G guide · Enter confirm · Esc cancel"
+                    + " · Up/Down stage · V play · B step · G guide · N variant · Enter confirm · Esc cancel"
         );
         return List.copyOf(lines);
     }
@@ -283,6 +294,9 @@ public final class PreviewClientState {
         }
         if (clicked(PreviewKeys.Action.guide)) {
             GuideController.toggle();
+        }
+        if (clicked(PreviewKeys.Action.nextVariant)) {
+            send(PreviewControlPayload.Control.nextVariant, null);
         }
         trackReset();
     }

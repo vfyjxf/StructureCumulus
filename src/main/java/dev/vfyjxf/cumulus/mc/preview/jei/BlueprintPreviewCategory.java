@@ -27,7 +27,7 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             .create(Constants.modId, "multiblock_preview", BlueprintPreviewRecipe.class);
 
     static final int width = 176;
-    static final int height = 164;
+    static final int height = 178;
 
     static final int sceneX = 2;
     static final int sceneY = 2;
@@ -53,6 +53,13 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
     static final int modeY = 148;
     static final int modeWidth = 172;
     static final int modeHeight = 14;
+
+    /** The variant row: one page per group, the arrows switch the member in place (design 15 §12.3). */
+    static final int variantX = 2;
+    static final int variantY = 164;
+    static final int variantWidth = 172;
+    static final int variantHeight = 14;
+    static final int variantArrowWidth = 18;
 
     /** One panel of the three-view: three of these and the two gaps fill the scene's width. */
     static final int panelWidth = 50;
@@ -165,7 +172,37 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         drawSlider(graphics, recipe);
         drawButton(graphics, mouseX, mouseY);
         drawModeButton(graphics, recipe, mouseX, mouseY);
+        drawVariantRow(graphics, recipe, mouseX, mouseY);
         drawMaterials(graphics, recipe, mouseX, mouseY);
+    }
+
+    /** The variant row: the selected member's label between two arrows; a standalone page draws none. */
+    private void drawVariantRow(GuiGraphics graphics, BlueprintPreviewRecipe recipe, double mouseX, double mouseY) {
+        if (recipe.variantCount() < 2) {
+            return;
+        }
+        drawFace(graphics, variantX, variantY, variantWidth, variantHeight, mouseX, mouseY);
+        graphics.drawString(Minecraft.getInstance().font, "<", variantX + 6, variantY + 3, 0xFFF0F0F0, false);
+        graphics.drawString(
+            Minecraft.getInstance().font,
+            ">",
+            variantX + variantWidth - 11,
+            variantY + 3,
+            0xFFF0F0F0,
+            false
+        );
+        String label = recipe.variantLine();
+        if (label != null) {
+            int textWidth = Minecraft.getInstance().font.width(label);
+            graphics.drawString(
+                Minecraft.getInstance().font,
+                label,
+                variantX + (variantWidth - textWidth) / 2,
+                variantY + 3,
+                0xFFC0E8C0,
+                false
+            );
+        }
     }
 
     /** The panels the current mode draws, in the order the hover asks them; the fit is the entry's bounds. */

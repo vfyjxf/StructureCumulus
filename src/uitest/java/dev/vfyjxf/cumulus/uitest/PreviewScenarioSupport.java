@@ -11,6 +11,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
 final class PreviewScenarioSupport {
 
     static final NamespacedId probe = NamespacedId.of("structurecumulus", "preview_probe");
+    /** The two-tier coil variant group of the uitest datapack (design 15 §12). */
+    static final NamespacedId coilBasic = NamespacedId.of("structurecumulus", "coil_basic");
+    static final NamespacedId coilReinforced = NamespacedId.of("structurecumulus", "coil_reinforced");
     /** The siting origin every preview scenario uses; the floor sits one block below it. */
     static final BlockPos origin = new BlockPos(0, 100, 0);
 

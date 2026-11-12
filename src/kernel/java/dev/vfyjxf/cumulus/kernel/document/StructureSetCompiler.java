@@ -203,7 +203,13 @@ public final class StructureSetCompiler {
             null,
             root.source()
         );
-        return new Document(document.schemaVersion(), replaced, document.definitions(), document.extensions());
+        return new Document(
+            document.schemaVersion(),
+            replaced,
+            document.definitions(),
+            document.extensions(),
+            document.variants()
+        );
     }
 
     private static void validate(CompiledStructureSet set, List<Finding> findings) {

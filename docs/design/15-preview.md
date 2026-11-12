@@ -70,6 +70,11 @@ public record PreviewControlPayload(Control control, @Nullable LatticePoint targ
   payload appears.
 - A marker whose locus is not world-frame re-anchors at the overlay bounds on the client: no source
   span crosses the wire, and the client needs no document to render a label.
+- The session payload and every catalog entry also carry the blueprint's variant summary — the group
+  id and its members in declaration order, each with the label the declaration carried (§12). The
+  document schema bounds the declaration (16 members, 128-character labels), so the summary is
+  bounded before it reaches the wire and needs no cap of its own; an over-cap declaration is a
+  compile finding, never a truncated list (D-98).
 
 ## 4. Sessions
 
@@ -92,6 +97,12 @@ A session is keyed by `(player, level)` and lives on the server.
 - **Resume.** A refused or failed confirm leaves the plan in the session (5.1); the next `confirm`
   re-validates against a fresh capture without re-picking the siting, and the HUD says "can
   continue" once the shortage is resupplied (10.1).
+- **Variant switch.** `nextVariant` (the `N` key) re-opens the session on the group's next member, in
+  declaration order and wrapping, at the session's current origin (§12.2). The new blueprint id brings
+  its own preference memory, so the siting is re-derived for that member; the old session closes and
+  the new one opens through the ordinary open path. A member that cannot be opened at that origin
+  closes the session and the message names the reason, like any failed open. A standalone blueprint
+  answers with a note and keeps its session.
 - **Confirm.** `confirm` runs the build flow of design 14 §10 with the session's current siting and
   item-source choice. `cancel` closes the session and writes nothing.
 
@@ -124,12 +135,14 @@ unchanged. The Y-slice keys keep their meaning there; the stage keys are new.
 | `R` | reset to the first candidate; long-press returns identity (3.7) |
 | `P` | recall a retracted session (4.6) |
 | PageUp / PageDown | Y-slice up / down (4.2) |
+| `N` | next variant of the group; a switch is a re-open at the current origin (§12.2) |
 | Enter | confirm |
 | Esc | cancel |
 
-The presentation pack adds four keys beside these — `↑`/`↓` the stage, `V` play/pause, `B` one cell
-step, and `G` the guided mode of [16](16-presentation.md) §12. No key above changes meaning, and no
-stage key reaches the server ([16](16-presentation.md) §6.3).
+The presentation pack adds five keys beside these — `↑`/`↓` the stage, `V` play/pause, `B` one cell
+step, `G` the guided mode of [16](16-presentation.md) §12 and `N` the next variant (§12.2). No key
+above changes meaning, and no stage key reaches the server ([16](16-presentation.md) §6.3); `N` does
+reach it, because a switch is a server-side re-open.
 
 Every key is a NeoForge `KeyMapping` in the settings screen; the defaults avoid vanilla's
 high-frequency keys, and full keyboard reach is required (8.1).
@@ -157,7 +170,10 @@ version incompatibility is a plugin load failure attributed by the existing poli
 the mod down.
 
 - Entries are every blueprint id of the merged document source (built-in plus datapack),
-  generically generated — no preset scenes.
+  generically generated — no preset scenes. The wire keeps one entry per blueprint id; the category
+  shows one page per group, keyed by the first member the catalog ships in declaration order and
+  switching among the shipped members in place (§12.3), so the pages a player sees never grow with
+  the number of variants.
 - The view is an isometric, drag-rotatable 3D rendering with a Y-slice slider and tooltips that
   summarize the expected blocks (id, properties, counts).
 - A "Ghost to world" button opens an in-world session (§4) at the player's crosshair.
@@ -219,6 +235,11 @@ and pitch below, never a payload field.
 - **Tooltip.** The cursor is unprojected into the scene's orthographic view; the nearest visible cell
   whose box the ray crosses names its block id and each of its property values. The material list's
   icons answer with the item name and count.
+- **Variants.** A page whose group ships more than one member draws a variant row under the mode
+  button: the arrows switch the member in place, the row names the selected label, and the scene, the
+  materials, the tooltip and "Ghost to world" follow the selection. The selection is per-recipe view
+  state, like the yaw and the slice, and a reload keeps it while the selected member still ships
+  (§12.3).
 - **Bounds.** The fitted scale keeps every projected corner inside the viewport, so the scene never
   paints over a neighbouring recipe.
 
@@ -390,11 +411,80 @@ public record ChoiceHistory(java.util.List<Siting> recent) {
 A session invalidation is `SC-BLD-0008` (design 14 §14). Preview allocates no code family of its
 own; everything else it shows is a finding the check, solve or build already produced. The
 presentation pack allocates none either: its stage, HUD and animation surfaces show marks, names and
-document text, and its cap overflows stay markers ([16](16-presentation.md) §14).
+document text, and its cap overflows stay markers ([16](16-presentation.md) §14). E6's variant
+validity codes are the `document` module's own (`SC-DOC-0016`/`SC-DOC-0017`, document §4.7), not a
+presentation code.
 
 ## 11. Non-goals (v1)
 
 Preset scenes or hand-authored preview content; web `visual/` tooling changes; multiplayer
 co-editing of one plan; lossy orientation fallbacks (3.5); the P8 backlog listed in
-[`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md). The presentation pack's
-own non-goals are [16](16-presentation.md) §16; the two lists do not overlap.
+[`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md). A parameterized document
+language, per-instance variant parameters and variant groups that are not static documents stay
+backlog (§12, D-98). The presentation pack's own non-goals are [16](16-presentation.md) §16; the two
+lists do not overlap.
+
+## 12. Variant groups (E6, light)
+
+A variant group is a static combination of blueprint documents: independent documents that compile on
+their own, declared in one group by the document `variants` block ([document](../modules/document.md)
+§4.7, D-98). There is no parameterized document language and no scene generator; the group adds a
+*switch* between documents the source already has.
+
+### 12.1 The carry
+
+The declaration is parsed into the compiled value — `Blueprint.variants()`: the group id and the
+members in declaration order, each with the label the declaration carried — and travels on the session
+payload and on every catalog entry as one summary beside the presentation block (design 16 §5):
+
+```java
+package dev.vfyjxf.cumulus.mc.preview.net;
+
+// The group a session or a catalog entry belongs to; absent for a standalone blueprint. Bounded by
+// the document schema (16 members, 128-character labels), so it needs no wire cap of its own.
+public record VariantSummary(NamespacedId group, java.util.List<Member> members) {
+    public @Nullable Member member(NamespacedId id);
+    public int indexOf(NamespacedId id);
+
+    public record Member(NamespacedId id, @Nullable String label) {
+        public String text();   // the label, or the id when the declaration carried none
+    }
+}
+```
+
+The kernel never enumerates, orders, formats or switches the group; the summary is carried text-like
+data and part of the compiled blueprint's equality (D-94, D-98). The declaration's bounds are compile
+findings (document §4.7), so the summary is bounded before it reaches the wire and the payload codecs
+need no variant cap of their own.
+
+### 12.2 The switch (in-world)
+
+`N` cycles the session to the next member of its group, in declaration order, wrapping. A switch is
+the ordinary open of the new blueprint id at the session's current origin: the siting is re-derived
+for that id, its own preference memory and part pins apply (they are keyed by blueprint id), and the
+previous session is closed. Origin semantics are preserved — the user's chosen cell does not move —
+while everything remembered per blueprint stays with the blueprint. A member whose pose is not
+expressible at that origin closes the session with the open's own failure message, exactly like any
+failed open (§4). A standalone blueprint answers with a note and keeps its session. The HUD names the
+current member: `variant <index>/<count>: <label> · group <id>`.
+
+### 12.3 The switch (JEI)
+
+The category lists one page per group, keyed by the first member the catalog ships in declaration
+order; the group's other members are not pages, so the entries a player pages through never grow with
+the number of variants. The page's variant row switches left/right in place, and the page's scene,
+materials, tooltip lines and "Ghost to world" target follow the selected member. The selection is
+per-recipe view state, never a payload field; a reload keeps it while the selected member still ships.
+
+The catalog payload still carries one entry per blueprint id — every member is an ordinary document
+with its own cells and materials — so the per-entry and whole-catalog caps keep their meaning. A
+member left out by a cap is not switchable from the page, and the catalog's WARNING log names it like
+every other left-out entry, so a shortened page is never silent.
+
+### 12.4 The build pass-through
+
+"Ghost to world" opens the session on the *selected* member's id, and the in-world confirm hands the
+session's own blueprint id to the build executor. The executor, its policy gate, its item source and
+its report are unchanged: a variant changes which declaration is built, never how (§4, design 14 §10).
+A confirm that forms the selected member writes that member's id into the orientation memory, so the
+next session of that id starts where the last one ended (§9).

@@ -9,7 +9,8 @@
 **Owns:** `Bay`, `Coverage`, `Check`, `CheckResult`, `Focus`, `FocusResult`, `FocusContext`,
 `Focuses`, `Expectation`, `ExpectationContext`, `ExpectationMeta`, `Expectations`, `Reply`,
 `ReadScope`, `BayView`, `DoorView`, `Seam`, `SeamId`, `SeamKind`, `AnchorSpec`, `AnchorRoles`,
-`OrientationPolicy`, `DerivationSpec`, `Blueprint`, `BlueprintBuilder`, `Plan`,
+`OrientationPolicy`, `DerivationSpec`, `VariantGroup`, `VariantMember`, `Blueprint`, `BlueprintBuilder`,
+`Plan`,
 `Computation`, `SectionComputation`, `AggregateComputation`, `SectionContext`, `AggregateContext`,
 `Computations`, `FocusFactory`, `ExpectationFactory`, `ComputationFactory`, `FactoryContext`,
 `SitingResult`.
@@ -26,6 +27,8 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 | `Bay` | record | id + `CuboidSet` cells + coverage + footprint + sharing |
 | `Coverage` | enum | `everyCell`, `oneSubject`, `anySubject` |
 | `Check<T>` | record | id + bay + focus + expectation + description |
+| `VariantGroup` | record | a compiled variant group: group id + members in declaration order (carried, never interpreted) |
+| `VariantMember` | record | one group member: blueprint document id + optional label |
 | `CheckResult` | record | reply + subjects + non-fatal notes |
 | `Focus<T>` | interface | binds a subject or explains why not |
 | `FocusResult<T>` | sealed | `Taken(value, subjects, notes)`, `Unavailable(findings)` |
@@ -369,6 +372,13 @@ public record Plan(java.util.List<SectionComputation<?>> sections,
                    java.util.List<AggregateComputation<?>> aggregates,
                    java.util.List<Check<?>> checks) { }
 
+public record VariantMember(NamespacedId id, @Nullable String label) { }
+
+public record VariantGroup(NamespacedId group, java.util.List<VariantMember> members) {
+    public @Nullable VariantMember member(NamespacedId id);
+    public int indexOf(NamespacedId id);
+}
+
 public final class Blueprint {
     public NamespacedId id();
     public Cuboid bounds();
@@ -381,6 +391,7 @@ public final class Blueprint {
     public java.util.List<DerivationSpec> derivations();
     public Value arguments();
     public @Nullable String description();
+    public @Nullable VariantGroup variants();
     public @Nullable SourceSpan source();
     public Plan plan();
     public ReadScope reads();
@@ -413,6 +424,7 @@ public final class BlueprintBuilder {
     public BlueprintBuilder derivations(java.util.Collection<DerivationSpec> derivations);
     public BlueprintBuilder arguments(Value arguments);
     public BlueprintBuilder description(@Nullable String description);
+    public BlueprintBuilder variants(@Nullable VariantGroup variants);
     public BlueprintBuilder source(SourceSpan source);
     public Blueprint build();
 }
@@ -429,7 +441,10 @@ shell, a two-leaf door, an L-shaped room and a pipe corner are all sets of boxes
 A bay is a declaration, not a check: `Coverage` says what a match must establish, `Footprint` says
 what the instance owns, `Sharing` says how claims meet. They are three independent axes.
 `description` and `hint` are carried text: the compiler copies them, no rule reads them, and they
-participate in the bay's equality (`design/16` §3, D-94).
+participate in the bay's equality (`design/16` §3, D-94). The same carry law covers the blueprint's
+variant group: `Blueprint.variants()` is the document's declaration lowered to ids and labels in
+declaration order, part of the value's equality, read by no rule
+([design/15](../design/15-preview.md) §12, D-98).
 
 | Coverage | Build obligation | Settle obligation |
 | --- | --- | --- |
@@ -622,8 +637,8 @@ leaves, and the `fluid` factory composes its two typed reads under `allOf` (`ada
 construction path.
 It is immutable: private final fields, copied collections, a cached `Plan`, cached `bayCells()` and
 cached `reads()` (all excluded from equality). `equals` is structural over the declarations (id,
-bounds, bays, checks, computations, seams, anchors, orientation, derivations, arguments, description);
-it excludes `source`, `plan`, `bayCells()` and `reads()`.
+bounds, bays, checks, computations, seams, anchors, orientation, derivations, arguments, description,
+variants); it excludes `source`, `plan`, `bayCells()` and `reads()`.
 
 `plan()` returns the cached `Plan`: sections in declaration order, aggregates in a topological order
 of `inputs()`, checks in declaration order. An **aggregate** input must be produced by another

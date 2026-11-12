@@ -38,6 +38,8 @@ import dev.vfyjxf.cumulus.kernel.structure.FocusFactory;
 import dev.vfyjxf.cumulus.kernel.structure.OrientationPolicy;
 import dev.vfyjxf.cumulus.kernel.structure.Seam;
 import dev.vfyjxf.cumulus.kernel.structure.SeamId;
+import dev.vfyjxf.cumulus.kernel.structure.VariantGroup;
+import dev.vfyjxf.cumulus.kernel.structure.VariantMember;
 import dev.vfyjxf.cumulus.kernel.world.OccupantSnapshot;
 import org.jspecify.annotations.Nullable;
 
@@ -59,8 +61,17 @@ public final class DocumentCompiler {
     public static CompileResult compile(Document document, CompilerContext context) {
         Objects.requireNonNull(document, "document");
         Objects.requireNonNull(context, "context");
+        return compile(document, context, true);
+    }
+
+    /**
+     * The internal entry: {@code followVariants} is false while a member document is compiled for its
+     * declaring document's group check, which keeps the repeated declaration from recursing
+     * (design 15 §12).
+     */
+    private static CompileResult compile(Document document, CompilerContext context, boolean followVariants) {
         try {
-            return compileChecked(document, context);
+            return compileChecked(document, context, followVariants);
         } catch (IllegalArgumentException rejected) {
             List<Finding> findings = new ArrayList<>();
             error(
@@ -75,7 +86,7 @@ public final class DocumentCompiler {
         }
     }
 
-    private static CompileResult compileChecked(Document document, CompilerContext context) {
+    private static CompileResult compileChecked(Document document, CompilerContext context, boolean followVariants) {
         List<Finding> findings = new ArrayList<>();
         if (document.schemaVersion() != Document.currentVersion) {
             error(
@@ -105,6 +116,9 @@ public final class DocumentCompiler {
         }
         rejectUnusedBays(flat, document, findings);
         rejectUnplacedDefinitions(document, findings);
+        if (followVariants) {
+            validateVariants(document, context, findings);
+        }
         if (hasErrors(findings)) {
             return new CompileResult(FindingBundle.of(findings), null);
         }
@@ -141,6 +155,9 @@ public final class DocumentCompiler {
         if (document.root().description() != null) {
             builder.description(document.root().description());
         }
+        if (document.variants() != null) {
+            builder.variants(variantGroup(document.variants()));
+        }
         if (document.root().source() != null) {
             builder.source(document.root().source());
         }
@@ -158,6 +175,161 @@ public final class DocumentCompiler {
             );
             return new CompileResult(FindingBundle.of(findings), null);
         }
+    }
+
+    /** The member cap: the group summary travels on a payload, so the declaration is bounded. */
+    private static final int maxVariantMembers = 16;
+    /** The label cap; a longer label is a document error, never a silent truncation. */
+    private static final int maxVariantLabel = 128;
+
+    /**
+     * Validates and lowers the {@code variants} declaration (design 15 §12): the group is a static
+     * combination of blueprint documents, every member repeats the declaration verbatim and every
+     * member compiles on its own. A member is compiled with its own declaration unchecked, because
+     * the repeated block is exactly the one being validated here.
+     */
+    private static void validateVariants(Document document, CompilerContext context, List<Finding> findings) {
+        VariantGroupSpec variants = document.variants();
+        if (variants == null) {
+            return;
+        }
+        List<VariantMemberSpec> members = variants.members();
+        if (members.size() < 2) {
+            error(
+                findings,
+                Codes.documentField,
+                "a variant group needs at least two members: " + variants.group().text(),
+                variants.source(),
+                documentLocus(document),
+                document
+            );
+            return;
+        }
+        if (members.size() > maxVariantMembers) {
+            error(
+                findings,
+                Codes.documentField,
+                "a variant group declares " + members.size() + " members, over the " + maxVariantMembers + " cap",
+                variants.source(),
+                documentLocus(document),
+                document
+            );
+            return;
+        }
+        Set<NamespacedId> seen = new HashSet<>();
+        boolean declaringIsMember = false;
+        for (VariantMemberSpec member : members) {
+            if (!seen.add(member.id())) {
+                error(
+                    findings,
+                    Codes.documentDuplicate,
+                    "variant member " + member.id().text() + " is declared twice",
+                    member.source(),
+                    documentLocus(document),
+                    document
+                );
+            }
+            if (member.id().equals(document.root().id())) {
+                declaringIsMember = true;
+            }
+            if (member.label() != null && member.label().length() > maxVariantLabel) {
+                error(
+                    findings,
+                    Codes.documentField,
+                    "variant member " + member.id().text() + " declares a label of " + member.label().length()
+                            + " characters, over the " + maxVariantLabel + " cap",
+                    member.source(),
+                    documentLocus(document),
+                    document
+                );
+            } else if (member.label() != null && member.label().isEmpty()) {
+                error(
+                    findings,
+                    Codes.documentField,
+                    "variant member " + member.id().text() + " declares an empty label",
+                    member.source(),
+                    documentLocus(document),
+                    document
+                );
+            }
+        }
+        if (!declaringIsMember) {
+            error(
+                findings,
+                Codes.documentField,
+                "the declaring document " + document.root().id().text() + " is not a member of its own group "
+                        + variants.group().text(),
+                variants.source(),
+                documentLocus(document),
+                document
+            );
+        }
+        for (VariantMemberSpec member : members) {
+            if (member.id().equals(document.root().id())) {
+                continue;
+            }
+            Document referenced = context.documents().find(member.id());
+            if (referenced == null) {
+                error(
+                    findings,
+                    Codes.definitionMissing,
+                    "variant member " + member.id().text() + " names no blueprint document",
+                    member.source(),
+                    documentLocus(document),
+                    document
+                );
+                continue;
+            }
+            if (!referenced.root().id().equals(member.id())) {
+                error(
+                    findings,
+                    Codes.variantMember,
+                    "variant member " + member.id().text() + " names a document that declares "
+                            + referenced.root().id().text(),
+                    member.source(),
+                    documentLocus(document),
+                    document
+                );
+                continue;
+            }
+            VariantGroupSpec declared = referenced.variants();
+            if (declared == null || !declared.sameDeclaration(variants)) {
+                error(
+                    findings,
+                    Codes.variantGroupMismatch,
+                    "variant member " + member.id().text()
+                            + (declared == null ? " declares no variant group" : " declares a different variant group"),
+                    member.source(),
+                    documentLocus(document),
+                    document
+                );
+                continue;
+            }
+            CompileResult memberResult = compile(referenced, context, false);
+            if (memberResult.blueprint() == null) {
+                String first = memberResult.findings().findings().isEmpty()
+                        ? "no finding"
+                        : memberResult.findings().findings().get(0).code().text() + " "
+                                + memberResult.findings().findings().get(0).message();
+                error(
+                    findings,
+                    Codes.variantMember,
+                    "variant member " + member.id().text() + " does not compile: " + first,
+                    member.source(),
+                    documentLocus(document),
+                    document
+                );
+            }
+        }
+    }
+
+    /** Lowers the declaration into the compiled value: ids and labels, in declaration order. */
+    private static VariantGroup variantGroup(VariantGroupSpec spec) {
+        List<VariantMember> members = new ArrayList<>(spec.members().size());
+        for (VariantMemberSpec member : spec.members()) {
+            members.add(new VariantMember(member.id(), member.label()));
+        }
+        return new VariantGroup(spec.group(), members);
     }
 
     private static void rejectUnusedBays(Flat flat, Document document, List<Finding> findings) {

@@ -543,7 +543,8 @@ class ApiExamplesTest {
             null
         );
 
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), documentContext());
+        CompileResult result = DocumentCompiler
+                .compile(new Document(1, root, Map.of(), Map.of(), null), documentContext());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         assertNotNull(result.blueprint(), "the §5 document lowers to a blueprint");
 
@@ -664,7 +665,8 @@ class ApiExamplesTest {
             null
         );
 
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), documentContext());
+        CompileResult result = DocumentCompiler
+                .compile(new Document(1, root, Map.of(), Map.of(), null), documentContext());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint reactor = result.blueprint();
         assertNotNull(reactor, "the §6.5 document as written lowers to a blueprint");

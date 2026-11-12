@@ -204,6 +204,8 @@ public final class Codes {
     public static final CodeEntry readerFailed = ...;              // SC-DOC-0013
     public static final CodeEntry documentDeclared = ...;          // SC-DOC-0014
     public static final CodeEntry documentTooLarge = ...;          // SC-DOC-0015
+    public static final CodeEntry variantMember = ...;             // SC-DOC-0016
+    public static final CodeEntry variantGroupMismatch = ...;      // SC-DOC-0017
     public static final CodeEntry computationFailed = ...;         // SC-CTX-0001
     public static final CodeEntry deriverMissing = ...;            // SC-CTX-0004
     public static final CodeEntry deriverFailed = ...;             // SC-CTX-0005
@@ -367,11 +369,13 @@ sites lists every class that emits it.
 | `SC-DOC-0008` | ERROR | P | a key's declared type does not match its producer | document | `DocumentCompiler`, `BuiltinComputations` |
 | `SC-DOC-0009` | ERROR | P | a definition cycle | document | `DocumentCompiler` |
 | `SC-DOC-0010` | ERROR | P | two derivations share an output/order | document | `DocumentCompiler` |
-| `SC-DOC-0011` | ERROR | P | a placement or a set member names a missing definition | document | `DocumentCompiler`, `StructureSetCompiler` |
+| `SC-DOC-0011` | ERROR | P | a placement, a set member or a variant member names a missing document | document | `DocumentCompiler`, `StructureSetCompiler` |
 | `SC-DOC-0012` | INFO | – | the reader produced no spans | document | adapter `JsonReader`, `StructureSetReader` |
 | `SC-DOC-0013` | ERROR | – | the reader failed to parse or format | document | adapter `JsonReader`, `DatapackBlueprints` |
 | `SC-DOC-0014` | ERROR | P | a declaration disagrees with the factory that produces it | document | `DocumentCompiler` |
 | `SC-DOC-0015` | ERROR | P | the document expands beyond the compile budget | document | `DocumentCompiler` |
+| `SC-DOC-0016` | ERROR | P | a variant group member is not a usable blueprint document (a wrong root id or a document that does not compile) | document | `DocumentCompiler` |
+| `SC-DOC-0017` | ERROR | P | a variant group member declares a different group (none, another group id or another member order) | document | `DocumentCompiler` |
 | `SC-CTX-0001` | ERROR | P | a computation produced no value | context | `MatchEngine` check |
 | `SC-CTX-0004` | ERROR | P | a derivation names a missing deriver | context | `MatchEngine` derive |
 | `SC-CTX-0005` | ERROR | P | a deriver produced no usable value (no value, wrong type, wrong output or a non-INSTANCE key; a deriver that throws is `SC-SPI-0001`) | context | `MatchEngine` derive |
@@ -401,7 +405,7 @@ sites lists every class that emits it.
 | `SC-MC-0010` | ERROR | P | a host snapshot value was not captured | adapter | host expectations (absent) and `McAnchors` (missing anchor state), always unreadable, never a mismatch |
 | `SC-MC-*` | — | — | adapter-only family; never minted by the kernel, never in `Codes.all`; the capture paths (`0001`–`0005`) relay through a `ReadRefusal` or a `CaptureReport` entry (`world` §4.10), and the expectation paths (`0006`–`0010`) pass `SC-MC-0010` as the absent code of `Expectations.host` (`world` §4.11) | adapter | the adapter |
 
-`Codes.all` has 67 entries in this revision, matching the registry; the capture-report and host
+`Codes.all` has 69 entries in this revision, matching the registry; the capture-report and host
 expectation channels add none of them. `SC-MC-0003` (a nested cut), `SC-MC-0004` (a block state cannot
 express the siting orientation) and `SC-MC-0005` (the root is over the element ceiling) are produced by
 the adapter in a `CaptureReport` (`adapter` §12): they are host codes, never kernel registry entries,
@@ -417,7 +421,7 @@ the `CodeEntry` — and no caller parses a message (D-66).
 
 ## 7. Tests
 
-- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 67 entries, one per code,
+- Code parse/text round-trip; malformed parse returns null; `Codes.all` has 69 entries, one per code,
   every entry has an explanation; every code in `all` appears in the producer table; `SC-MC-*` are
   absent from `all`.
 - Wire tags: every `wireName()` and every `Family` tag is the uppercase form; `text()`/`parse`

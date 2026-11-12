@@ -2,7 +2,7 @@
 
 > This plan tracks execution. The normative contract is
 > [`docs/design/16-presentation.md`](../design/16-presentation.md) plus the decision record
-> (D-93…D-97) and the module files; if this file and those disagree, they win. Source plan:
+> (D-93…D-98) and the module files; if this file and those disagree, they win. Source plan:
 > `Data/StructureCumulus/plan-2026-11-12-presentation/00-roadmap.md`.
 
 ## Scope
@@ -48,6 +48,9 @@ mutual exclusion); E9 demos the landed pack.
 - **F.5** the half-automatic "shall I build the rest?" dialogue between guided mode and the executor.
 - **Hints on a focus-id part** — v1 hints are bay-scoped, because a bay is what a stage is derived from
   (design 16 §3, §4).
+- **A parameterized variant form** — v1 groups are static combinations of blueprint documents (E6,
+  design 15 §12, D-98). One declaration plus per-instance arguments that change geometry stays
+  backlog; it would move the variant into the compiler, the catalog and the build request at once.
 
 Absorbed into the pack and therefore no longer backlog: P8 **5.6** rollback visibility (E2's fade) and
 P8 **4.3** hand-aware pulse (E5's hand awareness). P8 **8.2** quiet HUD mode stays backlog: the pack's

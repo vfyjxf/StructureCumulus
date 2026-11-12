@@ -170,7 +170,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        Document document = new Document(1, root, Map.of(), Map.of());
+        Document document = new Document(1, root, Map.of(), Map.of(), null);
 
         CompileResult result = DocumentCompiler.compile(document, context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
@@ -217,7 +217,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint compiled = result.blueprint();
         assertNotNull(compiled);
@@ -272,7 +272,7 @@ class DocumentCompilerTest {
             null
         );
         CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(id("unit"), definition), Map.of()), context());
+                .compile(new Document(1, root, Map.of(id("unit"), definition), Map.of(), null), context());
         assertNull(result.blueprint());
         assertEquals(
             FindingCode.of(FindingCode.Family.doc, 2),
@@ -320,7 +320,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint compiled = result.blueprint();
         assertNotNull(compiled);
@@ -392,7 +392,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        Document document = new Document(1, root, Map.of(id("unit"), definition), Map.of());
+        Document document = new Document(1, root, Map.of(id("unit"), definition), Map.of(), null);
         CompileResult result = DocumentCompiler.compile(document, context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint blueprint = result.blueprint();
@@ -425,7 +425,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult version = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of()), context());
+        CompileResult version = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of(), null), context());
         assertNull(version.blueprint());
         assertEquals(
             FindingCode.of(FindingCode.Family.doc, 1),
@@ -461,7 +461,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult missing = DocumentCompiler.compile(new Document(1, root2, Map.of(), Map.of()), context());
+        CompileResult missing = DocumentCompiler.compile(new Document(1, root2, Map.of(), Map.of(), null), context());
         assertNull(missing.blueprint());
         assertFalse(missing.findings().isEmpty());
         assertEquals(
@@ -517,7 +517,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         assertEquals(
             FindingCode.of(FindingCode.Family.bpt, 2),
@@ -563,7 +563,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         Blueprint blueprint = result.blueprint();
         assertNotNull(blueprint);
@@ -613,7 +613,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 8));
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -652,7 +652,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         assertEquals(
             1,
@@ -705,7 +705,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context);
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context);
         assertNull(result.blueprint());
         assertEquals(
             1,
@@ -748,7 +748,7 @@ class DocumentCompilerTest {
                 null,
                 null
             );
-            CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+            CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
             assertNull(result.blueprint(), "envelope=" + envelope);
             List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
             assertEquals(1, found.size(), () -> "envelope=" + envelope + " " + result.findings().findings());
@@ -798,7 +798,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -857,7 +857,7 @@ class DocumentCompilerTest {
             null
         );
         CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(id("leaky"), definition), Map.of()), context());
+                .compile(new Document(1, root, Map.of(id("leaky"), definition), Map.of(), null), context());
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -905,7 +905,7 @@ class DocumentCompilerTest {
             null
         );
         CompileResult result = DocumentCompiler
-                .compile(new Document(1, root, Map.of(id("ghost"), ghost), Map.of()), context());
+                .compile(new Document(1, root, Map.of(id("ghost"), ghost), Map.of(), null), context());
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 2));
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -945,7 +945,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         assertEquals(2, result.findings().size(), () -> result.findings().findings().toString());
         for (Finding finding : result.findings().findings()) {
@@ -978,7 +978,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         Finding finding = Objects.requireNonNull(result.findings().primary(), "primary");
         assertTrue(finding.hasPrimary(), () -> finding.toString());
@@ -1012,7 +1012,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(Codes.definitionMissing.code());
         assertEquals(2, found.size(), () -> result.findings().findings().toString());
@@ -1082,7 +1082,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        Document document = new Document(1, root, Map.of(id("middle"), middle, id("leaf"), leaf), Map.of());
+        Document document = new Document(1, root, Map.of(id("middle"), middle, id("leaf"), leaf), Map.of(), null);
         CompileResult result = DocumentCompiler.compile(document, context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         assertNotNull(result.blueprint());
@@ -1109,7 +1109,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        Document external = new Document(2, externalRoot, Map.of(), Map.of());
+        Document external = new Document(2, externalRoot, Map.of(), Map.of(), null);
         Catalogs catalogs = Catalogs.builtin();
         CompilerContext context = new CompilerContext(
             catalogs.focuses(),
@@ -1137,7 +1137,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context);
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context);
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(FindingCode.of(FindingCode.Family.doc, 1));
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -1179,7 +1179,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of(), null), context());
         assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
         assertNotNull(result.blueprint());
     }
@@ -1218,7 +1218,7 @@ class DocumentCompilerTest {
         );
         CompileResult result = assertTimeoutPreemptively(
             Duration.ofSeconds(30),
-            () -> DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context())
+            () -> DocumentCompiler.compile(new Document(1, root, definitions, Map.of(), null), context())
         );
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(Codes.documentTooLarge.code());
@@ -1270,7 +1270,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of(), null), context());
         assertNull(result.blueprint());
         List<Finding> found = result.findings().ofCode(Codes.documentTooLarge.code());
         assertEquals(1, found.size(), () -> result.findings().findings().toString());
@@ -1345,7 +1345,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
+        CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of(), null), context());
         assertNull(result.blueprint());
         List<Finding> found = result.findings().findings();
         assertEquals(1, found.size(), () -> found.toString());
@@ -1386,7 +1386,7 @@ class DocumentCompilerTest {
             null,
             null
         );
-        return new Document(1, root, Map.of(), Map.of());
+        return new Document(1, root, Map.of(), Map.of(), null);
     }
 
     private static ComputationFactory gatheringFactory(ContextKey<Long> input) {

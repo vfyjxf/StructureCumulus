@@ -6,7 +6,8 @@
 
 ## 1. Scope
 
-**Owns:** `Document`, `BlueprintSpec`, `BaySpec`, `SeamSpec`, `CheckSpec`, `ComputationSpec`,
+**Owns:** `Document`, `BlueprintSpec`, `VariantGroupSpec`, `VariantMemberSpec`, `BaySpec`, `SeamSpec`,
+`CheckSpec`, `ComputationSpec`,
 `KeySpec`, `PlacementSpec`, `StructureSetDocument`, `StructureSetSpec`, `SatelliteSpec`, `LinkSpec`,
 `PresenceSpec`, `LinkMode`, `DistanceMetric`, `CompileResult`, `StructureSetCompileResult`,
 `CompiledStructureSet`, `CompiledSatellite`, `CompilerContext`, `DocumentCompiler`,
@@ -24,6 +25,8 @@ validation (`structure`), the `Value` tree (`core`), the run-time meaning of a f
 | --- | --- | --- |
 | `Document` | record | schema version + root spec + reusable definitions + extensions |
 | `BlueprintSpec` | record | the data form of one blueprint |
+| `VariantGroupSpec` | record | the document's variant group declaration: group id + ordered members |
+| `VariantMemberSpec` | record | one declared member: blueprint document id + optional label |
 | `BaySpec` | record | data form of a bay |
 | `SeamSpec` | record | data form of a seam |
 | `CheckSpec` | record | data form of a check (focus/expectation by kind + args) |
@@ -55,9 +58,20 @@ package dev.vfyjxf.cumulus.kernel.document;
 
 public record Document(int schemaVersion, BlueprintSpec root,
                        java.util.Map<NamespacedId, BlueprintSpec> definitions,
-                       java.util.Map<String, Value> extensions) {
+                       java.util.Map<String, Value> extensions,
+                       @Nullable VariantGroupSpec variants) {
     public static final int currentVersion = 1;
     public Document { /* version >= 1; maps immutable and ordered */ }
+}
+
+public record VariantGroupSpec(NamespacedId group, java.util.List<VariantMemberSpec> members,
+                               @Nullable SourceSpan source) {
+    public VariantGroupSpec { /* group and members non-null; members immutable and ordered */ }
+    public VariantGroupSpec withoutSpans();
+}
+
+public record VariantMemberSpec(NamespacedId id, @Nullable String label, @Nullable SourceSpan source) {
+    public VariantMemberSpec withoutSpans();
 }
 
 public record BlueprintSpec(NamespacedId id, Cuboid bounds, boolean envelope, boolean envelopeEntities,
@@ -204,6 +218,7 @@ public interface DocumentWriter {
 | `envelope` | boolean | no | `true` derives the closed-world air pair over cells no bay or declared footprint covers; absent or `false` is off; root-only |
 | `envelopeEntities` | boolean | no | `true` makes that envelope count entities as foreign and adds the `entity` kind to its read scope (`structure` §4.11, D-55); absent or `false` leaves entities transparent; root-only, and `SC-DOC-0002` unless the root also declares `envelope: true` |
 | `description` | string | no | human text carried with the blueprint and never interpreted ([design/16](../design/16-presentation.md) §3, D-94); absent means none |
+| `variants` | object | no | a static variant group declaration ([design/15](../design/15-preview.md) §12, D-98); absent means the document declares no group; root-only |
 | `definitions` | object id → spec | no | reusable specs, compiled on placement |
 | `placements` | placement[] | no | definitions placed into the root |
 | `bays` | bay[] | yes* | the root's own bays |
@@ -288,8 +303,8 @@ published), and the compiler honours it as declared.
 ### 4.2 Definitions in v1
 
 A `definitions` entry contributes **bays, seams and placements** only. Checks, computations, keys,
-derivations, anchors, the orientation policy, `envelope`, `envelopeEntities` and `description` are
-root-only; a definition that declares one is `SC-DOC-0002`. `arguments` and `extensions` are not
+derivations, anchors, the orientation policy, `envelope`, `envelopeEntities`, `description` and
+`variants` are root-only; a definition that declares one is `SC-DOC-0002`. `arguments` and `extensions` are not
 members of a definition at all: the reader rejects them as unknown members (`SC-DOC-0002`). A
 definition's `bounds` is required and must contain the definition's own bays and seams; a cell
 outside them is `SC-DOC-0002`. This keeps a placed definition a pure geometry unit: its bays and
@@ -307,18 +322,22 @@ definition no placement reaches, directly or through another placement, is `SC-D
 2. Resolve placements on an explicit depth-first work stack. A cycle is `SC-DOC-0009`; a missing
    definition is `SC-DOC-0011`; a placed cell outside the root bounds is `SC-DOC-0005`; an
    expansion past the budget is `SC-DOC-0015` (§4.6).
-3. Merge definitions into the root as bays and seams (definitions are geometry only); duplicate ids
+3. Validate the variant group before lowering it (§4.7): the block's shape, every member's
+   document, the repeated declaration and each member's own compile. A group finding leaves the
+   blueprint null, exactly like every other document error.
+4. Merge definitions into the root as bays and seams (definitions are geometry only); duplicate ids
    with different content are `SC-DOC-0004`, equal duplicates collapse. Root checks, computations,
    keys, derivations and anchors are then built against the merged ids.
-4. Build keys (`KeySpec` → `ContextKey`), then bays (`BaySpec` → `Bay`), seams, computations
+5. Build keys (`KeySpec` → `ContextKey`), then bays (`BaySpec` → `Bay`), seams, computations
    (factory + key + region), derivations, anchors and the orientation policy.
-5. Build checks: resolve the focus factory and the expectation factory, check
+6. Build checks: resolve the focus factory and the expectation factory, check
    `focus.subject() == expectation.subject()`, then `Check.of`.
-6. Call `Blueprint.builder(...)`; when the root carries `envelope`, call `.envelope()` before
-   `build()`, and when it carries `envelopeEntities`, call `.envelopeEntities()`. A build exception
+7. Call `Blueprint.builder(...)`; when the root carries `envelope`, call `.envelope()` before
+   `build()`, when it carries `envelopeEntities`, call `.envelopeEntities()`, and when the document
+   carries a variant group, call `.variants(...)`. A build exception
    is caught and reported as its own code (for example `SC-BPT-0004`
    for a reserved envelope id); a clean compile never reaches that path.
-7. Return `CompileResult(bundle, blueprint)`; `findings` may contain warnings even when the
+8. Return `CompileResult(bundle, blueprint)`; `findings` may contain warnings even when the
    blueprint is non-null.
 
 Lowering is a function of `(document, definitions, context)`; it reads no world, no clock and no
@@ -410,6 +429,48 @@ nothing of that document is lowered. The budget is a constant, not a host option
 must behave the same everywhere (D-83). The ceiling is not a depth limit — a deep chain of few
 declarations stays legal.
 
+### 4.7 Variant groups
+
+A blueprint document may declare a static variant group:
+
+```json
+"variants": {
+  "group": "coil",
+  "members": [
+    {"id": "mymod:coil_basic", "label": "basic coil"},
+    {"id": "mymod:coil_reinforced", "label": "reinforced coil"}
+  ]
+}
+```
+
+The block is document-level and root-only: a definition that carries it is `SC-DOC-0002`. `group` is a
+`NamespacedId` (an unqualified one resolves in `structurecumulus`, the reader's usual default);
+`members` is a non-empty array of objects with a required `id` and an optional `label` string; absent
+means the document declares no group. The declaration is bounded — at most 16 members, a label of at
+most 128 characters and never the empty string, all `SC-DOC-0002` — so the group summary the
+presentation surfaces carry is a bounded payload field with no cap of its own
+([design/15](../design/15-preview.md) §12).
+
+The group is a **static combination** of independent blueprint documents, not a parameterized form:
+each member is an ordinary document that compiles on its own, and the group only names them in
+declaration order (which is also the switch order). Every member document repeats the declaration
+verbatim — the same group id and the same members in the same order — so a compiled member always
+knows its group without a cross-document lookup, and the declaring document must itself be a member.
+
+| Rule | Code |
+| --- | --- |
+| the block's shape, the member count, the labels, the declaring document's own membership | `SC-DOC-0002` |
+| a member id is declared twice | `SC-DOC-0004` |
+| a member id names no blueprint document | `SC-DOC-0011` |
+| a member names a document whose root id is another id, or that does not compile | `SC-DOC-0016` |
+| a member declares no group or a different one | `SC-DOC-0017` |
+
+A member is compiled for this check with its own `variants` block unfolded, so the repeated
+declaration never recurses; its findings are summarised in the declaring document's `SC-DOC-0016`
+message. The group is lowered into the compiled value (`Blueprint.variants()`), participates in its
+equality, and no finding or verdict reads it (D-94, D-98). Switching, payloads and the build
+pass-through are presentation law ([design/15](../design/15-preview.md) §12).
+
 ## 5. Codes
 
 | Code | Sev | Meaning | Producer |
@@ -429,6 +490,8 @@ declarations stays legal.
 | `SC-DOC-0013` | ERROR | reader/writer parse/format failure | `DocumentReader`/`Writer` |
 | `SC-DOC-0014` | ERROR | a declaration disagrees with the factory that produces it | `DocumentCompiler` |
 | `SC-DOC-0015` | ERROR | the document expands beyond the compile budget | `DocumentCompiler` |
+| `SC-DOC-0016` | ERROR | a variant member is not a usable blueprint document | `DocumentCompiler` |
+| `SC-DOC-0017` | ERROR | a variant member declares a different group | `DocumentCompiler` |
 
 `StructureSetCompiler` reuses `SC-DOC-0002` for a malformed or nested set reference,
 `SC-DOC-0004` for a duplicate satellite id (raised by the reader) and `SC-DOC-0011` for a root or
@@ -483,6 +546,14 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   text reaches no finding and no code (`design/16` §3, D-94).
 - Missing root/satellite documents are `SC-DOC-0011`; a set naming a set is `SC-DOC-0002`; a
   presence region outside the satellite bounds is `SC-DOC-0002`.
+- Variants: a document without `variants` compiles with no group and writes back without the member;
+  a valid two-member group reads, compiles and carries the group id and the members in declaration
+  order (the compiled value's equality includes it); a member id that names no document is
+  `SC-DOC-0011`; a member whose document does not compile, or names a document with another root id,
+  is `SC-DOC-0016`; a member that declares no group or a different group is `SC-DOC-0017`; a group of
+  one member, a duplicate member, a declaring document outside its group, a seventeenth member and an
+  over-long or empty label are document errors. Two documents that name each other under different
+  group ids are refused on both sides instead of looping.
 
 ## 7. Dependencies
 
@@ -511,6 +582,10 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   becomes a located finding; `CompileResult.blueprint()` is null whenever an error exists.
 - A blueprint document is kindless or `blueprint`; a set document is `structure_set`. A set names
   only blueprints, never another set (no nesting).
+- A variant group is a static combination: independent blueprint documents named in declaration
+  order, each repeating the declaration verbatim, each compiling on its own. It is a document-level
+  carry, not a parameterized form; the kernel never enumerates, orders, formats or switches it
+  (`design/15` §12, D-98).
 - Presentation text is carried, never interpreted. `description` and `hint` are strings the compiler
   copies into the compiled value; it never parses, formats, defaults or localizes them, no finding or
   verdict reads them, and they are part of the compiled value's equality (`design/16` §3, D-94).
@@ -519,9 +594,9 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 
 ## 9. Pipeline
 
-`DocumentCompiler.compile(document, context)` flattens placements, builds keys, bays, seams,
-checks, computations and derivations, validates them through `BlueprintBuilder`, and returns the
-same `Blueprint` a Java builder would. The result is either one blueprint or a `FindingBundle`; the
+`DocumentCompiler.compile(document, context)` validates the variant group against the document
+source, flattens placements, builds keys, bays, seams, checks, computations and derivations,
+validates them through `BlueprintBuilder`, and returns the same `Blueprint` a Java builder would. The result is either one blueprint or a `FindingBundle`; the
 engine never sees a half-built blueprint.
 
 `StructureSetCompiler.compile(document, context)` resolves the root and every satellite through

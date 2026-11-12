@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.mc.preview.jei.JeiPreview;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
+import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.recipe.RecipeType;
@@ -15,8 +16,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import org.jspecify.annotations.Nullable;
 
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The harness's own JEI plugin: it captures the runtime so a scenario can open the production
@@ -63,6 +67,30 @@ public final class PreviewJeiProbe implements IModPlugin {
 
     static List<NamespacedId> catalogIds() {
         return PreviewCatalogClient.entries().stream().map(PreviewCatalogPayload.Entry::blueprintId).toList();
+    }
+
+    /**
+     * The pages the category should list: a standalone entry is its own page, a group is one page keyed
+     * by the first shipped member in declaration order (design 15 §12.3).
+     */
+    static List<NamespacedId> pageIds() {
+        List<PreviewCatalogPayload.Entry> entries = PreviewCatalogClient.entries();
+        Set<NamespacedId> shipped = new HashSet<>(catalogIds());
+        Set<NamespacedId> pages = new LinkedHashSet<>();
+        for (PreviewCatalogPayload.Entry entry : entries) {
+            VariantSummary summary = entry.variants();
+            if (summary == null) {
+                pages.add(entry.blueprintId());
+                continue;
+            }
+            for (VariantSummary.Member member : summary.members()) {
+                if (shipped.contains(member.id())) {
+                    pages.add(member.id());
+                    break;
+                }
+            }
+        }
+        return List.copyOf(pages);
     }
 
     static @Nullable PreviewPresentation presentation(NamespacedId blueprintId) {

@@ -6,6 +6,7 @@ import dev.vfyjxf.cumulus.mc.plugin.ModPlugin;
 import dev.vfyjxf.cumulus.mc.plugin.PluginMarker;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.constants.VanillaTypes;
@@ -32,6 +33,10 @@ import java.util.Set;
  * The conditional built-in plugin: JEI's annotation scan instantiates it, and the adapter's loader pass
  * validates the same id through {@link JeiPreviewPlugins}. The category is a singleton, so both
  * instances share one registration and one recipe table.
+ *
+ * <p>A variant group is one page, keyed by the first member the catalog ships in declaration order;
+ * the group's other members are not listed as pages, so the entry count never grows with the number
+ * of variants (design 15 §12.3).
  */
 @JeiPlugin
 @PluginMarker
@@ -65,8 +70,8 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
         List<BlueprintPreviewRecipe> seeded = new ArrayList<>();
-        for (PreviewCatalogPayload.Entry entry : PreviewCatalogClient.entries()) {
-            BlueprintPreviewRecipe recipe = recipeFor(entry);
+        for (Map.Entry<NamespacedId, List<PreviewCatalogPayload.Entry>> page : pages().entrySet()) {
+            BlueprintPreviewRecipe recipe = recipeFor(page.getKey(), page.getValue());
             if (sent.add(recipe)) {
                 seeded.add(recipe);
             }
@@ -114,18 +119,52 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         return true;
     }
 
-    private static BlueprintPreviewRecipe recipeFor(PreviewCatalogPayload.Entry entry) {
-        BlueprintPreviewRecipe recipe = recipes.get(entry.blueprintId());
+    /**
+     * The catalog reshaped into pages: a standalone entry is its own page, a group is one page keyed
+     * by the first member the catalog ships, holding every shipped member in declaration order. A
+     * member left out by a catalogue cap is not switchable; the catalogue log names it, as every cap
+     * does (design 15 §6.1, §12.3).
+     */
+    private static Map<NamespacedId, List<PreviewCatalogPayload.Entry>> pages() {
+        List<PreviewCatalogPayload.Entry> entries = PreviewCatalogClient.entries();
+        Map<NamespacedId, PreviewCatalogPayload.Entry> byId = new LinkedHashMap<>();
+        for (PreviewCatalogPayload.Entry entry : entries) {
+            byId.put(entry.blueprintId(), entry);
+        }
+        Map<NamespacedId, List<PreviewCatalogPayload.Entry>> pages = new LinkedHashMap<>();
+        for (PreviewCatalogPayload.Entry entry : entries) {
+            VariantSummary summary = entry.variants();
+            List<PreviewCatalogPayload.Entry> members = new ArrayList<>();
+            if (summary == null) {
+                members.add(entry);
+            } else {
+                for (VariantSummary.Member member : summary.members()) {
+                    PreviewCatalogPayload.Entry shipped = byId.get(member.id());
+                    if (shipped != null) {
+                        members.add(shipped);
+                    }
+                }
+            }
+            if (members.isEmpty()) {
+                members.add(entry);
+            }
+            pages.putIfAbsent(members.get(0).blueprintId(), List.copyOf(members));
+        }
+        return pages;
+    }
+
+    private static BlueprintPreviewRecipe recipeFor(NamespacedId pageId, List<PreviewCatalogPayload.Entry> group) {
+        BlueprintPreviewRecipe recipe = recipes.get(pageId);
         if (recipe == null) {
-            recipe = new BlueprintPreviewRecipe(entry);
-            recipes.put(entry.blueprintId(), recipe);
+            recipe = new BlueprintPreviewRecipe(group);
+            recipes.put(pageId, recipe);
         } else {
-            recipe.update(entry);
+            recipe.update(group);
         }
         return recipe;
     }
 
-    /** Adds new entries and hides vanished ones; JEI has no removal, so a reload hides instead. */
+    /** Adds new pages and hides vanished ones; JEI has no removal, so a reload hides instead. */
     private static void reconcile() {
         IJeiRuntime current = runtime;
         if (current == null) {
@@ -135,9 +174,9 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         Set<NamespacedId> listed = new HashSet<>();
         List<BlueprintPreviewRecipe> added = new ArrayList<>();
         List<BlueprintPreviewRecipe> restored = new ArrayList<>();
-        for (PreviewCatalogPayload.Entry entry : PreviewCatalogClient.entries()) {
-            listed.add(entry.blueprintId());
-            BlueprintPreviewRecipe recipe = recipeFor(entry);
+        for (Map.Entry<NamespacedId, List<PreviewCatalogPayload.Entry>> page : pages().entrySet()) {
+            listed.add(page.getKey());
+            BlueprintPreviewRecipe recipe = recipeFor(page.getKey(), page.getValue());
             if (sent.add(recipe)) {
                 added.add(recipe);
             } else if (hidden.remove(recipe)) {

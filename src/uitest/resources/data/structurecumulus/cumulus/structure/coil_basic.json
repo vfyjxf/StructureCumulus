@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:coil_basic",
+  "description": "the basic coil: four copper windings",
+  "bounds": [0, 0, 0, 2, 1, 2],
+  "variants": {
+    "group": "coil",
+    "members": [
+      {
+        "id": "structurecumulus:coil_basic",
+        "label": "基础线圈"
+      },
+      {
+        "id": "structurecumulus:coil_reinforced",
+        "label": "强化线圈"
+      }
+    ]
+  },
+  "bays": [
+    {
+      "id": "windings",
+      "box": [0, 0, 0, 2, 1, 2],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the four windings",
+      "hint": "place the ring before the core"
+    }
+  ],
+  "checks": [
+    {
+      "id": "windings_check",
+      "bay": "windings",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:copper_block"}}
+    }
+  ]
+}

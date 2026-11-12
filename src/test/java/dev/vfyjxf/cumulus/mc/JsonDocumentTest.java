@@ -626,7 +626,8 @@ class JsonDocumentTest {
                 null
             ),
             document.definitions(),
-            document.extensions()
+            document.extensions(),
+            null
         );
         assertThrows(IllegalStateException.class, () -> new JsonWriter().write(withSeam));
     }
@@ -883,7 +884,7 @@ class JsonDocumentTest {
             null,
             null
         );
-        Document document = new Document(1, root, Map.of(), Map.of());
+        Document document = new Document(1, root, Map.of(), Map.of(), null);
         String text = new JsonWriter().write(document);
         assertTrue(text.contains("\"identity\""), "the identity turn is written");
         assertTrue(
@@ -1049,7 +1050,8 @@ class JsonDocumentTest {
             document.schemaVersion(),
             document.root(),
             Map.of(unit.id(), amended),
-            document.extensions()
+            document.extensions(),
+            null
         );
         IllegalStateException rejected = assertThrows(
             IllegalStateException.class,
@@ -1086,7 +1088,8 @@ class JsonDocumentTest {
             document.schemaVersion(),
             document.root(),
             Map.of(unit.id(), amended),
-            document.extensions()
+            document.extensions(),
+            null
         );
         IllegalStateException rejected = assertThrows(
             IllegalStateException.class,
@@ -1247,6 +1250,137 @@ class JsonDocumentTest {
         }
     }
 
+    @Test
+    void variantsReadWrittenCompiledAndCarried() {
+        String basic = """
+                {"schemaVersion":1,"id":"test:coil_basic","description":"the basic coil",
+                 "bounds":[0,0,0,1,1,1],
+                 "variants":{"group":"coil","members":[
+                    {"id":"test:coil_basic","label":"basic coil"},
+                    {"id":"test:coil_reinforced"}]},
+                 "bays":[{"id":"shell","box":[0,0,0,1,1,1],"coverage":"every_cell",
+                          "footprint":"box","sharing":"exclusive"}],
+                 "checks":[{"id":"shell_check","bay":"shell","focus":{"kind":"bay"},
+                            "expect":{"kind":"each_cell","element":{"kind":"block",
+                                     "id":"minecraft:copper_block"}}}]}
+                """;
+        // the same group declaration verbatim; only the root id and the expected block differ
+        String reinforced = basic.replaceFirst("\"id\":\"test:coil_basic\"", "\"id\":\"test:coil_reinforced\"")
+                .replace("minecraft:copper_block", "minecraft:iron_block");
+        Document document = read(basic);
+        assertNotNull(document.variants(), "the reader carries the declaration");
+        assertEquals(NamespacedId.of("coil"), document.variants().group(), "an unqualified group resolves");
+        assertEquals(2, document.variants().members().size());
+        assertEquals("basic coil", document.variants().members().get(0).label());
+        assertNull(document.variants().members().get(1).label(), "an absent label stays absent");
+        assertNotNull(document.variants().source(), "the block carries its offset");
+
+        String written = new JsonWriter().write(document);
+        int description = written.indexOf("\"description\"");
+        int variants = written.indexOf("\"variants\"");
+        int bays = written.indexOf("\"bays\"");
+        assertTrue(description >= 0 && description < variants && variants < bays, "variants follow description");
+        Document back = read(written);
+        assertEquals(withoutSpans(document), withoutSpans(back));
+        assertEquals(written, new JsonWriter().write(back), "the written form is a fixed point");
+
+        CompileResult result = DocumentCompiler.compile(
+            back,
+            context(
+                Map.of(
+                    NamespacedId.of("test", "coil_basic"),
+                    back,
+                    NamespacedId.of("test", "coil_reinforced"),
+                    read(reinforced)
+                )
+            )
+        );
+        assertTrue(result.findings().isEmpty(), () -> result.findings().findings().toString());
+        Blueprint blueprint = result.blueprint();
+        assertNotNull(blueprint);
+        assertNotNull(blueprint.variants());
+        assertEquals(NamespacedId.of("coil"), blueprint.variants().group());
+        assertEquals(
+            List.of(NamespacedId.of("test", "coil_basic"), NamespacedId.of("test", "coil_reinforced")),
+            blueprint.variants().members().stream().map(member -> member.id()).toList()
+        );
+        assertEquals("basic coil", blueprint.variants().members().get(0).label());
+        assertEquals(1, blueprint.variants().indexOf(NamespacedId.of("test", "coil_reinforced")));
+    }
+
+    @Test
+    void absentVariantsWriteNoMember() {
+        String text = """
+                {"schemaVersion":1,"id":"test:plain","bounds":[0,0,0,1,1,1],
+                 "bays":[{"id":"shell","box":[0,0,0,1,1,1],"coverage":"every_cell",
+                          "footprint":"box","sharing":"exclusive"}],
+                 "checks":[{"id":"shell_check","bay":"shell","focus":{"kind":"bay"},
+                            "expect":{"kind":"each_cell","element":{"kind":"block",
+                                     "id":"minecraft:stone"}}}]}
+                """;
+        Document document = read(text);
+        assertNull(document.variants());
+        assertFalse(new JsonWriter().write(document).contains("\"variants\""));
+    }
+
+    @Test
+    void variantBlocksRejectUnknownMembersAndWrongKinds() {
+        String unknown = """
+                {"schemaVersion":1,"id":"test:variant_unknown","bounds":[0,0,0,1,1,1],
+                 "variants":{"group":"coil","members":[{"id":"test:a"},{"id":"test:b"}],"extra":1},
+                 "bays":[],"checks":[]}
+                """;
+        assertReaderError(unknown, "unknown member 'extra'");
+
+        String memberUnknown = """
+                {"schemaVersion":1,"id":"test:variant_member","bounds":[0,0,0,1,1,1],
+                 "variants":{"group":"coil","members":[{"id":"test:a","note":"x"}]},
+                 "bays":[],"checks":[]}
+                """;
+        assertReaderError(memberUnknown, "unknown member 'note'");
+
+        String notArray = """
+                {"schemaVersion":1,"id":"test:variant_array","bounds":[0,0,0,1,1,1],
+                 "variants":{"group":"coil","members":{"id":"test:a"}},
+                 "bays":[],"checks":[]}
+                """;
+        assertReaderError(notArray, "expected a JSON array");
+
+        String label = """
+                {"schemaVersion":1,"id":"test:variant_label","bounds":[0,0,0,1,1,1],
+                 "variants":{"group":"coil","members":[{"id":"test:a","label":1}]},
+                 "bays":[],"checks":[]}
+                """;
+        assertReaderError(label, "expected a string");
+
+        String definition = """
+                {"schemaVersion":1,"id":"test:variant_definition","bounds":[0,0,0,1,1,1],
+                 "definitions":{"test:unit":{"bounds":[0,0,0,1,1,1],
+                    "variants":{"group":"coil","members":[{"id":"test:a"},{"id":"test:b"}]}}},
+                 "bays":[],"checks":[]}
+                """;
+        assertReaderError(definition, "unknown member 'variants'");
+    }
+
+    private void assertReaderError(String text, String message) {
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        assertEquals(1, errors.size(), () -> "one finding: " + errors);
+        assertEquals(FindingCode.of(FindingCode.Family.doc, 2), errors.get(0).code());
+        assertTrue(errors.get(0).message().contains(message), errors.get(0).message());
+    }
+
+    private static CompilerContext context(Map<NamespacedId, Document> documents) {
+        Catalogs catalogs = Catalogs.builtin();
+        return new CompilerContext(
+            catalogs.focuses(),
+            catalogs.expectations(),
+            catalogs.computations(),
+            Map.of(),
+            DocumentSource.of(documents)
+        );
+    }
+
     private static CompilerContext context() {
         Catalogs catalogs = Catalogs.builtin();
         return new CompilerContext(
@@ -1278,7 +1412,8 @@ class JsonDocumentTest {
                     TreeMap::new
                 )
             ),
-            document.extensions()
+            document.extensions(),
+            document.variants() == null ? null : document.variants().withoutSpans()
         );
     }
 

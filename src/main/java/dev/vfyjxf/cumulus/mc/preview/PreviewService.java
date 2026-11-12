@@ -134,7 +134,11 @@ public final class PreviewService {
         );
     }
 
-    /** One control from the client; a session that cannot recompute is closed. */
+    /**
+     * One control from the client; a session that cannot recompute is closed. A variant switch is the
+     * session's ordinary open with the next member at the same origin: the new id brings its own
+     * preference memory, and nothing else about the session survives (design 15 §12.2).
+     */
     public static void control(
         ServerPlayer player,
         PreviewControlPayload.Control control,
@@ -146,7 +150,15 @@ public final class PreviewService {
         }
         if (!session.apply(player, control, target)) {
             sessions.remove(key(player));
+            NamespacedId next = session.variantSwitch();
+            LatticePoint origin = next == null ? null : session.siting().origin();
             session.close();
+            if (next != null && origin != null) {
+                Opened opened = openFor(player, next, origin);
+                if (!opened.opened()) {
+                    player.sendSystemMessage(Component.literal(opened.message()));
+                }
+            }
         }
     }
 

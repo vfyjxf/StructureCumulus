@@ -958,7 +958,7 @@ The adapter registers its codes in its own code catalog through `Catalogs.Builde
 (`AdapterCodes` holds the ten `SC-MC` codes and their entries; `BuildCodes` holds the build family),
 so each carries the canonical severity
 above and an explanation, and `/cumulus explain` resolves it. The catalog is the host's, not
-`Codes.all`: `Codes.all` has 67 entries, and a capture entry's code is never a kernel registry
+`Codes.all`: `Codes.all` has 69 entries, and a capture entry's code is never a kernel registry
 entry. `CaptureReports` is the only report site: it reads the code's `CodeEntry` (or answers `error`
 when the host registered none), relays the entry as a finding, and applies the kernel's trust guard —
 a code that is already in `Codes.all` is replaced by `SC-OCC-0004` plus a note (`world` §4.1, §4.10).
@@ -1138,7 +1138,7 @@ session, the network payloads, the client overlay renderer and the JEI category 
 single structure's `--settle` flag is no longer absent: P7 chains the settle path after a committed,
 re-check-clean run (§16.2).
 
-The presentation pack (design 16, D-93…D-97) is specified and lands at E1–E5 (§19); E1's stage model,
+The presentation pack (design 16, D-93…D-98) is specified and lands at E1–E6 (§19); E1's stage model,
 staged playback, HUD tiers and banner and E2's placement feedback are in. What stays absent is stated
 there — no presentation state on the server beyond the payload facts, no animation or particle work on
 the server thread, and no second client config file.
@@ -1329,7 +1329,8 @@ package dev.vfyjxf.cumulus.mc.preview.net;
 public record PreviewSyncPayload(NamespacedId blueprintId, java.util.List<SitingCandidate> candidates, int current,
                                  OverlayModel overlay, java.util.List<GhostCell> ghostCells,
                                  java.util.List<Marker> markers,
-                                 PreviewPresentation presentation) implements CustomPacketPayload {
+                                 PreviewPresentation presentation,
+                                 @Nullable VariantSummary variants) implements CustomPacketPayload {
     public static final Type<PreviewSyncPayload> type;
     @Override public Type<? extends CustomPacketPayload> type();
 }
@@ -1338,7 +1339,8 @@ public record PreviewControlPayload(Control control, @Nullable LatticePoint targ
     public static final Type<PreviewControlPayload> type;
 
     public enum Control {
-        turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity, cyclePart, recall, confirm, cancel
+        turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity, cyclePart, recall, confirm, cancel,
+        nextVariant
     }
 
     public static PreviewControlPayload of(Control control);
@@ -1363,9 +1365,19 @@ public record PreviewCatalogPayload(java.util.List<Entry> entries) implements Cu
     @Override public Type<? extends CustomPacketPayload> type();
 
     public record Entry(NamespacedId blueprintId, java.util.List<GhostCell> cells,
-                        java.util.List<MaterialLine> materials, PreviewPresentation presentation) { }
+                        java.util.List<MaterialLine> materials, PreviewPresentation presentation,
+                        @Nullable VariantSummary variants) { }
 
     public record MaterialLine(NamespacedId item, int count) { }
+}
+
+public record VariantSummary(NamespacedId group, java.util.List<Member> members) {
+    public @Nullable Member member(NamespacedId id);
+    public int indexOf(NamespacedId id);
+
+    public record Member(NamespacedId id, @Nullable String label) {
+        public String text();
+    }
 }
 
 public record PreviewOpenPayload(NamespacedId blueprintId) implements CustomPacketPayload {
@@ -1435,7 +1447,7 @@ public final class PlacementAnimator {
 public final class PreviewKeys {
     public enum Action {
         turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
-        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide
+        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant
     }
 
     public static @Nullable KeyMapping binding(Action action);
@@ -1492,6 +1504,11 @@ public final class JeiPreview {
     public static java.util.List<String> hoverText(NamespacedId blueprintId, double mouseX, double mouseY);
     public static void openWorld(NamespacedId blueprintId);
     public static boolean show(NamespacedId blueprintId);
+    public static java.util.List<NamespacedId> variants(NamespacedId blueprintId);
+    public static int variantIndex(NamespacedId blueprintId);
+    public static @Nullable NamespacedId selectedBlueprintId(NamespacedId blueprintId);
+    public static boolean cycleVariant(NamespacedId blueprintId, int step);
+    public static void openSelected(NamespacedId blueprintId);
 }
 
 public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
@@ -2026,6 +2043,15 @@ The landed half (P3), with the wire facts a second implementation would need:
   `PreviewBuilds`, the real executor flow of §18: the session hands over its siting, its item source
   and the assembled `SolvePreferences`, and a refusal keeps the plan in the session for another try
   (5.1).
+- **Variant switch (E6).** When the session's blueprint carries a variant group, its summary travels
+  on `PreviewSyncPayload.variants` (the group id and the members in declaration order, each with its
+  carried label) and the HUD names the current member. `N` is `PreviewKeys.Action.nextVariant`, which
+  sends `PreviewControlPayload.Control.nextVariant`; the session answers with the next member's id and
+  `PreviewService.control` closes it and re-opens the ordinary session for that id at the same origin,
+  through `PreviewService.openFor` — the new id's own preference memory and part pins apply, and the
+  build path is untouched (design 15 §12.2, §12.4). The summary is compiled-bounded, so the codec has
+  no variant cap: an over-cap declaration never compiles (`SC-DOC-0002`) instead of arriving
+  truncated.
 - **Client.** `PreviewClientBridge` is the only common-side reference into `...preview.client`; the
   handler body resolves it inside `enqueueWork`, so no client class loads on a dedicated server.
   `PreviewClientState` is the read-only model the HUD, the renderers and the scenarios share;
@@ -2068,11 +2094,23 @@ The JEI half (P4), with the same kind of wire and lifecycle facts:
   block models under its own orthographic camera, far-to-near by depth, and flushes with
   `BufferSource.endBatch()` rather than `GuiGraphics.flush()` (whose contract disables the depth test
   around the batch). `PreviewInputHandler` is the one input surface — drag rotates, the slider and
-  the wheel move the Y slice, the button calls `JeiPreview.openWorld`. `JeiPreview` is the public
-  face: listed ids, the frame counters the harness asserts on, `show(id)` and `openWorld(id)`.
+  the wheel move the Y slice, the button calls `JeiPreview.openSelected`, the mode button and the
+  variant row switch their own view state. `JeiPreview` is the public face: listed ids, the frame
+  counters the harness asserts on, `show(id)`, `openWorld(id)`, the variant selection
+  (`variants(id)`, `variantIndex(id)`, `selectedBlueprintId(id)`, `cycleVariant(id, step)`) and
+  `openSelected(id)`.
 - **Ghost to world.** `PreviewOpenPayload` carries only the blueprint id; `PreviewService.open(
   ServerPlayer, NamespacedId)` takes the crosshair origin and runs the same session path as
   `/cumulus preview`, so a JEI-opened preview is the §4 session with the same confirm exit.
+- **Variant page (E6).** The catalog still carries one entry per blueprint id (each member is an
+  ordinary document with its own cells and materials), and every entry's `variants` summary lets the
+  client build one page per group: `JeiPreviewPlugin.pages()` keys a group by the first member the
+  catalog ships in declaration order and attaches the other shipped members to it, so
+  `JeiPreview.blueprintIds()` lists pages, not variants. `BlueprintPreviewRecipe` holds the shipped
+  members and the selected index; the variant row switches it in place as per-recipe view state (no
+  payload field), and the button's `openSelected` sends the selected member's id. A member left out
+  by a catalog cap is simply not switchable, and the catalog's WARNING line names it as for every
+  left-out entry (design 15 §12.3).
 
 ## 18. Preferences (design 15 §9, landed with P5)
 
@@ -2124,7 +2162,7 @@ a tie goes to the choice whose latest occurrence is the most recent). Every writ
 - **Not persisted.** The build undo history stays in-memory (D-87); only the preferences and their
   memory are durable.
 
-## 19. Presentation (design 16, approved at E0, landing E1–E5)
+## 19. Presentation (design 16, approved at E0, landing E1–E6)
 
 `dev.vfyjxf.cumulus.mc.preview` owns the stage model and the payload facts, `...preview.client` owns
 playback, the layered ghosts, the HUD tiers, the stage banner, the placement animator and the guide,
@@ -2142,7 +2180,9 @@ three-view with its section band, the slice grid and the per-cell tooltip that n
 (design 16 §11). E5: the guided build — `G`, the next-step line, the next group's emphasis, the hand
 pulse, the frontier's automatic advance through the existing invalidation channel, and the hovered
 ghost's tooltip; `Enter` stays §18's confirm, so a hand-placed stage and a machine-built one share one
-executor (design 16 §12). The milestone's state lives in
+executor (design 16 §12). E6: the variant groups — the document's `variants` block in the compiled
+value, the summary on both payloads, `N`'s re-open and the JEI page's in-place switch
+(design 15 §12, D-98). The milestone's state lives in
 [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
 The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
 §18's confirm path and §16's build, undo and codes.
@@ -2152,7 +2192,7 @@ The sections that already describe this ground keep their meaning — §17's ses
 | Piece | What it is | Owner |
 | --- | --- | --- |
 | the stage model | one pure function over a compiled blueprint and its definition-frame expected cells, producing the stage table (names, expected and satisfied counts, the bay's description and hint); no world, no siting, no clock (D-93) | `mc.preview` |
-| the payload facts | the presentation block (the blueprint's description, the stage table, the frontier stage the marks imply, the plan's shortage lines) on the session payload and on the catalog entry; one stage index per ghost cell; ghosts ordered by stage then definition-frame cell order | `mc.preview.net` |
+| the payload facts | the presentation block (the blueprint's description, the stage table, the frontier stage the marks imply, the plan's shortage lines) on the session payload and on the catalog entry; one stage index per ghost cell; ghosts ordered by stage then definition-frame cell order; the variant summary beside the presentation block on both payloads, compiled-bounded (E6) | `mc.preview.net` |
 | the commit feedback | one S2C payload per committed transaction and per undo, to the invoking player only, listing the cells the transaction changed in the order it changed them, with the status and the formed flag (D-95); `ApplyReport.changes` is where the cells come from, and `BuildFeedback` is the one sender | `mc.preview.net`, sent by the confirm path and the build commands |
 | the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: `hud.*` with `animation.enabled`/`animation.speed` at E1, `animation.sound`/`animation.celebrate` at E2 | `mc.ClientConfig`, registered by the mod entry |
 
@@ -2175,10 +2215,20 @@ invalidation channel (§17's `LevelWatch` revision check), its next-step line is
 formatter with a fixed vocabulary, and its `Enter` is the §18 confirm unchanged — the world keeps one
 writer (D-97).
 
-**JEI side (E4).** The category gains a mode button (isometric, three-view, slice grid) beside the
+**JEI side (E4, E6).** The category gains a mode button (isometric, three-view, slice grid) beside the
 existing slider and button. All three modes draw the catalog entry's cells; the mode is per-recipe
 view state, no payload carries it, and no cap changes — the entry is already at most 512 cells or
-absent (§17's catalog law, design 15 §6.1).
+absent (§17's catalog law, design 15 §6.1). E6 adds the variant row: a group is one page keyed by the
+first shipped member, the row switches the member in place (per-recipe view state, no payload field),
+and the button opens the selected member's id through the same `openSelected` entry point
+(design 15 §12.3).
+
+**Variant groups (E6).** The document block is read and written by the host's `JsonReader`/`JsonWriter`
+(a document-level `variants` member, canonical order after `description`), validated by
+`DocumentCompiler` (`SC-DOC-0016`/`SC-DOC-0017`, every member compiled once) and carried as
+`Blueprint.variants()`. `PreviewVariants` is the one conversion from the compiled carry to the wire
+`VariantSummary` and the one switch arithmetic (declaration order, wrapping); both are package-private,
+so the adapter's public surface grows by the payload record and `JeiPreview`'s five methods only.
 
 **Still absent.** A server-side stage or playback state; animation or particle work on the server
 thread; broadcasting another player's placement animation; a stage-number billboard in the world; a

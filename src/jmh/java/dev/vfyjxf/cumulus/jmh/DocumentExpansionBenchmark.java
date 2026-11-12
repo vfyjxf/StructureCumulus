@@ -117,7 +117,7 @@ public class DocumentExpansionBenchmark {
                     : List.of(new PlacementSpec(id("c" + (layer + 1)), LatticePoint.origin, id("next"), null));
             definitions.put(id("c" + layer), definition(id("c" + layer), placements));
         }
-        return new Document(Document.currentVersion, root, definitions, Map.of());
+        return new Document(Document.currentVersion, root, definitions, Map.of(), null);
     }
 
     private static Document diamondDocument() {
@@ -138,7 +138,7 @@ public class DocumentExpansionBenchmark {
             definitions.put(id("l" + layer), definition(id("l" + layer), placements));
             definitions.put(id("r" + layer), definition(id("r" + layer), placements));
         }
-        return new Document(Document.currentVersion, root, definitions, Map.of());
+        return new Document(Document.currentVersion, root, definitions, Map.of(), null);
     }
 
     private static BlueprintSpec rootSpec(List<PlacementSpec> placements) {

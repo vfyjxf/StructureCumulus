@@ -63,6 +63,8 @@ class CodesTest {
             SC-DOC-0013 ERROR DASH document
             SC-DOC-0014 ERROR P document
             SC-DOC-0015 ERROR P document
+            SC-DOC-0016 ERROR P document
+            SC-DOC-0017 ERROR P document
             SC-CTX-0001 ERROR P context
             SC-CTX-0004 ERROR P context
             SC-CTX-0005 ERROR P context
@@ -119,7 +121,7 @@ class CodesTest {
                 rows.add(line.split("\\s+"));
             }
         }
-        assertEquals(67, rows.size());
+        assertEquals(69, rows.size());
         assertEquals(rows.size(), Codes.all.size());
 
         Set<FindingCode> seen = new HashSet<>();

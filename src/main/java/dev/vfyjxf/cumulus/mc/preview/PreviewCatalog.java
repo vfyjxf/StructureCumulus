@@ -133,7 +133,7 @@ final class PreviewCatalog {
             List.of(),
             0
         );
-        return new PreviewCatalogPayload.Entry(id, cells, materials, presentation);
+        return new PreviewCatalogPayload.Entry(id, cells, materials, presentation, PreviewVariants.summary(blueprint));
     }
 
     private static List<PreviewCatalogPayload.MaterialLine> materials(Map<LatticePoint, BlockState> states) {

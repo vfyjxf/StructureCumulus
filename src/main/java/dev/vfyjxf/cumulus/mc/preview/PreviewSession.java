@@ -59,6 +59,7 @@ import dev.vfyjxf.cumulus.mc.preview.net.PreviewControlPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
+import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -112,6 +113,7 @@ final class PreviewSession {
     private final ServerLevel level;
     private final NamespacedId blueprintId;
     private final Blueprint blueprint;
+    private final @Nullable VariantSummary variants;
     private final PreviewCycle cycle;
     private final BuildPreferences preferences;
     private final ItemSource source;
@@ -134,6 +136,7 @@ final class PreviewSession {
     private boolean retracted;
     private boolean invalidated;
     private @Nullable String lastNote;
+    private @Nullable NamespacedId variantSwitch;
     private boolean cancelled;
 
     private PreviewSession(
@@ -147,6 +150,7 @@ final class PreviewSession {
         this.level = player.serverLevel();
         this.blueprintId = blueprint.id();
         this.blueprint = blueprint;
+        this.variants = PreviewVariants.summary(blueprint);
         this.cycle = cycle;
         this.preferences = preferences;
         this.source = source;
@@ -201,6 +205,29 @@ final class PreviewSession {
 
     UUID playerId() {
         return playerId;
+    }
+
+    NamespacedId blueprintId() {
+        return blueprintId;
+    }
+
+    /** The pose this session currently holds; a variant switch carries its origin (design 15 §12). */
+    Siting siting() {
+        return cycle.slot().siting();
+    }
+
+    /** The group summary the client shows, or null for a standalone blueprint. */
+    @Nullable
+    VariantSummary variants() {
+        return variants;
+    }
+
+    /** The member a {@code nextVariant} control asked for, read once when the session ends. */
+    @Nullable
+    NamespacedId variantSwitch() {
+        NamespacedId requested = variantSwitch;
+        variantSwitch = null;
+        return requested;
     }
 
     ServerLevel level() {
@@ -262,6 +289,19 @@ final class PreviewSession {
                 }
             }
             case cyclePart -> cyclePart(target);
+            case nextVariant -> {
+                if (variants == null) {
+                    lastNote = "this blueprint is not a variant group";
+                    break;
+                }
+                NamespacedId next = PreviewVariants.next(variants, blueprintId, 1);
+                if (next == null) {
+                    lastNote = "the variant group has no other member";
+                    break;
+                }
+                variantSwitch = next;
+                return false;
+            }
             case confirm -> {
                 return confirm(player);
             }
@@ -323,7 +363,8 @@ final class PreviewSession {
             overlayOrEmpty(),
             ghosts,
             markers,
-            presentation
+            presentation,
+            variants
         );
     }
 

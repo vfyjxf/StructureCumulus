@@ -2175,6 +2175,40 @@ coherent.
 block, and leaving it leaves an ordinary session. A completion state names settle as the claim step,
 because a fully satisfied confirm is the idempotent empty report and not a formation.
 
+### D-98 — A variant group is a static combination of blueprint documents
+
+A variant group ([design/15](15-preview.md) §12) is a document-level declaration naming other
+blueprint documents in order: each member is an ordinary document that compiles on its own, every
+member repeats the declaration verbatim, and the group only carries ids and labels into the compiled
+value. Switching re-opens a session on the next member's id at the current origin (design 15 §12.2),
+the JEI page switches its shipped members in place (design 15 §12.3), and the build executor is
+untouched (design 15 §12.4).
+
+**Why static documents.** A parameterized document language — one declaration plus per-instance
+arguments that produce different bays, checks or bounds — would move the variant into the compiler, the
+catalog projection and the build request at once, and every one of them would need a versioned meaning
+for "the same blueprint with a different shape". The preview's own arguments (design 15 §9) already
+show the boundary: an argument overrides *values* a factory reads, never geometry. Independent
+documents keep one schema, one lowering function and one equality rule; a group is only an index over
+them (D-94's carry law applied to the group).
+
+**Why the repeated declaration.** A compiled member must know its group without a cross-document
+lookup: the catalog has the merged source, the session has one blueprint, and the JEI client has
+neither. Fetching the group from a second document would make the payload depend on the document
+source at render time. Repeating the block costs a copied array in the datapack and buys a compiled
+value that is self-describing; the compiler checks that the copies agree, so a disagreement is a
+finding, never a silently different UI.
+
+**Rejected: a server-side variant index beside the session.** It would be a second source of truth for
+what a group is, could drift on a reload, and would make the session's switch depend on state that
+outlives it. The group travels with the value that owns it (D-94).
+
+**Consequence.** A group of one is not a group (`SC-DOC-0002`), and two documents that claim one group
+under different declarations are refused on both sides (`SC-DOC-0017`) instead of looping. A group
+adds no finding family of its own: an unusable member is `SC-DOC-0016`/`SC-DOC-0017`, and the
+presentation surfaces show the carried labels verbatim (D-94). The parameterized form stays backlog
+(design 15 §11).
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
