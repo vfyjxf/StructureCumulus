@@ -75,6 +75,21 @@ final class PreviewExpected {
         return new Outcome(oriented, null);
     }
 
+    /** The definition-frame cells one check declares over, whether or not their blocks resolve. */
+    static List<LatticePoint> declared(Check<?> check) {
+        List<NamespacedId> perCell = new ArrayList<>();
+        List<NamespacedId> focused = new ArrayList<>();
+        walk(check.expectation().declaration(), false, false, perCell, focused);
+        List<LatticePoint> cells = new ArrayList<>();
+        if (!perCell.isEmpty()) {
+            cells.addAll(cells(check.bay().cells()));
+        }
+        if (!focused.isEmpty()) {
+            cells.addAll(cells(check.focus().staticCells(check.bay().cells())));
+        }
+        return cells;
+    }
+
     static Map<String, String> properties(BlockState state) {
         Map<String, String> properties = new TreeMap<>();
         for (Property<?> property : state.getProperties()) {

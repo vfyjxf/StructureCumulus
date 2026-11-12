@@ -29,12 +29,18 @@ public record PreviewCatalogPayload(List<Entry> entries) implements CustomPacket
     }
 
     /** One blueprint, projected to the expected states of its identity orientation. */
-    public record Entry(NamespacedId blueprintId, List<GhostCell> cells, List<MaterialLine> materials) {
+    public record Entry(
+        NamespacedId blueprintId,
+        List<GhostCell> cells,
+        List<MaterialLine> materials,
+        PreviewPresentation presentation
+    ) {
 
         public Entry {
             Objects.requireNonNull(blueprintId, "blueprintId");
             cells = List.copyOf(cells);
             materials = List.copyOf(materials);
+            Objects.requireNonNull(presentation, "presentation");
         }
     }
 

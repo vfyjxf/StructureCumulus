@@ -247,28 +247,42 @@ public record PreviewSyncPayload(NamespacedId blueprintId, java.util.List<Siting
                                  java.util.List<Marker> markers,
                                  PreviewPresentation presentation) { }
 
-// One presentation block: the blueprint's own text, its stage table in index order, and the stage the
-// world is working on right now (-1 when the table is empty).
+// One presentation block: the blueprint's own text, its stage table in index order, the stage the
+// world is working on right now (-1 when the table is empty), and the plan's shortage lines.
 public record PreviewPresentation(@Nullable String description, java.util.List<Stage> stages,
-                                  int currentStage) { }
+                                  int currentStage, java.util.List<MaterialStatus> materials,
+                                  int moreMaterials) { }
 
-// One stage: its display name, its expected cell count, and the bay's carried hint (E3).
-public record Stage(String name, int expectedCells, @Nullable String hint) { }
+// One stage: its display name, its expected cell count, how many of them the world already holds, the
+// bay's carried hint (E3) and the bay's carried description (the banner's second line, §8).
+public record Stage(String name, int expectedCells, int satisfiedCells,
+                    @Nullable String hint, @Nullable String description) { }
+
+// One item the open plan still lacks: what it asks for and what the item source can give (§7.3).
+public record MaterialStatus(NamespacedId item, int need, int have) { }
 
 public record GhostCell(LatticePoint cell, NamespacedId block,
                         java.util.Map<String, String> properties, int stageIndex) { }
 ```
 
-- **The shape changes once, at E1.** The text fields exist from E1 and stay null/absent there; E3
-  fills them (§10) without touching the wire shape again.
+- **The shape lands once, at E1.** `Stage` carries both text members from the first payload: its
+  `description` is filled from the bay the stage derives from, because §8's banner shows that line
+  from E1; its `hint` stays null until E3 fills it, and `PreviewPresentation.description` (the root
+  text) stays null the same way. E3 fills values and never changes this shape.
+- **`satisfiedCells` is what the segmented bar fills by.** §7.2 fills each segment by its stage's
+  satisfied fraction, and the client holds no stage index for a marked cell that draws no ghost
+  (`present`, `wrong`, `blocked`), so the counting happens where the marks are: the server.
+- **`materials` is the third tier's source.** §7.3 draws one line per shortage with its `have/need`;
+  the dry run's item simulation is server-only, so the lines travel (at most three, the rest counted
+  in `moreMaterials`) instead of being re-simulated or parsed out of a marker's text.
 - **`currentStage` is the frontier, computed by the server.** The lowest stage index with an
   unsatisfied expected cell, or the last stage when every cell is satisfied; `-1` when the table is
   empty (§6.1). The server computes it from the marks it ships in the same payload, so the client
   derives nothing (§15). It is A.3's "already built + buildable now" stage, and it is what the
   banner announces when it moves (§8, §12.5).
-- **The catalog entry carries the same two records.** `PreviewCatalogPayload.Entry` ships the same
-  `PreviewPresentation` and the same `GhostCell`, because one cell type must mean one thing (§11's
-  tooltips and stage grouping read it). A catalog is not a session: there is no live world under it,
+- **The catalog entry carries the same records.** `PreviewCatalogPayload.Entry` ships the same
+  `PreviewPresentation`, the same `Stage` and the same `GhostCell`, because one cell type must mean
+  one thing (§11's tooltips and stage grouping read it). A catalog is not a session: there is no live world under it,
   so the same frontier definition yields `0` whenever it has a stage (nothing is satisfied in a page),
   and its table is the identity-orientation table of §5's derivation.
 - **`ghostCells` are emitted ordered by `(stageIndex, definition-frame canonical cell order)`**, and
@@ -426,6 +440,10 @@ is estimated, sampled or invented.
   `have/need` from the same simulation, plus one bar per line.
 - At most three lines, then `+k more`; a creative source collapses the tier to nothing (4.4's law),
   and a satisfied plan shows no lines at all.
+- **The lines are payload facts, not a client calculation.** The session reads them from the dry
+  run's item simulation (`BuildMaterials.missing`) and ships at most three as `MaterialStatus`
+  entries, counting the rest in `moreMaterials` (§5); a page has no item source, so a catalog entry's
+  list is empty.
 
 ### 7.4 Layout and quiet compatibility
 

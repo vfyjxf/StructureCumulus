@@ -24,8 +24,12 @@ final class PreviewScenarioSupport {
     }
 
     static ScenarioBuilder open(ScenarioBuilder build) {
+        return open(build, probe);
+    }
+
+    static ScenarioBuilder open(ScenarioBuilder build, NamespacedId id) {
         return build.runCommand(
-            "cumuluspreview " + probe.text() + " " + origin.getX() + " " + origin.getY() + " " + origin.getZ()
+            "cumuluspreview " + id.text() + " " + origin.getX() + " " + origin.getY() + " " + origin.getZ()
         );
     }
 

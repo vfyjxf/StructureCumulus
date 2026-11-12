@@ -9,6 +9,8 @@ import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -92,16 +94,26 @@ final class PreviewCatalog {
             );
             return null;
         }
+        StageModel.Table table = StageModel.of(blueprint, states.keySet());
+        List<Stage> stages = new ArrayList<>(table.stages().size());
         List<GhostCell> cells = new ArrayList<>(states.size());
-        for (Map.Entry<LatticePoint, BlockState> state : states.entrySet()) {
-            BlockState value = state.getValue();
-            cells.add(
-                new GhostCell(
-                    state.getKey(),
-                    PreviewExpected.blockId(value.getBlock()),
-                    PreviewExpected.properties(value)
-                )
-            );
+        for (int index = 0; index < table.stages().size(); index++) {
+            StageModel.Stage stage = table.stages().get(index);
+            stages.add(new Stage(stage.name(), stage.cells().size(), 0, null, stage.description()));
+            for (LatticePoint cell : stage.cells()) {
+                BlockState value = states.get(cell);
+                if (value == null) {
+                    continue;
+                }
+                cells.add(
+                    new GhostCell(
+                        cell,
+                        PreviewExpected.blockId(value.getBlock()),
+                        PreviewExpected.properties(value),
+                        index
+                    )
+                );
+            }
         }
         List<PreviewCatalogPayload.MaterialLine> materials = materials(states);
         if (materials.size() > maxMaterials) {
@@ -113,7 +125,15 @@ final class PreviewCatalog {
             );
             return null;
         }
-        return new PreviewCatalogPayload.Entry(id, cells, materials);
+        // a page satisfies nothing, so its frontier is the first stage whenever it has one (design 16 §5)
+        PreviewPresentation presentation = new PreviewPresentation(
+            null,
+            stages,
+            stages.isEmpty() ? -1 : 0,
+            List.of(),
+            0
+        );
+        return new PreviewCatalogPayload.Entry(id, cells, materials, presentation);
     }
 
     private static List<PreviewCatalogPayload.MaterialLine> materials(Map<LatticePoint, BlockState> states) {

@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus;
 
+import dev.vfyjxf.cumulus.mc.ClientConfig;
 import dev.vfyjxf.cumulus.mc.CumulusCommand;
 import dev.vfyjxf.cumulus.mc.DatapackBlueprints;
 import dev.vfyjxf.cumulus.mc.ServerState;
@@ -42,6 +43,8 @@ public final class StructureCumulus {
         container.registerConfig(ModConfig.Type.SERVER, BuildConfig.spec);
         // the preference defaults live in their own server file; the memory is per-level SavedData
         container.registerConfig(ModConfig.Type.SERVER, PrefConfig.spec, "structurecumulus-preferences.toml");
+        // the client file is loaded on a physical client only; its readers fall back to the defaults
+        container.registerConfig(ModConfig.Type.CLIENT, ClientConfig.spec, "structurecumulus-client.toml");
         WatchEvents.register();
         logger.info("{} loading", Constants.modId);
     }

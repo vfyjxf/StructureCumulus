@@ -8,8 +8,11 @@ import dev.vfyjxf.cumulus.kernel.remedy.OverlayModel;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
+import dev.vfyjxf.cumulus.mc.preview.net.MaterialStatus;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewControlPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.BlockHitResult;
@@ -97,8 +100,22 @@ public final class PreviewClientState {
         }
         int total = present + problems;
         var siting = current.candidates().get(current.current()).siting();
+        PreviewPresentation presentation = current.presentation();
+        List<Stage> stages = presentation.stages();
+        int selected = PlaybackController.selected();
         List<String> lines = new ArrayList<>();
         lines.add("preview: " + current.blueprintId().text() + " · " + present + "/" + total);
+        lines.add("progress " + present + "/" + total + " (" + percent(present, total) + "%)");
+        if (!stages.isEmpty() && selected >= 0 && selected < stages.size()) {
+            Stage stage = stages.get(selected);
+            lines.add("stage " + (selected + 1) + "/" + stages.size() + ": " + stage.name());
+        }
+        for (MaterialStatus material : presentation.materials()) {
+            lines.add("material " + material.item().text() + " " + material.have() + "/" + material.need());
+        }
+        if (presentation.moreMaterials() > 0) {
+            lines.add("+" + presentation.moreMaterials() + " more material(s)");
+        }
         lines.add(
             "candidate " + (current.current() + 1) + "/" + current.candidates().size() + " · turn "
                     + siting.placement().orientation().turn() + " · flip "
@@ -123,7 +140,8 @@ public final class PreviewClientState {
             lines.add("hover: " + tooltip);
         }
         lines.add(
-            "keys: [ ] turn · ; flip · , . origin · R reset (hold = identity) · P recall · PgUp/PgDn slice · T all/problems · Enter confirm · Esc cancel"
+            "keys: [ ] turn · ; flip · , . origin · R reset (hold = identity) · P recall · PgUp/PgDn slice · T all/problems"
+                    + " · Up/Down stage · V play · B step · Enter confirm · Esc cancel"
         );
         return List.copyOf(lines);
     }
@@ -132,6 +150,7 @@ public final class PreviewClientState {
         session = payload;
         lastSyncTick = now();
         hoverTooltip = null;
+        PlaybackController.accept(payload);
         if (sliceY == Integer.MIN_VALUE) {
             sliceY = payload.overlay().bounds().min().y();
         }
@@ -144,6 +163,7 @@ public final class PreviewClientState {
         hoverTooltip = null;
         sliceY = Integer.MIN_VALUE;
         resetHeldTicks = 0;
+        PlaybackController.clear();
         PreviewOverlayRenderer.clear();
     }
 
@@ -191,6 +211,7 @@ public final class PreviewClientState {
         }
         updateTooltip(current);
         dispatchControls();
+        PlaybackController.tick();
     }
 
     private static void dispatchControls() {
@@ -228,6 +249,18 @@ public final class PreviewClientState {
         }
         if (clicked(PreviewKeys.Action.toggleProblems)) {
             problemsOnly = !problemsOnly;
+        }
+        if (clicked(PreviewKeys.Action.prevStage)) {
+            PlaybackController.previousStage();
+        }
+        if (clicked(PreviewKeys.Action.nextStage)) {
+            PlaybackController.nextStage();
+        }
+        if (clicked(PreviewKeys.Action.playPause)) {
+            PlaybackController.togglePlay();
+        }
+        if (clicked(PreviewKeys.Action.stepCell)) {
+            PlaybackController.step();
         }
         trackReset();
     }
@@ -346,6 +379,11 @@ public final class PreviewClientState {
 
     private static String describe(LatticePoint point) {
         return "(" + point.x() + "," + point.y() + "," + point.z() + ")";
+    }
+
+    /** The 7.1 percentage: 100 only when every expected cell is present. */
+    private static int percent(int satisfied, int expected) {
+        return expected == 0 ? 0 : (int) Math.floor(100.0D * satisfied / expected);
     }
 
     private static String sliceLabel(int slice) {

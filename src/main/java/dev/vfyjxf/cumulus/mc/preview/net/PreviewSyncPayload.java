@@ -12,8 +12,8 @@ import java.util.Objects;
 
 /**
  * The server's whole answer for one preview session: the expressible cycle, the current pick, the
- * overlay marks, the expected states to draw and the session's own markers. A capped ghost list
- * carries an overflow marker, so a truncation is never silent.
+ * overlay marks, the expected states to draw, the session's own markers and the presentation block.
+ * A capped ghost list carries an overflow marker, so a truncation is never silent.
  */
 public record PreviewSyncPayload(
     NamespacedId blueprintId,
@@ -21,7 +21,8 @@ public record PreviewSyncPayload(
     int current,
     OverlayModel overlay,
     List<GhostCell> ghostCells,
-    List<Marker> markers
+    List<Marker> markers,
+    PreviewPresentation presentation
 ) implements CustomPacketPayload {
 
     public static final Type<PreviewSyncPayload> type = new Type<>(
@@ -40,6 +41,7 @@ public record PreviewSyncPayload(
         Objects.requireNonNull(overlay, "overlay");
         ghostCells = List.copyOf(ghostCells);
         markers = List.copyOf(markers);
+        Objects.requireNonNull(presentation, "presentation");
     }
 
     @Override

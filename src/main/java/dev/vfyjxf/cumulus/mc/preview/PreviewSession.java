@@ -54,12 +54,18 @@ import dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData;
 import dev.vfyjxf.cumulus.mc.pref.SitingCandidateScorer;
 import dev.vfyjxf.cumulus.mc.pref.SolvePreferenceAssembler;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
+import dev.vfyjxf.cumulus.mc.preview.net.MaterialStatus;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewControlPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jspecify.annotations.Nullable;
@@ -116,6 +122,9 @@ final class PreviewSession {
     private List<GhostCell> ghosts = List.of();
     private List<Marker> markers = List.of();
     private List<LatticePoint> pending = List.of();
+    private StageModel.@Nullable Table stageTable;
+    private PreviewPresentation presentation = new PreviewPresentation(null, List.of(), -1, List.of(), 0);
+    private List<BuildMaterials.MaterialShortage> missing = List.of();
     private List<String> shortages = List.of();
     private boolean planned;
     private @Nullable ClaimView claims;
@@ -313,7 +322,8 @@ final class PreviewSession {
             cycle.current(),
             overlayOrEmpty(),
             ghosts,
-            markers
+            markers,
+            presentation
         );
     }
 
@@ -459,10 +469,15 @@ final class PreviewSession {
             abort(draft);
         }
         planned = repair != null;
-        shortages = repair == null
+        missing = repair == null
                 ? List.of()
-                : BuildMaterials.shortages(repair, siting, level, source, LevelAccess.materializers());
+                : BuildMaterials.missing(repair, siting, level, source, LevelAccess.materializers());
+        shortages = BuildMaterials.shortages(missing);
         overlay = new OverlayModel(bounds, marks, List.of());
+        if (stageTable == null) {
+            evaluate(expected.states());
+        }
+        presentation = presentation(marks, siting);
         ghosts = ghosts(marks, expected.states(), siting);
         markers = cap(sessionMarkers(built, marks, bounds), Locus.world(bounds.asSet()));
         revision = LevelAccess.blockRevision(level, bounds);
@@ -512,6 +527,17 @@ final class PreviewSession {
                 new Marker(
                     locus,
                     "ghost cap " + maxGhosts + " reached: showing " + drawn + " of " + expectedGhosts + " cells",
+                    MarkerKind.warning
+                )
+            );
+        }
+        StageModel.Table table = stageTable;
+        if (table != null && table.truncated()) {
+            built.add(
+                new Marker(
+                    locus,
+                    "stage cap " + StageModel.maxStages + " reached: showing " + table.stages().size() + " of "
+                            + table.expectedStages() + " stages",
                     MarkerKind.warning
                 )
             );
@@ -615,34 +641,92 @@ final class PreviewSession {
         return text.toString();
     }
 
+    /** The stage table, derived once: it is a function of the blueprint (design 16 §4.3). */
+    private void evaluate(Map<LatticePoint, BlockState> expected) {
+        stageTable = StageModel.of(blueprint, expected.keySet());
+    }
+
+    /** The wire presentation: the table with its satisfied share, the frontier and the plan's shortages. */
+    private PreviewPresentation presentation(Map<LatticeKey, CellMark> marks, Siting siting) {
+        StageModel.Table table = stageTable;
+        List<StageModel.Stage> derived = table == null ? List.of() : table.stages();
+        List<Stage> stages = new ArrayList<>(derived.size());
+        int frontier = -1;
+        for (int index = 0; index < derived.size(); index++) {
+            StageModel.Stage stage = derived.get(index);
+            int satisfied = 0;
+            for (LatticePoint cell : stage.cells()) {
+                LatticePoint world = siting.toWorld(cell);
+                if (world != null && marks.get(world.key()) == CellMark.present) {
+                    satisfied++;
+                }
+            }
+            if (frontier < 0 && satisfied < stage.cells().size()) {
+                frontier = index;
+            }
+            stages.add(new Stage(stage.name(), stage.cells().size(), satisfied, null, stage.description()));
+        }
+        if (frontier < 0 && !stages.isEmpty()) {
+            frontier = stages.size() - 1;
+        }
+        List<MaterialStatus> materials = new ArrayList<>(maxShownShortages);
+        int more = 0;
+        if (!(source instanceof CreativeItemSource)) {
+            more = Math.max(0, missing.size() - maxShownShortages);
+            for (int index = 0; index < missing.size() && index < maxShownShortages; index++) {
+                BuildMaterials.MaterialShortage shortage = missing.get(index);
+                materials.add(new MaterialStatus(itemId(shortage.template()), shortage.need(), shortage.have()));
+            }
+        }
+        return new PreviewPresentation(null, stages, frontier, materials, more);
+    }
+
+    /** The ghosts in play order: the stage table's stages in order, each in canonical cell order. */
     private List<GhostCell> ghosts(
         Map<LatticeKey, CellMark> marks,
         Map<LatticePoint, BlockState> expected,
         Siting siting
     ) {
+        StageModel.Table table = stageTable;
+        List<StageModel.Stage> stages = table == null ? List.of() : table.stages();
         List<GhostCell> built = new ArrayList<>();
-        for (Map.Entry<LatticePoint, BlockState> entry : expected.entrySet()) {
-            LatticePoint world = siting.toWorld(entry.getKey());
-            if (world == null) {
-                continue;
+        for (int stageIndex = 0; stageIndex < stages.size() && built.size() < maxGhosts; stageIndex++) {
+            for (LatticePoint cell : stages.get(stageIndex).cells()) {
+                if (built.size() >= maxGhosts) {
+                    break;
+                }
+                BlockState state = expected.get(cell);
+                if (state == null) {
+                    continue;
+                }
+                LatticePoint world = siting.toWorld(cell);
+                if (world == null) {
+                    continue;
+                }
+                CellMark mark = marks.get(world.key());
+                if (mark == CellMark.present
+                        || mark == CellMark.wrong
+                        || mark == CellMark.extra
+                        || mark == CellMark.blocked
+                        || mark == CellMark.unknown) {
+                    continue;
+                }
+                built.add(
+                    new GhostCell(
+                        world,
+                        PreviewExpected.blockId(state.getBlock()),
+                        PreviewExpected.properties(state),
+                        stageIndex
+                    )
+                );
             }
-            CellMark mark = marks.get(world.key());
-            if (mark == CellMark.present
-                    || mark == CellMark.wrong
-                    || mark == CellMark.extra
-                    || mark == CellMark.blocked
-                    || mark == CellMark.unknown) {
-                continue;
-            }
-            if (built.size() >= maxGhosts) {
-                break;
-            }
-            BlockState state = entry.getValue();
-            built.add(
-                new GhostCell(world, PreviewExpected.blockId(state.getBlock()), PreviewExpected.properties(state))
-            );
         }
         return List.copyOf(built);
+    }
+
+    private static NamespacedId itemId(ItemStack stack) {
+        ResourceLocation key = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return NamespacedId.of(key.getNamespace(), key.getPath());
     }
 
     /** The declaration-derived marks: present when the live state already matches, missing otherwise. */

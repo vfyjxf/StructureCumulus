@@ -1163,6 +1163,14 @@ with a reason; it may not leave a public presentation type in neither place.
 ```java
 package dev.vfyjxf.cumulus.mc;
 
+public final class ClientConfig {
+    public static final ModConfigSpec spec;
+    public static boolean animationEnabled();
+    public static double animationSpeed();
+    public static boolean hudProgress();
+    public static boolean hudStageBanner();
+}
+
 public final class LevelAccess {
     public static @Nullable StructureKernel kernel();
     public static @Nullable LevelCapture capture(ServerLevel level);
@@ -1294,11 +1302,23 @@ public interface PreviewConfirmHandler {
 
 public final class PreviewEvents { }
 
+public final class StageModel {
+    public static final int maxStages;
+    public static Table of(Blueprint blueprint, java.util.Collection<LatticePoint> expected);
+
+    public record Stage(String name, @Nullable String description, java.util.List<LatticePoint> cells) { }
+
+    public record Table(java.util.List<Stage> stages, int expectedStages) {
+        public boolean truncated();
+    }
+}
+
 package dev.vfyjxf.cumulus.mc.preview.net;
 
 public record PreviewSyncPayload(NamespacedId blueprintId, java.util.List<SitingCandidate> candidates, int current,
                                  OverlayModel overlay, java.util.List<GhostCell> ghostCells,
-                                 java.util.List<Marker> markers) implements CustomPacketPayload {
+                                 java.util.List<Marker> markers,
+                                 PreviewPresentation presentation) implements CustomPacketPayload {
     public static final Type<PreviewSyncPayload> type;
     @Override public Type<? extends CustomPacketPayload> type();
 }
@@ -1316,14 +1336,23 @@ public record PreviewControlPayload(Control control, @Nullable LatticePoint targ
 
 public record SitingCandidate(Siting siting, int score) { }
 
-public record GhostCell(LatticePoint cell, NamespacedId block, java.util.Map<String, String> properties) { }
+public record GhostCell(LatticePoint cell, NamespacedId block, java.util.Map<String, String> properties,
+                        int stageIndex) { }
+
+public record Stage(String name, int expectedCells, int satisfiedCells,
+                    @Nullable String hint, @Nullable String description) { }
+
+public record PreviewPresentation(@Nullable String description, java.util.List<Stage> stages, int currentStage,
+                                  java.util.List<MaterialStatus> materials, int moreMaterials) { }
+
+public record MaterialStatus(NamespacedId item, int need, int have) { }
 
 public record PreviewCatalogPayload(java.util.List<Entry> entries) implements CustomPacketPayload {
     public static final Type<PreviewCatalogPayload> type;
     @Override public Type<? extends CustomPacketPayload> type();
 
     public record Entry(NamespacedId blueprintId, java.util.List<GhostCell> cells,
-                        java.util.List<MaterialLine> materials) { }
+                        java.util.List<MaterialLine> materials, PreviewPresentation presentation) { }
 
     public record MaterialLine(NamespacedId item, int count) { }
 }
@@ -1349,10 +1378,25 @@ public final class PreviewClientState {
     public static java.util.List<String> hudLines();
 }
 
+public final class PlaybackController {
+    public static java.util.List<String> bannerLines();
+    public static float alphaOf(GhostCell ghost);
+    public static boolean revealed(GhostCell ghost);
+    public static boolean revealedCell(LatticePoint cell);
+    public static @Nullable Integer stageOf(LatticePoint cell);
+    public static @Nullable PreviewPresentation presentation();
+    public static int stageCount();
+    public static int selected();
+    public static int revealed(int stage);
+    public static int ghostCount(int stage);
+    public static boolean playing();
+    public static @Nullable Stage stage(int index);
+}
+
 public final class PreviewKeys {
     public enum Action {
         turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
-        confirm, cancel
+        confirm, cancel, prevStage, nextStage, playPause, stepCell
     }
 
     public static @Nullable KeyMapping binding(Action action);
@@ -1514,8 +1558,12 @@ public final class BuildJournal {
     public void forget();
 }
 public final class BuildMaterials {
+    public record MaterialShortage(ItemStack template, int have, int need) { }
+
     public static List<String> shortages(EditPlan plan, Siting siting, ServerLevel level, ItemSource source);
     public static List<String> shortages(EditPlan plan, Siting siting, ServerLevel level, ItemSource source, Materializers materializers);
+    public static List<String> shortages(List<MaterialShortage> missing);
+    public static List<MaterialShortage> missing(EditPlan plan, Siting siting, ServerLevel level, ItemSource source, Materializers materializers);
 }
 public record BuildPolicy(int permissionLevel, long maxTouchedVolume, boolean allowRemoval) {
     public static final int defaultPermissionLevel;
@@ -1979,7 +2027,9 @@ and `...preview.jei` owns the view modes. No third package appears, and the pres
 module edge. The contracts are design 16's; this section states the adapter-side shape of them, and
 its signatures join §15 per milestone (the batch 10 note there).
 
-**Landed.** Nothing yet: E1–E5 are `pending` in [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
+**Landed.** E1: the stage model, the presentation block on both payloads, staged playback and stage
+switching, the layered ghosts, the three HUD tiers, the stage banner and the client config file.
+E2–E5 are `pending` in [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
 The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
 §18's confirm path and §16's build, undo and codes.
 
@@ -1987,10 +2037,10 @@ The sections that already describe this ground keep their meaning — §17's ses
 
 | Piece | What it is | Owner |
 | --- | --- | --- |
-| the stage model | one pure function over a compiled blueprint, producing the stage table (names, expected counts, the bay hint); no world, no siting, no clock (D-93) | `mc.preview` |
-| the payload facts | the presentation block (the blueprint's description, the stage table and the frontier stage the marks imply) on the session payload and on the catalog entry; one stage index per ghost cell; ghosts ordered by stage then definition-frame cell order | `mc.preview.net` |
+| the stage model | one pure function over a compiled blueprint and its definition-frame expected cells, producing the stage table (names, expected and satisfied counts, the bay's description and hint); no world, no siting, no clock (D-93) | `mc.preview` |
+| the payload facts | the presentation block (the blueprint's description, the stage table, the frontier stage the marks imply, the plan's shortage lines) on the session payload and on the catalog entry; one stage index per ghost cell; ghosts ordered by stage then definition-frame cell order | `mc.preview.net` |
 | the commit feedback | one S2C payload per committed transaction and per undo, to the invoking player only, listing the cells the transaction changed in the order it changed them, with the status and the formed flag (D-95) | `mc.preview.net`, sent by the confirm path and the build commands |
-| the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: the `hud.*` keys at E1, the `animation.*` keys at E2 | the mod entry |
+| the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: `hud.*` and `animation.enabled`/`animation.speed` at E1, the sound and celebration keys at E2 | `mc.ClientConfig`, registered by the mod entry |
 
 The server adds no presentation state: no per-player playback record, no animation queue, no tick
 handler, no map beside the session. The payload is plain data, and its handler resolves client classes

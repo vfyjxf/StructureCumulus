@@ -37,6 +37,8 @@ final class PreviewOverlayRenderer {
     private static final int unknown = 0x90A0A0A0;
     private static final int pulse = 0xE0FF2020;
     private static final long pulseTicks = 40L;
+    /** The done stage's frame keeps a quarter of the mark's alpha. */
+    private static final float doneFrame = 0.25F;
     private static final int maxFrames = 1_024;
 
     private static volatile List<LatticePoint> pulsed = List.of();
@@ -106,6 +108,21 @@ final class PreviewOverlayRenderer {
                 continue;
             }
             float alpha = PreviewClientState.layerAlpha(cell.y());
+            Integer stage = PlaybackController.stageOf(cell);
+            int selected = PlaybackController.selected();
+            if (stage != null && selected >= 0) {
+                if (stage > selected) {
+                    continue;
+                }
+                if (stage < selected) {
+                    emitThin(buffer, matrix, cell, camera, withAlpha(color, alpha * doneFrame));
+                    drawn++;
+                    continue;
+                }
+                if (!PlaybackController.revealedCell(cell)) {
+                    continue;
+                }
+            }
             emit(buffer, matrix, cell, camera, withAlpha(color, alpha));
             drawn++;
         }
@@ -136,12 +153,28 @@ final class PreviewOverlayRenderer {
     }
 
     private static void emit(BufferBuilder buffer, Matrix4f matrix, LatticePoint cell, Vec3 camera, int argb) {
-        float x0 = (float) (cell.x() - camera.x) - 0.002F;
-        float y0 = (float) (cell.y() - camera.y) - 0.002F;
-        float z0 = (float) (cell.z() - camera.z) - 0.002F;
-        float x1 = x0 + 1.004F;
-        float y1 = y0 + 1.004F;
-        float z1 = z0 + 1.004F;
+        emitBox(buffer, matrix, cell, camera, argb, 0.002F);
+    }
+
+    /** The done stage's frame: a thinner, dimmer box than the current stage's (design 16 §6.2). */
+    private static void emitThin(BufferBuilder buffer, Matrix4f matrix, LatticePoint cell, Vec3 camera, int argb) {
+        emitBox(buffer, matrix, cell, camera, argb, 0.3F);
+    }
+
+    private static void emitBox(
+        BufferBuilder buffer,
+        Matrix4f matrix,
+        LatticePoint cell,
+        Vec3 camera,
+        int argb,
+        float inset
+    ) {
+        float x0 = (float) (cell.x() - camera.x) + inset;
+        float y0 = (float) (cell.y() - camera.y) + inset;
+        float z0 = (float) (cell.z() - camera.z) + inset;
+        float x1 = (float) (cell.x() - camera.x) + 1.0F - inset;
+        float y1 = (float) (cell.y() - camera.y) + 1.0F - inset;
+        float z1 = (float) (cell.z() - camera.z) + 1.0F - inset;
         edge(buffer, matrix, x0, y0, z0, x1, y0, z0, argb);
         edge(buffer, matrix, x0, y0, z1, x1, y0, z1, argb);
         edge(buffer, matrix, x0, y1, z0, x1, y1, z0, argb);

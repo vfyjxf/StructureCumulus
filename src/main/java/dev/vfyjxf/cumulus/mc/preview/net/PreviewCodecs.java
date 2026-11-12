@@ -16,6 +16,7 @@ import dev.vfyjxf.cumulus.kernel.space.Placement;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +61,7 @@ final class PreviewCodecs {
             writeGhost(buffer, ghost);
         }
         writeMarkers(buffer, payload.markers());
+        writePresentation(buffer, payload.presentation());
     }
 
     private static PreviewSyncPayload decodeSync(RegistryFriendlyByteBuf buffer) {
@@ -85,13 +87,15 @@ final class PreviewCodecs {
             ghosts.add(readGhost(buffer));
         }
         List<Marker> markers = readMarkers(buffer, bounds);
+        PreviewPresentation presentation = readPresentation(buffer);
         return new PreviewSyncPayload(
             blueprintId,
             candidates,
             current,
             new OverlayModel(bounds, cells, overlayMarkers),
             ghosts,
-            markers
+            markers,
+            presentation
         );
     }
 
@@ -123,6 +127,7 @@ final class PreviewCodecs {
                 writeId(buffer, line.item());
                 buffer.writeVarInt(line.count());
             }
+            writePresentation(buffer, entry.presentation());
         }
     }
 
@@ -141,7 +146,7 @@ final class PreviewCodecs {
             for (int material = 0; material < materialCount; material++) {
                 materials.add(new PreviewCatalogPayload.MaterialLine(readId(buffer), buffer.readVarInt()));
             }
-            entries.add(new PreviewCatalogPayload.Entry(blueprintId, cells, materials));
+            entries.add(new PreviewCatalogPayload.Entry(blueprintId, cells, materials, readPresentation(buffer)));
         }
         return new PreviewCatalogPayload(entries);
     }
@@ -162,6 +167,7 @@ final class PreviewCodecs {
             buffer.writeUtf(property.getKey());
             buffer.writeUtf(property.getValue());
         }
+        buffer.writeVarInt(ghost.stageIndex());
     }
 
     private static GhostCell readGhost(RegistryFriendlyByteBuf buffer) {
@@ -172,7 +178,60 @@ final class PreviewCodecs {
         for (int property = 0; property < propertyCount; property++) {
             properties.put(buffer.readUtf(), buffer.readUtf());
         }
-        return new GhostCell(cell, block, properties);
+        return new GhostCell(cell, block, properties, buffer.readVarInt());
+    }
+
+    private static void writePresentation(RegistryFriendlyByteBuf buffer, PreviewPresentation presentation) {
+        writeOptional(buffer, presentation.description());
+        buffer.writeVarInt(presentation.stages().size());
+        for (Stage stage : presentation.stages()) {
+            buffer.writeUtf(stage.name());
+            buffer.writeVarInt(stage.expectedCells());
+            buffer.writeVarInt(stage.satisfiedCells());
+            writeOptional(buffer, stage.hint());
+            writeOptional(buffer, stage.description());
+        }
+        buffer.writeVarInt(presentation.currentStage());
+        buffer.writeVarInt(presentation.materials().size());
+        for (MaterialStatus material : presentation.materials()) {
+            writeId(buffer, material.item());
+            buffer.writeVarInt(material.need());
+            buffer.writeVarInt(material.have());
+        }
+        buffer.writeVarInt(presentation.moreMaterials());
+    }
+
+    private static PreviewPresentation readPresentation(RegistryFriendlyByteBuf buffer) {
+        String description = readOptional(buffer);
+        int stageCount = buffer.readVarInt();
+        List<Stage> stages = new ArrayList<>(stageCount);
+        for (int index = 0; index < stageCount; index++) {
+            String name = buffer.readUtf();
+            int expectedCells = buffer.readVarInt();
+            int satisfiedCells = buffer.readVarInt();
+            String hint = readOptional(buffer);
+            String stageDescription = readOptional(buffer);
+            stages.add(new Stage(name, expectedCells, satisfiedCells, hint, stageDescription));
+        }
+        int currentStage = buffer.readVarInt();
+        int materialCount = buffer.readVarInt();
+        List<MaterialStatus> materials = new ArrayList<>(materialCount);
+        for (int index = 0; index < materialCount; index++) {
+            materials.add(new MaterialStatus(readId(buffer), buffer.readVarInt(), buffer.readVarInt()));
+        }
+        int moreMaterials = buffer.readVarInt();
+        return new PreviewPresentation(description, stages, currentStage, materials, moreMaterials);
+    }
+
+    private static void writeOptional(RegistryFriendlyByteBuf buffer, @Nullable String text) {
+        buffer.writeBoolean(text != null);
+        if (text != null) {
+            buffer.writeUtf(text);
+        }
+    }
+
+    private static @Nullable String readOptional(RegistryFriendlyByteBuf buffer) {
+        return buffer.readBoolean() ? buffer.readUtf() : null;
     }
 
     private static void writeMarkers(RegistryFriendlyByteBuf buffer, List<Marker> markers) {
