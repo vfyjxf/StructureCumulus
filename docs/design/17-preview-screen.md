@@ -321,7 +321,7 @@ public record SceneCamera(
 ### 4.4 The input table (R11)
 
 The screen owns the keyboard and the mouse while it is open: a `Screen` receives every key press
-(`Screen.keyPressed`), its mouse is released from the game's grab (`Minecraft.setScreen`, [KB 03](../kb/03-client-camera.md)),
+(`Screen.keyPressed`), its mouse is released from the game's grab (`Minecraft.setScreen`, KB 03),
 and vanilla does not poll a `KeyMapping` while a screen is open. Every world preview key of 15 §5 and
 16 §6.3 is therefore inert here, and every key below is the screen's own — the two tables never meet,
 which is R11's conflict check stated as a law and asserted by the SC1 `screen` uitest group.
