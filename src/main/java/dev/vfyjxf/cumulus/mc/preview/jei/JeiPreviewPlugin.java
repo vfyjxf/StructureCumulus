@@ -5,8 +5,10 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.plugin.ModPlugin;
 import dev.vfyjxf.cumulus.mc.plugin.PluginMarker;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
+import dev.vfyjxf.cumulus.mc.preview.jei.BlueprintPreviewCategory.PageView;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
+import dev.vfyjxf.cumulus.mc.preview.scene.BlueprintPreviewRecipe;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.constants.VanillaTypes;
@@ -45,6 +47,7 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
     static final NamespacedId id = NamespacedId.of(Constants.modId, "jei_preview");
 
     private static final Map<NamespacedId, BlueprintPreviewRecipe> recipes = new LinkedHashMap<>();
+    private static final Map<NamespacedId, PageView> views = new LinkedHashMap<>();
     private static final Set<BlueprintPreviewRecipe> sent = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Set<BlueprintPreviewRecipe> hidden = Collections.newSetFromMap(new IdentityHashMap<>());
     private static final Runnable onCatalog = JeiPreviewPlugin::reconcile;
@@ -92,6 +95,7 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         PreviewCatalogClient.unlisten(onCatalog);
         runtime = null;
         recipes.clear();
+        views.clear();
         sent.clear();
         hidden.clear();
     }
@@ -102,6 +106,19 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
 
     static @Nullable BlueprintPreviewRecipe recipe(NamespacedId blueprintId) {
         return recipes.get(blueprintId);
+    }
+
+    /** One page's JEI-side view state, or null when the category does not list the page. */
+    static @Nullable PageView view(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = recipes.get(blueprintId);
+        return recipe == null ? null : viewFor(recipe);
+    }
+
+    /** The page's view state, clamped to the page's current layer count. */
+    static PageView viewFor(BlueprintPreviewRecipe recipe) {
+        PageView view = views.computeIfAbsent(recipe.blueprintId(), id -> new PageView());
+        view.clamp(recipe.scene().layers());
+        return view;
     }
 
     static List<String> lines(NamespacedId blueprintId) {
@@ -161,6 +178,7 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         } else {
             recipe.update(group);
         }
+        viewFor(recipe);
         return recipe;
     }
 

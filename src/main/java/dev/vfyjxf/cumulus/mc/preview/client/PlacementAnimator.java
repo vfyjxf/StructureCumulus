@@ -3,6 +3,7 @@ package dev.vfyjxf.cumulus.mc.preview.client;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.mc.ClientConfig;
 import dev.vfyjxf.cumulus.mc.preview.net.BuildCommitPayload;
+import dev.vfyjxf.cumulus.mc.preview.scene.CellStates;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

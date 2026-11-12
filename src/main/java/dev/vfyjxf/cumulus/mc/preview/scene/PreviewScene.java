@@ -1,9 +1,8 @@
-package dev.vfyjxf.cumulus.mc.preview.jei;
+package dev.vfyjxf.cumulus.mc.preview.scene;
 
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
@@ -11,11 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.Property;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import org.joml.Quaternionf;
 import org.joml.Vector2f;
@@ -25,8 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * One blueprint's expected states as an isometric scene inside a GUI: the cells resolved against the
@@ -34,81 +28,101 @@ import java.util.Optional;
  * the chosen one. Depth-sorted cells plus the GUI pass's depth buffer order the cubes, and the batch
  * is flushed without {@code GuiGraphics.flush()} so depth writes survive it (design 15 §6).
  */
-final class PreviewScene {
+public final class PreviewScene {
 
     /** One expected cell: the wire description it came from, plus the client state it resolves to. */
-    record Cell(GhostCell ghost, @Nullable BlockState state) {}
+    public record Cell(GhostCell ghost, @Nullable BlockState state) {}
 
     /** How a panel filters the entry's cells by Y: the whole entry, the layers up to one, or exactly one. */
-    enum LayerRule {
+    public enum LayerRule {
         all, upTo, exact
     }
 
-    /** One panel's rectangle and the camera its mode gives it; the fit is always the entry's bounds. */
-    record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) {}
+    /** One panel's rectangle and the camera its mode gives it; the fit is always the drawn hull. */
+    public record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) {}
 
     /** What one panel drew: its cell count and the Y layer it isolates or highlights. */
-    record Panel(int cells, int layer) {}
+    public record Panel(int cells, int layer) {}
 
-    private static final float margin = 0.86F;
     private static final int sceneDepth = 150;
     private static final int bandColor = 0x38FFFFFF;
     private static final int bandEdgeColor = 0x58FFFFFF;
 
     private final List<Cell> cells;
-    private final int minX;
+    private final Hull hull;
     private final int minY;
-    private final int minZ;
-    private final int maxX;
     private final int maxY;
-    private final int maxZ;
 
-    private PreviewScene(List<Cell> cells, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+    private PreviewScene(List<Cell> cells) {
         this.cells = List.copyOf(cells);
-        this.minX = minX;
-        this.minY = minY;
-        this.minZ = minZ;
-        this.maxX = maxX;
-        this.maxY = maxY;
-        this.maxZ = maxZ;
+        this.hull = hullOf(cells, PreviewScene::draws);
+        if (this.hull.isEmpty()) {
+            this.minY = 0;
+            this.maxY = -1;
+        } else {
+            this.minY = (int) this.hull.minY();
+            this.maxY = (int) this.hull.maxY() - 1;
+        }
     }
 
-    static PreviewScene of(PreviewCatalogPayload.Entry entry) {
+    public static PreviewScene of(PreviewCatalogPayload.Entry entry) {
         List<Cell> resolved = new ArrayList<>(entry.cells().size());
-        int minX = Integer.MAX_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int minZ = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxY = Integer.MIN_VALUE;
-        int maxZ = Integer.MIN_VALUE;
         for (GhostCell ghost : entry.cells()) {
-            LatticePoint at = ghost.cell();
+            resolved.add(new Cell(ghost, CellStates.of(ghost.block(), ghost.properties())));
+        }
+        return new PreviewScene(resolved);
+    }
+
+    /** The box of the cells that draw something; an air or unresolvable cell contributes no corner. */
+    static Hull hullOf(List<Cell> cells, Predicate<Cell> draws) {
+        float minX = Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE;
+        float minZ = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE;
+        float maxY = -Float.MAX_VALUE;
+        float maxZ = -Float.MAX_VALUE;
+        boolean any = false;
+        for (Cell cell : cells) {
+            if (!draws.test(cell)) {
+                continue;
+            }
+            LatticePoint at = cell.ghost().cell();
             minX = Math.min(minX, at.x());
             minY = Math.min(minY, at.y());
             minZ = Math.min(minZ, at.z());
-            maxX = Math.max(maxX, at.x());
-            maxY = Math.max(maxY, at.y());
-            maxZ = Math.max(maxZ, at.z());
-            resolved.add(new Cell(ghost, resolve(ghost)));
+            maxX = Math.max(maxX, at.x() + 1.0F);
+            maxY = Math.max(maxY, at.y() + 1.0F);
+            maxZ = Math.max(maxZ, at.z() + 1.0F);
+            any = true;
         }
-        return new PreviewScene(resolved, minX, minY, minZ, maxX, maxY, maxZ);
+        return any ? new Hull(minX, minY, minZ, maxX, maxY, maxZ) : new Hull(0.0F, 0.0F, 0.0F, -1.0F, -1.0F, -1.0F);
     }
 
-    int cellCount() {
+    /** The drawn hull of §3.3: the fit input of every panel, never the declared bounds. */
+    public Hull hull() {
+        return hull;
+    }
+
+    private static boolean draws(Cell cell) {
+        BlockState state = cell.state();
+        return state != null && !state.isAir();
+    }
+
+    public int cellCount() {
         return cells.size();
     }
 
-    List<Cell> cells() {
+    public List<Cell> cells() {
         return cells;
     }
 
-    /** The number of Y layers the blueprint spans; at least one, so the slider always has a range. */
-    int layers() {
+    /** The number of Y layers the drawn cells span; at least one, so the slider always has a range. */
+    public int layers() {
         return maxY < minY ? 1 : maxY - minY + 1;
     }
 
     @Nullable
-    Cell hover(double mouseX, double mouseY, View view, int layer) {
+    public Cell hover(double mouseX, double mouseY, View view, int layer) {
         if (mouseX < view.x()
                 || mouseX >= view.x() + view.width()
                 || mouseY < view.y()
@@ -121,7 +135,7 @@ final class PreviewScene {
         Cell nearest = null;
         float nearestExit = Float.NEGATIVE_INFINITY;
         for (Cell cell : cells) {
-            if (!visible(cell, view.rule(), layer)) {
+            if (!draws(cell) || !visible(cell, view.rule(), layer)) {
                 continue;
             }
             float exit = exit(origin, direction, cell.ghost().cell(), projection);
@@ -135,9 +149,9 @@ final class PreviewScene {
 
     /** Where one cell's centre lands inside a panel, or null when that panel filters it out. */
     @Nullable
-    Vector2f point(View view, int layer, LatticePoint at) {
+    public Vector2f point(View view, int layer, LatticePoint at) {
         for (Cell cell : cells) {
-            if (cell.ghost().cell().equals(at) && visible(cell, view.rule(), layer)) {
+            if (draws(cell) && cell.ghost().cell().equals(at) && visible(cell, view.rule(), layer)) {
                 return projection(view).screenOf(at);
             }
         }
@@ -145,10 +159,10 @@ final class PreviewScene {
     }
 
     /** Draws the panel's cells and returns what it covered. */
-    Panel draw(GuiGraphics graphics, View view, int layer, boolean band) {
+    public Panel draw(GuiGraphics graphics, View view, int layer, boolean band) {
         List<Cell> drawn = new ArrayList<>(cells.size());
         for (Cell cell : cells) {
-            if (visible(cell, view.rule(), layer) && cell.state() != null) {
+            if (draws(cell) && visible(cell, view.rule(), layer)) {
                 drawn.add(cell);
             }
         }
@@ -194,6 +208,107 @@ final class PreviewScene {
         return new Panel(drawn.size(), layer);
     }
 
+    /**
+     * The cell under the cursor in one screen viewport: the nearest drawn cell whose box the ray
+     * crosses, using the cells' current positions (design 17 §5.3).
+     */
+    @Nullable
+    public Cell hover(double mouseX, double mouseY, Fit fit) {
+        if (mouseX < fit.x()
+                || mouseX >= fit.x() + fit.width()
+                || mouseY < fit.y()
+                || mouseY >= fit.y() + fit.height()) {
+            return null;
+        }
+        float centreX = fit.x() + fit.width() * 0.5F;
+        float centreY = fit.y() + fit.height() * 0.5F;
+        float[] originView;
+        float[] directionView;
+        if (fit.camera().projection() == SceneCamera.Projection.orthographic) {
+            originView = new float[]{(float) ((mouseX - centreX) * fit.unitsPerPixel()),
+                    (float) (-(mouseY - centreY) * fit.unitsPerPixel()), 10_000.0F};
+            directionView = new float[]{0.0F, 0.0F, -1.0F};
+        } else {
+            originView = new float[]{0.0F, 0.0F, fit.camera().distance()};
+            directionView = new float[]{(float) ((mouseX - centreX) / fit.focal()),
+                    (float) (-(mouseY - centreY) / fit.focal()), -1.0F};
+        }
+        float[] origin = fit.camera().worldPoint(originView[0], originView[1], originView[2]);
+        float[] direction = fit.camera().world(directionView[0], directionView[1], directionView[2]);
+        Vector3f rayOrigin = new Vector3f(origin[0], origin[1], origin[2]);
+        Vector3f rayDirection = new Vector3f(direction[0], direction[1], direction[2]);
+        Cell nearest = null;
+        float nearestExit = Float.POSITIVE_INFINITY;
+        for (Cell cell : cells) {
+            if (!draws(cell)) {
+                continue;
+            }
+            LatticePoint at = cell.ghost().cell();
+            float exit = exit(rayOrigin, rayDirection, at.x(), at.y(), at.z());
+            if (exit > 0.0F && exit < nearestExit) {
+                nearestExit = exit;
+                nearest = cell;
+            }
+        }
+        return nearest;
+    }
+
+    /** Where one drawn cell's centre lands in one screen viewport, or null when it does not draw. */
+    @Nullable
+    public Vector2f point(Fit fit, LatticePoint at) {
+        for (Cell cell : cells) {
+            if (draws(cell) && cell.ghost().cell().equals(at)) {
+                return fit.project(at.x() + 0.5F, at.y() + 0.5F, at.z() + 0.5F);
+            }
+        }
+        return null;
+    }
+
+    /** Draws the page through one screen viewport's camera and fit. */
+    public Panel draw(GuiGraphics graphics, Fit fit) {
+        List<Cell> drawn = new ArrayList<>(cells.size());
+        for (Cell cell : cells) {
+            if (draws(cell)) {
+                drawn.add(cell);
+            }
+        }
+        if (drawn.isEmpty()) {
+            return new Panel(0, 0);
+        }
+        drawn.sort(Comparator.comparingDouble(cell -> {
+            LatticePoint at = cell.ghost().cell();
+            return fit.depth(at.x() + 0.5F, at.y() + 0.5F, at.z() + 0.5F);
+        }));
+        PoseStack pose = graphics.pose();
+        pose.pushPose();
+        pose.mulPose(fit.matrix());
+        Lighting.setupFor3DItems();
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthMask(true);
+        for (Cell cell : drawn) {
+            BlockState state = cell.state();
+            if (state == null) {
+                continue;
+            }
+            LatticePoint at = cell.ghost().cell();
+            pose.pushPose();
+            pose.translate(at.x(), at.y(), at.z());
+            Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
+                state,
+                pose,
+                graphics.bufferSource(),
+                LightTexture.FULL_BRIGHT,
+                OverlayTexture.NO_OVERLAY,
+                ModelData.EMPTY,
+                null
+            );
+            pose.popPose();
+        }
+        graphics.bufferSource().endBatch();
+        pose.popPose();
+        return new Panel(drawn.size(), 0);
+    }
+
     private void drawBand(GuiGraphics graphics, View view, Projection projection, int layer) {
         float bottom = projection.screenYOf(minY + layer);
         float top = projection.screenYOf(minY + layer + 1);
@@ -211,38 +326,6 @@ final class PreviewScene {
             case upTo -> offset <= layer;
             case exact -> offset == layer;
         };
-    }
-
-    private static @Nullable BlockState resolve(GhostCell ghost) {
-        NamespacedId id = ghost.block();
-        ResourceLocation key = ResourceLocation.fromNamespaceAndPath(id.namespace(), id.path());
-        if (!BuiltInRegistries.BLOCK.containsKey(key)) {
-            return null;
-        }
-        Block block = BuiltInRegistries.BLOCK.get(key);
-        BlockState state = block.defaultBlockState();
-        for (Map.Entry<String, String> property : ghost.properties().entrySet()) {
-            state = apply(state, property.getKey(), property.getValue());
-        }
-        return state;
-    }
-
-    private static BlockState apply(BlockState state, String name, String value) {
-        for (Property<?> property : state.getProperties()) {
-            if (property.getName().equals(name)) {
-                return withValue(state, property, value);
-            }
-        }
-        return state;
-    }
-
-    private static <T extends Comparable<T>> BlockState withValue(
-        BlockState state,
-        Property<T> property,
-        String value
-    ) {
-        Optional<T> parsed = property.getValue(value);
-        return parsed.map(typed -> state.setValue(property, typed)).orElse(state);
     }
 
     /** The cube-to-screen map of one camera pose: orthographic, one unit of the scene per {@code scale} pixels. */
@@ -295,25 +378,28 @@ final class PreviewScene {
         int height = view.height();
         Quaternionf rotation = new Quaternionf().rotateY((float) Math.toRadians(view.yaw()))
                 .rotateX((float) Math.toRadians(view.pitch()));
-        float shiftX = (minX + maxX + 1) * 0.5F;
-        float shiftY = (minY + maxY + 1) * 0.5F;
-        float shiftZ = (minZ + maxZ + 1) * 0.5F;
+        Hull box = hull.fitBox();
+        float shiftX = box.centreX();
+        float shiftY = box.centreY();
+        float shiftZ = box.centreZ();
         float minU = Float.MAX_VALUE;
         float maxU = -Float.MAX_VALUE;
         float minV = Float.MAX_VALUE;
         float maxV = -Float.MAX_VALUE;
         for (int corner = 0; corner < 8; corner++) {
-            float cx = (corner & 1) == 0 ? minX : maxX + 1;
-            float cy = (corner & 2) == 0 ? minY : maxY + 1;
-            float cz = (corner & 4) == 0 ? minZ : maxZ + 1;
+            float cx = (corner & 1) == 0 ? box.minX() : box.maxX();
+            float cy = (corner & 2) == 0 ? box.minY() : box.maxY();
+            float cz = (corner & 4) == 0 ? box.minZ() : box.maxZ();
             Vector3f rotated = rotation.transform(new Vector3f(cx - shiftX, cy - shiftY, cz - shiftZ));
             minU = Math.min(minU, rotated.x);
             maxU = Math.max(maxU, rotated.x);
             minV = Math.min(minV, rotated.y);
             maxV = Math.max(maxV, rotated.y);
         }
-        float scale = Math
-                .min(width * margin / Math.max(0.001F, maxU - minU), height * margin / Math.max(0.001F, maxV - minV));
+        float scale = Math.min(
+            width * Fit.margin / Math.max(0.001F, maxU - minU),
+            height * Fit.margin / Math.max(0.001F, maxV - minV)
+        );
         return new Projection(
             rotation,
             new Quaternionf(rotation).invert(),
@@ -327,14 +413,38 @@ final class PreviewScene {
     }
 
     private static float exit(Vector3f origin, Vector3f direction, LatticePoint at, Projection projection) {
-        float minX = at.x() - projection.shiftX();
-        float minY = at.y() - projection.shiftY();
-        float minZ = at.z() - projection.shiftZ();
+        return exit(
+            origin.x - projection.shiftX(),
+            origin.y - projection.shiftY(),
+            origin.z - projection.shiftZ(),
+            direction.x,
+            direction.y,
+            direction.z,
+            at.x() - projection.shiftX(),
+            at.y() - projection.shiftY(),
+            at.z() - projection.shiftZ()
+        );
+    }
+
+    private static float exit(Vector3f origin, Vector3f direction, float minX, float minY, float minZ) {
+        return exit(origin.x, origin.y, origin.z, direction.x, direction.y, direction.z, minX, minY, minZ);
+    }
+
+    private static float exit(
+        float originX,
+        float originY,
+        float originZ,
+        float directionX,
+        float directionY,
+        float directionZ,
+        float minX,
+        float minY,
+        float minZ
+    ) {
         float[] boxMin = {minX, minY, minZ};
         float[] boxMax = {minX + 1.0F, minY + 1.0F, minZ + 1.0F};
-        float[] originParts = {origin.x - projection.shiftX(), origin.y - projection.shiftY(),
-                origin.z - projection.shiftZ()};
-        float[] directionParts = {direction.x, direction.y, direction.z};
+        float[] originParts = {originX, originY, originZ};
+        float[] directionParts = {directionX, directionY, directionZ};
         float enter = Float.NEGATIVE_INFINITY;
         float leave = Float.POSITIVE_INFINITY;
         for (int axis = 0; axis < 3; axis++) {

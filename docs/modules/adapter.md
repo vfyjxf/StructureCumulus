@@ -1325,7 +1325,7 @@ public final class StageModel {
     public static Table of(Blueprint blueprint, java.util.Collection<LatticePoint> expected);
 
     public record Stage(String name, @Nullable String description, @Nullable String hint,
-                        java.util.List<LatticePoint> cells) { }
+                        java.util.List<LatticePoint> cells, NamespacedId bay) { }
 
     public record Table(java.util.List<Stage> stages, int expectedStages) {
         public boolean truncated();
@@ -1366,7 +1366,7 @@ public record GhostCell(LatticePoint cell, NamespacedId block, java.util.Map<Str
                         int stageIndex) { }
 
 public record Stage(String name, int expectedCells, int satisfiedCells,
-                    @Nullable String hint, @Nullable String description) { }
+                    @Nullable String hint, @Nullable String description, NamespacedId bay) { }
 
 public record PreviewPresentation(@Nullable String description, java.util.List<Stage> stages, int currentStage,
                                   java.util.List<MaterialStatus> materials, int moreMaterials) { }
@@ -1517,13 +1517,175 @@ public final class PreviewCatalogClient {
 
 public final class PreviewClientEvents { }
 
-package dev.vfyjxf.cumulus.mc.preview.jei;
+package dev.vfyjxf.cumulus.mc.preview.scene;
+
+// One page's expected states, resolved against the client's block registry and drawn through a
+// rectangle and a camera (design 15 §6, design 17 §10).
+public final class PreviewScene {
+
+    public record Cell(GhostCell ghost, @Nullable BlockState state) { }
+
+    public enum LayerRule {
+        all, upTo, exact
+    }
+
+    public record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) { }
+
+    public record Panel(int cells, int layer) { }
+
+    public static PreviewScene of(PreviewCatalogPayload.Entry entry);
+    public Hull hull();
+    public int cellCount();
+    public java.util.List<Cell> cells();
+    public int layers();
+    public @Nullable Cell hover(double mouseX, double mouseY, View view, int layer);
+    public @Nullable Vector2f point(View view, int layer, LatticePoint at);
+    public Panel draw(GuiGraphics graphics, View view, int layer, boolean band);
+    public @Nullable Cell hover(double mouseX, double mouseY, Fit fit);
+    public @Nullable Vector2f point(Fit fit, LatticePoint at);
+    public Panel draw(GuiGraphics graphics, Fit fit);
+}
+
+public final class BlueprintPreviewRecipe {
+
+    public record Material(ItemStack stack, int count) { }
+
+    public BlueprintPreviewRecipe(java.util.List<PreviewCatalogPayload.Entry> group);
+    public void update(java.util.List<PreviewCatalogPayload.Entry> group);
+    public NamespacedId blueprintId();
+    public NamespacedId selectedBlueprintId();
+    public java.util.List<NamespacedId> variantIds();
+    public int variantIndex();
+    public int variantCount();
+    public boolean cycleVariant(int step);
+    public boolean selectVariant(NamespacedId blueprintId);
+    public @Nullable String variantLine();
+    public java.util.List<String> lines();
+    public PreviewScene scene();
+    public PreviewPresentation presentation();
+    public java.util.List<String> cellLines(PreviewScene.Cell cell);
+    public java.util.List<Material> materials();
+}
 
 public enum PreviewViewMode {
     isometric, threeView, sliceGrid;
     public String label();
     public PreviewViewMode next();
 }
+
+public final class CellStates {
+    public static @Nullable BlockState of(NamespacedId block, java.util.Map<String, String> properties);
+}
+
+public final class TintedBuffers implements MultiBufferSource {
+    public static MultiBufferSource of(MultiBufferSource delegate, float alpha);
+    public static MultiBufferSource of(MultiBufferSource delegate, float alpha, float red, float green, float blue);
+    @Override public VertexConsumer getBuffer(RenderType type);
+}
+
+// The drawn hull of design 17 §3.3: a box in cell units over the cells that draw something. The fit
+// box widens every extent to at least one cell, so no fit ever divides by zero.
+public record Hull(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+    public Hull union(Hull other);
+    public boolean isEmpty();
+}
+
+// One viewport's orbit camera (design 17 §4.2): a pure value whose every operation returns a new one.
+public record SceneCamera(float targetX, float targetY, float targetZ, float yaw, float pitch,
+                          float distance, float zoom, Projection projection) {
+    public enum Projection { orthographic, perspective }
+    public enum Snap { front, back, right, left, top, bottom }
+    public static final float defaultYaw;
+    public static final float defaultPitch;
+    public static final float minZoom;
+    public static final float maxZoom;
+    public static final float minDistance;
+    public static final float maxDistance;
+    public static final float fovDegrees;
+    public static final float maxPitch;
+    public static SceneCamera isometric();
+    public SceneCamera orbit(float deltaYaw, float deltaPitch);
+    public SceneCamera pan(float right, float up);
+    public SceneCamera zoom(float factor);
+    public SceneCamera frame(Hull hull, float aspect);
+    public SceneCamera snap(Snap snap);
+    public SceneCamera reset(Hull hull, float aspect);
+    public SceneCamera withProjection(Projection next, Hull hull);
+}
+
+// The three axes of design 17 §6: the drawn hull's minimum corner as origin, one segment and one
+// label anchor per axis, projected through one viewport's camera.
+public record AxisGizmo(Segment x, Segment y, Segment z) {
+    public record Segment(Vector2f start, Vector2f end, Vector2f label) { }
+    public static final int xColor;
+    public static final int yColor;
+    public static final int zColor;
+    public static AxisGizmo of(Hull hull, SceneCamera camera, int x, int y, int width, int height);
+}
+
+// The fit of design 17 §4.3: one hull into one rectangle through one camera, with the 2D projection
+// the axes, the picking and the scene share.
+public record Fit(Hull hull, SceneCamera camera, int x, int y, int width, int height,
+                  float scale, float focal) {
+    public static final float margin;
+    public static Fit of(Hull hull, int x, int y, int width, int height, SceneCamera camera);
+    public float unitsPerPixel();
+    public Vector2f project(float worldX, float worldY, float worldZ);
+    public float depth(float worldX, float worldY, float worldZ);
+    public org.joml.Matrix4f matrix();
+}
+
+package dev.vfyjxf.cumulus.mc.preview.client.screen;
+
+// The screen's rectangles of design 17 §5.1: the two strips and the four viewports, a pure function
+// of the screen size. The three small panels collapse to null when their column has no room.
+public record ScreenLayout(Rect title, Rect main, @Nullable Rect front, @Nullable Rect side,
+                           @Nullable Rect top, Rect control) {
+
+    public static final int titleHeight;
+    public static final int controlHeight;
+    public static final int panelGap;
+    public static final float mainFraction;
+
+    public record Rect(int x, int y, int width, int height) {
+        public static final Rect empty;
+        public boolean isEmpty();
+    }
+
+    public static ScreenLayout of(int width, int height);
+}
+
+// The one screen of design 17 §5: the page looked up in the last catalogue, one shared camera and the
+// four derived viewports.
+public final class PreviewScreen extends Screen {
+    public static void open(NamespacedId blueprintId);
+    @Override public void added();
+    @Override public void removed();
+    @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick);
+    @Override public boolean keyPressed(int keyCode, int scanCode, int modifiers);
+    @Override public void mouseMoved(double mouseX, double mouseY);
+    @Override public boolean mouseClicked(double mouseX, double mouseY, int button);
+    @Override public boolean mouseReleased(double mouseX, double mouseY, int button);
+    @Override public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY);
+    @Override public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY);
+    public SceneCamera camera();
+    public ScreenLayout layout();
+    public PreviewScene scene();
+    public int drawnCells();
+    public @Nullable PreviewScene.Cell hovered();
+    public ScreenClock clock();
+    public @Nullable AxisGizmo gizmo();
+}
+
+// The screen's own clock of design 17 §4.6: a fractional tick accumulator, fed by the frame's
+// real-time delta because a screen pauses the game tick.
+public record ScreenClock(int ticks, float fraction) {
+    public static ScreenClock start();
+    public ScreenClock advance(float realtimeDeltaTicks);
+    public float time();
+}
+
+package dev.vfyjxf.cumulus.mc.preview.jei;
 
 public final class JeiPreview {
     public record Panel(int cells, int layer, int x, int y, int width, int height) { }
@@ -2371,9 +2533,10 @@ conditional plugin and its loader pass, `JeiPreview` and its client events. The 
 17's; this section states the adapter-side shape of them, and its members join §15 per milestone
 (the same batch discipline §19 used).
 
-**Landed, and landing.** SC0 lands this section, [design/17](../design/17-preview-screen.md) and
-D-101…D-105. SC1 lands the migration, `PreviewScreen`, the camera and projection, the four viewports,
-the axes and the drawn-hull fit (the JEI view takes the same hull change). SC2 lands the staged
+**Landed, and landing.** SC0 landed this section, [design/17](../design/17-preview-screen.md) and
+D-101…D-105. SC1 has landed the migration, the stage's `bay` on both payloads, `PreviewScreen`, the
+camera and projection, the four viewports, the axes, the screen's own clock, the hover and the
+drawn-hull fit (the JEI view takes the same hull change and keeps its own camera). SC2 lands the staged
 playback, the delta treatments and the exploded view. SC3 lands the links: the JEI button, the client
 command, the `openScreen` key, the open payload's heading and the in-screen variant switch. SC4 lands
 the demo documents. The milestone state lives in
@@ -2404,9 +2567,16 @@ the explode, SC3 for the action and the command), and a name that exists in neit
 | `preview.scene` | `PreviewViewMode` | the scene's projection vocabulary, for the JEI face to select |
 | `preview.scene` | `SceneCamera` (with `Projection` and `Snap`) | the orbit camera value: target, yaw, pitch, distance, zoom, projection; pure operations only |
 | `preview.scene` | `Hull` | the drawn hull of design 17 §3.3, the input of every fit |
+| `preview.scene` | `Fit` | the fit of design 17 §4.3: one hull into one viewport through one camera, the scale and the 2D projection the scene, the gizmo and the picking share |
+
+The screen's `SceneCamera` is a turntable — yaw about the world's vertical, pitch above the horizon —
+so its default 45°/35.264° is the true isometric view. The JEI face keeps its own `View` yaw/pitch
+tilt (design 16 §11), so the migration changes no JEI picture: the two surfaces have two cameras.
 | `preview.scene` | `ExplodeModel` | the per-bay offset function of design 17 §8.1 |
 | `preview.scene` | `AxisGizmo` | the three axes and their label anchors, projected through a camera |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
+| `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
+| `preview.client.screen` | `ScreenClock` | the screen's own two-number clock of design 17 §4.6, advanced by the frame's real-time tick delta |
 | `preview.client.screen` | `PreviewScreen` | the one `Screen`: the layout, the four viewports, the widgets, the input and the one world action |
 | `preview.client.screen` | `ViewportWidget` | one viewport's rectangle, its camera derivation, its draw and its picking |
 | `preview.client.screen` | `CameraController` | the input table of design 17 §4.4 translated into `SceneCamera` operations, plus the stage framing and its hand-back |

@@ -1,4 +1,4 @@
-package dev.vfyjxf.cumulus.mc.preview.jei;
+package dev.vfyjxf.cumulus.mc.preview.scene;
 
 /**
  * The category's three view modes (design 16 §11). The mode is per-recipe view state, like the yaw

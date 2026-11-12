@@ -2,6 +2,7 @@ package dev.vfyjxf.cumulus.mc.preview.client;
 
 import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.vfyjxf.cumulus.mc.preview.scene.TintedBuffers;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;

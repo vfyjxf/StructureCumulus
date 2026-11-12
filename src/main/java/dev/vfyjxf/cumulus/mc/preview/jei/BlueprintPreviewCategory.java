@@ -1,6 +1,9 @@
 package dev.vfyjxf.cumulus.mc.preview.jei;
 
 import dev.vfyjxf.cumulus.Constants;
+import dev.vfyjxf.cumulus.mc.preview.scene.BlueprintPreviewRecipe;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewViewMode;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.ITooltipBuilder;
 import mezz.jei.api.gui.drawable.IDrawable;
@@ -12,10 +15,12 @@ import mezz.jei.api.recipe.category.IRecipeCategory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import org.joml.Vector2f;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The "Multiblock Preview" category: the isometric scene, the Y-slice slider, the material summary and
@@ -123,7 +128,7 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
 
     @Override
     public void createRecipeExtras(IRecipeExtrasBuilder builder, BlueprintPreviewRecipe recipe, IFocusGroup focuses) {
-        builder.addInputHandler(new PreviewInputHandler(recipe));
+        builder.addInputHandler(new PreviewInputHandler(recipe, JeiPreviewPlugin.viewFor(recipe)));
     }
 
     @Override
@@ -135,7 +140,8 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         double mouseY
     ) {
         graphics.fill(sceneX, sceneY, sceneX + sceneWidth, sceneY + sceneHeight, panelColor);
-        PreviewScene.View[] views = views(recipe.viewMode(), recipe.yaw(), recipe.pitch());
+        PageView page = JeiPreviewPlugin.viewFor(recipe);
+        PreviewScene.View[] views = views(page.mode(), page.yaw(), page.pitch());
         for (PreviewScene.View view : views) {
             if (view.width() < sceneWidth) {
                 graphics.fill(view.x(), view.y(), view.x() + view.width(), view.y() + view.height(), panelBackColor);
@@ -144,14 +150,13 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         List<JeiPreview.Panel> panels = new ArrayList<>(views.length);
         for (int index = 0; index < views.length; index++) {
             PreviewScene.View view = views[index];
-            PreviewScene.Panel drawn = recipe.scene()
-                    .draw(graphics, view, recipe.slice(), band(recipe.viewMode(), index));
+            PreviewScene.Panel drawn = recipe.scene().draw(graphics, view, page.slice(), band(page.mode(), index));
             panels.add(
                 new JeiPreview.Panel(drawn.cells(), drawn.layer(), view.x(), view.y(), view.width(), view.height())
             );
             graphics.drawString(
                 Minecraft.getInstance().font,
-                panelName(recipe.viewMode(), index),
+                panelName(page.mode(), index),
                 view.x() + 2,
                 view.y() + 2,
                 labelColor,
@@ -169,9 +174,9 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
                 false
             );
         }
-        drawSlider(graphics, recipe);
+        drawSlider(graphics, recipe, page);
         drawButton(graphics, mouseX, mouseY);
-        drawModeButton(graphics, recipe, mouseX, mouseY);
+        drawModeButton(graphics, page, mouseX, mouseY);
         drawVariantRow(graphics, recipe, mouseX, mouseY);
         drawMaterials(graphics, recipe, mouseX, mouseY);
     }
@@ -273,7 +278,7 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         double mouseX,
         double mouseY
     ) {
-        List<String> cellLines = recipe.hoverLines(mouseX, mouseY);
+        List<String> cellLines = JeiPreviewPlugin.viewFor(recipe).hoverLines(recipe, mouseX, mouseY);
         if (!cellLines.isEmpty()) {
             for (String line : cellLines) {
                 tooltip.add(Component.literal(line));
@@ -292,16 +297,16 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         }
     }
 
-    private void drawSlider(GuiGraphics graphics, BlueprintPreviewRecipe recipe) {
+    private void drawSlider(GuiGraphics graphics, BlueprintPreviewRecipe recipe, PageView page) {
         int layers = recipe.scene().layers();
         graphics.fill(sliderX, sliderY, sliderX + sliderWidth, sliderY + sliderHeight, trackColor);
         int travel = sliderHeight - 6;
-        float fraction = layers <= 1 ? 1.0F : recipe.slice() / (float) (layers - 1);
+        float fraction = layers <= 1 ? 1.0F : page.slice() / (float) (layers - 1);
         int thumbY = sliderY + Math.round((1.0F - fraction) * travel);
         graphics.fill(sliderX + 2, thumbY, sliderX + sliderWidth - 2, thumbY + 6, thumbColor);
         graphics.drawString(
             Minecraft.getInstance().font,
-            Integer.toString(recipe.slice() + 1),
+            Integer.toString(page.slice() + 1),
             sliderX + 3,
             sliderY + sliderHeight + 3,
             0xFFC0C0C0,
@@ -321,11 +326,11 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         );
     }
 
-    private void drawModeButton(GuiGraphics graphics, BlueprintPreviewRecipe recipe, double mouseX, double mouseY) {
+    private void drawModeButton(GuiGraphics graphics, PageView page, double mouseX, double mouseY) {
         drawFace(graphics, modeX, modeY, modeWidth, modeHeight, mouseX, mouseY);
         graphics.drawString(
             Minecraft.getInstance().font,
-            "view: " + recipe.viewMode().label(),
+            "view: " + page.mode().label(),
             modeX + 4,
             modeY + 3,
             0xFFF0F0F0,
@@ -393,5 +398,73 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
 
     static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    }
+
+    /** One page's JEI-side view state: the yaw, pitch, layer and mode the face mutates (design 17 §10.1). */
+    static final class PageView {
+
+        private float yaw = 135.0F;
+        private float pitch = 30.0F;
+        private int slice = -1;
+        private PreviewViewMode mode = PreviewViewMode.isometric;
+
+        float yaw() {
+            return yaw;
+        }
+
+        void yaw(float value) {
+            yaw = value;
+        }
+
+        float pitch() {
+            return pitch;
+        }
+
+        void pitch(float value) {
+            pitch = value;
+        }
+
+        int slice() {
+            return slice;
+        }
+
+        void slice(int value) {
+            slice = value;
+        }
+
+        PreviewViewMode mode() {
+            return mode;
+        }
+
+        void cycleMode() {
+            mode = mode.next();
+        }
+
+        /** Keeps the layer inside a page whose cell list just changed under the cursor. */
+        void clamp(int layers) {
+            slice = slice < 0 ? layers - 1 : Math.min(slice, layers - 1);
+        }
+
+        /** The cell tooltip under a recipe-local point in the current mode; a panel answers only for itself. */
+        List<String> hoverLines(BlueprintPreviewRecipe recipe, double mouseX, double mouseY) {
+            for (PreviewScene.View view : views(mode, yaw, pitch)) {
+                PreviewScene.Cell cell = recipe.scene().hover(mouseX, mouseY, view, slice);
+                if (cell != null) {
+                    return recipe.cellLines(cell);
+                }
+            }
+            return List.of();
+        }
+
+        /** Where one expected cell's centre lands in one panel of the current mode. */
+        Optional<JeiPreview.CellPoint> point(BlueprintPreviewRecipe recipe, int panel, int cellIndex) {
+            PreviewScene.View[] views = views(mode, yaw, pitch);
+            if (panel < 0 || panel >= views.length || cellIndex < 0 || cellIndex >= recipe.scene().cells().size()) {
+                return Optional.empty();
+            }
+            Vector2f point = recipe.scene()
+                    .point(views[panel], slice, recipe.scene().cells().get(cellIndex).ghost().cell());
+            return point == null ? Optional.empty() : Optional.of(new JeiPreview.CellPoint(point.x, point.y));
+        }
     }
 }

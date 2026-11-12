@@ -1,7 +1,10 @@
 package dev.vfyjxf.cumulus.mc.preview.jei;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.mc.preview.jei.BlueprintPreviewCategory.PageView;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
+import dev.vfyjxf.cumulus.mc.preview.scene.BlueprintPreviewRecipe;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewViewMode;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jspecify.annotations.Nullable;
 
@@ -57,17 +60,17 @@ public final class JeiPreview {
 
     /** The page's view mode, or null when the category does not list the entry. */
     public static @Nullable PreviewViewMode viewMode(NamespacedId blueprintId) {
-        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
-        return recipe == null ? null : recipe.viewMode();
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        return view == null ? null : view.mode();
     }
 
     /** The mode button's action: isometric → three-view → slice grid → isometric. */
     public static boolean cycleViewMode(NamespacedId blueprintId) {
-        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
-        if (recipe == null) {
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        if (view == null) {
             return false;
         }
-        recipe.cycleViewMode();
+        view.cycleMode();
         return true;
     }
 
@@ -97,30 +100,33 @@ public final class JeiPreview {
 
     /** The Y layer the page shows; the slider, the wheel and every panel read this one value. */
     public static int slice(NamespacedId blueprintId) {
-        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
-        return recipe == null ? -1 : recipe.slice();
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        return view == null ? -1 : view.slice();
     }
 
     /** Moves the page's layer; false when the entry is unknown, clamped to the entry's own layers. */
     public static boolean setSlice(NamespacedId blueprintId, int layer) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
-        if (recipe == null) {
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        if (recipe == null || view == null) {
             return false;
         }
-        recipe.slice(Math.max(0, Math.min(recipe.scene().layers() - 1, layer)));
+        view.slice(Math.max(0, Math.min(recipe.scene().layers() - 1, layer)));
         return true;
     }
 
     /** Where an expected cell's centre lands in one panel of the current mode, recipe-local. */
     public static Optional<CellPoint> cellPoint(NamespacedId blueprintId, int panel, int cellIndex) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
-        return recipe == null ? Optional.empty() : recipe.point(panel, cellIndex);
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        return recipe == null || view == null ? Optional.empty() : view.point(recipe, panel, cellIndex);
     }
 
     /** The cell tooltip's lines under a recipe-local point; empty when no visible cell is under it. */
     public static List<String> hoverText(NamespacedId blueprintId, double mouseX, double mouseY) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
-        return recipe == null ? List.of() : recipe.hoverLines(mouseX, mouseY);
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        return recipe == null || view == null ? List.of() : view.hoverLines(recipe, mouseX, mouseY);
     }
 
     /** The "Ghost to world" action: the server opens the ordinary session at the crosshair. */

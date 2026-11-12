@@ -241,6 +241,7 @@ final class PreviewCodecs {
             buffer.writeVarInt(stage.satisfiedCells());
             writeOptional(buffer, stage.hint());
             writeOptional(buffer, stage.description());
+            writeId(buffer, stage.bay());
         }
         buffer.writeVarInt(presentation.currentStage());
         buffer.writeVarInt(presentation.materials().size());
@@ -262,7 +263,8 @@ final class PreviewCodecs {
             int satisfiedCells = buffer.readVarInt();
             String hint = readOptional(buffer);
             String stageDescription = readOptional(buffer);
-            stages.add(new Stage(name, expectedCells, satisfiedCells, hint, stageDescription));
+            NamespacedId bay = readId(buffer);
+            stages.add(new Stage(name, expectedCells, satisfiedCells, hint, stageDescription, bay));
         }
         int currentStage = buffer.readVarInt();
         int materialCount = buffer.readVarInt();

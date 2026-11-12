@@ -38,9 +38,15 @@ public final class PreviewJeiScenario {
 
         build.waitUntil("the server pushed the catalog with the datapack probe", PreviewJeiProbe::catalogReady)
                 .check(
-                    "the catalog lists every built-in blueprint and the datapack probe",
-                    () -> PreviewJeiProbe.catalogIds()
-                            .containsAll(List.of(airCell, setRoot, setWing, PreviewScenarioSupport.probe)),
+                    "the catalog lists the datapack probe page",
+                    () -> PreviewJeiProbe.catalogIds().contains(PreviewScenarioSupport.probe),
+                    () -> PreviewJeiProbe.catalogIds().toString()
+                )
+                .check(
+                    "a blueprint that draws nothing is left out of the catalog, not shipped as a blank page",
+                    () -> !PreviewJeiProbe.catalogIds().contains(airCell)
+                            && !PreviewJeiProbe.catalogIds().contains(setRoot)
+                            && !PreviewJeiProbe.catalogIds().contains(setWing),
                     () -> PreviewJeiProbe.catalogIds().toString()
                 )
                 .check(

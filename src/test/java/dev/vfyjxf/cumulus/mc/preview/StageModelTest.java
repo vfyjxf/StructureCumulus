@@ -50,6 +50,8 @@ class StageModelTest {
         assertEquals("structurecumulus:stack", table.stages().get(1).name());
         assertEquals(1, table.stages().get(1).cells().size());
         assertEquals("The chimney", table.stages().get(1).description());
+        assertEquals(NamespacedId.of("structurecumulus", "hearth"), table.stages().get(0).bay());
+        assertEquals(NamespacedId.of("structurecumulus", "stack"), table.stages().get(1).bay());
         assertFalse(table.truncated());
     }
 
@@ -83,6 +85,10 @@ class StageModelTest {
         assertEquals(0, table.stages().get(0).cells().get(0).y());
         assertEquals(2, table.stages().get(2).cells().get(0).y());
         assertEquals("The tower", table.stages().get(1).description());
+        NamespacedId tower = NamespacedId.of("structurecumulus", "tower");
+        for (StageModel.Stage stage : table.stages()) {
+            assertEquals(tower, stage.bay());
+        }
     }
 
     @Test

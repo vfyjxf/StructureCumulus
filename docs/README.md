@@ -42,8 +42,8 @@ table defines who may emit each finding code.
 18. [design/17-preview-screen.md](design/17-preview-screen.md) — the preview screen pack: the client
     catalogue view, the camera and its projections, four linked viewports, the axis gizmo, stage
     playback and its delta, the per-bay exploded view, the five entry links and the demo content
-    (specified at SC0; landing through SC4 — SC1 the screen skeleton and the package migration, SC2
-    the playback and the explode, SC3 the links, SC4 the demo).
+    (specified at SC0; SC1 the screen skeleton and the package migration is on the tree, landing
+    through SC4 — SC2 the playback and the explode, SC3 the links, SC4 the demo).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -96,10 +96,10 @@ Then the module files, in dependency order:
   The preview screen pack is the next extension: [17 preview-screen](design/17-preview-screen.md)
   (D-101…D-105) tracked by [plan/screen-plan.md](plan/screen-plan.md), specified at SC0 and landing one
   milestone at a time — SC1 the screen skeleton (the `mc.preview.scene` migration, the 45° orthographic
-  camera, four linked viewports, the axes, the drawn-hull fit in both consumers), SC2 the staged
-  playback and the per-bay exploded view, SC3 the five entry links (JEI's button, the client command,
-  the `O` world key, ghost to world with the screen's heading, the in-screen variant switch) and SC4
-  the demo documents. Nothing of it is on the tree yet: SC0 is the design revision alone.
+  camera, four linked viewports, the axes, the drawn-hull fit in both consumers; on the tree), SC2 the
+  staged playback and the per-bay exploded view, SC3 the five entry links (JEI's button, the client
+  command, the `O` world key, ghost to world with the screen's heading, the in-screen variant switch)
+  and SC4 the demo documents. Of it, SC0's design revision and SC1's skeleton are on the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`

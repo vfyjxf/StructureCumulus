@@ -1,11 +1,11 @@
-package dev.vfyjxf.cumulus.mc.preview.client;
+package dev.vfyjxf.cumulus.mc.preview.scene;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 
 /** Forces one alpha and one rgb tint on every vertex of a model pass. */
-final class TintedBuffers implements MultiBufferSource {
+public final class TintedBuffers implements MultiBufferSource {
 
     private final MultiBufferSource delegate;
     private final float alpha;
@@ -21,11 +21,11 @@ final class TintedBuffers implements MultiBufferSource {
         this.blue = blue;
     }
 
-    static MultiBufferSource of(MultiBufferSource delegate, float alpha) {
+    public static MultiBufferSource of(MultiBufferSource delegate, float alpha) {
         return new TintedBuffers(delegate, alpha, 1.0F, 1.0F, 1.0F);
     }
 
-    static MultiBufferSource of(MultiBufferSource delegate, float alpha, float red, float green, float blue) {
+    public static MultiBufferSource of(MultiBufferSource delegate, float alpha, float red, float green, float blue) {
         return new TintedBuffers(delegate, alpha, red, green, blue);
     }
 

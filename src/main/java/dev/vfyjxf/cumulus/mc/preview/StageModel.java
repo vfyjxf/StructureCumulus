@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc.preview;
 
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.structure.Bay;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
@@ -23,11 +24,18 @@ public final class StageModel {
     /** The stage cap; an overflow keeps the first stages in order (design 16 §4.1.8). */
     public static final int maxStages = 256;
 
-    /** One stage: its display name, its bay's carried text, and its cells in canonical order. */
-    public record Stage(String name, @Nullable String description, @Nullable String hint, List<LatticePoint> cells) {
+    /** One stage: its bay, its display name, its bay's carried text, and its cells in canonical order. */
+    public record Stage(
+        String name,
+        @Nullable String description,
+        @Nullable String hint,
+        List<LatticePoint> cells,
+        NamespacedId bay
+    ) {
 
         public Stage {
             Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(bay, "bay");
             cells = List.copyOf(cells);
             if (cells.isEmpty()) {
                 throw new IllegalArgumentException("a stage needs at least one cell");
@@ -90,7 +98,7 @@ public final class StageModel {
                 continue;
             }
             Bay bay = bays.get(index);
-            stages.add(new Stage(bay.id().text(), bay.description(), bay.hint(), cells));
+            stages.add(new Stage(bay.id().text(), bay.description(), bay.hint(), cells, bay.id()));
         }
         return List.copyOf(stages);
     }
@@ -103,7 +111,7 @@ public final class StageModel {
         List<Stage> stages = new ArrayList<>(layers.size());
         int rank = 1;
         for (Map.Entry<Integer, List<LatticePoint>> layer : layers.entrySet()) {
-            stages.add(new Stage("layer " + rank, bay.description(), bay.hint(), layer.getValue()));
+            stages.add(new Stage("layer " + rank, bay.description(), bay.hint(), layer.getValue(), bay.id()));
             rank++;
         }
         return List.copyOf(stages);

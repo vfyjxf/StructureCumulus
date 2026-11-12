@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
+import dev.vfyjxf.cumulus.mc.preview.scene.CellStates;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;

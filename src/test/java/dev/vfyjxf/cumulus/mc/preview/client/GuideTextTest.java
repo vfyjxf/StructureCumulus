@@ -19,8 +19,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class GuideTextTest {
 
-    private static final Stage base = new Stage("structurecumulus:base", 9, 0, "lay the ring first", "the floor");
-    private static final Stage stack = new Stage("structurecumulus:stack", 3, 0, "place it after the floor", null);
+    private static final NamespacedId baseBay = NamespacedId.of("structurecumulus", "base");
+    private static final NamespacedId stackBay = NamespacedId.of("structurecumulus", "stack");
+    private static final Stage base = new Stage(
+        "structurecumulus:base",
+        9,
+        0,
+        "lay the ring first",
+        "the floor",
+        baseBay
+    );
+    private static final Stage stack = new Stage(
+        "structurecumulus:stack",
+        3,
+        0,
+        "place it after the floor",
+        null,
+        stackBay
+    );
     private static final NamespacedId bricks = NamespacedId.of("minecraft", "stone_bricks");
     private static final NamespacedId bars = NamespacedId.of("minecraft", "iron_bars");
 

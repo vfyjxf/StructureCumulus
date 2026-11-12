@@ -4,8 +4,8 @@ import dev.vfyjxf.cloudlib.uitest.api.ClientScenario;
 import dev.vfyjxf.cloudlib.uitest.api.ScenarioBuilder;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.jei.JeiPreview;
-import dev.vfyjxf.cumulus.mc.preview.jei.PreviewViewMode;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewViewMode;
 
 import java.util.ArrayList;
 import java.util.List;

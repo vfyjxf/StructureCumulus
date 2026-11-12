@@ -1,4 +1,4 @@
-package dev.vfyjxf.cumulus.mc.preview.client;
+package dev.vfyjxf.cumulus.mc.preview.scene;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -14,11 +14,11 @@ import java.util.Map;
  * Rebuilds a payload's block state on the client. The payload is the only source: no level read, no
  * block-entity data and no lookup the server did not ship.
  */
-final class CellStates {
+public final class CellStates {
 
     private CellStates() {}
 
-    static @Nullable BlockState of(NamespacedId block, Map<String, String> properties) {
+    public static @Nullable BlockState of(NamespacedId block, Map<String, String> properties) {
         Block found = BuiltInRegistries.BLOCK
                 .getOptional(ResourceLocation.fromNamespaceAndPath(block.namespace(), block.path())).orElse(null);
         if (found == null) {

@@ -1,6 +1,9 @@
 package dev.vfyjxf.cumulus.mc.preview.jei;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.vfyjxf.cumulus.mc.preview.jei.BlueprintPreviewCategory.PageView;
+import dev.vfyjxf.cumulus.mc.preview.scene.BlueprintPreviewRecipe;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewViewMode;
 import mezz.jei.api.gui.inputs.IJeiInputHandler;
 import mezz.jei.api.gui.inputs.IJeiUserInput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -20,10 +23,12 @@ final class PreviewInputHandler implements IJeiInputHandler {
     private static final float pitchLimit = 85.0F;
 
     private final BlueprintPreviewRecipe recipe;
+    private final PageView view;
     private Mode mode = Mode.none;
 
-    PreviewInputHandler(BlueprintPreviewRecipe recipe) {
+    PreviewInputHandler(BlueprintPreviewRecipe recipe, PageView view) {
         this.recipe = recipe;
+        this.view = view;
     }
 
     @Override
@@ -49,7 +54,7 @@ final class PreviewInputHandler implements IJeiInputHandler {
             return true;
         }
         if (pressed == Mode.view && hit == Mode.view) {
-            recipe.cycleViewMode();
+            view.cycleMode();
             return true;
         }
         if (pressed == Mode.variantPrev && hit == Mode.variantPrev) {
@@ -81,11 +86,11 @@ final class PreviewInputHandler implements IJeiInputHandler {
         return switch (mode) {
             case rotate -> {
                 // the three-view and the grid fix their planes, so only the isometric view turns
-                if (recipe.viewMode() != PreviewViewMode.isometric) {
+                if (view.mode() != PreviewViewMode.isometric) {
                     yield true;
                 }
-                recipe.yaw(recipe.yaw() + (float) dragX * degreesPerPixel);
-                recipe.pitch(clamp(recipe.pitch() + (float) dragY * degreesPerPixel));
+                view.yaw(view.yaw() + (float) dragX * degreesPerPixel);
+                view.pitch(clamp(view.pitch() + (float) dragY * degreesPerPixel));
                 yield true;
             }
             case slice -> {
@@ -109,8 +114,8 @@ final class PreviewInputHandler implements IJeiInputHandler {
             return false;
         }
         int layers = recipe.scene().layers();
-        int target = recipe.slice() + (scrollDeltaY > 0.0D ? 1 : -1);
-        recipe.slice(Math.max(0, Math.min(layers - 1, target)));
+        int target = view.slice() + (scrollDeltaY > 0.0D ? 1 : -1);
+        view.slice(Math.max(0, Math.min(layers - 1, target)));
         return true;
     }
 
@@ -183,13 +188,13 @@ final class PreviewInputHandler implements IJeiInputHandler {
     private void sliceAt(double mouseY) {
         int layers = recipe.scene().layers();
         if (layers <= 1) {
-            recipe.slice(0);
+            view.slice(0);
             return;
         }
         float fraction = 1.0F
                 - (float) ((mouseY - BlueprintPreviewCategory.sliderY) / BlueprintPreviewCategory.sliderHeight);
         int slice = Math.round(fraction * (layers - 1));
-        recipe.slice(Math.max(0, Math.min(layers - 1, slice)));
+        view.slice(Math.max(0, Math.min(layers - 1, slice)));
     }
 
     private static float clamp(float pitch) {

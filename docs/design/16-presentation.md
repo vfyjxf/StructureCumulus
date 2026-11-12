@@ -256,9 +256,10 @@ public record PreviewPresentation(@Nullable String description, java.util.List<S
                                   int moreMaterials) { }
 
 // One stage: its display name, its expected cell count, how many of them the world already holds, the
-// bay's carried hint (E3) and the bay's carried description (the banner's second line, §8).
+// bay's carried hint (E3), the bay's carried description (the banner's second line, §8) and the bay it
+// derives from (SC1, design 17 §3.2).
 public record Stage(String name, int expectedCells, int satisfiedCells,
-                    @Nullable String hint, @Nullable String description) { }
+                    @Nullable String hint, @Nullable String description, NamespacedId bay) { }
 
 // One item the open plan still lacks: what it asks for and what the item source can give (§7.3).
 public record MaterialStatus(NamespacedId item, int need, int have) { }
@@ -267,7 +268,8 @@ public record GhostCell(LatticePoint cell, NamespacedId block,
                         java.util.Map<String, String> properties, int stageIndex) { }
 ```
 
-- **The shape lands once, at E1.** `Stage` carries both text members from the first payload: its
+- **The shape lands once, at E1.** SC1 adds the one id the derivation already knows, the stage's `bay`
+  (design 17 §3.2), and changes nothing else. `Stage` carries both text members from the first payload: its
   `description` is filled from the bay the stage derives from, because §8's banner shows that line
   from E1; its `hint` stays null until E3 fills it, and `PreviewPresentation.description` (the root
   text) stays null the same way. E3 fills values and never changes this shape.

@@ -85,6 +85,20 @@ final class PreviewCatalog {
             return null;
         }
         Map<LatticePoint, BlockState> states = outcome.states();
+        boolean draws = false;
+        for (BlockState state : states.values()) {
+            if (!state.isAir()) {
+                draws = true;
+                break;
+            }
+        }
+        if (!draws) {
+            StructureCumulus.logger.warn(
+                "preview catalog: {} draws nothing (no expected cell resolves to a drawn block) and is left out",
+                id.text()
+            );
+            return null;
+        }
         if (states.size() > maxCells) {
             StructureCumulus.logger.warn(
                 "preview catalog: {} declares {} expected cells, over the {} cap, and is left out",
@@ -99,7 +113,9 @@ final class PreviewCatalog {
         List<GhostCell> cells = new ArrayList<>(states.size());
         for (int index = 0; index < table.stages().size(); index++) {
             StageModel.Stage stage = table.stages().get(index);
-            stages.add(new Stage(stage.name(), stage.cells().size(), 0, stage.hint(), stage.description()));
+            stages.add(
+                new Stage(stage.name(), stage.cells().size(), 0, stage.hint(), stage.description(), stage.bay())
+            );
             for (LatticePoint cell : stage.cells()) {
                 BlockState value = states.get(cell);
                 if (value == null) {
