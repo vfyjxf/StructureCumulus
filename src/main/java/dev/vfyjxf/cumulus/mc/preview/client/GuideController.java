@@ -1,6 +1,5 @@
 package dev.vfyjxf.cumulus.mc.preview.client;
 
-import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
@@ -8,13 +7,13 @@ import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellStates;
+import dev.vfyjxf.cumulus.mc.preview.scene.NextStepLine;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -126,11 +125,7 @@ public final class GuideController {
         return line(group, unsatisfied, stage, index, presentation.stages().size(), complete(presentation), breakable);
     }
 
-    /**
-     * The formatter: the data comes from the payload, the wording is these literals (design 16 §12.3).
-     * `place` when every unsatisfied cell of the group is missing, `replace` when one must be broken
-     * first; the group's largest distinct required item wins; the stage's carried hint is the why.
-     */
+    /** The formatter: the data comes from the payload, the wording is {@link NextStepLine}'s (design 16 §12.3). */
     static String line(
         List<GhostCell> group,
         int unsatisfied,
@@ -140,40 +135,7 @@ public final class GuideController {
         boolean complete,
         boolean breakable
     ) {
-        StringBuilder text = new StringBuilder();
-        // a stage with no ghost left to draw still has cells: nothing can be placed, so the verb is
-        // replace; a shortened ghost list with a clean world stays place, because the cap is no fault
-        boolean replace = group.isEmpty() && unsatisfied > 0 || group.size() < unsatisfied && breakable;
-        if (group.isEmpty()) {
-            text.append(replace ? "replace" : "nothing left to place");
-        } else {
-            NamespacedId item = null;
-            int count = 0;
-            Map<NamespacedId, Integer> counts = new LinkedHashMap<>();
-            for (GhostCell ghost : group) {
-                counts.merge(ghost.block(), 1, Integer::sum);
-            }
-            for (Map.Entry<NamespacedId, Integer> entry : counts.entrySet()) {
-                if (entry.getValue() > count) {
-                    item = entry.getKey();
-                    count = entry.getValue();
-                }
-            }
-            text.append(replace ? "replace" : "place").append(' ').append(count).append('\u00D7').append(' ');
-            text.append(item == null ? "" : item.text());
-        }
-        if (stage != null) {
-            text.append(" (stage ").append(stageIndex + 1).append('/').append(stageCount).append(": ")
-                    .append(stage.name()).append(')');
-            // the hint is the why of a cell to place; a stage with nothing left to place has no why
-            if (stage.hint() != null && !(group.isEmpty() && unsatisfied == 0)) {
-                text.append(" \u00B7 ").append(stage.hint());
-            }
-        }
-        if (stage != null && complete && unsatisfied == 0) {
-            text.append(" \u00B7 settle takes the claim; a confirm builds nothing");
-        }
-        return text.toString();
+        return NextStepLine.render(group, unsatisfied, stage, stageIndex, stageCount, complete, breakable);
     }
 
     /** True when every expected cell of the session is present: the guide's completion state (§12.5). */

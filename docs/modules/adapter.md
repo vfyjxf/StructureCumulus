@@ -1523,6 +1523,8 @@ package dev.vfyjxf.cumulus.mc.preview.scene;
 // rectangle and a camera (design 15 §6, design 17 §10).
 public final class PreviewScene {
 
+    public static final int sceneDepth;
+
     public record Cell(GhostCell ghost, @Nullable BlockState state) { }
 
     public enum LayerRule {
@@ -1533,6 +1535,14 @@ public final class PreviewScene {
 
     public record Panel(int cells, int layer) { }
 
+    public record Sight(float alpha, float dx, float dy, float dz) {
+        public static final Sight full;
+    }
+
+    public interface Treatment {
+        @Nullable Sight of(Cell cell);
+    }
+
     public static PreviewScene of(PreviewCatalogPayload.Entry entry);
     public Hull hull();
     public int cellCount();
@@ -1542,8 +1552,12 @@ public final class PreviewScene {
     public @Nullable Vector2f point(View view, int layer, LatticePoint at);
     public Panel draw(GuiGraphics graphics, View view, int layer, boolean band);
     public @Nullable Cell hover(double mouseX, double mouseY, Fit fit);
+    public @Nullable Cell hover(double mouseX, double mouseY, Fit fit, Treatment treatment);
     public @Nullable Vector2f point(Fit fit, LatticePoint at);
     public Panel draw(GuiGraphics graphics, Fit fit);
+    public Panel draw(GuiGraphics graphics, Fit fit, Treatment treatment);
+    public Hull hull(int stage);
+    public static boolean draws(Cell cell);
 }
 
 public final class BlueprintPreviewRecipe {
@@ -1588,6 +1602,7 @@ public final class TintedBuffers implements MultiBufferSource {
 public record Hull(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
     public Hull union(Hull other);
     public boolean isEmpty();
+    public float radius();
 }
 
 // One viewport's orbit camera (design 17 §4.2): a pure value whose every operation returns a new one.
@@ -1635,6 +1650,70 @@ public record Fit(Hull hull, SceneCamera camera, int x, int y, int width, int he
     public org.joml.Matrix4f matrix();
 }
 
+// The staged playback of design 17 §7: no cursor is the whole view, a cursor is the staged view, and
+// the reveal counts are what a play, a step and a jump move.
+public record StagePlayback(java.util.List<Stage> stages, java.util.List<Placed> cells, int cursor,
+                            java.util.List<Integer> revealed, boolean playing, float elapsed, float pause) {
+    public static final float doneAlpha;
+    public static final float currentAlpha;
+    public static final float unrevealedAlpha;
+    public static final int cellRevealTicks;
+    public static final int stageRevealMinTicks;
+    public static final int stageRevealMaxTicks;
+    public static final int stagePauseTicks;
+
+    public record Placed(GhostCell ghost, int stage, int position) { }
+
+    public record Cadence(double speed, boolean enabled) {
+        public static Cadence of(double speed, boolean enabled);
+    }
+
+    public static StagePlayback whole(java.util.List<Stage> stages, java.util.List<GhostCell> pageCells);
+    public boolean wholeView();
+    public int stageCount();
+    public int cellCount(int stage);
+    public java.util.List<GhostCell> stageCells(int stage);
+    public int revealed(int stage);
+    public boolean revealed(Placed cell);
+    public boolean drawn(Placed cell);
+    public float alpha(Placed cell);
+    public StagePlayback all();
+    public StagePlayback enter(int stage);
+    public StagePlayback previous();
+    public StagePlayback next();
+    public StagePlayback togglePlay(Cadence cadence);
+    public StagePlayback step();
+    public StagePlayback advance(float deltaTicks, Cadence cadence);
+    public int revealSpan(int stage, Cadence cadence);
+    public int pauseSpan(Cadence cadence);
+}
+
+// The exploded view's offset law of design 17 §8.1: one group per bay, each part pushed away from the
+// structure's centre along its own direction, and each part's label on its moved centroid.
+public record ExplodeModel(java.util.List<Group> groups, java.util.List<NamespacedId> bayOfStage,
+                           float distance, float centroidX, float centroidY, float centroidZ) {
+    public record Group(NamespacedId bay, String text, java.util.List<LatticePoint> cells,
+                        float x, float y, float z,
+                        float directionX, float directionY, float directionZ) { }
+    public record Label(String text, float x, float y, float z, float alpha) { }
+    public record Offset(float x, float y, float z) {
+        public static final Offset zero;
+    }
+
+    public static ExplodeModel of(java.util.List<Stage> stages, java.util.List<GhostCell> drawnCells, Hull hull);
+    public boolean separable();
+    public Offset offset(GhostCell ghost, float t);
+    public java.util.List<Label> labels(float t);
+    public float[] structureCentroid();
+}
+
+// 16 §12.3's next-step line, the pack's one formatter: the world's HUD and the screen read it, so the
+// wording exists once.
+public final class NextStepLine {
+    public static String render(java.util.List<GhostCell> group, int unsatisfied, @Nullable Stage stage,
+                                int stageIndex, int stageCount, boolean complete, boolean breakable);
+}
+
 package dev.vfyjxf.cumulus.mc.preview.client.screen;
 
 // The screen's rectangles of design 17 §5.1: the two strips and the four viewports, a pure function
@@ -1675,6 +1754,22 @@ public final class PreviewScreen extends Screen {
     public @Nullable PreviewScene.Cell hovered();
     public ScreenClock clock();
     public @Nullable AxisGizmo gizmo();
+    public StagePlayback playback();
+    public boolean staged();
+    public float alphaOf(GhostCell ghost);
+    public boolean drawn(GhostCell ghost);
+    public ExplodeModel explode();
+    public float explodeT();
+    public boolean canExplode();
+    public boolean outlineMode();
+    public @Nullable String summaryLine();
+    public StageBar stageBar();
+    public boolean framingActive();
+    public boolean framingArmed();
+    public int drawnLabels();
+    public int drawnFutureBoxes();
+    public @Nullable Rect buttonRect(String label);
+    public java.util.List<String> buttonLabels();
 }
 
 // The screen's own clock of design 17 §4.6: a fractional tick accumulator, fed by the frame's
@@ -1683,6 +1778,24 @@ public record ScreenClock(int ticks, float fraction) {
     public static ScreenClock start();
     public ScreenClock advance(float realtimeDeltaTicks);
     public float time();
+}
+
+// The stage bar of design 17 §7.3: one segment per stage, wide in proportion to its expected cells
+// with a 1 px floor and a 1 px gap, left to right. A table of contents, never a progress bar.
+public record StageBar(java.util.List<Segment> segments, int x, int y, int width, int height) {
+    public record Segment(int index, int x, int width) { }
+    public static StageBar of(java.util.List<Stage> stages, int x, int y, int width, int height);
+    public int hit(double mouseX, double mouseY);
+    public boolean fits(int index, int textWidth);
+}
+
+// One stage-framing flight of design 17 §7.5: the eased 12-tick leg from the camera the play found to
+// that stage's fit, sampled at the screen's clock. It moves the camera value only.
+public record StageFraming(SceneCamera from, SceneCamera to, float start, int ticks) {
+    public static final int stageFocusTicks;
+    public static StageFraming of(SceneCamera from, SceneCamera to, float start, int ticks);
+    public SceneCamera at(float time);
+    public boolean done(float time);
 }
 
 package dev.vfyjxf.cumulus.mc.preview.jei;
@@ -2536,8 +2649,10 @@ conditional plugin and its loader pass, `JeiPreview` and its client events. The 
 **Landed, and landing.** SC0 landed this section, [design/17](../design/17-preview-screen.md) and
 D-101…D-105. SC1 has landed the migration, the stage's `bay` on both payloads, `PreviewScreen`, the
 camera and projection, the four viewports, the axes, the screen's own clock, the hover and the
-drawn-hull fit (the JEI view takes the same hull change and keeps its own camera). SC2 lands the staged
-playback, the delta treatments and the exploded view. SC3 lands the links: the JEI button, the client
+drawn-hull fit (the JEI view takes the same hull change and keeps its own camera). SC2 has landed the
+staged playback and the delta treatments (`StagePlayback`, `StageBar`, `StageFraming`), the exploded
+view (`ExplodeModel`) and the one next-step formatter both surfaces read (`NextStepLine`). SC3 lands
+the links: the JEI button, the client
 command, the `openScreen` key, the open payload's heading and the in-screen variant switch. SC4 lands
 the demo documents. The milestone state lives in
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
@@ -2568,21 +2683,37 @@ the explode, SC3 for the action and the command), and a name that exists in neit
 | `preview.scene` | `SceneCamera` (with `Projection` and `Snap`) | the orbit camera value: target, yaw, pitch, distance, zoom, projection; pure operations only |
 | `preview.scene` | `Hull` | the drawn hull of design 17 §3.3, the input of every fit |
 | `preview.scene` | `Fit` | the fit of design 17 §4.3: one hull into one viewport through one camera, the scale and the 2D projection the scene, the gizmo and the picking share |
-
-The screen's `SceneCamera` is a turntable — yaw about the world's vertical, pitch above the horizon —
-so its default 45°/35.264° is the true isometric view. The JEI face keeps its own `View` yaw/pitch
-tilt (design 16 §11), so the migration changes no JEI picture: the two surfaces have two cameras.
-| `preview.scene` | `ExplodeModel` | the per-bay offset function of design 17 §8.1 |
+| `preview.scene` | `ExplodeModel` (with `Group`, `Label`, `Offset`) | the per-bay offset function of design 17 §8.1: the groups, the direction, the half-diagonal distance and the moved label anchors |
+| `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the four delta treatments and the reveal counts of design 17 §7, as a pure state machine |
+| `preview.scene` | `NextStepLine` | 16 §12.3's next-step line, the pack's one formatter: the world's HUD and the screen's summary line both read it |
 | `preview.scene` | `AxisGizmo` | the three axes and their label anchors, projected through a camera |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
 | `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
 | `preview.client.screen` | `ScreenClock` | the screen's own two-number clock of design 17 §4.6, advanced by the frame's real-time tick delta |
-| `preview.client.screen` | `PreviewScreen` | the one `Screen`: the layout, the four viewports, the widgets, the input and the one world action |
-| `preview.client.screen` | `ViewportWidget` | one viewport's rectangle, its camera derivation, its draw and its picking |
-| `preview.client.screen` | `CameraController` | the input table of design 17 §4.4 translated into `SceneCamera` operations, plus the stage framing and its hand-back |
-| `preview.client.screen` | `StagePlayerWidget` | the stage bar, the cursor and reveal counts, the summary line and the clock |
-| `preview.client.screen` | `ScreenButtons` | the button row of design 17 §4.5, one button per action |
-| `preview.client.screen` | `GhostToWorldAction` | the one C2S send, with the camera's heading |
+| `preview.client.screen` | `PreviewScreen` | the one `Screen`: the layout, the four viewports, the input, the widgets, the stage player and the exploded view |
+| `preview.client.screen` | `StageBar` (with `Segment`) | the table-of-contents bar of design 17 §7.3: proportional segments, a 1 px floor, a 1 px gap and the hit test |
+| `preview.client.screen` | `StageFraming` | the 12-tick `inOutCubic` stage-framing leg of design 17 §7.5 and its hand-back |
+
+The screen's `SceneCamera` is a turntable — yaw about the world's vertical, pitch above the horizon —
+so its default 45°/35.264° is the true isometric view. The JEI face keeps its own `View` yaw/pitch
+tilt (design 16 §11), so the migration changes no JEI picture: the two surfaces have two cameras.
+SC1 landed the viewports, the input table and the button row inside one `PreviewScreen` class rather
+than one class per widget, and SC2 keeps that shape: `StagePlayback` owns the player's state,
+`StageBar` its geometry and `StageFraming` its leg. SC3's one world action joins as a method of the
+screen, not as a second class.
+
+**The stage framing's screen reading.** Design 17 §7.5 borrows 16 §6.7.2's `stageShot` and its 12-tick
+`inOutCubic` leg; a `SceneCamera` frames a stage by its target and its fit (design 17 §4.3), so the
+leg flies the main viewport to `camera.frame(stage's drawn hull)` over 12 ticks (`StageFraming`,
+sampled at the screen's clock) and leaves the viewer's yaw and pitch alone — §5.2 makes the pose the
+viewer's, and a framing that rotated the page would fight the hand twice. The three small viewports
+never follow it, arming it moves the camera value only, and the first manual camera gesture disarms it
+for the rest of that play-through without pausing the play.
+
+**The scene's GUI depth layer.** Every screen viewport draws its models at `PreviewScene.sceneDepth`
+(the same 150 the JEI view uses) so the whole scene sits in front of the screen's background and of a
+panel's own fill; the gizmo, the part labels, the hover box and the future-cell boxes ride just in
+front of the models, and a chrome box carries its own cell's depth so a nearer model still hides it.
 
 **What the screen never does.** It reads no world state (no `Level`, no `ClientLevel`, no
 `getBlockState`, no camera entity) and no session: its only input is `PreviewCatalogClient`'s

@@ -44,7 +44,23 @@ public final class PreviewScene {
     /** What one panel drew: its cell count and the Y layer it isolates or highlights. */
     public record Panel(int cells, int layer) {}
 
-    private static final int sceneDepth = 150;
+    /** How one cell is drawn this frame: its alpha factor and its displacement (design 17 §7.2, §8.1). */
+    public record Sight(float alpha, float dx, float dy, float dz) {
+
+        public static final Sight full = new Sight(1.0F, 0.0F, 0.0F, 0.0F);
+    }
+
+    /** One frame's per-cell treatment; null means the stage hides the cell (design 17 §7.2). */
+    public interface Treatment {
+
+        @Nullable
+        Sight of(Cell cell);
+    }
+
+    private record Drawable(Cell cell, Sight sight) {}
+
+    /** The GUI depth at which the whole scene sits, in front of every screen background (design 17 §5.1). */
+    public static final int sceneDepth = 150;
     private static final int bandColor = 0x38FFFFFF;
     private static final int bandEdgeColor = 0x58FFFFFF;
 
@@ -103,7 +119,19 @@ public final class PreviewScene {
         return hull;
     }
 
-    private static boolean draws(Cell cell) {
+    /** The drawn hull of one stage's cells: the stage framing's fit box (design 17 §7.5). */
+    public Hull hull(int stage) {
+        List<Cell> owned = new ArrayList<>();
+        for (Cell cell : cells) {
+            if (cell.ghost().stageIndex() == stage) {
+                owned.add(cell);
+            }
+        }
+        return hullOf(owned, PreviewScene::draws);
+    }
+
+    /** True when the cell's expected state resolves to a block that draws something (design 17 §3.3). */
+    public static boolean draws(Cell cell) {
         BlockState state = cell.state();
         return state != null && !state.isAir();
     }
@@ -214,6 +242,12 @@ public final class PreviewScene {
      */
     @Nullable
     public Cell hover(double mouseX, double mouseY, Fit fit) {
+        return hover(mouseX, mouseY, fit, cell -> Sight.full);
+    }
+
+    /** The hover of the treated page: a cell the stage hides is not pickable (design 17 §5.3). */
+    @Nullable
+    public Cell hover(double mouseX, double mouseY, Fit fit, Treatment treatment) {
         if (mouseX < fit.x()
                 || mouseX >= fit.x() + fit.width()
                 || mouseY < fit.y()
@@ -243,8 +277,12 @@ public final class PreviewScene {
             if (!draws(cell)) {
                 continue;
             }
+            Sight sight = treatment.of(cell);
+            if (sight == null || sight.alpha() <= 0.0F) {
+                continue;
+            }
             LatticePoint at = cell.ghost().cell();
-            float exit = exit(rayOrigin, rayDirection, at.x(), at.y(), at.z());
+            float exit = exit(rayOrigin, rayDirection, at.x() + sight.dx(), at.y() + sight.dy(), at.z() + sight.dz());
             if (exit > 0.0F && exit < nearestExit) {
                 nearestExit = exit;
                 nearest = cell;
@@ -264,39 +302,55 @@ public final class PreviewScene {
         return null;
     }
 
-    /** Draws the page through one screen viewport's camera and fit. */
+    /** Draws the page through one screen viewport's camera and fit, every cell at full alpha. */
     public Panel draw(GuiGraphics graphics, Fit fit) {
-        List<Cell> drawn = new ArrayList<>(cells.size());
+        return draw(graphics, fit, cell -> Sight.full);
+    }
+
+    /** Draws the treated cells through one screen viewport's camera and fit (design 17 §7.2, §8.1). */
+    public Panel draw(GuiGraphics graphics, Fit fit, Treatment treatment) {
+        List<Drawable> drawn = new ArrayList<>(cells.size());
         for (Cell cell : cells) {
-            if (draws(cell)) {
-                drawn.add(cell);
+            if (!draws(cell)) {
+                continue;
             }
+            Sight sight = treatment.of(cell);
+            if (sight == null || sight.alpha() <= 0.0F) {
+                continue;
+            }
+            drawn.add(new Drawable(cell, sight));
         }
         if (drawn.isEmpty()) {
             return new Panel(0, 0);
         }
-        drawn.sort(Comparator.comparingDouble(cell -> {
-            LatticePoint at = cell.ghost().cell();
-            return fit.depth(at.x() + 0.5F, at.y() + 0.5F, at.z() + 0.5F);
+        drawn.sort(Comparator.comparingDouble(drawable -> {
+            LatticePoint at = drawable.cell().ghost().cell();
+            Sight sight = drawable.sight();
+            return fit.depth(at.x() + 0.5F + sight.dx(), at.y() + 0.5F + sight.dy(), at.z() + 0.5F + sight.dz());
         }));
         PoseStack pose = graphics.pose();
         pose.pushPose();
+        pose.translate(0.0F, 0.0F, sceneDepth);
         pose.mulPose(fit.matrix());
         Lighting.setupFor3DItems();
         RenderSystem.enableDepthTest();
         RenderSystem.depthMask(true);
-        for (Cell cell : drawn) {
+        for (Drawable drawable : drawn) {
+            Cell cell = drawable.cell();
+            Sight sight = drawable.sight();
             BlockState state = cell.state();
             if (state == null) {
                 continue;
             }
             LatticePoint at = cell.ghost().cell();
             pose.pushPose();
-            pose.translate(at.x(), at.y(), at.z());
+            pose.translate(at.x() + sight.dx(), at.y() + sight.dy(), at.z() + sight.dz());
             Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
                 state,
                 pose,
-                graphics.bufferSource(),
+                sight.alpha() >= 1.0F
+                        ? graphics.bufferSource()
+                        : TintedBuffers.of(graphics.bufferSource(), sight.alpha()),
                 LightTexture.FULL_BRIGHT,
                 OverlayTexture.NO_OVERLAY,
                 ModelData.EMPTY,

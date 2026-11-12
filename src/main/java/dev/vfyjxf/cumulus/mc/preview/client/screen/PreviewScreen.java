@@ -2,16 +2,24 @@ package dev.vfyjxf.cumulus.mc.preview.client.screen;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.mc.ClientConfig;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
+import dev.vfyjxf.cumulus.mc.preview.client.cine.Ease;
+import dev.vfyjxf.cumulus.mc.preview.client.cine.Tween;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout.Rect;
+import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload.Entry;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.scene.AxisGizmo;
+import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
+import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
+import dev.vfyjxf.cumulus.mc.preview.scene.NextStepLine;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene.Cell;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
+import dev.vfyjxf.cumulus.mc.preview.scene.StagePlayback;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -22,6 +30,7 @@ import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,19 +55,33 @@ public final class PreviewScreen extends Screen {
     private static final int tooltipColor = 0xE0101010;
     private static final int tooltipTextColor = 0xFFF0F0F0;
     private static final int outlineColor = 0xFFE8E8E8;
+    private static final int barColor = 0x60484848;
+    private static final int barHoverColor = 0x906A6A6A;
+    private static final int barCursorColor = 0xFFE8E8E8;
     private static final int buttonHeight = 14;
     private static final int buttonGap = 4;
+    private static final int barTop = 3;
+    private static final int barHeight = 9;
+    private static final int summaryTop = 13;
+    private static final int buttonsTop = 25;
     private static final float degreesPerPixel = 1.6F;
     private static final float scrollStep = 1.1F;
+    private static final int explodeTicks = 12;
 
     private final NamespacedId blueprintId;
     private final Runnable onCatalog = this::reconcile;
     private PreviewCatalogPayload.Entry entry;
     private PreviewScene scene;
+    private StagePlayback playback;
+    private Map<GhostCell, StagePlayback.Placed> placed;
+    private Map<LatticePoint, GhostCell> ghostAt;
+    private ExplodeModel explode;
     private SceneCamera camera = SceneCamera.isometric();
     private ScreenLayout layout;
     private boolean listening;
     private int drawnCells;
+    private int drawnLabels;
+    private int drawnFutureBoxes;
     private boolean dragging;
     private boolean panning;
     private boolean draggedSinceClick;
@@ -68,12 +91,27 @@ public final class PreviewScreen extends Screen {
     private ScreenClock clock = ScreenClock.start();
     private @Nullable Cell hovered;
     private @Nullable AxisGizmo gizmo;
+    private StageBar stageBar = new StageBar(List.of(), 0, 0, 0, 0);
+    private @Nullable String summary;
+    private @Nullable String barHover;
+    private boolean outline;
+    private float explodeT;
+    private float explodeTarget;
+    private @Nullable Tween explodeTween;
+    private float explodeTweenStart;
+    private @Nullable StageFraming framing;
+    private boolean framingArmed = true;
+    private int framedCursor = -1;
 
     private PreviewScreen(Entry entry) {
         super(Component.literal(entry.blueprintId().text()));
         this.blueprintId = entry.blueprintId();
         this.entry = entry;
         this.scene = PreviewScene.of(entry);
+        this.playback = StagePlayback.whole(entry.presentation().stages(), entry.cells());
+        this.placed = index(playback);
+        this.ghostAt = ghosts(entry.cells());
+        this.explode = explodeModel();
         this.layout = ScreenLayout.of(320, 240);
     }
 
@@ -126,17 +164,25 @@ public final class PreviewScreen extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        clock = clock.advance(Minecraft.getInstance().getTimer().getRealtimeDeltaTicks());
+        float delta = Minecraft.getInstance().getTimer().getRealtimeDeltaTicks();
+        clock = clock.advance(delta);
+        playback = playback.advance(delta, cadence());
+        tickExplode();
+        tickFraming();
         double cursorX = pointerX < 0.0D ? mouseX : pointerX;
         double cursorY = pointerY < 0.0D ? mouseY : pointerY;
         hovered = hoveredCell(cursorX, cursorY);
         graphics.drawString(font, blueprintId.text(), 4, 6, titleColor, false);
         drawnCells = 0;
+        drawnLabels = 0;
+        drawnFutureBoxes = 0;
         drawPanel(graphics, layout.main(), Panel.main, false);
         drawPanel(graphics, layout.front(), Panel.front, true);
         drawPanel(graphics, layout.side(), Panel.side, true);
         drawPanel(graphics, layout.top(), Panel.top, true);
         graphics.fill(0, layout.control().y(), width, layout.control().y() + layout.control().height(), panelColor);
+        drawStageBar(graphics, (int) cursorX, (int) cursorY);
+        drawSummary(graphics);
         drawButtons(graphics, (int) cursorX, (int) cursorY);
         if (hovered != null) {
             drawCellTooltip(graphics, hovered, (int) cursorX, (int) cursorY);
@@ -167,6 +213,22 @@ public final class PreviewScreen extends Screen {
                 snapMain(control ? SceneCamera.Snap.bottom : SceneCamera.Snap.top);
                 return true;
             }
+            case GLFW.GLFW_KEY_SPACE -> {
+                togglePlay();
+                return true;
+            }
+            case GLFW.GLFW_KEY_UP -> {
+                playback = playback.previous();
+                return true;
+            }
+            case GLFW.GLFW_KEY_DOWN -> {
+                playback = playback.next();
+                return true;
+            }
+            case GLFW.GLFW_KEY_B -> {
+                playback = playback.step();
+                return true;
+            }
             default -> {
                 // every other key stays the screen's own or closes it through Screen's Esc
             }
@@ -191,6 +253,11 @@ public final class PreviewScreen extends Screen {
                 candidate.action().run();
                 return true;
             }
+        }
+        int stage = stageBar.hit(mouseX, mouseY);
+        if (stage >= 0) {
+            playback = playback.enter(stage);
+            return true;
         }
         if (button == 0 || button == 2) {
             if (!inside(layout.main(), mouseX, mouseY)) {
@@ -228,6 +295,7 @@ public final class PreviewScreen extends Screen {
         draggedSinceClick = true;
         pointerX = mouseX;
         pointerY = mouseY;
+        handOnCamera();
         if (panning) {
             float units = mainUnitsPerPixel();
             camera = camera.pan((float) (dragX * units), (float) (-dragY * units));
@@ -242,29 +310,148 @@ public final class PreviewScreen extends Screen {
         if (!inside(layout.main(), mouseX, mouseY) || scrollY == 0.0D) {
             return false;
         }
+        handOnCamera();
         camera = camera.zoom((float) Math.pow(scrollStep, scrollY));
         return true;
     }
 
-    /** Frame all: target the drawn hull's centre and reset the orthographic zoom. */
+    /** `all`: drops the cursor, draws every stage and stops the play (design 17 §7.1). */
+    private void wholeView() {
+        playback = playback.all();
+        framedCursor = -1;
+        framing = null;
+        summary = null;
+    }
+
+    private void togglePlay() {
+        boolean starting = !playback.playing();
+        playback = playback.togglePlay(cadence());
+        if (starting) {
+            framingArmed = true;
+            framedCursor = -1;
+        }
+    }
+
+    /** The explode toggle: a 12-tick leg, and a second press reverses the same leg (design 17 §8.1). */
+    private void toggleExplode() {
+        if (!explode.separable()) {
+            explodeTarget = 0.0F;
+            return;
+        }
+        explodeTarget = explodeTarget > 0.5F ? 0.0F : 1.0F;
+        explodeTween = new Tween(explodeT, explodeTarget, explodeTicks(), Ease.inOutCubic);
+        explodeTweenStart = clock.time();
+    }
+
+    private void tickExplode() {
+        if (explodeTween == null) {
+            return;
+        }
+        double tick = clock.time() - explodeTweenStart;
+        explodeT = (float) explodeTween.at(tick);
+        if (explodeTween.done(tick)) {
+            explodeT = (float) explodeTween.to();
+            explodeTween = null;
+        }
+    }
+
+    /** A stage advance during a play flies the main viewport, until a hand takes the camera (design 17 §7.5). */
+    private void tickFraming() {
+        if (playback.cursor() != framedCursor) {
+            framedCursor = playback.cursor();
+            if (framingArmed && playback.playing() && framedCursor >= 0) {
+                startFraming(framedCursor);
+            }
+        }
+        if (framing != null && framing.done(clock.time())) {
+            camera = framing.to();
+            framing = null;
+        }
+    }
+
+    private void startFraming(int stage) {
+        SceneCamera from = currentCamera();
+        camera = from;
+        framing = StageFraming.of(from, from.frame(scene.hull(stage), mainAspect()), clock.time(), focusTicks());
+    }
+
+    /** The first manual camera gesture disarms framing for the rest of that play-through. */
+    private void handOnCamera() {
+        camera = currentCamera();
+        framing = null;
+        framingArmed = false;
+    }
+
+    private SceneCamera currentCamera() {
+        return framing == null ? camera : framing.at(clock.time());
+    }
+
+    /** Frame all: target the current hull's centre and fit it, exploded parts included (design 17 §8.3). */
     private void frameAll() {
-        camera = camera.frame(scene.hull(), mainAspect());
+        handOnCamera();
+        camera = fitted(currentCamera().frame(scene.hull(), mainAspect()));
     }
 
     /** The default 45° isometric, framed: the state a fresh open produces. */
     private void resetView() {
-        camera = camera.reset(scene.hull(), mainAspect());
+        handOnCamera();
+        camera = fitted(SceneCamera.isometric().frame(scene.hull(), mainAspect()));
     }
 
     private void snapMain(SceneCamera.Snap snap) {
+        handOnCamera();
         camera = camera.snap(snap);
     }
 
     private void toggleProjection() {
+        handOnCamera();
         SceneCamera.Projection next = camera.projection() == SceneCamera.Projection.orthographic
                 ? SceneCamera.Projection.perspective
                 : SceneCamera.Projection.orthographic;
         camera = camera.withProjection(next, scene.hull());
+    }
+
+    /** The zoom that makes the current hull, displaced cells included, exactly fill the page's fit. */
+    private SceneCamera fitted(SceneCamera base) {
+        Hull page = scene.hull();
+        Hull current = currentHull();
+        Rect main = layout.main();
+        if (main.isEmpty() || page.isEmpty() || current.equals(page)) {
+            return base;
+        }
+        float pageScale = Fit.of(page, main.x(), main.y(), main.width(), main.height(), base).scale();
+        float currentScale = Fit.of(current, main.x(), main.y(), main.width(), main.height(), base).scale();
+        if (currentScale >= pageScale) {
+            return base;
+        }
+        return base.zoom(
+            base.projection() == SceneCamera.Projection.orthographic
+                    ? currentScale / pageScale
+                    : current.radius() / page.radius()
+        );
+    }
+
+    /** The page hull union every drawn cell's displaced box: frame all's subject (design 17 §8.3). */
+    private Hull currentHull() {
+        Hull hull = scene.hull();
+        for (Cell cell : scene.cells()) {
+            PreviewScene.Sight sight = sightOf(cell);
+            if (sight == null) {
+                continue;
+            }
+            LatticePoint at = cell.ghost().cell();
+            hull = hull.union(
+                new Hull(
+                    at.x() + sight.dx(),
+                    at.y() + sight.dy(),
+                    at.z() + sight.dz(),
+                    at.x() + sight.dx() + 1.0F,
+                    at.y() + sight.dy() + 1.0F,
+                    at.z() + sight.dz() + 1.0F
+                )
+            );
+        }
+        return hull;
     }
 
     /** How many cells one pixel covers for pan, from the main viewport's own fit. */
@@ -273,7 +460,7 @@ public final class PreviewScreen extends Screen {
         if (main.isEmpty()) {
             return 1.0F;
         }
-        return Fit.of(scene.hull(), main.x(), main.y(), main.width(), main.height(), camera).unitsPerPixel();
+        return Fit.of(scene.hull(), main.x(), main.y(), main.width(), main.height(), currentCamera()).unitsPerPixel();
     }
 
     private static boolean inside(@Nullable Rect rect, double mouseX, double mouseY) {
@@ -285,32 +472,125 @@ public final class PreviewScreen extends Screen {
                 && mouseY < rect.y() + rect.height();
     }
 
-    private List<Button> buttons() {
-        List<Button> buttons = new ArrayList<>();
-        int y = layout.control().y() + buttonGap;
-        int x = buttonGap;
-        x = add(buttons, x, y, "close", "close (Esc)", this::onClose);
-        x = add(buttons, x, y, "iso", "reset: iso (Home)", this::resetView);
-        x = add(buttons, x, y, "frame", "frame all (F / double click)", this::frameAll);
-        x = add(buttons, x, y, "front", "front (1)", () -> snapMain(SceneCamera.Snap.front));
-        x = add(buttons, x, y, "side", "side (3)", () -> snapMain(SceneCamera.Snap.right));
-        x = add(buttons, x, y, "top", "top (7)", () -> snapMain(SceneCamera.Snap.top));
-        String projection = camera.projection() == SceneCamera.Projection.orthographic ? "ortho" : "perspective";
-        add(buttons, x, y, projection, "projection: " + projection, this::toggleProjection);
-        return List.copyOf(buttons);
+    private List<Stage> stages() {
+        return entry.presentation().stages();
     }
 
-    private int add(List<Button> buttons, int x, int y, String label, String tooltip, Runnable action) {
-        int width = font.width(label) + 10;
-        buttons.add(new Button(new Rect(x, y, width, buttonHeight), label, tooltip, action));
-        return x + width + buttonGap;
+    private StagePlayback.Cadence cadence() {
+        return StagePlayback.Cadence.of(ClientConfig.animationSpeed(), ClientConfig.animationEnabled());
+    }
+
+    private int explodeTicks() {
+        return ClientConfig.animationEnabled()
+                ? Math.max(1, (int) Math.ceil(explodeTicks / ClientConfig.animationSpeed()))
+                : 0;
+    }
+
+    private int focusTicks() {
+        return ClientConfig.animationEnabled()
+                ? Math.max(1, (int) Math.ceil(StageFraming.stageFocusTicks / ClientConfig.animationSpeed()))
+                : 0;
+    }
+
+    private static Map<LatticePoint, GhostCell> ghosts(List<GhostCell> cells) {
+        Map<LatticePoint, GhostCell> byPoint = new HashMap<>();
+        for (GhostCell ghost : cells) {
+            byPoint.put(ghost.cell(), ghost);
+        }
+        return Map.copyOf(byPoint);
+    }
+
+    private static Map<GhostCell, StagePlayback.Placed> index(StagePlayback playback) {
+        Map<GhostCell, StagePlayback.Placed> placed = new HashMap<>();
+        for (StagePlayback.Placed cell : playback.cells()) {
+            placed.put(cell.ghost(), cell);
+        }
+        return Map.copyOf(placed);
+    }
+
+    private ExplodeModel explodeModel() {
+        List<GhostCell> drawn = new ArrayList<>();
+        for (Cell cell : scene.cells()) {
+            if (PreviewScene.draws(cell)) {
+                drawn.add(cell.ghost());
+            }
+        }
+        return ExplodeModel.of(stages(), drawn, scene.hull());
+    }
+
+    /** One cell's treatment: the stage's alpha and the explode's displacement (design 17 §7.2, §8.1). */
+    private PreviewScene.@Nullable Sight sightOf(Cell cell) {
+        StagePlayback.Placed placedCell = placed.get(cell.ghost());
+        if (placedCell == null) {
+            return PreviewScene.Sight.full;
+        }
+        if (!playback.drawn(placedCell)) {
+            return null;
+        }
+        ExplodeModel.Offset offset = explode.offset(cell.ghost(), explodeT);
+        return new PreviewScene.Sight(playback.alpha(placedCell), offset.x(), offset.y(), offset.z());
+    }
+
+    private List<ButtonSpec> buttonSpecs() {
+        List<ButtonSpec> specs = new ArrayList<>();
+        specs.add(new ButtonSpec("close", "close (Esc)", this::onClose));
+        specs.add(new ButtonSpec("iso", "reset: iso (Home)", this::resetView));
+        specs.add(new ButtonSpec("frame", "frame all (F / double click)", this::frameAll));
+        specs.add(new ButtonSpec("front", "front (1)", () -> snapMain(SceneCamera.Snap.front)));
+        specs.add(new ButtonSpec("side", "side (3)", () -> snapMain(SceneCamera.Snap.right)));
+        specs.add(new ButtonSpec("top", "top (7)", () -> snapMain(SceneCamera.Snap.top)));
+        String projection = camera.projection() == SceneCamera.Projection.orthographic ? "ortho" : "perspective";
+        specs.add(new ButtonSpec(projection, "projection: " + projection, this::toggleProjection));
+        specs.add(new ButtonSpec("all", "the whole view", this::wholeView));
+        specs.add(
+            new ButtonSpec(
+                explode.separable() ? "explode" : "one part",
+                explode.separable() ? "the exploded view" : "one part: nothing to separate",
+                this::toggleExplode
+            )
+        );
+        specs.add(
+            new ButtonSpec(
+                playback.playing() ? "pause" : "play",
+                playback.playing() ? "pause the play (Space)" : "play the stages (Space)",
+                this::togglePlay
+            )
+        );
+        specs.add(new ButtonSpec("step", "one cell step (B)", () -> playback = playback.step()));
+        specs.add(new ButtonSpec("<", "previous stage (\u2191)", () -> playback = playback.previous()));
+        specs.add(new ButtonSpec(">", "next stage (\u2193)", () -> playback = playback.next()));
+        specs.add(
+            new ButtonSpec(
+                outline ? "outline" : "hidden",
+                outline ? "future cells: outline" : "future cells: hidden",
+                () -> outline = !outline
+            )
+        );
+        return List.copyOf(specs);
+    }
+
+    private List<Button> buttons() {
+        List<Button> built = new ArrayList<>();
+        int x = buttonGap;
+        int y = layout.control().y() + buttonsTop;
+        int bottom = layout.control().y() + layout.control().height() - 1;
+        for (ButtonSpec spec : buttonSpecs()) {
+            int specWidth = font.width(spec.label()) + 10;
+            if (x + specWidth > width - buttonGap) {
+                x = buttonGap;
+                y += buttonHeight + 2;
+            }
+            if (y + buttonHeight > bottom) {
+                break;
+            }
+            built.add(new Button(new Rect(x, y, specWidth, buttonHeight), spec.label(), spec.tooltip(), spec.action()));
+            x += specWidth + buttonGap;
+        }
+        return List.copyOf(built);
     }
 
     private void drawButtons(GuiGraphics graphics, int mouseX, int mouseY) {
         for (Button button : buttons()) {
-            if (button.rect().x() + button.rect().width() > width - buttonGap) {
-                continue;
-            }
             boolean hovered = button.inside(mouseX, mouseY);
             graphics.fill(
                 button.rect().x(),
@@ -328,21 +608,71 @@ public final class PreviewScreen extends Screen {
                 false
             );
             if (hovered) {
-                int textWidth = font.width(button.tooltip());
-                int textX = Math.max(2, (int) Math.min(mouseX + 8.0D, width - textWidth - 6));
-                int textY = Math.max(2, (int) mouseY - 12);
-                graphics.fill(textX - 3, textY - 3, textX + textWidth + 3, textY + 10, tooltipColor);
-                graphics.drawString(font, button.tooltip(), textX, textY, tooltipTextColor, false);
+                drawTooltip(graphics, button.tooltip(), mouseX, mouseY);
             }
         }
     }
 
-    /** One control-strip button: its rectangle, its face text and the tooltip that names its key. */
-    private record Button(Rect rect, String label, String tooltip, Runnable action) {
+    private void drawTooltip(GuiGraphics graphics, String text, int mouseX, int mouseY) {
+        int textWidth = font.width(text);
+        int textX = Math.max(2, (int) Math.min(mouseX + 8.0D, width - textWidth - 6));
+        int textY = Math.max(2, mouseY - 12);
+        graphics.fill(textX - 3, textY - 3, textX + textWidth + 3, textY + 10, tooltipColor);
+        graphics.drawString(font, text, textX, textY, tooltipTextColor, false);
+    }
 
-        boolean inside(double mouseX, double mouseY) {
-            return PreviewScreen.inside(rect, mouseX, mouseY);
+    /** The stage bar as a table of contents: proportional segments, the cursor outlined (design 17 §7.3). */
+    private void drawStageBar(GuiGraphics graphics, int mouseX, int mouseY) {
+        stageBar = StageBar.of(stages(), buttonGap, layout.control().y() + barTop, width - 2 * buttonGap, barHeight);
+        int hoveredIndex = stageBar.hit(mouseX, mouseY);
+        String barHover = null;
+        for (StageBar.Segment segment : stageBar.segments()) {
+            Stage stage = stages().get(segment.index());
+            graphics.fill(
+                segment.x(),
+                stageBar.y(),
+                segment.x() + segment.width(),
+                stageBar.y() + stageBar.height(),
+                segment.index() == hoveredIndex ? barHoverColor : barColor
+            );
+            if (segment.index() == playback.cursor()) {
+                outlineBox(graphics, segment.x(), stageBar.y(), segment.width(), stageBar.height(), barCursorColor);
+            }
+            if (stageBar.fits(segment.index(), font.width(stage.name()))) {
+                graphics.drawString(font, stage.name(), segment.x() + 1, stageBar.y() + 1, chromeColor, false);
+            }
+            if (segment.index() == hoveredIndex) {
+                barHover = stage.name() + " \u00B7 " + stage.expectedCells() + " cells";
+            }
         }
+        if (barHover != null) {
+            drawTooltip(graphics, barHover, mouseX, stageBar.y() - 2);
+        }
+    }
+
+    /** 16 §12.3's next-step line, and only while a cursor exists (design 17 §7.4). */
+    private void drawSummary(GuiGraphics graphics) {
+        summary = summary();
+        if (summary != null) {
+            graphics.drawString(font, summary, buttonGap, layout.control().y() + summaryTop, titleColor, false);
+        }
+    }
+
+    private @Nullable String summary() {
+        int cursor = playback.cursor();
+        if (cursor < 0 || cursor >= stages().size()) {
+            return null;
+        }
+        Stage stage = stages().get(cursor);
+        return NextStepLine.render(
+            playback.stageCells(cursor),
+            stage.expectedCells(),
+            stage,
+            cursor,
+            stages().size(),
+            false,
+            false
+        );
     }
 
     private void drawPanel(GuiGraphics graphics, @Nullable Rect rect, Panel panel, boolean label) {
@@ -350,23 +680,94 @@ public final class PreviewScreen extends Screen {
             return;
         }
         graphics.fill(rect.x(), rect.y(), rect.x() + rect.width(), rect.y() + rect.height(), panelColor);
-        SceneCamera panelCamera = cameraFor(camera, panel);
-        Fit fit = Fit.of(scene.hull(), rect.x(), rect.y(), rect.width(), rect.height(), panelCamera);
+        Fit fit = fitFor(panel);
         graphics.enableScissor(rect.x(), rect.y(), rect.x() + rect.width(), rect.y() + rect.height());
-        drawnCells += scene.draw(graphics, fit).cells();
+        drawnCells += scene.draw(graphics, fit, this::sightOf).cells();
+        drawFutureBoxes(graphics, fit);
         if (panel == Panel.main) {
-            drawGizmo(graphics, panelCamera, rect);
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + 10.0F);
+            drawGizmo(graphics, fit.camera(), rect);
+            graphics.pose().popPose();
         }
         if (hovered != null) {
-            drawOutline(graphics, fit, hovered);
+            PreviewScene.Sight sight = sightOf(hovered);
+            if (sight != null) {
+                Box box = boxOf(fit, hovered, sight);
+                graphics.pose().pushPose();
+                graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + box.depth());
+                drawBox(graphics, box.left(), box.top(), box.width(), box.height(), outlineColor);
+                graphics.pose().popPose();
+            }
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + 10.0F);
+        drawLabels(graphics, fit);
+        graphics.pose().popPose();
         graphics.disableScissor();
         if (label) {
             graphics.drawString(font, panel.name(), rect.x() + 2, rect.y() + 2, chromeColor, false);
         }
     }
 
-    /** The axes of design 17 §6: scene geometry through the main camera, named at their ends. */
+    /** Outline mode's 1-px chrome box at a future cell (design 17 §7.2). */
+    private void drawFutureBoxes(GuiGraphics graphics, Fit fit) {
+        if (!outline) {
+            return;
+        }
+        for (Cell cell : scene.cells()) {
+            if (!PreviewScene.draws(cell)) {
+                continue;
+            }
+            StagePlayback.Placed placedCell = placed.get(cell.ghost());
+            if (placedCell == null || playback.drawn(placedCell)) {
+                continue;
+            }
+            Box box = boxOf(fit, cell, new PreviewScene.Sight(1.0F, 0.0F, 0.0F, 0.0F));
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + box.depth());
+            drawBox(graphics, box.left(), box.top(), box.width(), box.height(), chromeColor);
+            graphics.pose().popPose();
+            drawnFutureBoxes++;
+        }
+    }
+
+    /** Every part's name on its moved centroid, faded with `t` (design 17 §8.2). */
+    private void drawLabels(GuiGraphics graphics, Fit fit) {
+        if (explodeT <= 0.0F) {
+            return;
+        }
+        List<ExplodeModel.Group> groups = explode.groups();
+        List<ExplodeModel.Label> labels = explode.labels(explodeT);
+        int alpha = (int) (Math.min(1.0F, explodeT) * 255.0F) << 24;
+        for (int index = 0; index < Math.min(groups.size(), labels.size()); index++) {
+            if (!partDrawn(groups.get(index))) {
+                continue;
+            }
+            ExplodeModel.Label label = labels.get(index);
+            Vector2f point = fit.project(label.x(), label.y(), label.z());
+            int textX = Math.round(point.x) - font.width(label.text()) / 2;
+            int textY = Math.round(point.y) - 4;
+            graphics.drawString(font, label.text(), textX, textY, alpha | 0x00C0C0C0, false);
+            drawnLabels++;
+        }
+    }
+
+    /** A part with no drawn cell has no anchor, so it has no label (design 17 §8.2). */
+    private boolean partDrawn(ExplodeModel.Group group) {
+        for (LatticePoint at : group.cells()) {
+            GhostCell ghost = ghostAt.get(at);
+            if (ghost == null) {
+                continue;
+            }
+            StagePlayback.Placed placedCell = placed.get(ghost);
+            if (placedCell == null || playback.drawn(placedCell)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void drawGizmo(GuiGraphics graphics, SceneCamera panelCamera, Rect rect) {
         AxisGizmo axes = AxisGizmo.of(scene.hull(), panelCamera, rect.x(), rect.y(), rect.width(), rect.height());
         gizmo = axes;
@@ -400,8 +801,11 @@ public final class PreviewScreen extends Screen {
         }
     }
 
-    /** The hovered cell's 1-px chrome box, drawn in every viewport it appears in (design 17 §5.3). */
-    private void drawOutline(GuiGraphics graphics, Fit fit, Cell cell) {
+    /** The 1-px chrome box around one cell at its current displacement. */
+                                                                           /** One cell's 2D chrome box: the rectangle and the depth the model of that cell draws at. */
+    private record Box(int left, int top, int width, int height, float depth) {}
+
+    private static Box boxOf(Fit fit, Cell cell, PreviewScene.Sight sight) {
         LatticePoint at = cell.ghost().cell();
         float minX = Float.MAX_VALUE;
         float minY = Float.MAX_VALUE;
@@ -409,23 +813,36 @@ public final class PreviewScreen extends Screen {
         float maxY = -Float.MAX_VALUE;
         for (int corner = 0; corner < 8; corner++) {
             Vector2f point = fit.project(
-                at.x() + ((corner & 1) == 0 ? 0.0F : 1.0F),
-                at.y() + ((corner & 2) == 0 ? 0.0F : 1.0F),
-                at.z() + ((corner & 4) == 0 ? 0.0F : 1.0F)
+                at.x() + sight.dx() + ((corner & 1) == 0 ? 0.0F : 1.0F),
+                at.y() + sight.dy() + ((corner & 2) == 0 ? 0.0F : 1.0F),
+                at.z() + sight.dz() + ((corner & 4) == 0 ? 0.0F : 1.0F)
             );
             minX = Math.min(minX, point.x);
             maxX = Math.max(maxX, point.x);
             minY = Math.min(minY, point.y);
             maxY = Math.max(maxY, point.y);
         }
-        int left = Math.round(minX);
-        int right = Math.round(maxX);
-        int top = Math.round(minY);
-        int bottom = Math.round(maxY);
-        graphics.fill(left, top, right, top + 1, outlineColor);
-        graphics.fill(left, bottom - 1, right, bottom, outlineColor);
-        graphics.fill(left, top, left + 1, bottom, outlineColor);
-        graphics.fill(right - 1, top, right, bottom, outlineColor);
+        float depth = fit.depth(at.x() + 0.5F + sight.dx(), at.y() + 0.5F + sight.dy(), at.z() + 0.5F + sight.dz());
+        return new Box(
+            Math.round(minX),
+            Math.round(minY),
+            Math.round(maxX) - Math.round(minX),
+            Math.round(maxY) - Math.round(minY),
+            depth + 0.5F
+        );
+    }
+
+    private static void drawBox(GuiGraphics graphics, int left, int top, int width, int height, int color) {
+        outlineBox(graphics, left, top, width, height, color);
+    }
+
+    private static void outlineBox(GuiGraphics graphics, int left, int top, int width, int height, int color) {
+        int right = left + width;
+        int bottom = top + height;
+        graphics.fill(left, top, right, top + 1, color);
+        graphics.fill(left, bottom - 1, right, bottom, color);
+        graphics.fill(left, top, left + 1, bottom, color);
+        graphics.fill(right - 1, top, right, bottom, color);
     }
 
     /** 15 §6.2's tooltip plus the owning stage's name (design 17 §5.3). */
@@ -464,7 +881,7 @@ public final class PreviewScreen extends Screen {
             if (!inside(rect, mouseX, mouseY)) {
                 continue;
             }
-            return scene.hover(mouseX, mouseY, fitFor(panel));
+            return scene.hover(mouseX, mouseY, fitFor(panel), this::sightOf);
         }
         return null;
     }
@@ -472,9 +889,9 @@ public final class PreviewScreen extends Screen {
     private Fit fitFor(Panel panel) {
         Rect rect = rectFor(panel);
         if (rect == null) {
-            return Fit.of(scene.hull(), 0, 0, 1, 1, cameraFor(camera, panel));
+            return Fit.of(scene.hull(), 0, 0, 1, 1, cameraFor(currentCamera(), panel));
         }
-        return Fit.of(scene.hull(), rect.x(), rect.y(), rect.width(), rect.height(), cameraFor(camera, panel));
+        return Fit.of(scene.hull(), rect.x(), rect.y(), rect.width(), rect.height(), cameraFor(currentCamera(), panel));
     }
 
     private @Nullable Rect rectFor(Panel panel) {
@@ -529,6 +946,21 @@ public final class PreviewScreen extends Screen {
         if (updated != entry) {
             this.entry = updated;
             this.scene = PreviewScene.of(updated);
+            int cursor = playback.cursor();
+            this.playback = StagePlayback.whole(updated.presentation().stages(), updated.cells());
+            if (cursor >= 0 && cursor < updated.presentation().stages().size()) {
+                this.playback = this.playback.enter(cursor);
+            }
+            this.placed = index(this.playback);
+            this.ghostAt = ghosts(updated.cells());
+            this.explode = explodeModel();
+            this.framedCursor = -1;
+            this.framing = null;
+            if (!this.explode.separable()) {
+                this.explodeT = 0.0F;
+                this.explodeTarget = 0.0F;
+                this.explodeTween = null;
+            }
         }
     }
 
@@ -538,9 +970,9 @@ public final class PreviewScreen extends Screen {
         }
     }
 
-    /** The shared camera value; the four panels derive their own from it. */
+    /** The shared camera value, as the frame samples it; the four panels derive their own from it. */
     public SceneCamera camera() {
-        return camera;
+        return currentCamera();
     }
 
     /** The current layout; the four viewport rectangles are recomputed from the screen size. */
@@ -572,4 +1004,105 @@ public final class PreviewScreen extends Screen {
     public @Nullable AxisGizmo gizmo() {
         return gizmo;
     }
+
+    /** The stage playback: whole view or staged, the cursor and the reveal counts (design 17 §7). */
+    public StagePlayback playback() {
+        return playback;
+    }
+
+    /** True when the staged view is entered, false in the whole view (design 17 §7.1). */
+    public boolean staged() {
+        return playback.cursor() >= 0;
+    }
+
+    /** The cell's alpha factor over the scene's base alpha (design 17 §7.2). */
+    public float alphaOf(GhostCell ghost) {
+        StagePlayback.Placed placedCell = placed.get(ghost);
+        return placedCell == null ? 1.0F : playback.alpha(placedCell);
+    }
+
+    /** True when the stage treatment draws the cell at all (design 17 §7.2). */
+    public boolean drawn(GhostCell ghost) {
+        StagePlayback.Placed placedCell = placed.get(ghost);
+        return placedCell == null || playback.drawn(placedCell);
+    }
+
+    /** The exploded view's model: its groups, its distance and its labels (design 17 §8). */
+    public ExplodeModel explode() {
+        return explode;
+    }
+
+    /** The explode animation's current `t` (design 17 §8.1). */
+    public float explodeT() {
+        return explodeT;
+    }
+
+    /** True when a second bay exists to separate; otherwise the button reports `one part` (§8.1). */
+    public boolean canExplode() {
+        return explode.separable();
+    }
+
+    /** The future cells' treatment: false is hidden, true is the 1-px outline (design 17 §7.2). */
+    public boolean outlineMode() {
+        return outline;
+    }
+
+    /** The next-step line under the stage bar, or null in the whole view (design 17 §7.4). */
+    public @Nullable String summaryLine() {
+        return summary;
+    }
+
+    /** The stage bar as last drawn (design 17 §7.3). */
+    public StageBar stageBar() {
+        return stageBar;
+    }
+
+    /** True while a stage-framing leg is in flight (design 17 §7.5). */
+    public boolean framingActive() {
+        return framing != null;
+    }
+
+    /** False once a manual camera gesture disarmed framing for this play-through (design 17 §7.5). */
+    public boolean framingArmed() {
+        return framingArmed;
+    }
+
+    /** The number of part labels drawn in the last frame, summed over the four panels (§8.2). */
+    public int drawnLabels() {
+        return drawnLabels;
+    }
+
+    /** The number of future-cell outline boxes drawn in the last frame (§7.2). */
+    public int drawnFutureBoxes() {
+        return drawnFutureBoxes;
+    }
+
+    /** The rectangle one control-strip button occupies, or null when the label is not on the strip. */
+    public @Nullable Rect buttonRect(String label) {
+        for (Button button : buttons()) {
+            if (button.label().equals(label)) {
+                return button.rect();
+            }
+        }
+        return null;
+    }
+
+    /** The control strip's button labels in layout order, for the §4.5 one-list-read-twice check. */
+    public List<String> buttonLabels() {
+        List<String> labels = new ArrayList<>();
+        for (Button button : buttons()) {
+            labels.add(button.label());
+        }
+        return List.copyOf(labels);
+    }
+
+    /** One control-strip button: its rectangle, its face text and the tooltip that names its key. */
+    private record Button(Rect rect, String label, String tooltip, Runnable action) {
+
+        boolean inside(double mouseX, double mouseY) {
+            return PreviewScreen.inside(rect, mouseX, mouseY);
+        }
+    }
+
+    private record ButtonSpec(String label, String tooltip, Runnable action) {}
 }

@@ -63,7 +63,7 @@ public record Hull(float minX, float minY, float minZ, float maxX, float maxY, f
     }
 
     /** The distance from the centre to a far corner: the sphere the perspective fit uses. */
-    float radius() {
+    public float radius() {
         float x = maxX - minX;
         float y = maxY - minY;
         float z = maxZ - minZ;
