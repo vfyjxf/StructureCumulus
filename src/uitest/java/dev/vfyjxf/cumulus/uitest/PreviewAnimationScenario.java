@@ -61,12 +61,7 @@ public final class PreviewAnimationScenario {
                     "one changed cell animates, never a cell the run skipped",
                     () -> PlacementProbe.animatingCells() == 1,
                     () -> Integer.toString(PlacementProbe.animatingCells())
-                )
-                .check(
-                    "the run requested a place cue",
-                    () -> PlacementProbe.soundRequests() > 0,
-                    () -> Integer.toString(PlacementProbe.soundRequests())
-                )
+                ).waitUntil("the run requested a place cue", () -> PlacementProbe.soundRequests() > 0)
                 .check(
                     "a committed run that did not form does not celebrate",
                     () -> PlacementProbe.celebrations() == 0,

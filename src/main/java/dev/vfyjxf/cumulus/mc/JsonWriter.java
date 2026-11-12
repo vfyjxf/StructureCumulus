@@ -70,6 +70,9 @@ public final class JsonWriter implements DocumentWriter {
         if (root.envelopeEntities()) {
             out.addProperty("envelopeEntities", true);
         }
+        if (root.description() != null) {
+            out.addProperty("description", root.description());
+        }
         if (!document.definitions().isEmpty()) {
             JsonObject definitions = new JsonObject();
             for (Map.Entry<NamespacedId, BlueprintSpec> entry : document.definitions().entrySet()) {
@@ -177,6 +180,9 @@ public final class JsonWriter implements DocumentWriter {
             json.addProperty("sharing", JsonVocabulary.sharingName(bay.sharing()));
             if (bay.description() != null) {
                 json.addProperty("description", bay.description());
+            }
+            if (bay.hint() != null) {
+                json.addProperty("hint", bay.hint());
             }
             array.add(json);
         }

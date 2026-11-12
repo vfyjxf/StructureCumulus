@@ -177,6 +177,43 @@ class StageModelTest {
         assertTrue(table.truncated());
     }
 
+    @Test
+    void aBayHintReachesEveryStageTheBayProduces() {
+        Blueprint blueprint = Blueprint.builder(NamespacedId.of("structurecumulus", "hinted"))
+                .bounds(Cuboid.of(0, 0, 0, 3, 2, 1))
+                .check(
+                    bayCheck(
+                        "base",
+                        bay("base", CuboidSet.of(Cuboid.ofSize(0, 0, 0, 3, 1, 1)), "the floor", "lay it first"),
+                        stone
+                    )
+                )
+                .check(
+                    bayCheck(
+                        "top",
+                        bay("top", CuboidSet.of(Cuboid.ofSize(0, 1, 0, 3, 1, 1)), null, "cap it last"),
+                        iron
+                    )
+                ).build();
+        StageModel.Table table = StageModel.of(blueprint, declared(blueprint));
+        assertEquals("lay it first", table.stages().get(0).hint());
+        assertEquals("cap it last", table.stages().get(1).hint());
+
+        Blueprint layered = Blueprint.builder(NamespacedId.of("structurecumulus", "layered"))
+                .bounds(Cuboid.of(0, 0, 0, 1, 2, 1))
+                .check(
+                    bayCheck(
+                        "tower",
+                        bay("tower", CuboidSet.of(Cuboid.ofSize(0, 0, 0, 1, 2, 1)), null, "one ring per layer"),
+                        stone
+                    )
+                ).build();
+        StageModel.Table rings = StageModel.of(layered, declared(layered));
+        assertEquals(2, rings.stages().size());
+        assertEquals("one ring per layer", rings.stages().get(0).hint());
+        assertEquals("one ring per layer", rings.stages().get(1).hint());
+    }
+
     private static List<LatticePoint> declared(Blueprint blueprint) {
         List<LatticePoint> cells = new ArrayList<>();
         for (Check<?> check : blueprint.checks()) {
@@ -198,13 +235,18 @@ class StageModelTest {
     }
 
     private static Bay bay(String id, CuboidSet cells, @Nullable String description) {
+        return bay(id, cells, description, null);
+    }
+
+    private static Bay bay(String id, CuboidSet cells, @Nullable String description, @Nullable String hint) {
         return new Bay(
             NamespacedId.of("structurecumulus", id),
             cells,
             Coverage.everyCell,
             Footprint.none(),
             Sharing.shared,
-            description
+            description,
+            hint
         );
     }
 

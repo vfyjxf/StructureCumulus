@@ -140,7 +140,7 @@ public record Bay(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint
                   Sharing sharing, @Nullable String description, @Nullable String hint) { }
 
 public final class BlueprintBuilder {
-    public BlueprintBuilder description(String description);   // null clears
+    public BlueprintBuilder description(@Nullable String description);   // null clears
 }
 
 // Blueprint gains `public @Nullable String description()`
@@ -608,6 +608,7 @@ table displays none of it.
 | preview HUD, title line | `preview: <id>` plus the root `description` when present | E3 |
 | preview HUD, stage line | `stage i/n: name` plus the current stage's bay `hint` when present | E1 (name), E3 (hint) |
 | stage banner (§8) | the stage name plus its bay `description` when present | E1 |
+| world billboard, above a part | that part's bay `hint`, anchored at the part's centre cell; the cursor's stage always at full alpha, the other parts faint, distance-culled | E3 |
 | JEI entry, tooltip and side list | the root `description`, and per stage its name, its count and its bay `hint` | E3 |
 | JEI view tooltip (§11) | the cell's block id, its properties, and the stage (part) that owns it (the stage name is E1's data) | E4 |
 
@@ -616,6 +617,13 @@ table displays none of it.
   bay hint; it does not re-route the bay description.
 - **A check's `description` is not displayed.** A check is not a part; its text stays carried for a
   later surface, and inventing one here would put a check's label where a part's belongs.
+- **The billboard's anchor is a render-side placement, not a second stage fact.** It is the bounding
+  centre cell of the stage's ghost cells on the wire, computed exactly as the marker billboards
+  already centre a marker's locus: the client groups the cells by the `stageIndex` it was sent and
+  derives no index, name, count or order. A part whose cells are all `present` draws no ghost and
+  therefore no label — there is nothing left to place there — and the ghost cap (15 §3) can leave a
+  later part without ghosts and so without a label. The text is the stage's carried `hint` and
+  nothing else; no prose is composed for it.
 - **`/cumulus explain` prints findings, never presentation text.** The explain chain is the
   document's diagnosis surface; a description has no code, no locus and no severity, and putting it
   there would blur the two.
@@ -793,7 +801,8 @@ needs a code has found a defect in this document and reports it.
 
 ## 16. Non-goals (v1)
 
-3D billboard stage numbers (A.6); broadcasting another player's placement animation (B.5); particle
+3D billboard stage numbers (A.6 — a part's `hint` billboard is §10's display point, not a stage
+number, and is in scope at E3); broadcasting another player's placement animation (B.5); particle
 trails or beams (B.6); localisation of the UI vocabulary (C.5 — the formatter and the HUD keep literal
 English); exporting a view as an image (D.4); the half-automatic "shall I build it" dialogue (F.5);
 hints on a part that is a focus id rather than a bay (v1 hints are bay-scoped, §3); a stage or

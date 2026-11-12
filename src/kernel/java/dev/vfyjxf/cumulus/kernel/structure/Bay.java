@@ -9,14 +9,15 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
-/** A rectangular region tested atomically, with its coverage, ownership and sharing. */
+/** A rectangular region tested atomically, with its coverage, ownership, sharing and its carried text. */
 public record Bay(
     NamespacedId id,
     CuboidSet cells,
     Coverage coverage,
     Footprint footprint,
     Sharing sharing,
-    @Nullable String description
+    @Nullable String description,
+    @Nullable String hint
 ) {
 
     public Bay {
@@ -31,11 +32,11 @@ public record Bay(
     }
 
     public static Bay of(NamespacedId id, Cuboid cells, Coverage coverage, Footprint footprint, Sharing sharing) {
-        return new Bay(id, CuboidSet.of(cells), coverage, footprint, sharing, null);
+        return new Bay(id, CuboidSet.of(cells), coverage, footprint, sharing, null, null);
     }
 
     public static Bay of(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint, Sharing sharing) {
-        return new Bay(id, cells, coverage, footprint, sharing, null);
+        return new Bay(id, cells, coverage, footprint, sharing, null, null);
     }
 
     public static Bay of(
@@ -46,6 +47,18 @@ public record Bay(
         Sharing sharing,
         String description
     ) {
-        return new Bay(id, cells, coverage, footprint, sharing, description);
+        return new Bay(id, cells, coverage, footprint, sharing, description, null);
+    }
+
+    public static Bay of(
+        NamespacedId id,
+        CuboidSet cells,
+        Coverage coverage,
+        Footprint footprint,
+        Sharing sharing,
+        @Nullable String description,
+        @Nullable String hint
+    ) {
+        return new Bay(id, cells, coverage, footprint, sharing, description, hint);
     }
 }

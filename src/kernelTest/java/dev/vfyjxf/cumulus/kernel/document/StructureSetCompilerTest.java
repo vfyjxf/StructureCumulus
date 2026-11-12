@@ -134,6 +134,7 @@ class StructureSetCompilerTest {
                 null,
                 List.of(),
                 Map.of(),
+                null,
                 null
             )
         );
@@ -177,6 +178,7 @@ class StructureSetCompilerTest {
                 null,
                 List.of(),
                 Map.of(),
+                null,
                 source
             )
         );
@@ -225,6 +227,7 @@ class StructureSetCompilerTest {
                 null,
                 List.of(),
                 Map.of(),
+                null,
                 null
             )
         );
@@ -249,6 +252,7 @@ class StructureSetCompilerTest {
                 null,
                 List.of(),
                 Map.of(),
+                null,
                 null
             )
         );
@@ -265,7 +269,7 @@ class StructureSetCompilerTest {
         Footprint footprint,
         Sharing sharing
     ) {
-        return new BaySpec(id, cells, coverage, footprint, sharing, null, null);
+        return new BaySpec(id, cells, coverage, footprint, sharing, null, null, null);
     }
 
     private static CheckSpec bayCheck(NamespacedId id, NamespacedId bay, NamespacedId block) {

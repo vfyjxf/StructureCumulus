@@ -377,6 +377,7 @@ class FacadeTest {
             Footprint.none(),
             Sharing.shared,
             null,
+            null,
             null
         );
         CheckSpec probe = new CheckSpec(
@@ -405,6 +406,7 @@ class FacadeTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult compiled = kernel.compile(new Document(1, root, Map.of(), Map.of()));

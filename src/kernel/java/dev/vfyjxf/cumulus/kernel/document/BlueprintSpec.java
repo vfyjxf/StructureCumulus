@@ -32,6 +32,7 @@ public record BlueprintSpec(
     @Nullable OrientationPolicy orientation,
     List<PlacementSpec> placements,
     Map<String, Value> extensions,
+    @Nullable String description,
     @Nullable SourceSpan source
 ) {
 

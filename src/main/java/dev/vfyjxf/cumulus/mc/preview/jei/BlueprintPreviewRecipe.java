@@ -2,6 +2,8 @@ package dev.vfyjxf.cumulus.mc.preview.jei;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -17,8 +19,12 @@ final class BlueprintPreviewRecipe {
     /** One material line with its client item resolved; an item this client cannot name is dropped. */
     record Material(ItemStack stack, int count) {}
 
+    /** The most part lines one entry's tooltip lists before it counts the rest. */
+    private static final int maxPartLines = 8;
+
     private final NamespacedId blueprintId;
     private PreviewScene scene;
+    private PreviewPresentation presentation = new PreviewPresentation(null, List.of(), -1, List.of(), 0);
     private List<Material> materials = List.of();
     private float yaw = 135.0F;
     private float pitch = 30.0F;
@@ -31,6 +37,7 @@ final class BlueprintPreviewRecipe {
 
     void update(PreviewCatalogPayload.Entry entry) {
         this.scene = PreviewScene.of(entry);
+        this.presentation = entry.presentation();
         List<Material> resolved = new ArrayList<>(entry.materials().size());
         for (PreviewCatalogPayload.MaterialLine line : entry.materials()) {
             ItemStack stack = stack(line.item());
@@ -44,6 +51,28 @@ final class BlueprintPreviewRecipe {
 
     NamespacedId blueprintId() {
         return blueprintId;
+    }
+
+    /** The entry's own text: the root description, then one line per part with its hint (design 16 §10). */
+    List<String> lines() {
+        List<String> lines = new ArrayList<>();
+        if (presentation.description() != null) {
+            lines.add(presentation.description());
+        }
+        List<Stage> stages = presentation.stages();
+        int shown = Math.min(stages.size(), maxPartLines);
+        for (int index = 0; index < shown; index++) {
+            Stage stage = stages.get(index);
+            String line = (index + 1) + ". " + stage.name() + " (" + stage.expectedCells() + ")";
+            if (stage.hint() != null) {
+                line = line + " · " + stage.hint();
+            }
+            lines.add(line);
+        }
+        if (stages.size() > shown) {
+            lines.add("+" + (stages.size() - shown) + " more part(s)");
+        }
+        return List.copyOf(lines);
     }
 
     PreviewScene scene() {

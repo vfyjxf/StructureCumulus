@@ -241,43 +241,64 @@ final class PreviewHud {
 
     /** A marker with cells is labelled at its world position, so the text follows the structure. */
     private static void billboards(GuiGraphics graphics, Minecraft minecraft, PreviewSyncPayload session) {
+        int drawn = 0;
+        for (Marker marker : session.markers()) {
+            if (drawn >= maxBillboards) {
+                break;
+            }
+            LatticePoint anchor = PreviewOverlayRenderer.center(marker);
+            if (anchor == null) {
+                continue;
+            }
+            String label = shorten(marker.label());
+            if (billboard(graphics, minecraft, anchor, label, 1.0F, colorOf(marker.kind()))) {
+                drawn++;
+            }
+        }
+        for (PlaybackController.PartLabel part : PlaybackController.partLabels()) {
+            String label = shorten(part.hint());
+            billboard(graphics, minecraft, part.anchor(), label, part.alpha(), textColor);
+        }
+    }
+
+    /** Projects one label onto the anchor cell; false when the anchor is culled or off screen. */
+    private static boolean billboard(
+        GuiGraphics graphics,
+        Minecraft minecraft,
+        LatticePoint anchor,
+        String label,
+        float alpha,
+        int color
+    ) {
+        if (!PreviewClientState.inRange(anchor)) {
+            return false;
+        }
         Vec3 eye = PreviewClientState.cameraPosition();
         Matrix4f view = PreviewClientState.viewMatrix();
         Matrix4f projection = PreviewClientState.projectionMatrix();
         int screenWidth = minecraft.getWindow().getGuiScaledWidth();
         int screenHeight = minecraft.getWindow().getGuiScaledHeight();
-        int drawn = 0;
-        for (Marker marker : session.markers()) {
-            if (drawn >= maxBillboards) {
-                return;
-            }
-            LatticePoint anchor = PreviewOverlayRenderer.center(marker);
-            if (anchor == null || !PreviewClientState.inRange(anchor)) {
-                continue;
-            }
-            Vector4f point = new Vector4f(
-                (float) (anchor.x() + 0.5D - eye.x),
-                (float) (anchor.y() + 0.5D - eye.y),
-                (float) (anchor.z() + 0.5D - eye.z),
-                1.0F
-            );
-            point.mul(view).mul(projection);
-            if (point.w <= 0.01F) {
-                continue;
-            }
-            int x = Math.round((point.x / point.w * 0.5F + 0.5F) * screenWidth);
-            int y = Math.round((1.0F - (point.y / point.w * 0.5F + 0.5F)) * screenHeight);
-            if (x < 0 || x > screenWidth || y < 0 || y > screenHeight) {
-                continue;
-            }
-            String label = shorten(marker.label());
-            int labelWidth = minecraft.font.width(label);
-            graphics.pose().pushPose();
-            graphics.fill(x - 2, y - 10, x + labelWidth + 2, y, background);
-            graphics.drawString(minecraft.font, label, x, y - 9, colorOf(marker.kind()), false);
-            graphics.pose().popPose();
-            drawn++;
+        Vector4f point = new Vector4f(
+            (float) (anchor.x() + 0.5D - eye.x),
+            (float) (anchor.y() + 0.5D - eye.y),
+            (float) (anchor.z() + 0.5D - eye.z),
+            1.0F
+        );
+        point.mul(view).mul(projection);
+        if (point.w <= 0.01F) {
+            return false;
         }
+        int x = Math.round((point.x / point.w * 0.5F + 0.5F) * screenWidth);
+        int y = Math.round((1.0F - (point.y / point.w * 0.5F + 0.5F)) * screenHeight);
+        if (x < 0 || x > screenWidth || y < 0 || y > screenHeight) {
+            return false;
+        }
+        int labelWidth = minecraft.font.width(label);
+        graphics.pose().pushPose();
+        graphics.fill(x - 2, y - 10, x + labelWidth + 2, y, withAlpha(background, alpha));
+        graphics.drawString(minecraft.font, label, x, y - 9, withAlpha(color, alpha), false);
+        graphics.pose().popPose();
+        return true;
     }
 
     private static String shorten(String label) {

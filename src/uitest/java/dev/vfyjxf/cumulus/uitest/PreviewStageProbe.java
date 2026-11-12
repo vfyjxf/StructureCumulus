@@ -95,6 +95,10 @@ final class PreviewStageProbe {
         return PlaybackController.bannerLines();
     }
 
+    static List<PlaybackController.PartLabel> partLabels() {
+        return PlaybackController.partLabels();
+    }
+
     static List<MaterialStatus> materials() {
         PreviewPresentation presentation = presentation();
         return presentation == null ? List.of() : presentation.materials();

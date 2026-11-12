@@ -62,6 +62,7 @@ public final class JsonReader implements DocumentReader {
         "bounds",
         "envelope",
         "envelopeEntities",
+        "description",
         "definitions",
         "placements",
         "bays",
@@ -89,7 +90,7 @@ public final class JsonReader implements DocumentReader {
     );
 
     private static final Set<String> bayMembers = Set
-            .of("id", "box", "boxes", "minus", "coverage", "footprint", "sharing", "description");
+            .of("id", "box", "boxes", "minus", "coverage", "footprint", "sharing", "description", "hint");
 
     private static final Set<String> seamMembers = Set.of("id", "box", "kind", "properties");
 
@@ -245,6 +246,7 @@ public final class JsonReader implements DocumentReader {
             Cuboid bounds = box(required(object, "bounds", "$"), field("$", "bounds"));
             Boolean envelope = optionalBoolean(object, "envelope", "$");
             Boolean envelopeEntities = optionalBoolean(object, "envelopeEntities", "$");
+            String description = optionalString(object, "description", "$");
             Map<NamespacedId, BlueprintSpec> definitions = definitions(object);
             List<PlacementSpec> placements = placements(object, "$");
             List<BaySpec> bays = bays(object, "$", true);
@@ -275,6 +277,7 @@ public final class JsonReader implements DocumentReader {
                 orientation,
                 placements,
                 Map.of(),
+                description,
                 span("$")
             );
             if (failed) {
@@ -336,6 +339,7 @@ public final class JsonReader implements DocumentReader {
                 orientation(object, path),
                 placements(object, path),
                 extensions(object, path),
+                null,
                 span(path)
             );
         }
@@ -368,10 +372,11 @@ public final class JsonReader implements DocumentReader {
             Footprint footprint = footprint(object, path);
             Sharing sharing = sharing(object, path);
             String description = optionalString(object, "description", path);
+            String hint = optionalString(object, "hint", path);
             if (id == null || cells == null || coverage == null || footprint == null || sharing == null) {
                 return null;
             }
-            return new BaySpec(id, cells, coverage, footprint, sharing, description, span(path));
+            return new BaySpec(id, cells, coverage, footprint, sharing, description, hint, span(path));
         }
 
         private @Nullable CuboidSet bayCells(JsonObject object, String path) {

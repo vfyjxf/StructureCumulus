@@ -200,6 +200,7 @@ public final class StructureSetCompiler {
             root.orientation(),
             root.placements(),
             root.extensions(),
+            null,
             root.source()
         );
         return new Document(document.schemaVersion(), replaced, document.definitions(), document.extensions());

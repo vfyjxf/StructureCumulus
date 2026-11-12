@@ -2,7 +2,9 @@ package dev.vfyjxf.cumulus.uitest;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
+import dev.vfyjxf.cumulus.mc.preview.jei.JeiPreview;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.recipe.RecipeType;
@@ -59,6 +61,19 @@ public final class PreviewJeiProbe implements IModPlugin {
 
     static List<NamespacedId> catalogIds() {
         return PreviewCatalogClient.entries().stream().map(PreviewCatalogPayload.Entry::blueprintId).toList();
+    }
+
+    static @Nullable PreviewPresentation presentation(NamespacedId blueprintId) {
+        for (PreviewCatalogPayload.Entry entry : PreviewCatalogClient.entries()) {
+            if (entry.blueprintId().equals(blueprintId)) {
+                return entry.presentation();
+            }
+        }
+        return null;
+    }
+
+    static List<String> catalogLines(NamespacedId blueprintId) {
+        return JeiPreview.lines(blueprintId);
     }
 
     static int catalogCells(NamespacedId blueprintId) {

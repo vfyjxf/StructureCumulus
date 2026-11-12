@@ -47,6 +47,11 @@ public final class PreviewOpenScenario {
                             && PreviewProbe.hudHas("keys: ")
                 )
                 .check(
+                    "a document with no description keeps the title line bare",
+                    () -> PreviewProbe.hudLines().get(0).equals("preview: structurecumulus:preview_probe · 0/4"),
+                    () -> PreviewProbe.hudLines().get(0)
+                )
+                .check(
                     "the materials placeholder is reported, not invented",
                     () -> PreviewProbe.hasMarker("materials: ")
                 ).check("there is no invalidation yet", () -> !PreviewProbe.hasMarker("invalidated"))

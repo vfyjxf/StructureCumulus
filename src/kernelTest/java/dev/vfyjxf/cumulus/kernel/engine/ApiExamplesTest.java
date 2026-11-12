@@ -446,6 +446,7 @@ class ApiExamplesTest {
                     Footprint.box(),
                     Sharing.exclusive,
                     null,
+                    null,
                     null
                 ),
                 new BaySpec(
@@ -455,6 +456,7 @@ class ApiExamplesTest {
                     Footprint.box(),
                     Sharing.exclusive,
                     null,
+                    null,
                     null
                 ),
                 new BaySpec(
@@ -463,6 +465,7 @@ class ApiExamplesTest {
                     Coverage.everyCell,
                     Footprint.box(),
                     Sharing.exclusive,
+                    null,
                     null,
                     null
                 )
@@ -536,6 +539,7 @@ class ApiExamplesTest {
             ),
             List.of(),
             Map.of(),
+            null,
             null
         );
 
@@ -605,6 +609,7 @@ class ApiExamplesTest {
                     Footprint.bound(),
                     Sharing.exclusive,
                     null,
+                    null,
                     null
                 ),
                 new BaySpec(
@@ -613,6 +618,7 @@ class ApiExamplesTest {
                     Coverage.everyCell,
                     Footprint.none(),
                     Sharing.shared,
+                    null,
                     null,
                     null
                 )
@@ -654,6 +660,7 @@ class ApiExamplesTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
 

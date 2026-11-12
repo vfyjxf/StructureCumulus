@@ -32,6 +32,11 @@ public final class JeiPreview {
         return drawnCells;
     }
 
+    /** The entry's tooltip text: its root description and one line per part (design 16 §10). */
+    public static List<String> lines(NamespacedId blueprintId) {
+        return JeiPreviewPlugin.lines(blueprintId);
+    }
+
     /** The "Ghost to world" action: the server opens the ordinary session at the crosshair. */
     public static void openWorld(NamespacedId blueprintId) {
         PacketDistributor.sendToServer(new PreviewOpenPayload(blueprintId));

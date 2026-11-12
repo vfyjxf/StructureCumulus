@@ -23,8 +23,8 @@ public final class StageModel {
     /** The stage cap; an overflow keeps the first stages in order (design 16 §4.1.8). */
     public static final int maxStages = 256;
 
-    /** One stage: its display name, the description its bay carries, and its cells in canonical order. */
-    public record Stage(String name, @Nullable String description, List<LatticePoint> cells) {
+    /** One stage: its display name, its bay's carried text, and its cells in canonical order. */
+    public record Stage(String name, @Nullable String description, @Nullable String hint, List<LatticePoint> cells) {
 
         public Stage {
             Objects.requireNonNull(name, "name");
@@ -90,7 +90,7 @@ public final class StageModel {
                 continue;
             }
             Bay bay = bays.get(index);
-            stages.add(new Stage(bay.id().text(), bay.description(), cells));
+            stages.add(new Stage(bay.id().text(), bay.description(), bay.hint(), cells));
         }
         return List.copyOf(stages);
     }
@@ -103,7 +103,7 @@ public final class StageModel {
         List<Stage> stages = new ArrayList<>(layers.size());
         int rank = 1;
         for (Map.Entry<Integer, List<LatticePoint>> layer : layers.entrySet()) {
-            stages.add(new Stage("layer " + rank, bay.description(), layer.getValue()));
+            stages.add(new Stage("layer " + rank, bay.description(), bay.hint(), layer.getValue()));
             rank++;
         }
         return List.copyOf(stages);

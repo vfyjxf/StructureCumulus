@@ -101,6 +101,7 @@ class DocumentCompilerTest {
                     Footprint.box(),
                     Sharing.exclusive,
                     null,
+                    null,
                     null
                 ),
                 new BaySpec(
@@ -110,9 +111,19 @@ class DocumentCompilerTest {
                     Footprint.box(),
                     Sharing.exclusive,
                     null,
+                    null,
                     null
                 ),
-                new BaySpec(id("fire"), fireCells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                new BaySpec(
+                    id("fire"),
+                    fireCells,
+                    Coverage.everyCell,
+                    Footprint.box(),
+                    Sharing.exclusive,
+                    null,
+                    null,
+                    null
+                )
             ),
             List.of(),
             List.of(
@@ -156,6 +167,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         Document document = new Document(1, root, Map.of(), Map.of());
@@ -202,6 +214,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -224,7 +237,9 @@ class DocumentCompilerTest {
             true,
             false,
             Value.object(),
-            List.of(new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(
+                new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null)
+            ),
             List.of(),
             List.of(),
             List.of(),
@@ -234,6 +249,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         BlueprintSpec root = new BlueprintSpec(
@@ -252,6 +268,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("unit"), LatticePoint.origin, id("placed"), null)),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler
@@ -277,7 +294,9 @@ class DocumentCompilerTest {
             false,
             false,
             Value.object(),
-            List.of(new BaySpec(id("bay"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(
+                new BaySpec(id("bay"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null)
+            ),
             List.of(),
             List.of(
                 new CheckSpec(
@@ -298,6 +317,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -326,7 +346,9 @@ class DocumentCompilerTest {
             false,
             false,
             Value.object(),
-            List.of(new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(
+                new BaySpec(id("wall"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null)
+            ),
             List.of(),
             List.of(),
             List.of(),
@@ -336,6 +358,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         Value block = Value.object(Map.of("kind", Value.string("block"), "id", Value.string("minecraft:stone_bricks")));
@@ -366,6 +389,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("unit"), LatticePoint.of(1, 0, 0), id("south"), null)),
             Map.of(),
+            null,
             null
         );
         Document document = new Document(1, root, Map.of(id("unit"), definition), Map.of());
@@ -398,6 +422,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult version = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of()), context());
@@ -433,6 +458,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult missing = DocumentCompiler.compile(new Document(1, root2, Map.of(), Map.of()), context());
@@ -455,8 +481,8 @@ class DocumentCompilerTest {
             false,
             Value.object(),
             List.of(
-                new BaySpec(id("a"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null),
-                new BaySpec(id("b"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                new BaySpec(id("a"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null),
+                new BaySpec(id("b"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null)
             ),
             List.of(),
             List.of(
@@ -488,6 +514,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -510,7 +537,9 @@ class DocumentCompilerTest {
             false,
             false,
             Value.object(),
-            List.of(new BaySpec(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(
+                new BaySpec(id("bay"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null)
+            ),
             List.of(),
             List.of(
                 new CheckSpec(
@@ -531,6 +560,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -580,6 +610,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -618,6 +649,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -670,6 +702,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context);
@@ -692,7 +725,16 @@ class DocumentCompilerTest {
                 false,
                 Value.object(),
                 List.of(
-                    new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                    new BaySpec(
+                        id("stray"),
+                        cells,
+                        Coverage.everyCell,
+                        Footprint.box(),
+                        Sharing.exclusive,
+                        null,
+                        null,
+                        null
+                    )
                 ),
                 List.of(),
                 List.of(),
@@ -703,6 +745,7 @@ class DocumentCompilerTest {
                 null,
                 List.of(),
                 Map.of(),
+                null,
                 null
             );
             CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -722,6 +765,7 @@ class DocumentCompilerTest {
             Coverage.everyCell,
             Footprint.box(),
             Sharing.exclusive,
+            null,
             null,
             null
         );
@@ -751,6 +795,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -776,6 +821,7 @@ class DocumentCompilerTest {
                     Footprint.box(),
                     Sharing.exclusive,
                     null,
+                    null,
                     null
                 )
             ),
@@ -788,6 +834,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         BlueprintSpec root = new BlueprintSpec(
@@ -806,6 +853,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("leaky"), LatticePoint.origin, id("placed"), null)),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler
@@ -834,6 +882,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         BlueprintSpec root = new BlueprintSpec(
@@ -852,6 +901,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler
@@ -872,7 +922,16 @@ class DocumentCompilerTest {
             true,
             Value.object(),
             List.of(
-                new BaySpec(id("stray"), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                new BaySpec(
+                    id("stray"),
+                    cells,
+                    Coverage.everyCell,
+                    Footprint.box(),
+                    Sharing.exclusive,
+                    null,
+                    null,
+                    null
+                )
             ),
             List.of(),
             List.of(),
@@ -883,6 +942,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -915,6 +975,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(2, root, Map.of(), Map.of()), context());
@@ -948,6 +1009,7 @@ class DocumentCompilerTest {
                 new PlacementSpec(id("ghost_b"), LatticePoint.of(2, 0, 0), id("b"), null)
             ),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -979,6 +1041,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         BlueprintSpec middle = new BlueprintSpec(
@@ -997,6 +1060,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("leaf"), LatticePoint.origin, id("inner"), null)),
             Map.of(),
+            null,
             null
         );
         BlueprintSpec root = new BlueprintSpec(
@@ -1015,6 +1079,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("middle"), LatticePoint.origin, id("outer"), null)),
             Map.of(),
+            null,
             null
         );
         Document document = new Document(1, root, Map.of(id("middle"), middle, id("leaf"), leaf), Map.of());
@@ -1041,6 +1106,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         Document external = new Document(2, externalRoot, Map.of(), Map.of());
@@ -1068,6 +1134,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("external"), LatticePoint.origin, id("ext"), null)),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context);
@@ -1109,6 +1176,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("d0"), LatticePoint.origin, id("p"), null)),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context());
@@ -1145,6 +1213,7 @@ class DocumentCompilerTest {
             null,
             List.of(new PlacementSpec(id("d0"), LatticePoint.origin, id("twice"), null)),
             Map.of(),
+            null,
             null
         );
         CompileResult result = assertTimeoutPreemptively(
@@ -1170,6 +1239,7 @@ class DocumentCompilerTest {
                     Coverage.everyCell,
                     Footprint.none(),
                     Sharing.shared,
+                    null,
                     null,
                     null
                 )
@@ -1197,6 +1267,7 @@ class DocumentCompilerTest {
             null,
             rootPlacements,
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, definitions, Map.of()), context());
@@ -1223,6 +1294,7 @@ class DocumentCompilerTest {
             null,
             placements,
             Map.of(),
+            null,
             null
         );
     }
@@ -1237,8 +1309,8 @@ class DocumentCompilerTest {
             false,
             Value.object(),
             List.of(
-                new BaySpec(id(left), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null),
-                new BaySpec(id(right), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)
+                new BaySpec(id(left), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null),
+                new BaySpec(id(right), cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null)
             ),
             List.of(),
             List.of(
@@ -1270,6 +1342,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult result = DocumentCompiler.compile(new Document(1, root, Map.of(), Map.of()), context());
@@ -1287,7 +1360,9 @@ class DocumentCompilerTest {
             false,
             false,
             Value.object(),
-            List.of(new BaySpec(id("cell"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null)),
+            List.of(
+                new BaySpec(id("cell"), cell, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null)
+            ),
             List.of(),
             List.of(
                 new CheckSpec(
@@ -1308,6 +1383,7 @@ class DocumentCompilerTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         return new Document(1, root, Map.of(), Map.of());

@@ -18,6 +18,7 @@ public record BaySpec(
     Footprint footprint,
     Sharing sharing,
     @Nullable String description,
+    @Nullable String hint,
     @Nullable SourceSpan source
 ) {
 

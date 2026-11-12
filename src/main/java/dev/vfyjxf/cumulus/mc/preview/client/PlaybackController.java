@@ -12,6 +12,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 
 /**
@@ -33,9 +34,14 @@ public final class PlaybackController {
     private static final float doneAlpha = 0.25F;
     private static final float currentAlpha = 1.0F;
     private static final float faintAlpha = 0.08F;
+    /** A part label that is not the cursor's stage: readable, but behind the current part. */
+    private static final float partFaintAlpha = 0.35F;
+    /** The most part labels one frame draws; the cursor's stage is always one of them. */
+    static final int maxPartLabels = 8;
 
     private static @Nullable NamespacedId blueprintId;
     private static @Nullable PreviewPresentation presentation;
+    private static @Nullable PreviewSyncPayload synced;
     private static Map<LatticePoint, Integer> stageOfCell = Map.of();
     private static Map<LatticePoint, Integer> positionOfCell = Map.of();
     private static int[] counts = new int[0];
@@ -58,6 +64,7 @@ public final class PlaybackController {
         boolean tracked = !fresh && selected == previousFrontier;
         blueprintId = payload.blueprintId();
         presentation = block;
+        synced = payload;
         List<GhostCell> ghosts = payload.ghostCells();
         Map<LatticePoint, Integer> stages = new TreeMap<>();
         Map<LatticePoint, Integer> positions = new TreeMap<>();
@@ -107,6 +114,7 @@ public final class PlaybackController {
     static void clear() {
         blueprintId = null;
         presentation = null;
+        synced = null;
         stageOfCell = Map.of();
         positionOfCell = Map.of();
         counts = new int[0];
@@ -293,6 +301,73 @@ public final class PlaybackController {
 
     public static boolean playing() {
         return playing;
+    }
+
+    /** One part's world-space hint: the stage it belongs to, its anchor cell, the text and the draw alpha. */
+    public record PartLabel(int stage, LatticePoint anchor, String hint, float alpha) {
+
+        public PartLabel {
+            Objects.requireNonNull(anchor, "anchor");
+            Objects.requireNonNull(hint, "hint");
+        }
+    }
+
+    /** The part labels a frame draws: the cursor's stage first, then the other stages faintly, in range. */
+    public static List<PartLabel> partLabels() {
+        PreviewSyncPayload payload = synced;
+        PreviewPresentation block = presentation;
+        if (payload == null || block == null || block.stages().isEmpty() || selected < 0) {
+            return List.of();
+        }
+        Map<Integer, List<LatticePoint>> cells = new TreeMap<>();
+        for (GhostCell ghost : payload.ghostCells()) {
+            cells.computeIfAbsent(ghost.stageIndex(), ignored -> new ArrayList<>()).add(ghost.cell());
+        }
+        List<PartLabel> labels = new ArrayList<>(Math.min(maxPartLabels, block.stages().size()));
+        List<Integer> order = new ArrayList<>(block.stages().size());
+        order.add(selected);
+        for (int stage = 0; stage < block.stages().size(); stage++) {
+            if (stage != selected) {
+                order.add(stage);
+            }
+        }
+        for (int stage : order) {
+            if (labels.size() >= maxPartLabels) {
+                break;
+            }
+            if (stage < 0 || stage >= block.stages().size()) {
+                continue;
+            }
+            String hint = block.stages().get(stage).hint();
+            List<LatticePoint> owned = cells.get(stage);
+            if (hint == null || owned == null || owned.isEmpty()) {
+                continue;
+            }
+            LatticePoint anchor = anchorOf(owned);
+            if (!PreviewClientState.inRange(anchor)) {
+                continue;
+            }
+            labels.add(new PartLabel(stage, anchor, hint, stage == selected ? currentAlpha : partFaintAlpha));
+        }
+        return List.copyOf(labels);
+    }
+
+    /** The part's centre cell: the bounding centre in the wire's world frame, as the marker billboards use. */
+    private static LatticePoint anchorOf(List<LatticePoint> cells) {
+        LatticePoint first = cells.get(0);
+        int minX = first.x();
+        int maxX = first.x();
+        int minY = first.y();
+        int minZ = first.z();
+        int maxZ = first.z();
+        for (LatticePoint cell : cells) {
+            minX = Math.min(minX, cell.x());
+            maxX = Math.max(maxX, cell.x());
+            minY = Math.min(minY, cell.y());
+            minZ = Math.min(minZ, cell.z());
+            maxZ = Math.max(maxZ, cell.z());
+        }
+        return LatticePoint.of((minX + maxX) / 2, minY, (minZ + maxZ) / 2);
     }
 
     public static @Nullable Stage stage(int index) {

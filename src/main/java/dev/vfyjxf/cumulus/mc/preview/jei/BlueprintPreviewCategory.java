@@ -173,6 +173,10 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             BlueprintPreviewRecipe.Material line = recipe.materials().get(material);
             tooltip.add(line.stack().getHoverName());
             tooltip.add(Component.literal("x " + line.count()));
+            return;
+        }
+        for (String line : recipe.lines()) {
+            tooltip.add(Component.literal(line));
         }
     }
 

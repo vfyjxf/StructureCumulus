@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "structurecumulus:preview_stages",
+  "description": "the staged demo: a brick floor with a chimney above it",
   "bounds": [0, 0, 0, 3, 4, 3],
   "bays": [
     {
@@ -9,7 +10,8 @@
       "coverage": "every_cell",
       "footprint": "none",
       "sharing": "shared",
-      "description": "the brick floor"
+      "description": "the brick floor",
+      "hint": "lay the brick ring before the corners"
     },
     {
       "id": "stack",
@@ -17,7 +19,8 @@
       "coverage": "every_cell",
       "footprint": "none",
       "sharing": "shared",
-      "description": "the chimney above the floor"
+      "description": "the chimney above the floor",
+      "hint": "place it after the floor is complete"
     }
   ],
   "checks": [

@@ -72,10 +72,11 @@ public record BlueprintSpec(NamespacedId id, Cuboid bounds, boolean envelope, bo
                             @Nullable OrientationPolicy orientation,
                             java.util.List<PlacementSpec> placements,
                             java.util.Map<String, Value> extensions,
+                            @Nullable String description,
                             @Nullable SourceSpan source) { }
 
 public record BaySpec(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
-                      Sharing sharing, @Nullable String description,
+                      Sharing sharing, @Nullable String description, @Nullable String hint,
                       @Nullable SourceSpan source) { }
 
 public record SeamSpec(SeamId id, Cuboid cells, SeamKind kind,

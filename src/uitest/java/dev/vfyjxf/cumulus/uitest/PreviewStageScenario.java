@@ -4,9 +4,12 @@ import dev.vfyjxf.cloudlib.uitest.api.ClientScenario;
 import dev.vfyjxf.cloudlib.uitest.api.ScenarioBuilder;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.mc.preview.client.PlaybackController;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewKeys;
 import dev.vfyjxf.cumulus.mc.preview.net.MaterialStatus;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.level.block.Blocks;
 
 import java.util.List;
@@ -27,6 +30,9 @@ public final class PreviewStageScenario {
     private static final NamespacedId staged = NamespacedId.of("structurecumulus", "preview_stages");
     private static final String floorDescription = "the brick floor";
     private static final String stackDescription = "the chimney above the floor";
+    private static final String documentDescription = "the staged demo: a brick floor with a chimney above it";
+    private static final String floorHint = "lay the brick ring before the corners";
+    private static final String stackHint = "place it after the floor is complete";
 
     public void define(ScenarioBuilder build) {
         build = PreviewScenarioSupport.stage(build).runCommand("cumulusvisual hud hide").log(
@@ -81,9 +87,31 @@ public final class PreviewStageScenario {
                     () -> PreviewProbe.hudHas("progress 0/12 (0%)"),
                     () -> PreviewProbe.hudLines().toString()
                 ).check(
-                    "the stage line names the first part",
-                    () -> PreviewProbe.hudHas("stage 1/2: structurecumulus:base")
+                    "the title line carries the document's own description",
+                    () -> PreviewProbe
+                            .hudHas("preview: structurecumulus:preview_stages · 0/12 · " + documentDescription),
+                    () -> PreviewProbe.hudLines().toString()
                 ).check(
+                    "the stage line names the first part and carries its hint",
+                    () -> PreviewProbe.hudHas("stage 1/2: structurecumulus:base · " + floorHint),
+                    () -> PreviewProbe.hudLines().toString()
+                ).check("the first part's billboard sits at its centre cell and draws at full alpha", () -> {
+                    List<PlaybackController.PartLabel> labels = PreviewStageProbe.partLabels();
+                    return labels.size() == 2
+                            && labels.get(0).stage() == 0
+                            && labels.get(0).hint().equals(floorHint)
+                            && labels.get(0).anchor().equals(LatticePoint.of(1, 100, 1))
+                            && labels.get(0).alpha() == 1.0F;
+                }, () -> PreviewStageProbe.partLabels().toString())
+                .check("the second part's billboard is faint until its stage is current", () -> {
+                    List<PlaybackController.PartLabel> labels = PreviewStageProbe.partLabels();
+                    return labels.size() == 2
+                            && labels.get(1).stage() == 1
+                            && labels.get(1).hint().equals(stackHint)
+                            && labels.get(1).anchor().equals(LatticePoint.of(1, 101, 1))
+                            && labels.get(1).alpha() < 1.0F;
+                }, () -> PreviewStageProbe.partLabels().toString())
+                .check(
                     "the frontier stage is lit at open, not waiting for a key",
                     () -> PreviewStageProbe.revealedCells(0) == PreviewStageProbe.stageCells(0)
                             && PreviewStageProbe.alpha(0) == 1.0F,
@@ -97,8 +125,7 @@ public final class PreviewStageScenario {
                 .waitUntil(
                     "the step opens the next stage with its first cell",
                     () -> PreviewStageProbe.selectedStage() == 1 && PreviewStageProbe.revealedCells(1) == 1
-                )
-                .check(
+                ).check(
                     "the revealed cell draws as the current stage",
                     () -> PreviewStageProbe.alpha(1) == 1.0F,
                     () -> Float.toString(PreviewStageProbe.alpha(1))
@@ -153,11 +180,23 @@ public final class PreviewStageScenario {
                     () -> satisfiedCells(0) == 1 && expectedCells(0) == 9
                 )
                 .check(
+                    "a satisfied cell does not remove a part's billboard",
+                    () -> PreviewStageProbe.partLabels().size() == 2,
+                    () -> PreviewStageProbe.partLabels().toString()
+                )
+                .check(
                     "the creative source collapses the materials tier",
                     () -> PreviewStageProbe.materials().isEmpty()
                             && PreviewStageProbe.moreMaterials() == 0
                             && !PreviewProbe.hudHas("material ")
-                ).timelineRecord(
+                ).action("move the eye out of the billboard's reach", context -> teleport(60.5D)).frames(2)
+                .check(
+                    "a billboard is culled with the ghosts beyond the render radius",
+                    () -> PreviewStageProbe.partLabels().isEmpty(),
+                    () -> PreviewStageProbe.partLabels().toString()
+                ).action("move the eye back", context -> teleport(0.5D)).frames(2)
+                .check("the billboards return inside the radius", () -> PreviewStageProbe.partLabels().size() == 2)
+                .timelineRecord(
                     "preview-stage",
                     () -> "stages=" + PreviewStageProbe.stageCount() + ", selected=" + PreviewStageProbe.selectedStage()
                             + ", revealed=" + PreviewStageProbe.revealedCells(0) + ", present="
@@ -190,6 +229,13 @@ public final class PreviewStageScenario {
                     "preview-stage-materials",
                     () -> "materials=" + PreviewStageProbe.materials() + ", more=" + PreviewStageProbe.moreMaterials()
                 ).screenshot("03-stage-materials").frames(3).checkCaptured("03-stage-materials");
+    }
+
+    private static void teleport(double x) {
+        var player = Minecraft.getInstance().player;
+        if (player != null) {
+            player.setPos(x, 101.0D, 4.5D);
+        }
     }
 
     private static int turnOrdinal() {

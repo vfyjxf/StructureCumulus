@@ -61,7 +61,7 @@ their store (`context`), the engine loop (`engine`), the document IR (`document`
 package dev.vfyjxf.cumulus.kernel.structure;
 
 public record Bay(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
-                  Sharing sharing, @Nullable String description) {
+                  Sharing sharing, @Nullable String description, @Nullable String hint) {
     public Bay { /* id non-null; cells non-empty; footprint non-null; sharing non-null */ }
     public static Bay of(NamespacedId id, Cuboid cells, Coverage coverage, Footprint footprint,
                          Sharing sharing);
@@ -69,6 +69,8 @@ public record Bay(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint
                          Sharing sharing);
     public static Bay of(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
                          Sharing sharing, String description);
+    public static Bay of(NamespacedId id, CuboidSet cells, Coverage coverage, Footprint footprint,
+                         Sharing sharing, @Nullable String description, @Nullable String hint);
 }
 
 public enum Coverage { everyCell, oneSubject, anySubject }
@@ -378,6 +380,7 @@ public final class Blueprint {
     public @Nullable OrientationPolicy orientation();
     public java.util.List<DerivationSpec> derivations();
     public Value arguments();
+    public @Nullable String description();
     public @Nullable SourceSpan source();
     public Plan plan();
     public ReadScope reads();
@@ -409,6 +412,7 @@ public final class BlueprintBuilder {
     public BlueprintBuilder derive(DerivationSpec derivation);
     public BlueprintBuilder derivations(java.util.Collection<DerivationSpec> derivations);
     public BlueprintBuilder arguments(Value arguments);
+    public BlueprintBuilder description(@Nullable String description);
     public BlueprintBuilder source(SourceSpan source);
     public Blueprint build();
 }
@@ -424,6 +428,8 @@ shell, a two-leaf door, an L-shaped room and a pipe corner are all sets of boxes
 
 A bay is a declaration, not a check: `Coverage` says what a match must establish, `Footprint` says
 what the instance owns, `Sharing` says how claims meet. They are three independent axes.
+`description` and `hint` are carried text: the compiler copies them, no rule reads them, and they
+participate in the bay's equality (`design/16` §3, D-94).
 
 | Coverage | Build obligation | Settle obligation |
 | --- | --- | --- |
@@ -616,8 +622,8 @@ leaves, and the `fluid` factory composes its two typed reads under `allOf` (`ada
 construction path.
 It is immutable: private final fields, copied collections, a cached `Plan`, cached `bayCells()` and
 cached `reads()` (all excluded from equality). `equals` is structural over the declarations (id,
-bounds, bays, checks, computations, seams, anchors, orientation, derivations, arguments); it excludes
-`source`, `plan`, `bayCells()` and `reads()`.
+bounds, bays, checks, computations, seams, anchors, orientation, derivations, arguments, description);
+it excludes `source`, `plan`, `bayCells()` and `reads()`.
 
 `plan()` returns the cached `Plan`: sections in declaration order, aggregates in a topological order
 of `inputs()`, checks in declaration order. An **aggregate** input must be produced by another

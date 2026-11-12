@@ -73,6 +73,7 @@ class JsonDocumentTest {
               "schemaVersion": 1,
               "id": "test:workshop",
               "bounds": [0, 0, 0, 5, 4, 5],
+              "description": "the workshop",
               "definitions": {
                 "test:unit": {
                   "bounds": [0, 0, 0, 1, 1, 1],
@@ -93,7 +94,7 @@ class JsonDocumentTest {
               "bays": [
                 {"id": "floor", "boxes": [[0,0,0,5,1,5]], "minus": [[2,0,2,3,1,3]],
                  "coverage": "any_subject", "footprint": {"declared": [[0,0,0,1,1,1]]},
-                 "sharing": "exclusive", "description": "the floor"}
+                 "sharing": "exclusive", "description": "the floor", "hint": "raise the walls first"}
               ],
               "checks": [
                 {"id": "floor_air", "bay": "test:left/cell", "focus": {"kind": "bay"},
@@ -218,6 +219,7 @@ class JsonDocumentTest {
         int schema = text.indexOf("\n  \"schemaVersion\"");
         int id = text.indexOf("\n  \"id\"");
         int bounds = text.indexOf("\n  \"bounds\"");
+        int description = text.indexOf("\n  \"description\"");
         int definitions = text.indexOf("\n  \"definitions\"");
         int placements = text.indexOf("\n  \"placements\"");
         int bays = text.indexOf("\n  \"bays\"");
@@ -231,7 +233,8 @@ class JsonDocumentTest {
         int extensions = text.indexOf("\n  \"extensions\"");
         assertTrue(schema >= 0 && schema < id, "schemaVersion leads");
         assertTrue(id < bounds, "id before bounds");
-        assertTrue(bounds < definitions, "bounds before definitions");
+        assertTrue(bounds < description, "bounds before description");
+        assertTrue(description < definitions, "description before definitions");
         assertTrue(definitions < placements, "definitions before placements");
         assertTrue(placements < bays, "placements before bays");
         assertTrue(bays < checks, "bays before checks");
@@ -619,6 +622,7 @@ class JsonDocumentTest {
                 root.orientation(),
                 root.placements(),
                 Map.of(),
+                null,
                 null
             ),
             document.definitions(),
@@ -876,6 +880,7 @@ class JsonDocumentTest {
             policy,
             List.of(),
             Map.of(),
+            null,
             null
         );
         Document document = new Document(1, root, Map.of(), Map.of());
@@ -976,7 +981,8 @@ class JsonDocumentTest {
             "\"coverage\"",
             "\"footprint\"",
             "\"sharing\"",
-            "\"description\""
+            "\"description\"",
+            "\"hint\""
         );
         assertOrdered(text, "\"id\": \"portal\"", "\"bay\"", "\"focus\"", "\"expect\"", "\"description\"");
         int focus = text.indexOf("\"focus\"");
@@ -1036,6 +1042,7 @@ class JsonDocumentTest {
             unit.orientation(),
             unit.placements(),
             unit.extensions(),
+            null,
             unit.source()
         );
         Document carrying = new Document(
@@ -1072,6 +1079,7 @@ class JsonDocumentTest {
             unit.orientation(),
             unit.placements(),
             Map.of("test:vendor", Value.object(Map.of("v", Value.number(1)))),
+            null,
             unit.source()
         );
         Document carrying = new Document(
@@ -1169,6 +1177,66 @@ class JsonDocumentTest {
         );
     }
 
+    @Test
+    void presentationTextRoundTripsAndRejectsBadTypes() {
+        Document document = read(richDocument);
+        assertEquals("the workshop", document.root().description());
+        assertEquals("the floor", document.root().bays().get(0).description());
+        assertEquals("raise the walls first", document.root().bays().get(0).hint());
+        assertEquals("the portal", document.root().checks().get(1).description());
+        String text = new JsonWriter().write(document);
+        assertTrue(text.contains("\"description\": \"the workshop\""), text);
+        assertTrue(text.contains("\"hint\": \"raise the walls first\""), text);
+        Document reread = read(text);
+        assertEquals("the workshop", reread.root().description());
+        assertEquals("raise the walls first", reread.root().bays().get(0).hint());
+        assertEquals(document.root().checks().get(1).description(), reread.root().checks().get(1).description());
+
+        String bare = """
+                {"schemaVersion":1,"id":"test:bare","bounds":[0,0,0,1,1,1],
+                 "bays":[{"id":"shell","box":[0,0,0,1,1,1],"coverage":"every_cell",
+                          "footprint":"none","sharing":"shared"}],
+                 "checks":[{"id":"shell_air","bay":"shell","focus":{"kind":"bay"},
+                            "expect":{"kind":"each_cell","element":{"kind":"air"}}}]}
+                """;
+        Document absent = read(bare);
+        assertNull(absent.root().description());
+        assertNull(absent.root().bays().get(0).description());
+        assertNull(absent.root().bays().get(0).hint());
+        String absentText = new JsonWriter().write(absent);
+        assertFalse(absentText.contains("\"description\""), absentText);
+        assertFalse(absentText.contains("\"hint\""), absentText);
+
+        assertDocumentField("""
+                {"schemaVersion":1,"id":"test:bad_root","bounds":[0,0,0,1,1,1],"description":7,
+                 "bays":[],"checks":[]}
+                """, "expected a string");
+        assertDocumentField("""
+                {"schemaVersion":1,"id":"test:bad_hint","bounds":[0,0,0,1,1,1],
+                 "bays":[{"id":"shell","box":[0,0,0,1,1,1],"coverage":"every_cell",
+                          "footprint":"none","sharing":"shared","hint":[]}],
+                 "checks":[]}
+                """, "expected a string");
+        assertDocumentField("""
+                {"schemaVersion":1,"id":"test:bad_check","bounds":[0,0,0,1,1,1],"bays":[],
+                 "checks":[{"id":"c","bay":"shell","focus":{"kind":"bay"},
+                            "expect":{"kind":"each_cell","element":{"kind":"air"}},"description":true}]}
+                """, "expected a string");
+        assertDocumentField("""
+                {"schemaVersion":1,"id":"test:definition_description","bounds":[0,0,0,1,1,1],
+                 "definitions":{"test:unit":{"bounds":[0,0,0,1,1,1],"description":"the unit"}},
+                 "bays":[],"checks":[]}
+                """, "unknown member 'description'");
+    }
+
+    private static void assertDocumentField(String text, String message) {
+        List<Finding> errors = new ArrayList<>();
+        assertNull(new JsonReader().read(documentId, text, errors));
+        Finding finding = errors.stream().filter(f -> f.code().equals(FindingCode.of(FindingCode.Family.doc, 2)))
+                .findFirst().orElseThrow();
+        assertTrue(finding.message().contains(message), () -> finding.message());
+    }
+
     private static void assertOrdered(String text, String anchor, String... members) {
         int index = text.indexOf(anchor);
         assertTrue(index >= 0, () -> "missing anchor " + anchor);
@@ -1237,6 +1305,7 @@ class JsonDocumentTest {
             spec.orientation(),
             placements,
             spec.extensions(),
+            spec.description(),
             null
         );
     }
@@ -1249,6 +1318,7 @@ class JsonDocumentTest {
             spec.footprint(),
             spec.sharing(),
             spec.description(),
+            spec.hint(),
             null
         );
     }

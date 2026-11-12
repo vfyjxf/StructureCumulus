@@ -104,11 +104,19 @@ public final class PreviewClientState {
         List<Stage> stages = presentation.stages();
         int selected = PlaybackController.selected();
         List<String> lines = new ArrayList<>();
-        lines.add("preview: " + current.blueprintId().text() + " · " + present + "/" + total);
+        String title = "preview: " + current.blueprintId().text() + " · " + present + "/" + total;
+        if (presentation.description() != null) {
+            title = title + " · " + presentation.description();
+        }
+        lines.add(title);
         lines.add("progress " + present + "/" + total + " (" + percent(present, total) + "%)");
         if (!stages.isEmpty() && selected >= 0 && selected < stages.size()) {
             Stage stage = stages.get(selected);
-            lines.add("stage " + (selected + 1) + "/" + stages.size() + ": " + stage.name());
+            String stageLine = "stage " + (selected + 1) + "/" + stages.size() + ": " + stage.name();
+            if (stage.hint() != null) {
+                stageLine = stageLine + " · " + stage.hint();
+            }
+            lines.add(stageLine);
         }
         for (MaterialStatus material : presentation.materials()) {
             lines.add("material " + material.item().text() + " " + material.have() + "/" + material.need());

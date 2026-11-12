@@ -24,6 +24,7 @@ public final class Blueprint {
     private final @Nullable OrientationPolicy orientation;
     private final List<DerivationSpec> derivations;
     private final Value arguments;
+    private final @Nullable String description;
     private final @Nullable SourceSpan source;
     private final Plan plan;
     private final CuboidSet bayCells;
@@ -40,6 +41,7 @@ public final class Blueprint {
         @Nullable OrientationPolicy orientation,
         List<DerivationSpec> derivations,
         Value arguments,
+        @Nullable String description,
         @Nullable SourceSpan source,
         Plan plan,
         CuboidSet bayCells
@@ -54,6 +56,7 @@ public final class Blueprint {
         this.orientation = orientation;
         this.derivations = List.copyOf(derivations);
         this.arguments = arguments;
+        this.description = description;
         this.source = source;
         this.plan = plan;
         this.bayCells = bayCells;
@@ -102,6 +105,11 @@ public final class Blueprint {
 
     public Value arguments() {
         return arguments;
+    }
+
+    /** The root's carried text, or null when the document declares none (design 16 §3). */
+    public @Nullable String description() {
+        return description;
     }
 
     public @Nullable SourceSpan source() {
@@ -173,13 +181,25 @@ public final class Blueprint {
                 && anchors.equals(blueprint.anchors)
                 && Objects.equals(orientation, blueprint.orientation)
                 && derivations.equals(blueprint.derivations)
-                && arguments.equals(blueprint.arguments);
+                && arguments.equals(blueprint.arguments)
+                && Objects.equals(description, blueprint.description);
     }
 
     @Override
     public int hashCode() {
-        return Objects
-                .hash(id, bounds, bays, checks, computations, seams, anchors, orientation, derivations, arguments);
+        return Objects.hash(
+            id,
+            bounds,
+            bays,
+            checks,
+            computations,
+            seams,
+            anchors,
+            orientation,
+            derivations,
+            arguments,
+            description
+        );
     }
 
     @Override

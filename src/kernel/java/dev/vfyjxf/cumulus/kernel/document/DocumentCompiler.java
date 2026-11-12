@@ -138,6 +138,9 @@ public final class DocumentCompiler {
         if (flat.orientation != null) {
             builder.orientation(flat.orientation);
         }
+        if (document.root().description() != null) {
+            builder.description(document.root().description());
+        }
         if (document.root().source() != null) {
             builder.source(document.root().source());
         }
@@ -278,7 +281,8 @@ public final class DocumentCompiler {
                         || !spec.anchors().isEmpty()
                         || spec.orientation() != null
                         || spec.envelope()
-                        || spec.envelopeEntities()) {
+                        || spec.envelopeEntities()
+                        || spec.description() != null) {
                     error(
                         findings,
                         Codes.documentField,
@@ -346,6 +350,7 @@ public final class DocumentCompiler {
                         footprint,
                         bay.sharing(),
                         bay.description(),
+                        bay.hint(),
                         bay.source()
                     )
                 );
@@ -562,7 +567,8 @@ public final class DocumentCompiler {
                     spec.coverage(),
                     spec.footprint(),
                     spec.sharing(),
-                    spec.description()
+                    spec.description(),
+                    spec.hint()
                 );
                 Bay previous = bays.putIfAbsent(bay.id(), bay);
                 if (previous != null && !previous.equals(bay)) {

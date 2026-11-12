@@ -664,7 +664,7 @@ final class PreviewSession {
             if (frontier < 0 && satisfied < stage.cells().size()) {
                 frontier = index;
             }
-            stages.add(new Stage(stage.name(), stage.cells().size(), satisfied, null, stage.description()));
+            stages.add(new Stage(stage.name(), stage.cells().size(), satisfied, stage.hint(), stage.description()));
         }
         if (frontier < 0 && !stages.isEmpty()) {
             frontier = stages.size() - 1;
@@ -678,7 +678,7 @@ final class PreviewSession {
                 materials.add(new MaterialStatus(itemId(shortage.template()), shortage.need(), shortage.have()));
             }
         }
-        return new PreviewPresentation(null, stages, frontier, materials, more);
+        return new PreviewPresentation(blueprint.description(), stages, frontier, materials, more);
     }
 
     /** The ghosts in play order: the stage table's stages in order, each in canonical cell order. */

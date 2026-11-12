@@ -95,13 +95,23 @@ class DocumentParityTest {
             false,
             Value.object(),
             List.of(
-                new BaySpec(id("wall"), shell, Coverage.everyCell, Footprint.bound(), Sharing.exclusive, null, null),
+                new BaySpec(
+                    id("wall"),
+                    shell,
+                    Coverage.everyCell,
+                    Footprint.bound(),
+                    Sharing.exclusive,
+                    null,
+                    null,
+                    null
+                ),
                 new BaySpec(
                     id("cavity"),
                     cavityCells,
                     Coverage.everyCell,
                     Footprint.box(),
                     Sharing.exclusive,
+                    null,
                     null,
                     null
                 ),
@@ -111,6 +121,7 @@ class DocumentParityTest {
                     Coverage.oneSubject,
                     Footprint.bound(),
                     Sharing.exclusive,
+                    null,
                     null,
                     null
                 )
@@ -171,6 +182,7 @@ class DocumentParityTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
 
@@ -252,7 +264,16 @@ class DocumentParityTest {
             false,
             Value.object(),
             List.of(
-                new BaySpec(id("cell"), unitCells, Coverage.everyCell, Footprint.box(), Sharing.shared, null, null)
+                new BaySpec(
+                    id("cell"),
+                    unitCells,
+                    Coverage.everyCell,
+                    Footprint.box(),
+                    Sharing.shared,
+                    null,
+                    null,
+                    null
+                )
             ),
             List.of(new SeamSpec(new SeamId(id("port")), Cuboid.of(0, 0, 0, 1, 1, 1), SeamKind.fluid, Map.of(), null)),
             List.of(),
@@ -263,6 +284,7 @@ class DocumentParityTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         BlueprintSpec root = new BlueprintSpec(
@@ -279,6 +301,7 @@ class DocumentParityTest {
                     Footprint.declared(wallCells),
                     Sharing.shared,
                     "the root wall",
+                    null,
                     null
                 )
             ),
@@ -337,6 +360,7 @@ class DocumentParityTest {
                 new PlacementSpec(id("unit"), LatticePoint.of(3, 0, 0), id("west"), null)
             ),
             Map.of(),
+            null,
             null
         );
 
@@ -382,6 +406,7 @@ class DocumentParityTest {
                     Footprint.none(),
                     Sharing.shared,
                     null,
+                    null,
                     null
                 ),
                 new BaySpec(
@@ -390,6 +415,7 @@ class DocumentParityTest {
                     Coverage.everyCell,
                     Footprint.none(),
                     Sharing.shared,
+                    null,
                     null,
                     null
                 )
@@ -428,6 +454,7 @@ class DocumentParityTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
 
@@ -502,6 +529,7 @@ class DocumentParityTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         BlueprintSpec root = rootWithPlacements(
@@ -556,6 +584,7 @@ class DocumentParityTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult seamResult = compile(twinSeams);
@@ -672,6 +701,7 @@ class DocumentParityTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
         CompileResult computationResult = compile(computation);
@@ -838,7 +868,7 @@ class DocumentParityTest {
     }
 
     private static BaySpec cellBay(NamespacedId bayId, CuboidSet cells) {
-        return new BaySpec(bayId, cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null);
+        return new BaySpec(bayId, cells, Coverage.everyCell, Footprint.box(), Sharing.exclusive, null, null, null);
     }
 
     private static CheckSpec airCheck(NamespacedId checkId, NamespacedId bayId) {
@@ -871,6 +901,7 @@ class DocumentParityTest {
             null,
             placements,
             Map.of(),
+            null,
             null
         );
     }
@@ -897,6 +928,7 @@ class DocumentParityTest {
             null,
             placements,
             Map.of(),
+            null,
             null
         );
     }
@@ -922,6 +954,7 @@ class DocumentParityTest {
             null,
             List.of(),
             Map.of(),
+            null,
             null
         );
     }

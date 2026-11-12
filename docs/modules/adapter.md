@@ -1311,7 +1311,8 @@ public final class StageModel {
     public static final int maxStages;
     public static Table of(Blueprint blueprint, java.util.Collection<LatticePoint> expected);
 
-    public record Stage(String name, @Nullable String description, java.util.List<LatticePoint> cells) { }
+    public record Stage(String name, @Nullable String description, @Nullable String hint,
+                        java.util.List<LatticePoint> cells) { }
 
     public record Table(java.util.List<Stage> stages, int expectedStages) {
         public boolean truncated();
@@ -1415,6 +1416,9 @@ public final class PlaybackController {
     public static int ghostCount(int stage);
     public static boolean playing();
     public static @Nullable Stage stage(int index);
+    public static java.util.List<PartLabel> partLabels();
+
+    public record PartLabel(int stage, LatticePoint anchor, String hint, float alpha) { }
 }
 
 public final class PlacementAnimator {
@@ -1459,6 +1463,7 @@ public final class JeiPreview {
     public static java.util.List<NamespacedId> blueprintIds();
     public static int drawnFrames();
     public static int drawnCells();
+    public static java.util.List<String> lines(NamespacedId blueprintId);
     public static void openWorld(NamespacedId blueprintId);
     public static boolean show(NamespacedId blueprintId);
 }
@@ -2101,12 +2106,14 @@ its signatures join §15 per milestone (the batch 10 note there).
 **Landed.** E1: the stage model, the presentation block on both payloads, staged playback and stage
 switching, the layered ghosts, the three HUD tiers, the stage banner and the client config file. E2:
 the commit-feedback payload and its four send sites, the pop-in, the rollback and undo fade, the
-rate-limited cues and the formed celebration. E3–E5 are `pending` in
+rate-limited cues and the formed celebration. E3: the document's `description` and bay `hint` in the
+compiled value and on both payloads, the HUD title and stage lines, the JEI entry lines and the
+part-hint billboard in the world (design 16 §3, §10). E4–E5 are `pending` in
 [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
 The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
 §18's confirm path and §16's build, undo and codes.
 
-**Server side (E1, E2).**
+**Server side (E1, E2; E3 fills the text values).**
 
 | Piece | What it is | Owner |
 | --- | --- | --- |
@@ -2119,13 +2126,16 @@ The server adds no presentation state: no per-player playback record, no animati
 handler, no map beside the session. The payload is plain data, and its handler resolves client classes
 only inside the enqueued work (§17's law, design 15 §6.4), so a dedicated server never loads one.
 
-**Client side (E1, E2, E4, E5).** The playback controller keeps three facts per session — the
+**Client side (E1, E2, E3, E4, E5).** The playback controller keeps three facts per session — the
 presentation block it was sent (table and frontier), the view cursor and the reveal counts — and
 derives nothing from the marks. The layered renderer multiplies the stage factor into the ghost alpha it
 already forces (§17's translucent pass) and leaves the Y slice and the distance cull in charge of
 visibility. The placement animator consumes the commit payload in its list order and draws an extra
 translucent copy of the model; it never reads the world to correct itself and nothing waits for it. A
-capped payload's one note line is drawn by the animator's own HUD layer, which needs no session.
+capped payload's one note line is drawn by the animator's own HUD layer, which needs no session. The
+part-hint billboards reuse the marker billboard's projection: each label is anchored at the bounding
+centre of the cells its stage was sent, the cursor's stage draws at full alpha, the other parts faint,
+and the same distance cull applies (design 16 §10).
 The guide is the same session viewed differently: its automatic advance is the session's existing
 invalidation channel (§17's `LevelWatch` revision check), its next-step line is composed by one
 formatter with a fixed vocabulary, and its `Enter` is the §18 confirm unchanged — the world keeps one

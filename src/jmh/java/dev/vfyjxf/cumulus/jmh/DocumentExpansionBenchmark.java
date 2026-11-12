@@ -156,6 +156,7 @@ public class DocumentExpansionBenchmark {
                     Footprint.box(),
                     Sharing.exclusive,
                     null,
+                    null,
                     null
                 )
             ),
@@ -168,6 +169,7 @@ public class DocumentExpansionBenchmark {
             null,
             placements,
             Map.of(),
+            null,
             null
         );
     }
@@ -189,6 +191,7 @@ public class DocumentExpansionBenchmark {
             null,
             placements,
             Map.of(),
+            null,
             null
         );
     }

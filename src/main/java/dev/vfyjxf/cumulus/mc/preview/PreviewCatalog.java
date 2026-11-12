@@ -99,7 +99,7 @@ final class PreviewCatalog {
         List<GhostCell> cells = new ArrayList<>(states.size());
         for (int index = 0; index < table.stages().size(); index++) {
             StageModel.Stage stage = table.stages().get(index);
-            stages.add(new Stage(stage.name(), stage.cells().size(), 0, null, stage.description()));
+            stages.add(new Stage(stage.name(), stage.cells().size(), 0, stage.hint(), stage.description()));
             for (LatticePoint cell : stage.cells()) {
                 BlockState value = states.get(cell);
                 if (value == null) {
@@ -127,7 +127,7 @@ final class PreviewCatalog {
         }
         // a page satisfies nothing, so its frontier is the first stage whenever it has one (design 16 §5)
         PreviewPresentation presentation = new PreviewPresentation(
-            null,
+            blueprint.description(),
             stages,
             stages.isEmpty() ? -1 : 0,
             List.of(),

@@ -122,6 +122,7 @@ final class BuiltinDocuments {
                         claimable ? Footprint.box() : Footprint.none(),
                         claimable ? Sharing.exclusive : Sharing.shared,
                         null,
+                        null,
                         null
                     )
                 ),
@@ -145,6 +146,7 @@ final class BuiltinDocuments {
                 null,
                 List.of(),
                 Map.of(),
+                null,
                 null
             ),
             Map.of(),

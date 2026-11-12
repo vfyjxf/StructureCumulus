@@ -40,6 +40,7 @@ public final class BlueprintBuilder {
     private final List<DerivationSpec> derivations = new ArrayList<>();
     private @Nullable OrientationPolicy orientation;
     private Value arguments = Value.object();
+    private @Nullable String description;
     private @Nullable SourceSpan source;
     private boolean envelope;
     private boolean envelopeEntities;
@@ -139,6 +140,11 @@ public final class BlueprintBuilder {
 
     public BlueprintBuilder arguments(Value arguments) {
         this.arguments = Objects.requireNonNull(arguments, "arguments");
+        return this;
+    }
+
+    public BlueprintBuilder description(@Nullable String description) {
+        this.description = description;
         return this;
     }
 
@@ -431,6 +437,7 @@ public final class BlueprintBuilder {
             orientation,
             List.copyOf(derivations),
             arguments,
+            description,
             source,
             new Plan(sections, orderedAggregates, checkList),
             bayCells
