@@ -970,7 +970,7 @@ file; and any synchronisation of the staged playback into the web `visual/` trac
 | E3 | §3 the document members and the carry law, §10 the display points |
 | E4 | §11 the view modes |
 | E5 | §12 guided mode, plus the count and plan close-out |
-| E8 | §6.7 the cinema mode, §13's `cinematics.*` keys (design 15 §12's variant summary is E6, not this file) |
+| E8 | §6.7 the cinema mode and the hand-off transitions, §13's `cinematics.*` keys |
 
 E6 lands [15](15-preview.md) §12's variant groups; this file contributes no section of its own, and
 the summary it puts on both payloads is described there.
