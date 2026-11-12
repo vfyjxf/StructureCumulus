@@ -9,9 +9,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import org.joml.Vector2f;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /** One catalog entry as a JEI recipe: the scene plus the view state the GUI mutates in place. */
 final class BlueprintPreviewRecipe {
@@ -29,6 +32,7 @@ final class BlueprintPreviewRecipe {
     private float yaw = 135.0F;
     private float pitch = 30.0F;
     private int slice = -1;
+    private PreviewViewMode viewMode = PreviewViewMode.isometric;
 
     BlueprintPreviewRecipe(PreviewCatalogPayload.Entry entry) {
         this.blueprintId = entry.blueprintId();
@@ -77,6 +81,53 @@ final class BlueprintPreviewRecipe {
 
     PreviewScene scene() {
         return scene;
+    }
+
+    PreviewViewMode viewMode() {
+        return viewMode;
+    }
+
+    void cycleViewMode() {
+        viewMode = viewMode.next();
+    }
+
+    /** The cell tooltip under a recipe-local point in the current mode; a panel answers only for itself. */
+    List<String> hoverLines(double mouseX, double mouseY) {
+        for (PreviewScene.View view : BlueprintPreviewCategory.views(viewMode, yaw, pitch)) {
+            PreviewScene.Cell cell = scene.hover(mouseX, mouseY, view, slice);
+            if (cell != null) {
+                return cellLines(cell);
+            }
+        }
+        return List.of();
+    }
+
+    /**
+     * The tooltip's cell lines: the block id, each property in key order, then the stage that owns the
+     * cell (design 16 §10, §11). Ordering matters because the payload's map has none.
+     */
+    List<String> cellLines(PreviewScene.Cell cell) {
+        List<String> lines = new ArrayList<>(cell.ghost().properties().size() + 2);
+        lines.add(cell.ghost().block().text());
+        cell.ghost().properties().entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .forEach(property -> lines.add(property.getKey() + ": " + property.getValue()));
+        List<Stage> stages = presentation.stages();
+        int index = cell.ghost().stageIndex();
+        if (index >= 0 && index < stages.size()) {
+            Stage stage = stages.get(index);
+            lines.add("part: " + stage.name() + (stage.hint() == null ? "" : " · " + stage.hint()));
+        }
+        return List.copyOf(lines);
+    }
+
+    /** Where one expected cell's centre lands in one panel of the current mode. */
+    Optional<JeiPreview.CellPoint> point(int panel, int cellIndex) {
+        PreviewScene.View[] views = BlueprintPreviewCategory.views(viewMode, yaw, pitch);
+        if (panel < 0 || panel >= views.length || cellIndex < 0 || cellIndex >= scene.cells().size()) {
+            return Optional.empty();
+        }
+        Vector2f point = scene.point(views[panel], slice, scene.cells().get(cellIndex).ghost().cell());
+        return point == null ? Optional.empty() : Optional.of(new JeiPreview.CellPoint(point.x, point.y));
     }
 
     List<Material> materials() {

@@ -1,8 +1,10 @@
 package dev.vfyjxf.cumulus.uitest;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
 import dev.vfyjxf.cumulus.mc.preview.jei.JeiPreview;
+import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewPresentation;
 import mezz.jei.api.IModPlugin;
@@ -80,6 +82,30 @@ public final class PreviewJeiProbe implements IModPlugin {
         for (PreviewCatalogPayload.Entry entry : PreviewCatalogClient.entries()) {
             if (entry.blueprintId().equals(blueprintId)) {
                 return entry.cells().size();
+            }
+        }
+        return -1;
+    }
+
+    static @Nullable GhostCell cell(NamespacedId blueprintId, int index) {
+        for (PreviewCatalogPayload.Entry entry : PreviewCatalogClient.entries()) {
+            if (entry.blueprintId().equals(blueprintId)) {
+                return index < 0 || index >= entry.cells().size() ? null : entry.cells().get(index);
+            }
+        }
+        return null;
+    }
+
+    /** The entry's cell at one lattice point, or -1 when the entry declares none there. */
+    static int cellIndex(NamespacedId blueprintId, int x, int y, int z) {
+        for (PreviewCatalogPayload.Entry entry : PreviewCatalogClient.entries()) {
+            if (entry.blueprintId().equals(blueprintId)) {
+                for (int index = 0; index < entry.cells().size(); index++) {
+                    LatticePoint at = entry.cells().get(index).cell();
+                    if (at.x() == x && at.y() == y && at.z() == z) {
+                        return index;
+                    }
+                }
             }
         }
         return -1;

@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import org.joml.Quaternionf;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 
@@ -38,8 +39,21 @@ final class PreviewScene {
     /** One expected cell: the wire description it came from, plus the client state it resolves to. */
     record Cell(GhostCell ghost, @Nullable BlockState state) {}
 
+    /** How a panel filters the entry's cells by Y: the whole entry, the layers up to one, or exactly one. */
+    enum LayerRule {
+        all, upTo, exact
+    }
+
+    /** One panel's rectangle and the camera its mode gives it; the fit is always the entry's bounds. */
+    record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) {}
+
+    /** What one panel drew: its cell count and the Y layer it isolates or highlights. */
+    record Panel(int cells, int layer) {}
+
     private static final float margin = 0.86F;
     private static final int sceneDepth = 150;
+    private static final int bandColor = 0x38FFFFFF;
+    private static final int bandEdgeColor = 0x58FFFFFF;
 
     private final List<Cell> cells;
     private final int minX;
@@ -84,23 +98,30 @@ final class PreviewScene {
         return cells.size();
     }
 
+    List<Cell> cells() {
+        return cells;
+    }
+
     /** The number of Y layers the blueprint spans; at least one, so the slider always has a range. */
     int layers() {
         return maxY < minY ? 1 : maxY - minY + 1;
     }
 
     @Nullable
-    Cell hover(double mouseX, double mouseY, int x, int y, int width, int height, float yaw, float pitch, int slice) {
-        if (mouseX < x || mouseX >= x + width || mouseY < y || mouseY >= y + height) {
+    Cell hover(double mouseX, double mouseY, View view, int layer) {
+        if (mouseX < view.x()
+                || mouseX >= view.x() + view.width()
+                || mouseY < view.y()
+                || mouseY >= view.y() + view.height()) {
             return null;
         }
-        Projection projection = projection(x, y, width, height, yaw, pitch);
+        Projection projection = projection(view);
         Vector3f origin = projection.origin(mouseX, mouseY);
         Vector3f direction = projection.direction();
         Cell nearest = null;
         float nearestExit = Float.NEGATIVE_INFINITY;
         for (Cell cell : cells) {
-            if (!visible(cell, slice)) {
+            if (!visible(cell, view.rule(), layer)) {
                 continue;
             }
             float exit = exit(origin, direction, cell.ghost().cell(), projection);
@@ -112,18 +133,29 @@ final class PreviewScene {
         return nearest;
     }
 
-    /** Draws the visible cells and returns how many it rendered. */
-    int draw(GuiGraphics graphics, int x, int y, int width, int height, float yaw, float pitch, int slice) {
+    /** Where one cell's centre lands inside a panel, or null when that panel filters it out. */
+    @Nullable
+    Vector2f point(View view, int layer, LatticePoint at) {
+        for (Cell cell : cells) {
+            if (cell.ghost().cell().equals(at) && visible(cell, view.rule(), layer)) {
+                return projection(view).screenOf(at);
+            }
+        }
+        return null;
+    }
+
+    /** Draws the panel's cells and returns what it covered. */
+    Panel draw(GuiGraphics graphics, View view, int layer, boolean band) {
         List<Cell> drawn = new ArrayList<>(cells.size());
         for (Cell cell : cells) {
-            if (visible(cell, slice) && cell.state() != null) {
+            if (visible(cell, view.rule(), layer) && cell.state() != null) {
                 drawn.add(cell);
             }
         }
         if (drawn.isEmpty()) {
-            return 0;
+            return new Panel(0, layer);
         }
-        Projection projection = projection(x, y, width, height, yaw, pitch);
+        Projection projection = projection(view);
         drawn.sort(Comparator.comparingDouble(cell -> projection.depth(cell.ghost().cell())));
         PoseStack pose = graphics.pose();
         pose.pushPose();
@@ -156,11 +188,29 @@ final class PreviewScene {
         // GuiGraphics.flush() disables the depth test around the batch, which would drop this scene's occlusion.
         graphics.bufferSource().endBatch();
         pose.popPose();
-        return drawn.size();
+        if (band) {
+            drawBand(graphics, view, projection, layer);
+        }
+        return new Panel(drawn.size(), layer);
     }
 
-    private boolean visible(Cell cell, int slice) {
-        return cell.ghost().cell().y() - minY <= slice;
+    private void drawBand(GuiGraphics graphics, View view, Projection projection, int layer) {
+        float bottom = projection.screenYOf(minY + layer);
+        float top = projection.screenYOf(minY + layer + 1);
+        int topY = Math.round(Math.min(top, bottom));
+        int bottomY = Math.round(Math.max(top, bottom));
+        graphics.fill(view.x(), topY, view.x() + view.width(), bottomY, bandColor);
+        graphics.fill(view.x(), topY, view.x() + view.width(), topY + 1, bandEdgeColor);
+        graphics.fill(view.x(), bottomY - 1, view.x() + view.width(), bottomY, bandEdgeColor);
+    }
+
+    private boolean visible(Cell cell, LayerRule rule, int layer) {
+        int offset = cell.ghost().cell().y() - minY;
+        return switch (rule) {
+            case all -> true;
+            case upTo -> offset <= layer;
+            case exact -> offset == layer;
+        };
     }
 
     private static @Nullable BlockState resolve(GhostCell ghost) {
@@ -227,11 +277,24 @@ final class PreviewScene {
         Vector3f direction() {
             return inverse.transform(new Vector3f(0.0F, 0.0F, 1.0F));
         }
+
+        /** The panel point the centre of one cell projects to. */
+        Vector2f screenOf(LatticePoint at) {
+            Vector3f rotated = rotate(at.x() + 0.5F, at.y() + 0.5F, at.z() + 0.5F);
+            return new Vector2f(screenX + rotated.x * scale, screenY - rotated.y * scale);
+        }
+
+        /** The panel row a horizontal Y plane sits on, used by the three-view's section band. */
+        float screenYOf(float worldY) {
+            return screenY - rotate(0.0F, worldY, 0.0F).y * scale;
+        }
     }
 
-    private Projection projection(int x, int y, int width, int height, float yaw, float pitch) {
-        Quaternionf rotation = new Quaternionf().rotateY((float) Math.toRadians(yaw))
-                .rotateX((float) Math.toRadians(pitch));
+    private Projection projection(View view) {
+        int width = view.width();
+        int height = view.height();
+        Quaternionf rotation = new Quaternionf().rotateY((float) Math.toRadians(view.yaw()))
+                .rotateX((float) Math.toRadians(view.pitch()));
         float shiftX = (minX + maxX + 1) * 0.5F;
         float shiftY = (minY + maxY + 1) * 0.5F;
         float shiftZ = (minZ + maxZ + 1) * 0.5F;
@@ -258,8 +321,8 @@ final class PreviewScene {
             shiftX,
             shiftY,
             shiftZ,
-            x + width * 0.5F,
-            y + height * 0.5F
+            view.x() + width * 0.5F,
+            view.y() + height * 0.5F
         );
     }
 

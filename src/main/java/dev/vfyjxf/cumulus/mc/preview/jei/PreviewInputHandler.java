@@ -6,13 +6,14 @@ import mezz.jei.api.gui.inputs.IJeiUserInput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 
 /**
- * The category's one input surface: drag rotates the camera, the slider reveals a Y layer, and a
- * click on the button is the "ghost to world" action. All coordinates are recipe-local.
+ * The category's one input surface: drag rotates the isometric camera, the slider reveals a Y layer,
+ * a click on the mode button cycles the view, and a click on the other button opens the session.
+ * All coordinates are recipe-local.
  */
 final class PreviewInputHandler implements IJeiInputHandler {
 
     private enum Mode {
-        none, rotate, slice, button
+        none, rotate, slice, button, view
     }
 
     private static final float degreesPerPixel = 1.6F;
@@ -46,6 +47,10 @@ final class PreviewInputHandler implements IJeiInputHandler {
             JeiPreview.openWorld(recipe.blueprintId());
             return true;
         }
+        if (pressed == Mode.view && hit == Mode.view) {
+            recipe.cycleViewMode();
+            return true;
+        }
         if (pressed == Mode.slice || hit == Mode.slice) {
             sliceAt(mouseY);
             return true;
@@ -66,6 +71,10 @@ final class PreviewInputHandler implements IJeiInputHandler {
         }
         return switch (mode) {
             case rotate -> {
+                // the three-view and the grid fix their planes, so only the isometric view turns
+                if (recipe.viewMode() != PreviewViewMode.isometric) {
+                    yield true;
+                }
                 recipe.yaw(recipe.yaw() + (float) dragX * degreesPerPixel);
                 recipe.pitch(clamp(recipe.pitch() + (float) dragY * degreesPerPixel));
                 yield true;
@@ -97,6 +106,16 @@ final class PreviewInputHandler implements IJeiInputHandler {
     }
 
     private Mode modeAt(double mouseX, double mouseY) {
+        if (BlueprintPreviewCategory.inside(
+            mouseX,
+            mouseY,
+            BlueprintPreviewCategory.modeX,
+            BlueprintPreviewCategory.modeY,
+            BlueprintPreviewCategory.modeWidth,
+            BlueprintPreviewCategory.modeHeight
+        )) {
+            return Mode.view;
+        }
         if (BlueprintPreviewCategory.inside(
             mouseX,
             mouseY,

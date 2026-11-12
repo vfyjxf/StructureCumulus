@@ -95,6 +95,10 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         return List.copyOf(recipes.keySet());
     }
 
+    static @Nullable BlueprintPreviewRecipe recipe(NamespacedId blueprintId) {
+        return recipes.get(blueprintId);
+    }
+
     static List<String> lines(NamespacedId blueprintId) {
         BlueprintPreviewRecipe recipe = recipes.get(blueprintId);
         return recipe == null ? List.of() : recipe.lines();

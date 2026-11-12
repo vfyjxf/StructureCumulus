@@ -1459,11 +1459,27 @@ public final class PreviewClientEvents { }
 
 package dev.vfyjxf.cumulus.mc.preview.jei;
 
+public enum PreviewViewMode {
+    isometric, threeView, sliceGrid;
+    public String label();
+    public PreviewViewMode next();
+}
+
 public final class JeiPreview {
+    public record Panel(int cells, int layer, int x, int y, int width, int height) { }
+    public record CellPoint(double x, double y) { }
+
     public static java.util.List<NamespacedId> blueprintIds();
     public static int drawnFrames();
     public static int drawnCells();
+    public static java.util.List<Panel> drawnPanels();
     public static java.util.List<String> lines(NamespacedId blueprintId);
+    public static @Nullable PreviewViewMode viewMode(NamespacedId blueprintId);
+    public static boolean cycleViewMode(NamespacedId blueprintId);
+    public static int slice(NamespacedId blueprintId);
+    public static boolean setSlice(NamespacedId blueprintId, int layer);
+    public static java.util.Optional<CellPoint> cellPoint(NamespacedId blueprintId, int panel, int cellIndex);
+    public static java.util.List<String> hoverText(NamespacedId blueprintId, double mouseX, double mouseY);
     public static void openWorld(NamespacedId blueprintId);
     public static boolean show(NamespacedId blueprintId);
 }
@@ -2108,8 +2124,9 @@ switching, the layered ghosts, the three HUD tiers, the stage banner and the cli
 the commit-feedback payload and its four send sites, the pop-in, the rollback and undo fade, the
 rate-limited cues and the formed celebration. E3: the document's `description` and bay `hint` in the
 compiled value and on both payloads, the HUD title and stage lines, the JEI entry lines and the
-part-hint billboard in the world (design 16 §3, §10). E4–E5 are `pending` in
-[`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
+part-hint billboard in the world (design 16 §3, §10). E4: the category's three view modes — the
+three-view with its section band, the slice grid and the per-cell tooltip that names the owning part
+(design 16 §11). E5 is `pending` in [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
 The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
 §18's confirm path and §16's build, undo and codes.
 

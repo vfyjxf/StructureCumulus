@@ -3,17 +3,30 @@ package dev.vfyjxf.cumulus.mc.preview.jei;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
- * The JEI preview's public face: what the category lists, what its last frame covered, and the one
- * action its button performs. Another renderer integration copies this shape (roadmap §9).
+ * The JEI preview's public face: what the category lists, the page state its face mutates, what its
+ * last frame covered, and the one action its button performs. Another renderer integration copies
+ * this shape (roadmap §9).
  */
 public final class JeiPreview {
 
+    /**
+     * One panel of the last drawn frame: how many cells it drew, the layer it highlights, and the
+     * recipe-local rectangle it occupied.
+     */
+    public record Panel(int cells, int layer, int x, int y, int width, int height) {}
+
+    /** A point of the recipe's own face, in pixels from its top-left corner. */
+    public record CellPoint(double x, double y) {}
+
     private static volatile int drawnFrames;
     private static volatile int drawnCells;
+    private static volatile List<Panel> drawnPanels = List.of();
 
     private JeiPreview() {}
 
@@ -27,14 +40,63 @@ public final class JeiPreview {
         return drawnFrames;
     }
 
-    /** The expected cells the last drawn frame covered. */
+    /** The expected cells the last drawn frame covered, summed over its panels. */
     public static int drawnCells() {
         return drawnCells;
+    }
+
+    /** The panels the last drawn frame covered; one in the isometric view, three in the three-view. */
+    public static List<Panel> drawnPanels() {
+        return drawnPanels;
     }
 
     /** The entry's tooltip text: its root description and one line per part (design 16 §10). */
     public static List<String> lines(NamespacedId blueprintId) {
         return JeiPreviewPlugin.lines(blueprintId);
+    }
+
+    /** The page's view mode, or null when the category does not list the entry. */
+    public static @Nullable PreviewViewMode viewMode(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null ? null : recipe.viewMode();
+    }
+
+    /** The mode button's action: isometric → three-view → slice grid → isometric. */
+    public static boolean cycleViewMode(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        if (recipe == null) {
+            return false;
+        }
+        recipe.cycleViewMode();
+        return true;
+    }
+
+    /** The Y layer the page shows; the slider, the wheel and every panel read this one value. */
+    public static int slice(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null ? -1 : recipe.slice();
+    }
+
+    /** Moves the page's layer; false when the entry is unknown, clamped to the entry's own layers. */
+    public static boolean setSlice(NamespacedId blueprintId, int layer) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        if (recipe == null) {
+            return false;
+        }
+        recipe.slice(Math.max(0, Math.min(recipe.scene().layers() - 1, layer)));
+        return true;
+    }
+
+    /** Where an expected cell's centre lands in one panel of the current mode, recipe-local. */
+    public static Optional<CellPoint> cellPoint(NamespacedId blueprintId, int panel, int cellIndex) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null ? Optional.empty() : recipe.point(panel, cellIndex);
+    }
+
+    /** The cell tooltip's lines under a recipe-local point; empty when no visible cell is under it. */
+    public static List<String> hoverText(NamespacedId blueprintId, double mouseX, double mouseY) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null ? List.of() : recipe.hoverLines(mouseX, mouseY);
     }
 
     /** The "Ghost to world" action: the server opens the ordinary session at the crosshair. */
@@ -47,7 +109,12 @@ public final class JeiPreview {
         return JeiPreviewPlugin.show(blueprintId);
     }
 
-    static void recordFrame(int cells) {
+    static void recordFrame(List<Panel> panels) {
+        int cells = 0;
+        for (Panel panel : panels) {
+            cells += panel.cells();
+        }
+        drawnPanels = List.copyOf(panels);
         drawnCells = cells;
         drawnFrames++;
     }
@@ -55,5 +122,6 @@ public final class JeiPreview {
     static void resetFrames() {
         drawnFrames = 0;
         drawnCells = 0;
+        drawnPanels = List.of();
     }
 }
