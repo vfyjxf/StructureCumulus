@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.StructureCumulus;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
 import dev.vfyjxf.cumulus.kernel.document.Document;
+import dev.vfyjxf.cumulus.kernel.space.Heading;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.kernel.structure.Blueprint;
@@ -64,7 +65,7 @@ public final class PreviewService {
             StructureCumulus.logger.info("preview {} refused: the command source has no player", id.text());
             return 0;
         }
-        Opened opened = openFor(player, id, origin);
+        Opened opened = openFor(player, id, origin, null);
         if (!opened.opened()) {
             source.sendFailure(Component.literal(opened.message()));
             return 0;
@@ -75,7 +76,15 @@ public final class PreviewService {
 
     /** The JEI "ghost to world" entry: the crosshair supplies the origin and chat carries the outcome. */
     public static void open(ServerPlayer player, NamespacedId id) {
-        player.sendSystemMessage(Component.literal(openFor(player, id, null).message()));
+        open(player, id, null);
+    }
+
+    /**
+     * The screen's ghost to world: the payload's heading takes the player's own facing's place, so the
+     * cycle start and the facing weight follow the screen's side and nothing else moves (design 17 §9.4).
+     */
+    public static void open(ServerPlayer player, NamespacedId id, @Nullable Heading facing) {
+        player.sendSystemMessage(Component.literal(openFor(player, id, null, facing).message()));
     }
 
     private record Opened(boolean opened, String message) {}
@@ -112,7 +121,12 @@ public final class PreviewService {
         return new Loaded(blueprint, "");
     }
 
-    private static Opened openFor(ServerPlayer player, NamespacedId id, @Nullable LatticePoint origin) {
+    private static Opened openFor(
+        ServerPlayer player,
+        NamespacedId id,
+        @Nullable LatticePoint origin,
+        @Nullable Heading facing
+    ) {
         Loaded loaded = load(id);
         Blueprint blueprint = loaded.blueprint();
         if (blueprint == null) {
@@ -127,7 +141,7 @@ public final class PreviewService {
         if (previous != null) {
             previous.close();
         }
-        PreviewSession.OpenResult opened = PreviewSession.open(player, blueprint, origins, player.getDirection());
+        PreviewSession.OpenResult opened = PreviewSession.open(player, blueprint, origins, direction(player, facing));
         PreviewSession session = opened.session();
         if (session == null) {
             StructureCumulus.logger.info("preview {} refused: {}", id.text(), opened.failure());
@@ -222,7 +236,7 @@ public final class PreviewService {
             LatticePoint origin = next == null ? null : session.siting().origin();
             session.close();
             if (next != null && origin != null) {
-                Opened opened = openFor(player, next, origin);
+                Opened opened = openFor(player, next, origin, null);
                 if (!opened.opened()) {
                     player.sendSystemMessage(Component.literal(opened.message()));
                 }
@@ -330,6 +344,21 @@ public final class PreviewService {
             }
         }
         return List.copyOf(origins);
+    }
+
+    /** The open's facing: the payload's heading where the player's own facing would go. */
+    private static Direction direction(ServerPlayer player, @Nullable Heading facing) {
+        if (facing == null) {
+            return player.getDirection();
+        }
+        Direction direction = switch (facing) {
+            case north -> Direction.NORTH;
+            case south -> Direction.SOUTH;
+            case east -> Direction.EAST;
+            case west -> Direction.WEST;
+            case up, down -> null;
+        };
+        return direction == null ? player.getDirection() : direction;
     }
 
     private record Key(UUID player, ResourceKey<Level> level) {}

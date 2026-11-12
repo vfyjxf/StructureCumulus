@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.mc.preview.jei;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.jei.BlueprintPreviewCategory.PageView;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
 import dev.vfyjxf.cumulus.mc.preview.scene.BlueprintPreviewRecipe;
@@ -13,7 +14,7 @@ import java.util.Optional;
 
 /**
  * The JEI preview's public face: what the category lists, the page state its face mutates, what its
- * last frame covered, and the one action its button performs. Another renderer integration copies
+ * last frame covered, and the two actions its buttons perform. Another renderer integration copies
  * this shape (roadmap §9).
  */
 public final class JeiPreview {
@@ -138,6 +139,12 @@ public final class JeiPreview {
     public static void openSelected(NamespacedId blueprintId) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
         openWorld(recipe == null ? blueprintId : recipe.selectedBlueprintId());
+    }
+
+    /** The page's "open in screen" button: the client screen opens on the member the page shows. */
+    public static void openScreen(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        PreviewScreen.open(recipe == null ? blueprintId : recipe.selectedBlueprintId());
     }
 
     /** Pages the category to one blueprint; false when JEI or the entry is not available. */

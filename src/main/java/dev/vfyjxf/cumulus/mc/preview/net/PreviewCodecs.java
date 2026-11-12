@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.kernel.remedy.MarkerKind;
 import dev.vfyjxf.cumulus.kernel.remedy.OverlayModel;
 import dev.vfyjxf.cumulus.kernel.space.Cuboid;
 import dev.vfyjxf.cumulus.kernel.space.CuboidSet;
+import dev.vfyjxf.cumulus.kernel.space.Heading;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.kernel.space.Locus;
@@ -166,12 +167,38 @@ final class PreviewCodecs {
         return new PreviewCatalogPayload(entries);
     }
 
+    /**
+     * The heading is a trailing optional byte: an open from a client that predates it ends after the
+     * id and reads as absent, and a server that predates it never reads the byte (design 17 §3.2).
+     */
     private static void encodeOpen(RegistryFriendlyByteBuf buffer, PreviewOpenPayload payload) {
         writeId(buffer, payload.blueprintId());
+        Heading facing = horizontal(payload.facing());
+        if (facing != null) {
+            buffer.writeByte(facing.ordinal());
+        }
     }
 
     private static PreviewOpenPayload decodeOpen(RegistryFriendlyByteBuf buffer) {
-        return new PreviewOpenPayload(readId(buffer));
+        NamespacedId blueprintId = readId(buffer);
+        if (buffer.readableBytes() <= 0) {
+            return new PreviewOpenPayload(blueprintId);
+        }
+        Heading[] headings = Heading.values();
+        int ordinal = buffer.readUnsignedByte();
+        Heading read = ordinal < headings.length ? headings[ordinal] : null;
+        return new PreviewOpenPayload(blueprintId, horizontal(read));
+    }
+
+    /** The four horizons travel; {@code up}/{@code down} read as absent (design 17 §3.2). */
+    private static @Nullable Heading horizontal(@Nullable Heading heading) {
+        if (heading == null) {
+            return null;
+        }
+        return switch (heading) {
+            case up, down -> null;
+            default -> heading;
+        };
     }
 
     private static void encodeCommit(RegistryFriendlyByteBuf buffer, BuildCommitPayload payload) {

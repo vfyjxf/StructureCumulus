@@ -1302,6 +1302,7 @@ public final class PreviewCommand {
 public final class PreviewService {
     public static int open(CommandSourceStack source, NamespacedId id, @Nullable LatticePoint origin);
     public static void open(ServerPlayer player, NamespacedId id);
+    public static void open(ServerPlayer player, NamespacedId id, @Nullable Heading facing);
     public static int openAt(CommandSourceStack source, BuildPreset preset, ItemSource items);
     public static void control(ServerPlayer player, PreviewControlPayload.Control control, @Nullable LatticePoint target);
     public static @Nullable PreviewContext context(ServerPlayer player);
@@ -1393,8 +1394,10 @@ public record VariantSummary(NamespacedId group, java.util.List<Member> members)
     }
 }
 
-public record PreviewOpenPayload(NamespacedId blueprintId) implements CustomPacketPayload {
+public record PreviewOpenPayload(NamespacedId blueprintId, @Nullable Heading facing)
+        implements CustomPacketPayload {
     public static final Type<PreviewOpenPayload> type;
+    public PreviewOpenPayload(NamespacedId blueprintId);
     @Override public Type<? extends CustomPacketPayload> type();
 }
 
@@ -1460,7 +1463,8 @@ public final class PlacementAnimator {
 public final class PreviewKeys {
     public enum Action {
         turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
-        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant, savePreset, cinematic
+        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant, savePreset, cinematic,
+        openScreen
     }
 
     public static @Nullable KeyMapping binding(Action action);
@@ -1737,7 +1741,7 @@ public record ScreenLayout(Rect title, Rect main, @Nullable Rect front, @Nullabl
 // The one screen of design 17 §5: the page looked up in the last catalogue, one shared camera and the
 // four derived viewports.
 public final class PreviewScreen extends Screen {
-    public static void open(NamespacedId blueprintId);
+    public static boolean open(NamespacedId blueprintId);
     @Override public void added();
     @Override public void removed();
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick);
@@ -1770,6 +1774,10 @@ public final class PreviewScreen extends Screen {
     public int drawnFutureBoxes();
     public @Nullable Rect buttonRect(String label);
     public java.util.List<String> buttonLabels();
+    public Heading heading();
+    public @Nullable String variantLine();
+    public int variantCount();
+    public int variantIndex();
 }
 
 // The screen's own clock of design 17 §4.6: a fractional tick accumulator, fed by the frame's
@@ -1822,6 +1830,7 @@ public final class JeiPreview {
     public static @Nullable NamespacedId selectedBlueprintId(NamespacedId blueprintId);
     public static boolean cycleVariant(NamespacedId blueprintId, int step);
     public static void openSelected(NamespacedId blueprintId);
+    public static void openScreen(NamespacedId blueprintId);
 }
 
 public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
@@ -2461,9 +2470,11 @@ The JEI half (P4), with the same kind of wire and lifecycle facts:
   counters the harness asserts on, `show(id)`, `openWorld(id)`, the variant selection
   (`variants(id)`, `variantIndex(id)`, `selectedBlueprintId(id)`, `cycleVariant(id, step)`) and
   `openSelected(id)`.
-- **Ghost to world.** `PreviewOpenPayload` carries only the blueprint id; `PreviewService.open(
-  ServerPlayer, NamespacedId)` takes the crosshair origin and runs the same session path as
-  `/cumulus preview`, so a JEI-opened preview is the §4 session with the same confirm exit.
+- **Ghost to world.** `PreviewOpenPayload` carries the blueprint id and, from the screen, the heading
+  the page's camera looks along (`null` from the JEI button and every older client); `PreviewService.
+  open(ServerPlayer, NamespacedId, @Nullable Heading)` takes the crosshair origin, hands the heading
+  where the player's own facing goes, and runs the same session path as `/cumulus preview`, so a
+  JEI- or screen-opened preview is the §4 session with the same confirm exit.
 - **Variant page (E6).** The catalog still carries one entry per blueprint id (each member is an
   ordinary document with its own cells and materials), and every entry's `variants` summary lets the
   client build one page per group: `JeiPreviewPlugin.pages()` keys a group by the first member the
@@ -2651,10 +2662,14 @@ D-101…D-105. SC1 has landed the migration, the stage's `bay` on both payloads,
 camera and projection, the four viewports, the axes, the screen's own clock, the hover and the
 drawn-hull fit (the JEI view takes the same hull change and keeps its own camera). SC2 has landed the
 staged playback and the delta treatments (`StagePlayback`, `StageBar`, `StageFraming`), the exploded
-view (`ExplodeModel`) and the one next-step formatter both surfaces read (`NextStepLine`). SC3 lands
-the links: the JEI button, the client
-command, the `openScreen` key, the open payload's heading and the in-screen variant switch. SC4 lands
-the demo documents. The milestone state lives in
+view (`ExplodeModel`) and the one next-step formatter both surfaces read (`NextStepLine`). SC3 has
+landed the links: the JEI face's `open in screen` button (`JeiPreview.openScreen`, on the selected
+member and with no packet), the client command (`/cumulus preview screen <id>` registered on
+`RegisterClientCommandsEvent`, completing from the catalogue and answering 1 when a page opened), the
+`openScreen` key (`O`, polled with the other preview controls and inert without a session), the open
+payload's `facing` (a trailing optional byte, so an older client's open reads as absent) and the
+in-screen variant switch (a client-side entry replacement that keeps the camera, the explode `t` and
+the whole/staged presentation). SC4 lands the demo documents. The milestone state lives in
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
@@ -2672,8 +2687,11 @@ payload, no S2C open and no second open path appear.
 
 **Public shape promises.** Member-level signatures are not listed here yet; they join §15 at the
 milestone that lands the code (SC1 for the scene and the screen's skeleton, SC2 for the player and
-the explode, SC3 for the action and the command), and a name that exists in neither §15 nor
-`tools/spec-uncovered.txt` is a gate failure until then. The types are:
+the explode, SC3 for the world action, the two entry points and the payload's heading), and a name
+that exists in neither §15 nor `tools/spec-uncovered.txt` is a gate failure until then. The client
+command itself is a package-private `PreviewClientCommand` in `preview.client`, so the command tree
+adds no public type; the two entry points it and the JEI button call — `PreviewScreen.open` and
+`JeiPreview.openScreen` — are in §15. The types are:
 
 | Package | Type | What it is |
 | --- | --- | --- |

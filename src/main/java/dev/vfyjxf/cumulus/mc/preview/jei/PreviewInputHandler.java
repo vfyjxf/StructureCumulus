@@ -10,13 +10,13 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 
 /**
  * The category's one input surface: drag rotates the isometric camera, the slider reveals a Y layer,
- * a click on the mode button cycles the view, and a click on the other button opens the session.
- * All coordinates are recipe-local.
+ * a click on the mode button cycles the view, a click on the lower button opens the session and a
+ * click on the bottom one opens the screen. All coordinates are recipe-local.
  */
 final class PreviewInputHandler implements IJeiInputHandler {
 
     private enum Mode {
-        none, rotate, slice, button, view, variantPrev, variantNext
+        none, rotate, slice, button, view, variantPrev, variantNext, screen
     }
 
     private static final float degreesPerPixel = 1.6F;
@@ -55,6 +55,11 @@ final class PreviewInputHandler implements IJeiInputHandler {
         }
         if (pressed == Mode.view && hit == Mode.view) {
             view.cycleMode();
+            return true;
+        }
+        if (pressed == Mode.screen && hit == Mode.screen) {
+            // the page's own data and no packet: the screen reads the catalog this page is drawn from
+            JeiPreview.openScreen(recipe.blueprintId());
             return true;
         }
         if (pressed == Mode.variantPrev && hit == Mode.variantPrev) {
@@ -141,6 +146,16 @@ final class PreviewInputHandler implements IJeiInputHandler {
                 return Mode.variantNext;
             }
             return left ? Mode.variantPrev : Mode.none;
+        }
+        if (BlueprintPreviewCategory.inside(
+            mouseX,
+            mouseY,
+            BlueprintPreviewCategory.screenX,
+            BlueprintPreviewCategory.screenY,
+            BlueprintPreviewCategory.screenWidth,
+            BlueprintPreviewCategory.screenHeight
+        )) {
+            return Mode.screen;
         }
         if (BlueprintPreviewCategory.inside(
             mouseX,

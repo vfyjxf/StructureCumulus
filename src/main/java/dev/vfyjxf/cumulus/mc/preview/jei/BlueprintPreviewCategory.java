@@ -32,7 +32,7 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             .create(Constants.modId, "multiblock_preview", BlueprintPreviewRecipe.class);
 
     static final int width = 176;
-    static final int height = 178;
+    static final int height = 194;
 
     static final int sceneX = 2;
     static final int sceneY = 2;
@@ -65,6 +65,12 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
     static final int variantWidth = 172;
     static final int variantHeight = 14;
     static final int variantArrowWidth = 18;
+
+    /** The screen's entry: the page's selected member, opened as the client screen (design 17 §9.1). */
+    static final int screenX = 2;
+    static final int screenY = 180;
+    static final int screenWidth = 172;
+    static final int screenHeight = 14;
 
     /** One panel of the three-view: three of these and the two gaps fill the scene's width. */
     static final int panelWidth = 50;
@@ -178,6 +184,7 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         drawButton(graphics, mouseX, mouseY);
         drawModeButton(graphics, page, mouseX, mouseY);
         drawVariantRow(graphics, recipe, mouseX, mouseY);
+        drawScreenButton(graphics, mouseX, mouseY);
         drawMaterials(graphics, recipe, mouseX, mouseY);
     }
 
@@ -208,6 +215,19 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
                 false
             );
         }
+    }
+
+    /** The "open in screen" button: no packet and no session, the page is the screen's own data. */
+    private void drawScreenButton(GuiGraphics graphics, double mouseX, double mouseY) {
+        drawFace(graphics, screenX, screenY, screenWidth, screenHeight, mouseX, mouseY);
+        graphics.drawString(
+            Minecraft.getInstance().font,
+            "open in screen",
+            screenX + 4,
+            screenY + 3,
+            0xFFF0F0F0,
+            false
+        );
     }
 
     /** The panels the current mode draws, in the order the hover asks them; the fit is the entry's bounds. */

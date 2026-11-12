@@ -9,6 +9,7 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
+import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
@@ -29,6 +30,11 @@ public final class PreviewClientEvents {
     @SubscribeEvent
     private static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         PreviewKeys.register(event);
+    }
+
+    @SubscribeEvent
+    private static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
+        event.getDispatcher().register(PreviewClientCommand.root());
     }
 
     @SubscribeEvent

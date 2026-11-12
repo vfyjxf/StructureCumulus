@@ -55,6 +55,6 @@ public final class PreviewPayloads {
         if (!(context.player() instanceof ServerPlayer player)) {
             return;
         }
-        context.enqueueWork(() -> PreviewService.open(player, payload.blueprintId()));
+        context.enqueueWork(() -> PreviewService.open(player, payload.blueprintId(), payload.facing()));
     }
 }

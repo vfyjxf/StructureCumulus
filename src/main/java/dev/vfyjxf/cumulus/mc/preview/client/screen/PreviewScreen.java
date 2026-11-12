@@ -1,6 +1,7 @@
 package dev.vfyjxf.cumulus.mc.preview.client.screen;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.space.Heading;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.mc.ClientConfig;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
@@ -10,7 +11,9 @@ import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout.Rect;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload.Entry;
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
+import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import dev.vfyjxf.cumulus.mc.preview.scene.AxisGizmo;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
@@ -25,6 +28,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.joml.Vector2f;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
@@ -67,8 +71,10 @@ public final class PreviewScreen extends Screen {
     private static final float degreesPerPixel = 1.6F;
     private static final float scrollStep = 1.1F;
     private static final int explodeTicks = 12;
+    /** The declaration order is the wire's tie-breaker, not the compass's (north, south, west, east). */
+    private static final Heading[] horizons = {Heading.north, Heading.south, Heading.west, Heading.east};
 
-    private final NamespacedId blueprintId;
+    private NamespacedId blueprintId;
     private final Runnable onCatalog = this::reconcile;
     private PreviewCatalogPayload.Entry entry;
     private PreviewScene scene;
@@ -115,15 +121,19 @@ public final class PreviewScreen extends Screen {
         this.layout = ScreenLayout.of(320, 240);
     }
 
-    /** Opens the page for {@code blueprintId}; an id the snapshot does not carry opens nothing. */
-    public static void open(NamespacedId blueprintId) {
+    /**
+     * Opens the page for {@code blueprintId}; an id the snapshot does not carry opens nothing and
+     * answers with the one client message (design 17 §3.4). True when a page opened.
+     */
+    public static boolean open(NamespacedId blueprintId) {
         Minecraft minecraft = Minecraft.getInstance();
         Entry entry = find(blueprintId);
         if (entry == null) {
             say(minecraft, "no preview page for " + blueprintId.text());
-            return;
+            return false;
         }
         minecraft.setScreen(new PreviewScreen(entry));
+        return true;
     }
 
     /** The last catalogue's entry for {@code blueprintId}, or null when it carries none. */
@@ -173,6 +183,10 @@ public final class PreviewScreen extends Screen {
         double cursorY = pointerY < 0.0D ? mouseY : pointerY;
         hovered = hoveredCell(cursorX, cursorY);
         graphics.drawString(font, blueprintId.text(), 4, 6, titleColor, false);
+        String variant = variantLine();
+        if (variant != null) {
+            graphics.drawString(font, variant, 8 + font.width(blueprintId.text()), 6, chromeColor, false);
+        }
         drawnCells = 0;
         drawnLabels = 0;
         drawnFutureBoxes = 0;
@@ -534,6 +548,11 @@ public final class PreviewScreen extends Screen {
     private List<ButtonSpec> buttonSpecs() {
         List<ButtonSpec> specs = new ArrayList<>();
         specs.add(new ButtonSpec("close", "close (Esc)", this::onClose));
+        specs.add(new ButtonSpec("ghost to world", "open the ordinary session on this page", this::ghostToWorld));
+        if (variantCount() > 1) {
+            specs.add(new ButtonSpec("\u2039 variant", "the group's previous member", () -> switchVariant(-1)));
+            specs.add(new ButtonSpec("variant \u203A", "the group's next member", () -> switchVariant(1)));
+        }
         specs.add(new ButtonSpec("iso", "reset: iso (Home)", this::resetView));
         specs.add(new ButtonSpec("frame", "frame all (F / double click)", this::frameAll));
         specs.add(new ButtonSpec("front", "front (1)", () -> snapMain(SceneCamera.Snap.front)));
@@ -944,30 +963,147 @@ public final class PreviewScreen extends Screen {
             return;
         }
         if (updated != entry) {
-            this.entry = updated;
-            this.scene = PreviewScene.of(updated);
-            int cursor = playback.cursor();
-            this.playback = StagePlayback.whole(updated.presentation().stages(), updated.cells());
-            if (cursor >= 0 && cursor < updated.presentation().stages().size()) {
-                this.playback = this.playback.enter(cursor);
-            }
-            this.placed = index(this.playback);
-            this.ghostAt = ghosts(updated.cells());
-            this.explode = explodeModel();
-            this.framedCursor = -1;
-            this.framing = null;
-            if (!this.explode.separable()) {
-                this.explodeT = 0.0F;
-                this.explodeTarget = 0.0F;
-                this.explodeTween = null;
-            }
+            applyEntry(updated);
         }
+    }
+
+    /**
+     * Replaces the page's entry in place: the scene and the explode model are rebuilt, while the
+     * camera, the explode's `t` and the whole/staged presentation stay where the viewer left them,
+     * the cursor clamped to the new table (design 17 §3.4, §9.5).
+     */
+    private void applyEntry(Entry updated) {
+        camera = currentCamera();
+        framing = null;
+        framedCursor = -1;
+        entry = updated;
+        blueprintId = updated.blueprintId();
+        scene = PreviewScene.of(updated);
+        int cursor = playback.cursor();
+        playback = StagePlayback.whole(updated.presentation().stages(), updated.cells());
+        if (cursor >= 0 && cursor < updated.presentation().stages().size()) {
+            playback = playback.enter(cursor);
+        }
+        placed = index(playback);
+        ghostAt = ghosts(updated.cells());
+        explode = explodeModel();
+        if (!explode.separable()) {
+            explodeT = 0.0F;
+            explodeTarget = 0.0F;
+            explodeTween = null;
+        }
+    }
+
+    /**
+     * The in-screen variant switch (design 17 §9.5): the group's previous or next member in
+     * declaration order, wrapping, client-side and payload-free. A member the catalogue left out is
+     * not switchable and answers with the one client message.
+     */
+    private void switchVariant(int step) {
+        VariantSummary group = entry.variants();
+        if (group == null || group.members().size() < 2) {
+            return;
+        }
+        int index = group.indexOf(blueprintId);
+        if (index < 0) {
+            return;
+        }
+        List<VariantSummary.Member> members = group.members();
+        VariantSummary.Member next = members.get(Math.floorMod(index + step, members.size()));
+        Entry updated = find(next.id());
+        if (updated == null) {
+            say(Minecraft.getInstance(), "no preview page for " + next.id().text());
+            return;
+        }
+        applyEntry(updated);
+    }
+
+    /** 15 §12.2's line for the page's member, or null for a standalone page (design 17 §9.5). */
+    public @Nullable String variantLine() {
+        VariantSummary group = entry.variants();
+        if (group == null || group.members().size() < 2) {
+            return null;
+        }
+        int index = group.indexOf(blueprintId);
+        if (index < 0) {
+            return null;
+        }
+        VariantSummary.Member member = group.members().get(index);
+        return "variant " + (index + 1) + "/" + group.members().size() + ": " + member.text();
+    }
+
+    /** The group's declared member count, one for a standalone page (design 17 §9.5). */
+    public int variantCount() {
+        VariantSummary group = entry.variants();
+        return group == null ? 1 : group.members().size();
+    }
+
+    /** The page's member index in its group, or -1 for a standalone page. */
+    public int variantIndex() {
+        VariantSummary group = entry.variants();
+        return group == null ? -1 : group.indexOf(blueprintId);
     }
 
     private static void say(Minecraft minecraft, String line) {
         if (minecraft.player != null) {
             minecraft.player.displayClientMessage(Component.literal(line), false);
         }
+    }
+
+    /**
+     * The screen's one world action (design 17 §9.4): the existing open payload plus the camera's
+     * heading, and the screen closes on the click because the ghosts are what the click promised.
+     */
+    private void ghostToWorld() {
+        PacketDistributor.sendToServer(new PreviewOpenPayload(blueprintId, heading()));
+        Minecraft.getInstance().setScreen(null);
+    }
+
+    /** The heading this page's camera looks along; the four horizons only (design 17 §3.2, §9.4). */
+    public Heading heading() {
+        return headingOf(currentCamera().yaw());
+    }
+
+    /**
+     * The cardinal reading of one turntable yaw: the four horizons each own 45° either side, and an
+     * exact 45° boundary takes the earlier value in {@code Heading}'s declaration order, so the same
+     * camera always sends the same heading (design 17 §9.4).
+     */
+    static Heading headingOf(float yaw) {
+        float wrapped = yaw % 360.0F;
+        if (wrapped < 0.0F) {
+            wrapped += 360.0F;
+        }
+        Heading best = Heading.north;
+        float bestDistance = Float.MAX_VALUE;
+        for (Heading candidate : horizons) {
+            float distance = Math.abs(signedDistance(wrapped, bearing(candidate)));
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private static float bearing(Heading heading) {
+        return switch (heading) {
+            case north -> 0.0F;
+            case west -> 90.0F;
+            case south -> 180.0F;
+            case east -> 270.0F;
+            case up, down -> 0.0F;
+        };
+    }
+
+    private static float signedDistance(float from, float to) {
+        float delta = (to - from) % 360.0F;
+        if (delta > 180.0F) {
+            delta -= 360.0F;
+        } else if (delta <= -180.0F) {
+            delta += 360.0F;
+        }
+        return delta;
     }
 
     /** The shared camera value, as the frame samples it; the four panels derive their own from it. */

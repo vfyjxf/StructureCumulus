@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.kernel.remedy.MarkerKind;
 import dev.vfyjxf.cumulus.kernel.remedy.OverlayModel;
 import dev.vfyjxf.cumulus.kernel.space.LatticeKey;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.MaterialStatus;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewControlPayload;
@@ -316,7 +317,21 @@ public final class PreviewClientState {
         if (clicked(PreviewKeys.Action.cinematic)) {
             CinematicController.toggle();
         }
+        if (clicked(PreviewKeys.Action.openScreen)) {
+            openScreen();
+        }
         trackReset();
+    }
+
+    /**
+     * The world's screen key: the session is the source of an id, never of data, and the session stays
+     * exactly as it is behind the screen (design 17 §9.3).
+     */
+    private static void openScreen() {
+        PreviewSyncPayload current = session;
+        if (current != null) {
+            PreviewScreen.open(current.blueprintId());
+        }
     }
 
     /** 3.7: a tap resets to the first candidate, a hold returns the identity pose. */
