@@ -42,7 +42,10 @@ ghost de-saturation, 7.3 named preference profiles, 7.4 server default profile, 
 mode, 8.3 command completion, 10.2 leave-the-last-block mode.
 
 Outside the ergonomics numbering: config-izing the preview payload caps (design 15 §3; v1 keeps
-the code constants, 512 ghost cells and 48 markers per payload).
+the code constants, 512 ghost cells and 48 markers per payload); a `DoorView`-subjected JSON
+expectation so a document can declare its own front (the front law of design 15 §9 today reads only
+Java-side builders; raised at SC4 when the demo tower could not declare its doorway — design 17
+§11's law 3 records the workaround).
 
 Two entries above have moved into the presentation pack and are tracked there instead: 4.3's
 hand-aware pulse and 5.6's rollback visibility are E5 and E2 of

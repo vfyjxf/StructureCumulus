@@ -891,7 +891,7 @@ and a group of one is not a group (D-98, `SC-DOC-0002`).
 | --- | --- | --- | --- |
 | `structurecumulus:demo_machine` | the machine | member 1 of its group (label `full`) | the 5×5×4-ish machine: four bays, four stages, a direction-sensitive part, a full material set |
 | `structurecumulus:demo_machine_compact` | the machine | member 2 (label `compact`) | the same group, a visibly different shape — a variant switch must change the picture, not only the item list |
-| `structurecumulus:demo_tower` | the tower | standalone | the three-bay tower: three stages, a shell, a doorway the front law can see |
+| `structurecumulus:demo_tower` | the tower | standalone | the three-bay tower: three stages, a shell, a doorway on the identity front |
 
 - **Where.** `src/main/resources/data/structurecumulus/cumulus/structure/demo_machine.json`,
   `.../demo_machine_compact.json` and `.../demo_tower.json` — the builtin datapack the adapter's
@@ -908,8 +908,11 @@ and a group of one is not a group (D-98, `SC-DOC-0002`).
   2. **One bay per part.** The machine's four parts and the tower's three are four and three bays, so
      a stage is a bay and §8's exploded view separates them. A tower authored as one bay with three
      layers would have nothing to explode (§8.1).
-  3. **A direction-sensitive part.** At least one block with a directional property, so the front law
-     (15 §9) and the identity projection are exercised by the content itself.
+  3. **A direction-sensitive part.** At least one block with a directional property, so the identity
+     projection's orientation mapping is exercised by the content itself. (The front law of 15 §9
+     reads only a `DoorView`-subjected check, which no shipped JSON expectation can declare — the
+     tower's doorway therefore sits on the identity front, and a door expectation is a document-module
+     feature of its own, not a drive-by of this pack.)
   4. **The whole screen is exercised.** At least three stages, at least two bays, a non-trivial
      material set, and a group whose two members differ in shape — every screen feature has a document
      to be seen on.
