@@ -58,6 +58,7 @@ final class PreviewBuilds implements PreviewConfirmHandler {
         );
         boolean formed = report.status() == ApplyReport.Status.committed
                 && !hasCode(report, BuildCodes.recheckNotFormed);
+        BuildFeedback.send(player, report, formed);
         StructureCumulus.logger.info(
             "preview build {} at {}: {}{}",
             request.blueprintId().text(),

@@ -207,10 +207,16 @@ builtin) and drive the production `PreviewService` through the dev command `/cum
 | --- | --- | --- |
 | `preview` | `preview.open`, `preview.turn`, `preview.flip`, `preview.origin`, `preview.reset`, `preview.invalidated`, `preview.confirm` | the session opens with its overlay and ghosts, a turn/flip/origin/reset control re-syncs the pose, a world change inside the footprint invalidates the session (`SC-BLD-0008`), and a confirm runs the build path and leaves the session |
 | `jei` | `jei.preview` | the category lists the merged blueprint ids, the scene draws its frames, and "ghost to world" opens the same in-world session |
-| `stage` | `preview.stage` | a two-bay datapack document opens with its two stages in declaration order, the ghosts carry their stage index, the cell step and the playback advance the reveal counts, the arrow keys switch the cursor and fire the banner, and the progress and materials bars read the payload's numbers |
+| `stage` | `preview.stage` | a two-bay datapack document opens with its two stages in declaration order, the frontier is lit at open, the ghosts carry their stage index, the cell step and the playback advance the reveal counts, the arrow keys switch the cursor and fire the banner, and the progress and materials bars read the payload's numbers |
+| `animation` | `preview.animation` | a confirm starts the placement animator on the one cell it changed with a cue and no celebration, the three writes that finish the probe celebrate the formed run once, and the undo starts a fade-out and repeats no celebration — assertions on the animator's own state, never pixels |
+
+The `animation` group drives the production `/cumulus build` and `/cumulus build undo` through a
+dev-only twin, `/cumulusbuild`, because both commands need a player and a harness command source is
+the console.
 
 Run them with `./gradlew runClientTests -PclTest=group:preview`,
-`./gradlew runClientTests -PclTest=group:jei` and `./gradlew runClientTests -PclTest=group:stage`
+`./gradlew runClientTests -PclTest=group:jei`, `./gradlew runClientTests -PclTest=group:stage` and
+`./gradlew runClientTests -PclTest=group:animation`
 (the selector takes `group:`, not a glob); the
 scenario-harness rules of §6 apply unchanged, and `verifyHarnessIsolation`/`verifyRunIsolation`
 cover the harness staging.

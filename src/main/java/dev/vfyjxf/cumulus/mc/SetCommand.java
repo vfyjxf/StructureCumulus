@@ -21,6 +21,7 @@ import dev.vfyjxf.cumulus.mc.build.BuildPolicy;
 import dev.vfyjxf.cumulus.mc.build.ItemSource;
 import dev.vfyjxf.cumulus.mc.build.SetBuildHost;
 import dev.vfyjxf.cumulus.mc.build.SetBuildRequest;
+import dev.vfyjxf.cumulus.mc.preview.BuildFeedback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
@@ -96,10 +97,39 @@ final class SetCommand {
                 Budget.unbounded()
             );
             printBuild(source, plan, planned.origin(), result, options);
+            feedback(plan, result, player, options);
             if (options.settle() && !options.dry()) {
                 return result.formed() ? 1 : 0;
             }
             return result.built() ? 1 : 0;
+        }
+    }
+
+    /** One payload per member in build order; the run's formation travels on its last committed member. */
+    private static void feedback(
+        StructureSet plan,
+        StructureSetResult result,
+        ServerPlayer player,
+        BuildOptions options
+    ) {
+        boolean formed = options.settle() && !options.dry() && result.formed();
+        List<NamespacedId> order = new ArrayList<>();
+        order.add(plan.root().id());
+        for (StructureSet.Satellite satellite : plan.satellites()) {
+            order.add(satellite.id());
+        }
+        NamespacedId last = null;
+        for (NamespacedId member : order) {
+            ApplyReport report = result.buildOf(member);
+            if (report != null && report.status() == ApplyReport.Status.committed && !report.changes().isEmpty()) {
+                last = member;
+            }
+        }
+        for (NamespacedId member : order) {
+            ApplyReport report = result.buildOf(member);
+            if (report != null) {
+                BuildFeedback.send(player, report, formed && member.equals(last));
+            }
         }
     }
 

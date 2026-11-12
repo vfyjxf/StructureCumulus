@@ -1138,9 +1138,10 @@ session, the network payloads, the client overlay renderer and the JEI category 
 single structure's `--settle` flag is no longer absent: P7 chains the settle path after a committed,
 re-check-clean run (§16.2).
 
-The presentation pack (design 16, D-93…D-97) is specified and not yet built: it lands at E1–E5 (§19).
-What stays absent even then is stated there — no presentation state on the server beyond the payload
-facts, no animation or particle work on the server thread, and no second client config file.
+The presentation pack (design 16, D-93…D-97) is specified and lands at E1–E5 (§19); E1's stage model,
+staged playback, HUD tiers and banner and E2's placement feedback are in. What stays absent is stated
+there — no presentation state on the server beyond the payload facts, no animation or particle work on
+the server thread, and no second client config file.
 
 ## 15. Signatures
 
@@ -1167,6 +1168,8 @@ public final class ClientConfig {
     public static final ModConfigSpec spec;
     public static boolean animationEnabled();
     public static double animationSpeed();
+    public static boolean animationSound();
+    public static boolean animationCelebrate();
     public static boolean hudProgress();
     public static boolean hudStageBanner();
 }
@@ -1313,6 +1316,11 @@ public final class StageModel {
     }
 }
 
+public final class BuildFeedback {
+    public static void send(ServerPlayer player, ApplyReport report, boolean formed);
+    public static void undo(ServerPlayer player, ApplyReport report);
+}
+
 package dev.vfyjxf.cumulus.mc.preview.net;
 
 public record PreviewSyncPayload(NamespacedId blueprintId, java.util.List<SitingCandidate> candidates, int current,
@@ -1362,6 +1370,20 @@ public record PreviewOpenPayload(NamespacedId blueprintId) implements CustomPack
     @Override public Type<? extends CustomPacketPayload> type();
 }
 
+public record BuildCommitPayload(java.util.List<CommitCell> cells, Status status, boolean formed, int truncated)
+        implements CustomPacketPayload {
+    public static final int maxAnimatedCells;
+    public static final Type<BuildCommitPayload> type;
+    @Override public Type<? extends CustomPacketPayload> type();
+
+    public enum Status {
+        committed, rolledBack, undone
+    }
+
+    public record CommitCell(LatticePoint cell, NamespacedId block, java.util.Map<String, String> properties) {
+    }
+}
+
 public final class PreviewPayloads {
     public static void register(RegisterPayloadHandlersEvent event);
 }
@@ -1393,6 +1415,17 @@ public final class PlaybackController {
     public static @Nullable Stage stage(int index);
 }
 
+public final class PlacementAnimator {
+    public static java.util.List<String> noteLines();
+    public static boolean animating();
+    public static int animatingCells();
+    public static BuildCommitPayload.@Nullable Status lastStatus();
+    public static int soundRequests();
+    public static int celebrations();
+    public static int startedRuns();
+    public static int finishedRuns();
+}
+
 public final class PreviewKeys {
     public enum Action {
         turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
@@ -1405,6 +1438,7 @@ public final class PreviewKeys {
 public final class PreviewClientBridge {
     public static void accept(PreviewSyncPayload payload);
     public static void acceptCatalog(PreviewCatalogPayload payload);
+    public static void acceptCommit(BuildCommitPayload payload);
 }
 
 public final class PreviewCatalogClient {
@@ -1496,7 +1530,8 @@ public record PluginPass<T extends ModPlugin>(String name, Consumer<T> action) {
 
 package dev.vfyjxf.cumulus.mc.build;
 
-public record ApplyReport(Status status, List<Step> steps, List<ItemStack> itemsConsumed, FindingBundle findings) {
+public record ApplyReport(Status status, List<Step> steps, List<ItemStack> itemsConsumed, List<Change> changes,
+                          FindingBundle findings) {
     public static ApplyReport refused(FindingBundle findings);
     public static ApplyReport formed();
     public enum Status {
@@ -1507,6 +1542,8 @@ public record ApplyReport(Status status, List<Step> steps, List<ItemStack> items
     }
     public enum Outcome {
         applied, skipped, failed, restored
+    }
+    public record Change(LatticePoint cell, BlockPlacement placement) {
     }
 }
 public record BlockPlacement(BlockState state, @Nullable CompoundTag blockEntityData) {
@@ -2028,8 +2065,10 @@ module edge. The contracts are design 16's; this section states the adapter-side
 its signatures join §15 per milestone (the batch 10 note there).
 
 **Landed.** E1: the stage model, the presentation block on both payloads, staged playback and stage
-switching, the layered ghosts, the three HUD tiers, the stage banner and the client config file.
-E2–E5 are `pending` in [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
+switching, the layered ghosts, the three HUD tiers, the stage banner and the client config file. E2:
+the commit-feedback payload and its four send sites, the pop-in, the rollback and undo fade, the
+rate-limited cues and the formed celebration. E3–E5 are `pending` in
+[`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
 The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
 §18's confirm path and §16's build, undo and codes.
 
@@ -2039,8 +2078,8 @@ The sections that already describe this ground keep their meaning — §17's ses
 | --- | --- | --- |
 | the stage model | one pure function over a compiled blueprint and its definition-frame expected cells, producing the stage table (names, expected and satisfied counts, the bay's description and hint); no world, no siting, no clock (D-93) | `mc.preview` |
 | the payload facts | the presentation block (the blueprint's description, the stage table, the frontier stage the marks imply, the plan's shortage lines) on the session payload and on the catalog entry; one stage index per ghost cell; ghosts ordered by stage then definition-frame cell order | `mc.preview.net` |
-| the commit feedback | one S2C payload per committed transaction and per undo, to the invoking player only, listing the cells the transaction changed in the order it changed them, with the status and the formed flag (D-95) | `mc.preview.net`, sent by the confirm path and the build commands |
-| the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: `hud.*` and `animation.enabled`/`animation.speed` at E1, the sound and celebration keys at E2 | `mc.ClientConfig`, registered by the mod entry |
+| the commit feedback | one S2C payload per committed transaction and per undo, to the invoking player only, listing the cells the transaction changed in the order it changed them, with the status and the formed flag (D-95); `ApplyReport.changes` is where the cells come from, and `BuildFeedback` is the one sender | `mc.preview.net`, sent by the confirm path and the build commands |
+| the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: `hud.*` with `animation.enabled`/`animation.speed` at E1, `animation.sound`/`animation.celebrate` at E2 | `mc.ClientConfig`, registered by the mod entry |
 
 The server adds no presentation state: no per-player playback record, no animation queue, no tick
 handler, no map beside the session. The payload is plain data, and its handler resolves client classes
@@ -2051,7 +2090,8 @@ presentation block it was sent (table and frontier), the view cursor and the rev
 derives nothing from the marks. The layered renderer multiplies the stage factor into the ghost alpha it
 already forces (§17's translucent pass) and leaves the Y slice and the distance cull in charge of
 visibility. The placement animator consumes the commit payload in its list order and draws an extra
-translucent copy of the model; it never reads the world to correct itself and nothing waits for it.
+translucent copy of the model; it never reads the world to correct itself and nothing waits for it. A
+capped payload's one note line is drawn by the animator's own HUD layer, which needs no session.
 The guide is the same session viewed differently: its automatic advance is the session's existing
 invalidation channel (§17's `LevelWatch` revision check), its next-step line is composed by one
 formatter with a fixed vocabulary, and its `Enter` is the §18 confirm unchanged — the world keeps one

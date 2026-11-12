@@ -43,6 +43,7 @@ class ApplyReportTest {
                 new ApplyReport.Step(1, ApplyReport.Outcome.skipped, null)
             ),
             List.of(consumed),
+            List.of(),
             FindingBundle.empty()
         );
         assertEquals(List.of(0, 1), report.steps().stream().map(ApplyReport.Step::index).toList());

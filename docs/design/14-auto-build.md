@@ -45,7 +45,7 @@ four are host concerns.
 | `ItemRequirement` | record | template stack + count |
 | `VanillaMaterializer` | final class | the built-in materializer |
 | `EditTransaction` | final class | pre-image, ordered apply, reverse restore |
-| `ApplyReport` | record | status + per-step outcomes + consumed items + findings |
+| `ApplyReport` | record | status + per-step outcomes + consumed items + the cells the transaction changed + findings |
 | `BuildPolicy` | record | permission, volume ceiling, removal gate, claim rule |
 | `BuildRequest` | record | blueprint, siting, source, policy, dry flag, preferences |
 | `BuildExecutor` | final class | the capture → solve → validate → apply flow |
@@ -131,7 +131,8 @@ public final class EditTransaction implements AutoCloseable {
 }
 
 public record ApplyReport(Status status, java.util.List<Step> steps,
-                          java.util.List<ItemStack> itemsConsumed, FindingBundle findings) {
+                          java.util.List<ItemStack> itemsConsumed, java.util.List<Change> changes,
+                          FindingBundle findings) {
     public ApplyReport { /* immutable; steps align with the plan's step order */ }
 
     public enum Status { committed, rolledBack, partiallyRolledBack, refused }
@@ -139,6 +140,9 @@ public record ApplyReport(Status status, java.util.List<Step> steps,
     public record Step(int index, Outcome outcome, @Nullable String reason) { }
 
     public enum Outcome { applied, skipped, failed, restored }
+
+    // One cell the transaction actually wrote and the state it left there, in write order.
+    public record Change(LatticePoint cell, BlockPlacement placement) { }
 }
 
 public record BuildPolicy(int permissionLevel, long maxTouchedVolume, boolean allowRemoval) {
@@ -238,8 +242,10 @@ that throws fails the step — the chain never falls back past it — and the bu
 
 `ApplyReport` is the executor's only answer. Its `steps` align with the plan's step order, so a
 caller can juxtapose "what the plan asked" with "what the world answered" without re-walking the
-plan. `itemsConsumed` is what the commit actually extracted; `findings` carries every refusal and
-warning code the run produced.
+plan. `itemsConsumed` is what the commit actually extracted; `changes` is what the transaction
+actually wrote, in write order (a `skipped` cell is not a change), so a caller can replay the run's
+own order without asking the transaction again; `findings` carries every refusal and warning code
+the run produced.
 
 A set build answers the set result of §13: `StructureSetResult.builds` carries one `ApplyReport` per
 member, so a caller juxtaposes the set lifecycle with what each member's plan asked and got.

@@ -76,8 +76,10 @@ public final class PlaybackController {
         counts = perStage;
         int stageCount = block.stages().size();
         int[] next = new int[stageCount];
-        for (int stage = 0; stage < Math.min(revealed.length, stageCount); stage++) {
-            next[stage] = Math.min(revealed[stage], counts[stage]);
+        if (!fresh) {
+            for (int stage = 0; stage < Math.min(revealed.length, stageCount); stage++) {
+                next[stage] = Math.min(revealed[stage], counts[stage]);
+            }
         }
         if (fresh) {
             selected = clamp(block.currentStage());
@@ -87,6 +89,9 @@ public final class PlaybackController {
             selected = clamp(selected);
         }
         revealed = next;
+        if (fresh || (tracked && block.currentStage() > previousFrontier)) {
+            revealAll(selected);
+        }
         for (int stage = 0; stage < selected; stage++) {
             revealed[stage] = counts[stage];
         }

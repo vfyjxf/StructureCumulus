@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-/** The two wire codecs of a preview session. Marker loci travel as world cells, never as source spans. */
+/** The wire codecs of the preview session and of the build feedback; a locus travels as world cells. */
 final class PreviewCodecs {
 
     static final StreamCodec<RegistryFriendlyByteBuf, PreviewSyncPayload> sync = StreamCodec
@@ -37,6 +37,9 @@ final class PreviewCodecs {
 
     static final StreamCodec<RegistryFriendlyByteBuf, PreviewOpenPayload> open = StreamCodec
             .of(PreviewCodecs::encodeOpen, PreviewCodecs::decodeOpen);
+
+    static final StreamCodec<RegistryFriendlyByteBuf, BuildCommitPayload> commit = StreamCodec
+            .of(PreviewCodecs::encodeCommit, PreviewCodecs::decodeCommit);
 
     private PreviewCodecs() {}
 
@@ -157,6 +160,42 @@ final class PreviewCodecs {
 
     private static PreviewOpenPayload decodeOpen(RegistryFriendlyByteBuf buffer) {
         return new PreviewOpenPayload(readId(buffer));
+    }
+
+    private static void encodeCommit(RegistryFriendlyByteBuf buffer, BuildCommitPayload payload) {
+        buffer.writeByte(payload.status().ordinal());
+        buffer.writeBoolean(payload.formed());
+        buffer.writeVarInt(payload.truncated());
+        buffer.writeVarInt(payload.cells().size());
+        for (BuildCommitPayload.CommitCell cell : payload.cells()) {
+            writePoint(buffer, cell.cell());
+            writeId(buffer, cell.block());
+            buffer.writeVarInt(cell.properties().size());
+            for (Map.Entry<String, String> property : cell.properties().entrySet()) {
+                buffer.writeUtf(property.getKey());
+                buffer.writeUtf(property.getValue());
+            }
+        }
+    }
+
+    private static BuildCommitPayload decodeCommit(RegistryFriendlyByteBuf buffer) {
+        BuildCommitPayload.Status[] statuses = BuildCommitPayload.Status.values();
+        BuildCommitPayload.Status status = statuses[buffer.readUnsignedByte()];
+        boolean formed = buffer.readBoolean();
+        int truncated = buffer.readVarInt();
+        int cellCount = buffer.readVarInt();
+        List<BuildCommitPayload.CommitCell> cells = new ArrayList<>(cellCount);
+        for (int index = 0; index < cellCount; index++) {
+            LatticePoint cell = readPoint(buffer);
+            NamespacedId block = readId(buffer);
+            int propertyCount = buffer.readVarInt();
+            Map<String, String> properties = new TreeMap<>();
+            for (int property = 0; property < propertyCount; property++) {
+                properties.put(buffer.readUtf(), buffer.readUtf());
+            }
+            cells.add(new BuildCommitPayload.CommitCell(cell, block, properties));
+        }
+        return new BuildCommitPayload(cells, status, formed, truncated);
     }
 
     private static void writeGhost(RegistryFriendlyByteBuf buffer, GhostCell ghost) {

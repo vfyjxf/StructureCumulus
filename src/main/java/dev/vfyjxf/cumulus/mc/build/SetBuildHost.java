@@ -184,7 +184,8 @@ public final class SetBuildHost {
             Written member = written.get(index);
             Map<LatticePoint, BlockPlacement> preImage = preImages.get(index);
             Cuboid bounds = Cells.bounds(preImage.keySet());
-            String failure = restore(preImage, bounds);
+            Restore restore = restore(preImage, bounds);
+            String failure = restore.failure();
             List<Finding> findings = new ArrayList<>();
             if (failure != null) {
                 restored = false;
@@ -202,7 +203,7 @@ public final class SetBuildHost {
             );
             setFindings.addAll(findings);
             rollbackFailures.addAll(findings);
-            builds.put(member.key(), tornDown(member.report(), findings));
+            builds.put(member.key(), tornDown(member.report(), restore.changes(), findings));
             rolledBack.add(member.key());
         }
         if (restored) {
@@ -210,10 +211,10 @@ public final class SetBuildHost {
         }
     }
 
-    /** Restores one member's pre-image as its own transaction and answers null or the failure reason. */
-    private @Nullable String restore(Map<LatticePoint, BlockPlacement> preImage, @Nullable Cuboid bounds) {
+    /** Restores one member's pre-image as its own transaction and answers the failure and the restores. */
+    private Restore restore(Map<LatticePoint, BlockPlacement> preImage, @Nullable Cuboid bounds) {
         if (bounds == null) {
-            return null;
+            return new Restore(null, List.of());
         }
         Map<LatticePoint, BlockPlacement> reversed = new LinkedHashMap<>();
         List<LatticePoint> cells = new ArrayList<>(preImage.keySet());
@@ -223,11 +224,13 @@ public final class SetBuildHost {
         }
         try (EditTransaction transaction = EditTransaction.open(capture.level(), CuboidSet.of(bounds))) {
             ApplyReport.Step step = transaction.apply(0, reversed);
-            return step.failed() ? step.reason() : null;
+            return new Restore(step.failed() ? step.reason() : null, transaction.writtenCells());
         }
     }
 
-    private static ApplyReport tornDown(ApplyReport report, List<Finding> findings) {
+    private record Restore(@Nullable String failure, List<ApplyReport.Change> changes) {}
+
+    private static ApplyReport tornDown(ApplyReport report, List<ApplyReport.Change> changes, List<Finding> findings) {
         List<ApplyReport.Step> steps = new ArrayList<>(report.steps().size());
         for (ApplyReport.Step step : report.steps()) {
             steps.add(
@@ -242,6 +245,7 @@ public final class SetBuildHost {
             findings.isEmpty() ? ApplyReport.Status.rolledBack : ApplyReport.Status.partiallyRolledBack,
             steps,
             report.itemsConsumed(),
+            changes,
             FindingBundle.of(all)
         );
     }

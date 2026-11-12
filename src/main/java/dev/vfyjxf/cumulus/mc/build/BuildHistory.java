@@ -78,7 +78,13 @@ public final class BuildHistory {
         try (EditTransaction transaction = EditTransaction.open(level, CuboidSet.of(bounds))) {
             ApplyReport.Step step = transaction.apply(0, reversed);
             if (!step.failed()) {
-                return new ApplyReport(ApplyReport.Status.committed, List.of(step), List.of(), FindingBundle.empty());
+                return new ApplyReport(
+                    ApplyReport.Status.committed,
+                    List.of(step),
+                    List.of(),
+                    transaction.writtenCells(),
+                    FindingBundle.empty()
+                );
             }
             List<ApplyReport.Step> restored = transaction.rollback(List.of(step));
             boolean incomplete = restored.stream().anyMatch(ApplyReport.Step::failed);
@@ -104,6 +110,7 @@ public final class BuildHistory {
                 incomplete ? ApplyReport.Status.partiallyRolledBack : ApplyReport.Status.rolledBack,
                 restored,
                 List.of(),
+                transaction.restoredCells(),
                 FindingBundle.of(findings)
             );
         }

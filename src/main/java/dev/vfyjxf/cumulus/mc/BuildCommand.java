@@ -19,6 +19,7 @@ import dev.vfyjxf.cumulus.mc.build.ItemHandlerSource;
 import dev.vfyjxf.cumulus.mc.build.ItemSource;
 import dev.vfyjxf.cumulus.mc.build.ItemSources;
 import dev.vfyjxf.cumulus.mc.build.PlayerInventorySource;
+import dev.vfyjxf.cumulus.mc.preview.BuildFeedback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
@@ -87,12 +88,14 @@ final class BuildCommand {
         ApplyReport report = executor
                 .run(new BuildRequest(blueprint.id(), siting, items, policy, options.dry(), null, player));
         print(source, report, id, origin, options);
+        boolean formed = report.status() == ApplyReport.Status.committed
+                && !hasCode(report, BuildCodes.recheckNotFormed);
         if (!options.settle() || options.dry()) {
+            BuildFeedback.send(player, report, formed);
             return report.status() == ApplyReport.Status.committed ? 1 : 0;
         }
-        boolean formed = report.status() == ApplyReport.Status.committed
-                && !hasCode(report, BuildCodes.recheckNotFormed)
-                && SettleCommand.settle(source, state, level, blueprint, origin) instanceof MatchResult.Formed;
+        formed = formed && SettleCommand.settle(source, state, level, blueprint, origin) instanceof MatchResult.Formed;
+        BuildFeedback.send(player, report, formed);
         return formed ? 1 : 0;
     }
 
@@ -109,6 +112,7 @@ final class BuildCommand {
             source.sendFailure(Component.literal("nothing to undo in this world"));
             return 0;
         }
+        BuildFeedback.undo(player, report);
         CommandSupport.printFindings(source, "build undo: " + report.status(), report.findings());
         return report.status() == ApplyReport.Status.committed ? 1 : 0;
     }

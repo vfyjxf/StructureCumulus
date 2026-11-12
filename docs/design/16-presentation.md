@@ -325,9 +325,13 @@ unload).
   frontier — so a stage finished by hand advances the view. A cursor the player moved away stays put:
   the HUD keeps showing the stage the player is looking at, and the segment bar's frontier marker
   keeps showing where the world is.
-- **Seeding.** On the first sync of a session, `selected` = `currentStage` and every stage before it
-  counts as fully revealed. On later syncs, `selected` and the reveal counts are kept (subject to
-  tracking and clamping); they are never reset by a re-sync, a recall or a pose change.
+- **Seeding.** On the first sync of a session, `selected` = `currentStage` and every stage up to and
+  including it counts as fully revealed: the frontier is lit at alpha 1.0 from the first frame,
+  because it is the stage the world is working on and an opening screen that drew it faint until a
+  key was pressed would hide the one stage the pack exists to show. A re-sync whose frontier moved
+  past a tracking cursor reveals the new frontier the same way. Otherwise, `selected` and the reveal
+  counts are kept across syncs (subject to tracking and clamping); they are never reset by a re-sync,
+  a recall or a pose change.
 - A sync for a *different* blueprint id is a different session and re-seeds.
 - An **empty table** (`stages` empty, `currentStage` -1) leaves no stage facts at all: no cursor, no
   stage line, no banner and no segments, and every ghost draws with the current-stage treatment
@@ -502,7 +506,8 @@ public record BuildCommitPayload(java.util.List<CommitCell> cells, Status status
   `--settle` chain, 14 §10); it gates the celebration (§9.5).
 - **Send sites.** One per write path, each to the invoking player only: the preview's confirm path,
   `/cumulus build` on a committed run, `/cumulus set build` (one payload per member, in commit order),
-  and `/cumulus build undo`.
+  and `/cumulus build undo`. A set build that forms marks the flag on its last committed member, so
+  one set run celebrates once instead of once per member.
 - **Cap.** `maxAnimatedCells` is 512 cells per payload. An overflow ships the first 512 in play
   order and sets `truncated` to the number left out; the client names the played and expected counts
   in one line on the animator's own overlay for `bannerHoldTicks` — the same no-silent-truncation law
@@ -538,22 +543,26 @@ public record BuildCommitPayload(java.util.List<CommitCell> cells, Status status
   where `fraction` is the run's progress — so a long run rises and a small one stays flat.
 - A rollback plays the block's break sound under the same rate limit and the same pitch rule; an
   undo sounds like a rollback because it is one.
-- `animation.sound = false` (§13) silences both; nothing else changes.
+- `animation.sound = false` (§13) silences both; nothing else changes. A cue belongs to an
+  animation's beats, so `animation.enabled = false` leaves no beat and no cue either.
 
 ### 9.4 Rollback and undo fade
 
 - A `rolledBack` or `undone` payload fades its cells out in list order (restore order, so the visual
   is the reverse of the pop-in) over `fadeOutTicks`, staggered by the same span rule as the pop-in.
   The colour is the removal treatment, not the placement one — the point is causal visibility for
-  "the world changed back" (roadmap §5, B.3).
+  "the world changed back" (roadmap §5, B.3). A removal draws the run's extra model with a red-shifted
+  tint and no scale, because 15 §5 defines the marks' colouring and not a second palette.
 - The fade draws over the restored state, which is why the payload carries the post-run state of each
   cell (§9.1): the animator has nothing to look up and nothing to guess.
 
 ### 9.5 The formed celebration
 
-- When `status == committed && formed`, the client plays one particle burst at the structure's
-  bounds centre (a ring of vanilla particles over a few ticks) and one vanilla level-up cue, once per
-  run — the celebration marks the transition, it does not repeat.
+- When `status == committed && formed`, the client plays one particle burst at the run's centre (a
+  ring of vanilla particles over a few ticks) and one vanilla level-up cue, once per run — the
+  celebration marks the transition, it does not repeat. The centre is the bounding centre of the
+  payload's cells: the wire carries cells, not the blueprint's bounds, and the animator invents no
+  geometry.
 - `animation.celebrate = false` (§13) turns it off. A run that is committed but not formed gets no
   celebration: "the world now matches the plan" and "the structure is formed" are different facts
   (14 §10), and the pack must not conflate them.
@@ -705,7 +714,7 @@ No second client config file is ever registered.
 
 | Key | Type | Default | Range | Effect |
 | --- | --- | --- | --- | --- |
-| `animation.enabled` | bool | `true` | — | master switch for the reveal fade, the pop-in, the fade-out and the celebration; `false` shows every state change and every reveal at once |
+| `animation.enabled` | bool | `true` | — | master switch for the reveal fade, the pop-in, the fade-out, the cue and the celebration; `false` shows every state change and every reveal at once |
 | `animation.speed` | double | `1.0` | 0.25–4.0 | divides every animation cadence (§6.4, §9.2); never a cap and never a count |
 | `animation.sound` | bool | `true` | — | place and break cues (§9.3) |
 | `animation.celebrate` | bool | `true` | — | the formed celebration (§9.5) |

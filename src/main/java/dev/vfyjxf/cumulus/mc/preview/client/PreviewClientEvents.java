@@ -29,17 +29,20 @@ public final class PreviewClientEvents {
     @SubscribeEvent
     private static void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
         PreviewHud.register(event);
+        PlacementHud.register(event);
     }
 
     @SubscribeEvent
     private static void onClientTick(ClientTickEvent.Post event) {
         PreviewClientState.tick();
+        PlacementAnimator.tick();
     }
 
     @SubscribeEvent
     private static void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             GhostRenderer.render(event);
+            PlacementRenderer.render(event);
         } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
             PreviewOverlayRenderer.render(event);
             PreviewClientState.captureMatrices(
@@ -62,5 +65,6 @@ public final class PreviewClientEvents {
     private static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         PreviewClientState.clear();
         PreviewCatalogClient.clear();
+        PlacementAnimator.clear();
     }
 }

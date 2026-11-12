@@ -28,6 +28,8 @@ public final class EditTransaction implements AutoCloseable {
     private final ServerLevel level;
     private final Map<LatticePoint, BlockPlacement> preImage;
     private final Map<Integer, Map<LatticePoint, BlockPlacement>> applied = new TreeMap<>();
+    private final List<ApplyReport.Change> writtenChanges = new ArrayList<>();
+    private final List<ApplyReport.Change> restoredChanges = new ArrayList<>();
     private boolean closed;
 
     private EditTransaction(ServerLevel level, Map<LatticePoint, BlockPlacement> preImage) {
@@ -61,6 +63,7 @@ public final class EditTransaction implements AutoCloseable {
                     continue;
                 }
                 write(write.getKey(), write.getValue());
+                writtenChanges.add(new ApplyReport.Change(write.getKey(), write.getValue()));
                 written++;
             }
         } catch (RuntimeException failure) {
@@ -102,6 +105,16 @@ public final class EditTransaction implements AutoCloseable {
         return preImage;
     }
 
+    /** The cells the apply steps wrote, in write order, with the state left there. */
+    List<ApplyReport.Change> writtenCells() {
+        return List.copyOf(writtenChanges);
+    }
+
+    /** The cells a rollback restored, in restore order. */
+    List<ApplyReport.Change> restoredCells() {
+        return List.copyOf(restoredChanges);
+    }
+
     @Override
     public void close() {
         closed = true;
@@ -116,6 +129,7 @@ public final class EditTransaction implements AutoCloseable {
                 }
                 if (!atTarget(cell, before)) {
                     write(cell, before);
+                    restoredChanges.add(new ApplyReport.Change(cell, before));
                 }
             }
             return null;

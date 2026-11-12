@@ -8,8 +8,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 /**
- * Registers the preview payloads once per side. Both handlers hop to their own thread first: the
- * network thread never touches a session or the client render state.
+ * Registers the preview and the build-feedback payloads once per side. Every handler hops to its own
+ * thread first: the network thread never touches a session or the client render state.
  */
 public final class PreviewPayloads {
 
@@ -27,6 +27,7 @@ public final class PreviewPayloads {
         PayloadRegistrar registrar = event.registrar(protocolVersion);
         registrar.playToClient(PreviewSyncPayload.type, PreviewCodecs.sync, PreviewPayloads::acceptSync);
         registrar.playToClient(PreviewCatalogPayload.type, PreviewCodecs.catalog, PreviewPayloads::acceptCatalog);
+        registrar.playToClient(BuildCommitPayload.type, PreviewCodecs.commit, PreviewPayloads::acceptCommit);
         registrar.playToServer(PreviewControlPayload.type, PreviewCodecs.control, PreviewPayloads::acceptControl);
         registrar.playToServer(PreviewOpenPayload.type, PreviewCodecs.open, PreviewPayloads::acceptOpen);
     }
@@ -37,6 +38,10 @@ public final class PreviewPayloads {
 
     private static void acceptCatalog(PreviewCatalogPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> PreviewClientBridge.acceptCatalog(payload));
+    }
+
+    private static void acceptCommit(BuildCommitPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> PreviewClientBridge.acceptCommit(payload));
     }
 
     private static void acceptControl(PreviewControlPayload payload, IPayloadContext context) {

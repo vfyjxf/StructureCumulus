@@ -214,7 +214,13 @@ public final class BuildExecutor {
                 return ApplyReport.refused(FindingBundle.of(findings));
             }
             if (request.dry()) {
-                return new ApplyReport(ApplyReport.Status.committed, List.of(), List.of(), FindingBundle.empty());
+                return new ApplyReport(
+                    ApplyReport.Status.committed,
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    FindingBundle.empty()
+                );
             }
             return commit(plan, steps, touched);
         }
@@ -224,6 +230,7 @@ public final class BuildExecutor {
             List<ItemStack> consumed = new ArrayList<>();
             List<Finding> findings = new ArrayList<>();
             Map<LatticePoint, BlockPlacement> preImage;
+            List<ApplyReport.Change> changes;
             try (EditTransaction transaction = EditTransaction.open(level, touched)) {
                 boolean failed = false;
                 for (int index = 0; index < steps.size(); index++) {
@@ -247,11 +254,13 @@ public final class BuildExecutor {
                     return rolledBack(transaction, outcomes, consumed, findings, touched);
                 }
                 preImage = transaction.preImage();
+                changes = transaction.writtenCells();
             }
             ApplyReport committed = new ApplyReport(
                 ApplyReport.Status.committed,
                 outcomes,
                 consumed,
+                changes,
                 FindingBundle.of(findings)
             );
             journal.record(preImage);
@@ -289,6 +298,7 @@ public final class BuildExecutor {
                 incomplete ? ApplyReport.Status.partiallyRolledBack : ApplyReport.Status.rolledBack,
                 steps,
                 consumed,
+                transaction.restoredCells(),
                 FindingBundle.of(findings)
             );
         }
@@ -458,7 +468,13 @@ public final class BuildExecutor {
     private ApplyReport append(ApplyReport report, Finding finding) {
         List<Finding> findings = new ArrayList<>(report.findings().findings());
         findings.add(finding);
-        return new ApplyReport(report.status(), report.steps(), report.itemsConsumed(), FindingBundle.of(findings));
+        return new ApplyReport(
+            report.status(),
+            report.steps(),
+            report.itemsConsumed(),
+            report.changes(),
+            FindingBundle.of(findings)
+        );
     }
 
     /** One step per plan index: a restored step replaces the outcome the write reported. */

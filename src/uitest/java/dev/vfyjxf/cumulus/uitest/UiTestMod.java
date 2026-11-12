@@ -19,6 +19,7 @@ public final class UiTestMod {
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, event -> VisualClientState.tick());
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, VisualFixtureCommand::register);
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, PreviewDevCommand::register);
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, BuildDevCommand::register);
         VisualHighlights.register();
         VisualInspectHandler.register();
     }

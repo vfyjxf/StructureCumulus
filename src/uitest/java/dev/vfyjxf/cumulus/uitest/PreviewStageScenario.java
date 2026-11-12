@@ -84,26 +84,36 @@ public final class PreviewStageScenario {
                     "the stage line names the first part",
                     () -> PreviewProbe.hudHas("stage 1/2: structurecumulus:base")
                 ).check(
-                    "nothing is revealed, so the first stage draws faint",
-                    () -> PreviewStageProbe.revealedCells(0) == 0 && PreviewStageProbe.alpha(0) < 0.1F
+                    "the frontier stage is lit at open, not waiting for a key",
+                    () -> PreviewStageProbe.revealedCells(0) == PreviewStageProbe.stageCells(0)
+                            && PreviewStageProbe.alpha(0) == 1.0F,
+                    () -> PreviewStageProbe.revealedCells(0) + " " + PreviewStageProbe.alpha(0)
+                ).check(
+                    "the stage after the frontier stays faint",
+                    () -> PreviewStageProbe.alpha(1) < 0.1F,
+                    () -> Float.toString(PreviewStageProbe.alpha(1))
                 ).screenshot("01-stage-open").frames(3).checkCaptured("01-stage-open")
                 .pressBind(options -> PreviewKeys.binding(PreviewKeys.Action.stepCell))
-                .waitUntil("the step revealed one cell of the stage", () -> PreviewStageProbe.revealedCells(0) == 1)
+                .waitUntil(
+                    "the step opens the next stage with its first cell",
+                    () -> PreviewStageProbe.selectedStage() == 1 && PreviewStageProbe.revealedCells(1) == 1
+                )
                 .check(
                     "the revealed cell draws as the current stage",
-                    () -> PreviewStageProbe.alpha(0) == 1.0F,
-                    () -> Float.toString(PreviewStageProbe.alpha(0))
+                    () -> PreviewStageProbe.alpha(1) == 1.0F,
+                    () -> Float.toString(PreviewStageProbe.alpha(1))
                 ).pressBind(options -> PreviewKeys.binding(PreviewKeys.Action.playPause))
                 .waitUntil("the playback is running", PreviewStageProbe::playing)
-                .waitUntil("the playback revealed a further cell", () -> PreviewStageProbe.revealedCells(0) > 1)
+                .waitUntil("the playback revealed a further cell", () -> PreviewStageProbe.revealedCells(1) > 1)
                 .action("record the pose under playback", context -> turn[0] = turnOrdinal())
                 .pressBind(options -> PreviewKeys.binding(PreviewKeys.Action.turnCw))
                 .waitUntil("a turn still re-syncs during the playback", () -> turnOrdinal() != turn[0])
                 .check("the playback keeps running across the re-sync", PreviewStageProbe::playing)
-                .waitUntil("the playback advanced to the second stage", () -> PreviewStageProbe.selectedStage() == 1)
+                .waitUntil(
+                    "the playback played the last stage through",
+                    () -> PreviewStageProbe.revealedCells(1) == PreviewStageProbe.stageCells(1)
+                ).waitUntil("the playback stopped at the table's end", () -> !PreviewStageProbe.playing())
                 .check("the played-through stage draws as done", () -> PreviewStageProbe.alpha(0) == 0.25F)
-                .pressBind(options -> PreviewKeys.binding(PreviewKeys.Action.playPause))
-                .waitUntil("the playback stopped", () -> !PreviewStageProbe.playing())
                 .pressBind(options -> PreviewKeys.binding(PreviewKeys.Action.prevStage))
                 .waitUntil("the cursor returned to the first stage", () -> PreviewStageProbe.selectedStage() == 0)
                 .check(

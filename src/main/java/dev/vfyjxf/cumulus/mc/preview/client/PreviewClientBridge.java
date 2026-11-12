@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc.preview.client;
 
+import dev.vfyjxf.cumulus.mc.preview.net.BuildCommitPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
 
@@ -17,5 +18,9 @@ public final class PreviewClientBridge {
 
     public static void acceptCatalog(PreviewCatalogPayload payload) {
         PreviewCatalogClient.accept(payload);
+    }
+
+    public static void acceptCommit(BuildCommitPayload payload) {
+        PlacementAnimator.accept(payload);
     }
 }

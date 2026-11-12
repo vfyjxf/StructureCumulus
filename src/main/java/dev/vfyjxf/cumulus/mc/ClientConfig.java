@@ -15,6 +15,13 @@ public final class ClientConfig {
             .comment("Divides every animation cadence; it changes no cap, no count and no order.")
             .defineInRange("animation.speed", 1.0D, 0.25D, 4.0D);
 
+    private static final ModConfigSpec.BooleanValue animationSound = builder
+            .comment("The rate-limited place and break cues of a placement animation.").define("animation.sound", true);
+
+    private static final ModConfigSpec.BooleanValue animationCelebrate = builder
+            .comment("The formed celebration: one particle ring and one level-up cue per run.")
+            .define("animation.celebrate", true);
+
     private static final ModConfigSpec.BooleanValue hudProgress = builder
             .comment("The total bar, the segmented bar and the materials bar; the stage line stays.")
             .define("hud.progress", true);
@@ -37,6 +44,22 @@ public final class ClientConfig {
             return animationSpeed.get();
         } catch (IllegalStateException notLoaded) {
             return 1.0D;
+        }
+    }
+
+    public static boolean animationSound() {
+        try {
+            return animationSound.get();
+        } catch (IllegalStateException notLoaded) {
+            return true;
+        }
+    }
+
+    public static boolean animationCelebrate() {
+        try {
+            return animationCelebrate.get();
+        } catch (IllegalStateException notLoaded) {
+            return true;
         }
     }
 

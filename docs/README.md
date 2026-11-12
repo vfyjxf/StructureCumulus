@@ -36,7 +36,7 @@ table defines who may emit each finding code.
 17. [design/16-presentation.md](design/16-presentation.md) — the presentation pack: stages, playback,
     the progress HUD, placement feedback, part text, JEI view modes and the guided build (specified
     at E0; E1's stage model, staged playback, layered ghosts, HUD tiers, stage banner and client
-    config are implemented, E2–E5 pending).
+    config and E2's placement feedback are implemented, E3–E5 pending).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -78,9 +78,10 @@ Then the module files, in dependency order:
   were built, and their milestones carry the implementation status (P2–P7 landed, below).
   The presentation pack is the next such extension: [16 presentation](design/16-presentation.md)
   (D-93…D-97) tracked by [plan/presentation-plan.md](plan/presentation-plan.md), specified at E0 and
-  landing one milestone at a time — E1 is on the tree (the stage model, staged playback and stage
-  switching, the layered ghosts, the three HUD tiers, the stage banner, the client config), and
-  E2–E5 remain specified only.
+  landing one milestone at a time — E1 (the stage model, staged playback and stage switching, the
+  layered ghosts, the three HUD tiers, the stage banner, the client config) and E2 (the commit
+  feedback payload, the pop-in, the rollback and undo fade, the cues, the formed celebration) are on
+  the tree, and E3–E5 remain specified only.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
