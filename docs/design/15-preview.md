@@ -136,13 +136,15 @@ unchanged. The Y-slice keys keep their meaning there; the stage keys are new.
 | `P` | recall a retracted session (4.6) |
 | PageUp / PageDown | Y-slice up / down (4.2) |
 | `N` | next variant of the group; a switch is a re-open at the current origin (§12.2) |
+| `K` | save this session's build context as a preset (§13) |
 | Enter | confirm |
 | Esc | cancel |
 
 The presentation pack adds five keys beside these — `↑`/`↓` the stage, `V` play/pause, `B` one cell
 step, `G` the guided mode of [16](16-presentation.md) §12 and `N` the next variant (§12.2). No key
 above changes meaning, and no stage key reaches the server ([16](16-presentation.md) §6.3); `N` does
-reach it, because a switch is a server-side re-open.
+reach it, because a switch is a server-side re-open. E7 adds `K` beside them, and it reaches the
+server for the same reason: the preset the session saves is server state (§13).
 
 Every key is a NeoForge `KeyMapping` in the settings screen; the defaults avoid vanilla's
 high-frequency keys, and full keyboard reach is required (8.1).
@@ -488,3 +490,93 @@ session's own blueprint id to the build executor. The executor, its policy gate,
 its report are unchanged: a variant changes which declaration is built, never how (§4, design 14 §10).
 A confirm that forms the selected member writes that member's id into the orientation memory, so the
 next session of that id starts where the last one ended (§9).
+
+
+## 13. Build presets (E7)
+
+A **build preset** is one saved build context: the blueprint id, the pose, the item-source form and the
+removal policy a preview session held. It is the "save this preview and build it later" half of the
+autobuild story, and it is explicit user data, not memory.
+
+```java
+package dev.vfyjxf.cumulus.mc.pref;
+
+public record BuildPreset(
+    String name,
+    NamespacedId blueprintId,
+    Siting siting,
+    BuildPreset.Source source,
+    RemovalPolicy removalPolicy
+) {
+    public static final int formatVersion = 1;
+    public static final int capacity = 32;
+    public static final int maxNameLength = 32;
+
+    public record Source(Kind kind, @Nullable LatticePoint container, @Nullable NamespacedId provider) {
+        public enum Kind { creative, player, container, registered }
+    }
+}
+```
+
+The pose is stored, not re-derived: `siting` carries the origin and the placement (orientation and
+offset), so a preset is the whole `/cumulus build <id> <origin> …` request, and `apply` and
+`preview <name>` read the same pose. The source is stored as the build command's own four forms, not
+as a resolved `ItemSource`: a `container <pos>` or a registered kind id is resolved against the
+applying player's level at apply time, so a moved container or an uninstalled provider refuses instead
+of building from somewhere else. A variant member is its own document id (§12.4, D-98), so
+`blueprintId` covers the variant choice.
+
+### 13.1 Storage
+
+`PreferencesSavedData` (adapter §18) keeps the presets in the same per-level, per-player row as the
+preferences: `"Presets"` is a list of preset tags, sorted by name, each carrying its own `"Version"`.
+A tag of an unknown preset-shape version, or a malformed one, is skipped and the row's other presets
+survive. The file's `Version` covers the row layout; the preset's own version covers the preset shape.
+
+**Explicit data, not memory.** The remembered siting choices and the part pins are an implicit bounded
+LRU (`rememberedCapacity`, default 64): a new choice evicts the oldest. A preset is the user's own
+artifact and is never evicted: the bound is `capacity = 32` per player, the next new name is refused on
+a full store with the delete verb named, and a known name is replaced in place. `/cumulus prefs forget`
+clears the memory and the pins only; it never deletes a preset.
+
+### 13.2 Saving
+
+Two entry points, one shape:
+
+- `/cumulus build preset save <name> [with creative|player|container <pos>|<kind-id>]` copies the
+  player's live session — its blueprint id, its current pose, its removal policy — and the session's
+  own source form unless `with` names one. No active session is refused with the hint to open one; the
+  `with` form resolves through the build command's own source path, so its refusals match a build's.
+- **`K` in a session** (`PreviewControlPayload.Control.savePreset`). The key carries no text input, so
+  the name is the first free default, `preset-1`, `preset-2`, …; a player who wants a chosen name uses
+  the command. The session HUD carries the hint line and answers with the saved name or the capacity
+  refusal; the session itself is unchanged, so a refusal costs no plan. A chat-input naming flow is
+  backlog.
+
+### 13.3 Applying and previewing
+
+- `/cumulus build preset apply <name>` (`run` is the same verb) resolves the stored form, compiles the
+  stored blueprint and runs `BuildExecutor` on the stored pose. **Applying a preset is exactly the full
+  command typed by hand** (D-99): the policy is the server's `BuildConfig.policy()` narrowed or widened
+  by the preset's recorded `RemovalPolicy` (the same mapping the confirm path uses), the executor's dry
+  validation runs, and a changed world, a missing item, a foreign claim or a removal the policy forbids
+  refuses the run and writes nothing. Nothing is ever blind-written from a preset. The one difference
+  from typing the line is the pose: a typed command lets an anchored blueprint resolve its siting from
+  the formed anchor at the origin, while a preset carries the pose the session resolved at save time and
+  hands it over unchanged — the store's pose is the request the user saved, and the executor's
+  validation, not a second anchor read, is what decides whether it still applies.
+- `/cumulus build preset preview <name>` opens the ordinary session pinned to the stored pose and the
+  stored source form, so the preview shows what `apply` would build. The session is a single-pose
+  cycle: the cycling controls answer with a note, `confirm` is the ordinary build, and a variant switch
+  is still the ordinary re-open at the origin — a switch is a deliberate departure from the preset's
+  document, and the new member brings its own memory and pose (§12.2).
+- `/cumulus build preset list` prints the player's presets, sorted by name, with the pose and source
+  each apply would use, and the `n/32` count; `/cumulus build preset delete <name>` removes one. Exit
+  codes follow the adapter convention: `save`, `preview`, `list` and `delete` answer 1 when they did
+  their work, and `apply` answers 1 only on a committed run.
+- Name completion suggests the player's stored names; the `with` kind-id completion suggests the
+  registered item sources.
+
+The command shape is `build preset` rather than a new root verb because an apply *is* a build: one
+executor, one report, one policy gate, and the same chat summary line (`build <id> at <origin>: …`).
+

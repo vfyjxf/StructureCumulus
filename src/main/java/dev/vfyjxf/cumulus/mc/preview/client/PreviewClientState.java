@@ -167,7 +167,7 @@ public final class PreviewClientState {
         }
         lines.add(
             "keys: [ ] turn · ; flip · , . origin · R reset (hold = identity) · P recall · PgUp/PgDn slice · T all/problems"
-                    + " · Up/Down stage · V play · B step · G guide · N variant · Enter confirm · Esc cancel"
+                    + " · Up/Down stage · V play · B step · G guide · N variant · K save preset · Enter confirm · Esc cancel"
         );
         return List.copyOf(lines);
     }
@@ -297,6 +297,9 @@ public final class PreviewClientState {
         }
         if (clicked(PreviewKeys.Action.nextVariant)) {
             send(PreviewControlPayload.Control.nextVariant, null);
+        }
+        if (clicked(PreviewKeys.Action.savePreset)) {
+            send(PreviewControlPayload.Control.savePreset, null);
         }
         trackReset();
     }

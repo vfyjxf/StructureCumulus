@@ -279,6 +279,10 @@ Two report-text laws (expansion 6.3, 9.2):
   shared claim allows it and the report names the incumbents.
 - Items: a non-empty simulated shortage table refuses the run (`SC-BLD-0003`) with the per-item
   counts.
+- Presets: a build preset records the player's `RemovalPolicy` at save time and re-applies that
+  narrowing or widening on `apply` ([15](15-preview.md) §13.3, D-99). It is the same gate, never a
+  second one: the preset cannot lift the permission, volume or claim rules, and a preset saved before a
+  config change still meets the current config.
 
 ## 10. The executor flow
 
@@ -329,9 +333,9 @@ payload lists the cells the undo restored, in restore order ([16](16-presentatio
 
 ## 12. Commands
 
-All three verbs inherit the `/cumulus` root permission gate and the `CommandSupport.guarded`
-boundary (adapter §11); exit codes follow the existing convention — a mutating verb returns 1 only
-when its mutation succeeded.
+All the verbs inherit the `/cumulus` root permission gate and the `CommandSupport.guarded` boundary
+(adapter §11); exit codes follow the existing convention — a mutating verb returns 1 only when its
+mutation succeeded, and a read-only one (the preset `list`) answers 1 when it printed.
 
 - `/cumulus build <id> <origin> [with creative|player|container <pos>|<kind-id>] [--dry]
   [--allow-removal] [--settle]` —
@@ -345,6 +349,15 @@ when its mutation succeeded.
   no `--dry` it returns 1 only when the settle formed the structure.
   Chat prints a summary only; the detail lives in the preview HUD, not in chat spam.
 - `/cumulus build undo` — §11; same permission gate; returns 1 on a committed undo.
+- `/cumulus build preset <verb> …` — the saved build contexts of [15](15-preview.md) §13: `save <name>
+  [with creative|player|container <pos>|<kind-id>]` copies the live preview session, `apply <name>` /
+  `run <name>` runs the stored request, `preview <name>` re-opens the session at the stored pose, and
+  `list` / `delete <name>` manage the store. An `apply` is this command with every argument typed out —
+  the same `BuildExecutor` flow, the same policy gate, the same report and the same exit code (1 only on
+  `committed`) — so a world that changed refuses instead of being written from a stale request (D-99).
+  The preset's recorded `RemovalPolicy` narrows or widens the removal gate exactly as the confirm path
+  does; it never lifts the permission, volume or claim gates. The verb lives under `build` because an
+  apply is a build, not a second executor.
 - `/cumulus set build <id> <origin> [with creative|player|container <pos>|<kind-id>] [--dry]
   [--allow-removal] [--settle]` — §13 (P6); the single build's `with <kind-id>` form is shared. Its
   exit code is `built()` without `--settle` and `formed()` with it.

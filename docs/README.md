@@ -82,8 +82,8 @@ Then the module files, in dependency order:
   landed one milestone at a time — E1 (the stage model, staged playback and stage switching, the
   layered ghosts, the three HUD tiers, the stage banner, the client config), E2 (the commit feedback
   payload, the pop-in, the rollback and undo fade, the cues, the formed celebration), E3 (the carried
-  part text and its display points), E4 (the JEI view modes), E5 (the guided build) and E6 (the
-  variant groups) are on the tree.
+  part text and its display points), E4 (the JEI view modes), E5 (the guided build), E6 (the
+  variant groups) and E7 (the build presets) are on the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`

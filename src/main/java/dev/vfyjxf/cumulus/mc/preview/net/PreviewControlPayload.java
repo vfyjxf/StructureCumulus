@@ -19,7 +19,7 @@ public record PreviewControlPayload(Control control, @Nullable LatticePoint targ
     );
 
     public enum Control {
-        turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity, cyclePart, recall, confirm, cancel, nextVariant
+        turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity, cyclePart, recall, confirm, cancel, nextVariant, savePreset
     }
 
     public PreviewControlPayload {

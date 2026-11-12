@@ -2209,6 +2209,45 @@ adds no finding family of its own: an unusable member is `SC-DOC-0016`/`SC-DOC-0
 presentation surfaces show the carried labels verbatim (D-94). The parameterized form stays backlog
 (design 15 §11).
 
+### D-99 — Applying a build preset is the build command typed out, never a blind write
+
+A build preset ([design/15](15-preview.md) §13) is a stored build request: the blueprint id, the full
+`Siting` (origin, orientation, offset), the item-source form and the removal policy a preview session
+held. `apply`/`run` resolves that request and runs the ordinary `BuildExecutor` flow — fresh capture,
+check, solve, host-side validation, commit. A world that changed, an item shortage, a claim conflict or
+a removal the gate forbids refuses the run and writes nothing. The preset stores no pre-image, no plan
+and no resolved `ItemSource`, so nothing in it can go stale into a write.
+
+**Why.** A preset is the "build it later" half of a preview, and later is exactly when the world is not
+the one the user saw. A shortcut that replayed the session's old plan would skip the executor's
+validation — the one place the build path refuses — and would write cells a claim or an item rule now
+forbids. Re-entering the command path costs one capture and keeps every refusal a report.
+
+**Rejected: keeping the captured plan in the preset.** A plan is a result of one capture against one
+world revision. Replaying it later would either write stale cells or need its own re-validation, which
+is the executor's job, and the preset would become a second executor. A stored plan would also bind
+the preset to a pose: the pose is part of what the user saved, and the plan is one consequence of it.
+
+**Rejected: resolving the item source at save time.** A stored `ItemSource` instance would pin a
+container or a provider that can move, unload or be uninstalled. The preset stores the form; `apply`
+resolves it against the applying player's level, and a missing container or an unknown kind is the
+build command's own refusal, with the same message.
+
+**Consequence.** A preset saved in a creative session applies as `with creative` in a survival session
+without pretending the items exist: the form is data, and the run is exactly the command that form
+spells. The removal policy travels as data and narrows or widens the server gate the way the confirm
+path does, so a preset cannot lift a gate the config sets lower than the player's policy. Presets are
+explicit data in `PreferencesSavedData`: bounded at 32 per player, never LRU-evicted, and
+`/cumulus prefs forget` never deletes one.
+
+**Consequence for the pose.** The stored siting includes the origin, so the same preset is a request
+for one place in one world. A player who wants the same shape elsewhere re-previews there or saves a
+second preset; a relative or origin-less preset form is backlog. For an anchored blueprint the stored
+pose is the anchor-resolved pose the session held, and `apply` hands that pose to the executor instead
+of re-reading the anchor: the preview showed that pose, so a different one would make `preview <name>`
+lie. A moved anchor therefore surfaces as the check's own finding or a refusal, never as a silently
+different build.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2293,6 +2332,13 @@ presentation surfaces show the carried labels verbatim (D-94). The parameterized
   and only the view cursor, the reveal counts and the camera are the client's. A reviewer should
   reject any presentation change that computes a stage index, a candidate, a score or a plan on the
   client.
+- A preset stores an absolute pose and a source *form*, never a resolved source or a plan (D-99): the
+  same preset applied in another place is not expressible, and one saved with a container source
+  refuses when the container is gone. A reviewer should reject any preset change that writes without
+  the executor's validate/refuse step, or that keeps a captured plan for a later replay.
+- The preset store is explicit data beside the LRU memory (D-99, design 15 §13.1): a full store refuses
+  the next new name instead of evicting one, and `prefs forget` never deletes a preset. A reviewer
+  should not "unify" the two bounds — one is a convenience window, the other is the user's artifact.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is

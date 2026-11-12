@@ -1176,6 +1176,10 @@ public final class ClientConfig {
     public static boolean hudStageBanner();
 }
 
+public final class BuildPresetCommand {
+    public static LiteralArgumentBuilder<CommandSourceStack> literal();
+}
+
 public final class LevelAccess {
     public static @Nullable StructureKernel kernel();
     public static @Nullable LevelCapture capture(ServerLevel level);
@@ -1294,9 +1298,14 @@ public final class PreviewCommand {
 public final class PreviewService {
     public static int open(CommandSourceStack source, NamespacedId id, @Nullable LatticePoint origin);
     public static void open(ServerPlayer player, NamespacedId id);
+    public static int openAt(CommandSourceStack source, BuildPreset preset, ItemSource items);
     public static void control(ServerPlayer player, PreviewControlPayload.Control control, @Nullable LatticePoint target);
+    public static @Nullable PreviewContext context(ServerPlayer player);
     public static void installConfirmHandler(PreviewConfirmHandler handler);
 }
+
+public record PreviewContext(NamespacedId blueprintId, Siting siting, BuildPreset.Source source,
+                             RemovalPolicy removalPolicy) { }
 
 public interface PreviewConfirmHandler {
     boolean confirm(ServerPlayer player, Request request);
@@ -1340,7 +1349,7 @@ public record PreviewControlPayload(Control control, @Nullable LatticePoint targ
 
     public enum Control {
         turnCw, turnCcw, flip, nextOrigin, prevOrigin, reset, resetIdentity, cyclePart, recall, confirm, cancel,
-        nextVariant
+        nextVariant, savePreset
     }
 
     public static PreviewControlPayload of(Control control);
@@ -1447,7 +1456,7 @@ public final class PlacementAnimator {
 public final class PreviewKeys {
     public enum Action {
         turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
-        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant
+        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant, savePreset
     }
 
     public static @Nullable KeyMapping binding(Action action);
@@ -1761,6 +1770,26 @@ public final class VanillaMaterializer implements Materializer {
 
 package dev.vfyjxf.cumulus.mc.pref;
 
+public record BuildPreset( String name, NamespacedId blueprintId, Siting siting, Source source,
+                          RemovalPolicy removalPolicy ) {
+    public static final int formatVersion;
+    public static final int capacity;
+    public static final int maxNameLength;
+    public String text();
+    public static String pose(Siting siting);
+    public static String cellText(LatticePoint cell);
+
+    public record Source( Kind kind, @Nullable LatticePoint container, @Nullable NamespacedId provider ) {
+        public enum Kind {
+            creative, player, container, registered
+        }
+        public static Source creative();
+        public static Source player();
+        public static Source container(LatticePoint position);
+        public static Source registered(NamespacedId id);
+        public String text();
+    }
+}
 public record BuildPreferences( OrientationMode orientationMode, @Nullable Heading fixedHeading, RemovalPolicy removalPolicy, List<PlacementWeight> weights, Map<NamespacedId, ChoiceHistory> remembered ) {
     public static final int defaultRememberedCapacity;
     public static BuildPreferences of(OrientationMode mode, @Nullable Heading heading, RemovalPolicy removal, List<PlacementWeight> weights);
@@ -1819,7 +1848,17 @@ public final class PreferencesSavedData extends SavedData {
     public void forget(UUID player, @Nullable NamespacedId blueprint);
     public int rememberedBlueprints(UUID player);
     public int partPinCount(UUID player);
+    public List<BuildPreset> presets(UUID player);
+    public @Nullable BuildPreset preset(UUID player, String name);
+    public SaveResult savePreset(UUID player, BuildPreset preset);
+    public boolean deletePreset(UUID player, String name);
+    public int presetCount(UUID player);
+    public String nextPresetName(UUID player);
     @Override public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries);
+
+    public enum SaveResult {
+        saved, replaced, full
+    }
 }
 public enum RemovalPolicy {
     forbid, ask, allow;
@@ -2052,6 +2091,16 @@ The landed half (P3), with the wire facts a second implementation would need:
   build path is untouched (design 15 §12.2, §12.4). The summary is compiled-bounded, so the codec has
   no variant cap: an over-cap declaration never compiles (`SC-DOC-0002`) instead of arriving
   truncated.
+- **Presets (E7).** `PreviewService.context` publishes the live session's build context
+  (`PreviewContext`: blueprint id, the current pose, the source form, the player's removal policy) for
+  the preset save verb; `PreviewService.openAt` is the pinned open, which builds the cycle from the
+  stored `Siting` alone (`PreviewCycle.ofSittings` of one pose) and takes the command's resolved
+  `ItemSource`, so a `preview <name>` shows exactly what `apply <name>` would build (design 15 §13.3).
+  A pinned session marks itself `preset <name>` in the markers and answers the cycling controls with a
+  note; `K` is `PreviewKeys.Action.savePreset`, which sends `PreviewControlPayload.Control.savePreset`
+  and stores `preset-N` in the same store (design 15 §13.2). The preview never resolves a source form
+  itself: the command does, through `BuildCommand.items`, so the refusal a missing container or an
+  unknown kind produces is the build command's own.
 - **Client.** `PreviewClientBridge` is the only common-side reference into `...preview.client`; the
   handler body resolves it inside `enqueueWork`, so no client class loads on a dedicated server.
   `PreviewClientState` is the read-only model the HUD, the renderers and the scenarios share;
@@ -2112,7 +2161,7 @@ The JEI half (P4), with the same kind of wire and lifecycle facts:
   by a catalog cap is simply not switchable, and the catalog's WARNING line names it as for every
   left-out entry (design 15 §12.3).
 
-## 18. Preferences (design 15 §9, landed with P5)
+## 18. Preferences (design 15 §9, landed with P5; presets at E7)
 
 `dev.vfyjxf.cumulus.mc.pref` owns the siting preferences and their memory. The public values are
 `BuildPreferences` (the mode, the fixed heading, the removal policy, the ordered weights and the
@@ -2120,6 +2169,7 @@ per-blueprint `ChoiceHistory`), `OrientationMode`, `RemovalPolicy` and `Placemen
 `ChoiceHistory` is design 15 §9's frequency window (most recent last, eight choices, the mode wins,
 a tie goes to the choice whose latest occurrence is the most recent). Every write returns a new
 `BuildPreferences`, and `remember` is the bounded LRU rule with the capacity the caller passes.
+`BuildPreset` is the explicit-data value beside them (design 15 §13, D-99).
 
 - **Scorer.** `SitingCandidateScorer` is pure and deterministic: it ranks the measured candidates by
   descending score and breaks a tie by the candidate's canonical enumeration index, so a scrambled
@@ -2159,8 +2209,34 @@ a tie goes to the choice whose latest occurrence is the most recent). Every writ
   creative source for a creative player and the player inventory otherwise; the materials marker
   (4.4) reads `BuildMaterials.shortages` from the same dry run's item simulation, so a shortage list
   is never invented.
-- **Not persisted.** The build undo history stays in-memory (D-87); only the preferences and their
-  memory are durable.
+- **Presets (E7).** `BuildPreset` is one stored build request: the blueprint id, the full `Siting`, the
+  `BuildPreset.Source` form (`creative`, `player`, `container` + position, or a registered provider id)
+  and the recorded `RemovalPolicy`. `PreferencesSavedData` keeps them in the player row's `"Presets"`
+  list, sorted by name, each tag carrying its own `Version` (`BuildPreset.formatVersion`, gate in
+  `BuildPreset.read`); a malformed or unknown-shape tag is skipped and the other presets survive. The
+  bound is `BuildPreset.capacity = 32`: `savePreset` answers `SaveResult.saved|replaced|full`, a full
+  store refuses the next *new* name and never evicts one, and `deletePreset` is the only way down. The
+  explicit/implicit split is the law here — the choice history and the pins are the LRU, the presets
+  are the user's artifact, and `/cumulus prefs forget` never deletes a preset. `nextPresetName` is the
+  deterministic first free `preset-N`.
+- **Preset command (E7).** `BuildPresetCommand.literal()` is attached by the command owner as a child of
+  `build` inside `CumulusCommand.register`, *before* the `<id>` argument, so the literal wins the parse:
+  `save <name> [with …]`, `apply`/`run <name>`, `preview <name>`, `list`, `delete <name>`. `save` copies
+  `PreviewService.context` (the session's `PreviewContext`: id, pose, source form, removal policy) and
+  optionally overrides the form through `BuildCommand.items`, so a source refusal is the build
+  command's own; `apply`/`run` resolve the stored form through the same helper and run `BuildExecutor`
+  with `BuildConfig.policy()` narrowed or widened by the preset's policy, printing through
+  `BuildCommand.print` and sending `BuildFeedback`. Name completion lists the player's presets; the
+  kind-id completion lists the registered sources.
+- **Preset preview (E7).** `PreviewService.openAt` is the pinned open: `PreviewSession.openPreset` builds
+  a one-pose cycle from the stored `Siting` and takes the command's resolved `ItemSource`, so the
+  session's ghosts, materials and confirm are exactly the stored request. The session refuses the
+  cycling controls with a note and marks itself `preset <name>`; `N` still switches to the next variant
+  through the ordinary re-open. `PreviewKeys.Action.savePreset` is `K`, which sends
+  `PreviewControlPayload.Control.savePreset`; the session stores `preset-N` and answers in the HUD
+  (the hint line is one info marker, the capacity refusal one warning marker).
+- **Not persisted.** The build undo history stays in-memory (D-87); the preferences, their memory and
+  the presets are durable.
 
 ## 19. Presentation (design 16, approved at E0, landing E1–E6)
 

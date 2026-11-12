@@ -27,9 +27,11 @@ import java.util.TreeMap;
 import java.util.UUID;
 
 /**
- * The per-level preference store: each player's explicit settings, the remembered siting choices and
- * the per-part pin memories, keyed by player UUID in this dimension's data storage. The world owns the
- * instance through {@code DimensionDataStorage}, so a read never holds it across an unload.
+ * The per-level preference store: each player's explicit settings, the remembered siting choices, the
+ * per-part pin memories and the build presets, keyed by player UUID in this dimension's data storage.
+ * The world owns the instance through {@code DimensionDataStorage}, so a read never holds it across an
+ * unload. The store keeps the explicit data (the settings, the presets) apart from the implicit memory
+ * (the choice histories, the pins): the memory is a bounded LRU, a preset is never evicted.
  */
 public final class PreferencesSavedData extends SavedData {
 
@@ -44,6 +46,11 @@ public final class PreferencesSavedData extends SavedData {
     );
 
     private final Map<UUID, PlayerPreferences> players = new HashMap<>();
+
+    /** The outcome of one preset write: a new name, a replaced one, or the bound refusing it. */
+    public enum SaveResult {
+        saved, replaced, full
+    }
 
     PreferencesSavedData() {}
 
@@ -140,7 +147,10 @@ public final class PreferencesSavedData extends SavedData {
         return Collections.unmodifiableMap(pins);
     }
 
-    /** Clears one blueprint's memory and part pins, or every player's when the blueprint is null. */
+    /**
+     * Clears one blueprint's memory and part pins, or every player's when the blueprint is null. The
+     * presets are explicit user data and stay: only the delete verb removes one (design 15 §13).
+     */
     public void forget(UUID player, @Nullable NamespacedId blueprint) {
         PlayerPreferences stored = players.get(player);
         if (stored == null) {
@@ -167,6 +177,68 @@ public final class PreferencesSavedData extends SavedData {
     public int partPinCount(UUID player) {
         PlayerPreferences stored = players.get(player);
         return stored == null ? 0 : stored.partPins.size();
+    }
+
+    /** The player's presets, sorted by name; an unknown player has none. */
+    public List<BuildPreset> presets(UUID player) {
+        Objects.requireNonNull(player, "player");
+        PlayerPreferences stored = players.get(player);
+        return stored == null ? List.of() : List.copyOf(stored.presets.values());
+    }
+
+    /** One preset of the player, or null when the name is not stored here. */
+    public @Nullable BuildPreset preset(UUID player, String name) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(name, "name");
+        PlayerPreferences stored = players.get(player);
+        return stored == null ? null : stored.presets.get(name);
+    }
+
+    /**
+     * Stores one preset: a known name is replaced, and a new name is refused once the player holds
+     * {@link BuildPreset#capacity} presets. A preset is explicit user data, so a full store never evicts
+     * one — the caller reports the bound and the delete verb is the only way down (design 15 §13).
+     */
+    public SaveResult savePreset(UUID player, BuildPreset preset) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(preset, "preset");
+        PlayerPreferences stored = players.computeIfAbsent(player, ignored -> new PlayerPreferences());
+        if (!stored.presets.containsKey(preset.name()) && stored.presets.size() >= BuildPreset.capacity) {
+            return SaveResult.full;
+        }
+        SaveResult result = stored.presets.put(preset.name(), preset) == null ? SaveResult.saved : SaveResult.replaced;
+        setDirty();
+        return result;
+    }
+
+    /** Removes one preset; false means the name was not stored. */
+    public boolean deletePreset(UUID player, String name) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(name, "name");
+        PlayerPreferences stored = players.get(player);
+        if (stored == null || stored.presets.remove(name) == null) {
+            return false;
+        }
+        setDirty();
+        return true;
+    }
+
+    public int presetCount(UUID player) {
+        PlayerPreferences stored = players.get(player);
+        return stored == null ? 0 : stored.presets.size();
+    }
+
+    /**
+     * The first free default name, {@code preset-1}, {@code preset-2}, …; the session's save control
+     * uses it because the key has no text input (design 15 §13.2). The walk is deterministic: the same
+     * store always answers the same name.
+     */
+    public String nextPresetName(UUID player) {
+        int index = 1;
+        while (preset(player, "preset-" + index) != null) {
+            index++;
+        }
+        return "preset-" + index;
     }
 
     @Override
@@ -201,6 +273,11 @@ public final class PreferencesSavedData extends SavedData {
                 pins.add(entryTag);
             }
             row.put("PartPins", pins);
+            ListTag presets = new ListTag();
+            for (BuildPreset preset : stored.presets.values()) {
+                presets.add(BuildPreset.write(preset));
+            }
+            row.put("Presets", presets);
             rows.add(row);
         }
         tag.put("Players", rows);
@@ -232,12 +309,16 @@ public final class PreferencesSavedData extends SavedData {
                 }
                 stored.remembered = remembered(row.getList("Remembered", Tag.TAG_COMPOUND));
                 stored.partPins = partPins(row.getList("PartPins", Tag.TAG_COMPOUND));
+                stored.presets = presets(row.getList("Presets", Tag.TAG_COMPOUND));
             } catch (RuntimeException malformed) {
                 StructureCumulus.logger
                         .warn("preferences: dropping the entry of {}: {}", player, malformed.getMessage());
                 continue;
             }
-            if (stored.settings != null || !stored.remembered.isEmpty() || !stored.partPins.isEmpty()) {
+            if (stored.settings != null
+                    || !stored.remembered.isEmpty()
+                    || !stored.partPins.isEmpty()
+                    || !stored.presets.isEmpty()) {
                 data.players.put(player, stored);
             }
         }
@@ -321,6 +402,18 @@ public final class PreferencesSavedData extends SavedData {
         return pins;
     }
 
+    /** One malformed preset or an unknown preset shape is skipped; the row's other presets survive. */
+    private static TreeMap<String, BuildPreset> presets(ListTag rows) {
+        TreeMap<String, BuildPreset> presets = new TreeMap<>();
+        for (int index = 0; index < rows.size(); index++) {
+            BuildPreset preset = BuildPreset.read(rows.getCompound(index));
+            if (preset != null) {
+                presets.put(preset.name(), preset);
+            }
+        }
+        return presets;
+    }
+
     private static CompoundTag sitingTag(Siting siting) {
         CompoundTag tag = new CompoundTag();
         tag.putIntArray("Origin", point(siting.origin()));
@@ -356,12 +449,13 @@ public final class PreferencesSavedData extends SavedData {
         return LatticePoint.of(values[0], values[1], values[2]);
     }
 
-    /** One player's row: the explicit settings, the choice histories and the part memories. */
+    /** One player's row: the explicit settings, the choice histories, the part memories and the presets. */
     private static final class PlayerPreferences {
 
         private @Nullable BuildPreferences settings;
         private Map<NamespacedId, ChoiceHistory> remembered = Map.of();
         private LinkedHashMap<Part, LatticePoint> partPins = new LinkedHashMap<>();
+        private TreeMap<String, BuildPreset> presets = new TreeMap<>();
     }
 
     /** The part-memory key: a part id never migrates to another blueprint (2.4). */

@@ -35,9 +35,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 
 /**
- * The command surface: {@code check}, {@code compile}, {@code settle}, {@code build}, {@code explain},
- * {@code claims}, {@code preview}, {@code prefs} and the structure-set triple {@code set check}/{@code
- * set settle}/{@code set build}.
+ * The command surface: {@code check}, {@code compile}, {@code settle}, {@code build} (with
+ * {@code build undo} and {@code build preset ...}), {@code explain}, {@code claims}, {@code preview},
+ * {@code prefs} and the structure-set triple {@code set check}/{@code set settle}/{@code set build}.
  */
 @NullMarked
 public final class CumulusCommand {
@@ -59,15 +59,13 @@ public final class CumulusCommand {
                                         )
                             )
                             .then(
-                                Commands.literal("settle")
-                                        .then(
-                                            Commands.argument("id", ResourceLocationArgument.id()).then(
-                                                Commands.argument("origin", BlockPosArgument.blockPos()).executes(
-                                                    context -> CommandSupport
-                                                            .guarded(context, "settle", SettleCommand::run)
-                                                )
-                                            )
+                                Commands.literal("settle").then(
+                                    Commands.argument("id", ResourceLocationArgument.id()).then(
+                                        Commands.argument("origin", BlockPosArgument.blockPos()).executes(
+                                            context -> CommandSupport.guarded(context, "settle", SettleCommand::run)
                                         )
+                                    )
+                                )
                             )
                             .then(
                                 Commands.literal("build")
@@ -76,7 +74,7 @@ public final class CumulusCommand {
                                                 context -> CommandSupport
                                                         .guarded(context, "build undo", BuildCommand::undo)
                                             )
-                                        ).then(
+                                        ).then(BuildPresetCommand.literal()).then(
                                             Commands.argument("id", ResourceLocationArgument.id()).then(buildOrigin())
                                         )
                             ).then(PreviewCommand.literal()).then(PreferencesCommand.literal())

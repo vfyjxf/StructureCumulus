@@ -50,6 +50,7 @@ import dev.vfyjxf.cumulus.mc.build.CreativeItemSource;
 import dev.vfyjxf.cumulus.mc.build.ItemSource;
 import dev.vfyjxf.cumulus.mc.build.PlayerInventorySource;
 import dev.vfyjxf.cumulus.mc.pref.BuildPreferences;
+import dev.vfyjxf.cumulus.mc.pref.BuildPreset;
 import dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData;
 import dev.vfyjxf.cumulus.mc.pref.SitingCandidateScorer;
 import dev.vfyjxf.cumulus.mc.pref.SolvePreferenceAssembler;
@@ -117,6 +118,9 @@ final class PreviewSession {
     private final PreviewCycle cycle;
     private final BuildPreferences preferences;
     private final ItemSource source;
+    private final BuildPreset.Source sourceForm;
+    private final @Nullable String presetName;
+    private final boolean pinned;
     private final Map<NamespacedId, LatticePoint> pinChoice = new TreeMap<>();
 
     private @Nullable SnapshotLease lease;
@@ -136,6 +140,7 @@ final class PreviewSession {
     private boolean retracted;
     private boolean invalidated;
     private @Nullable String lastNote;
+    private @Nullable String lastRefusal;
     private @Nullable NamespacedId variantSwitch;
     private boolean cancelled;
 
@@ -144,7 +149,10 @@ final class PreviewSession {
         Blueprint blueprint,
         PreviewCycle cycle,
         BuildPreferences preferences,
-        ItemSource source
+        ItemSource source,
+        BuildPreset.Source sourceForm,
+        @Nullable String presetName,
+        boolean pinned
     ) {
         this.playerId = player.getUUID();
         this.level = player.serverLevel();
@@ -154,6 +162,9 @@ final class PreviewSession {
         this.cycle = cycle;
         this.preferences = preferences;
         this.source = source;
+        this.sourceForm = sourceForm;
+        this.presetName = presetName;
+        this.pinned = pinned;
         this.syncedAt = level.getGameTime();
     }
 
@@ -182,11 +193,48 @@ final class PreviewSession {
             blueprint,
             cycle,
             preferences,
-            player.isCreative() ? new CreativeItemSource() : new PlayerInventorySource(player)
+            player.isCreative() ? new CreativeItemSource() : new PlayerInventorySource(player),
+            player.isCreative() ? BuildPreset.Source.creative() : BuildPreset.Source.player(),
+            null,
+            false
         );
         session.seedPins(store);
         session.rank(player, playerFacing);
         cycle.lockProgress();
+        String failure = session.compute();
+        if (failure != null) {
+            session.close();
+            return OpenResult.failed(failure);
+        }
+        session.sync();
+        return OpenResult.opened(session);
+    }
+
+    /**
+     * The preset's open: one pinned pose and the preset's own source, so a preview shows exactly what
+     * {@code apply} would build (design 15 §13.3). Cycling is off — the stored pose is the request.
+     */
+    static OpenResult openPreset(ServerPlayer player, Blueprint blueprint, BuildPreset preset, ItemSource items) {
+        ServerLevel level = player.serverLevel();
+        PreviewCycle cycle = PreviewCycle.ofSittings(blueprint, List.of(preset.siting()), level);
+        if (cycle.isEmpty()) {
+            return OpenResult.failed(
+                "the preset pose of " + blueprint.id().text() + " is not expressible at "
+                        + BuildPreset.pose(preset.siting())
+            );
+        }
+        PreferencesSavedData store = PreferencesSavedData.get(level);
+        PreviewSession session = new PreviewSession(
+            player,
+            blueprint,
+            cycle,
+            store.preferences(player.getUUID()),
+            items,
+            preset.source(),
+            preset.name(),
+            true
+        );
+        session.seedPins(store);
         String failure = session.compute();
         if (failure != null) {
             session.close();
@@ -214,6 +262,11 @@ final class PreviewSession {
     /** The pose this session currently holds; a variant switch carries its origin (design 15 §12). */
     Siting siting() {
         return cycle.slot().siting();
+    }
+
+    /** The build context a preset save copies: the id, the pose, the source form and the removal policy. */
+    PreviewContext context() {
+        return new PreviewContext(blueprintId, siting(), sourceForm, preferences.removalPolicy());
     }
 
     /** The group summary the client shows, or null for a standalone blueprint. */
@@ -267,8 +320,10 @@ final class PreviewSession {
     /** Applies one control from the player who sent it; false means the session is over. */
     boolean apply(ServerPlayer player, PreviewControlPayload.Control control, @Nullable LatticePoint target) {
         invalidated = false;
-        if (cycles(control) && cycle.locked()) {
-            lastNote = "the built cells fix this siting; cycling is off (1.5)";
+        if (cycles(control) && (pinned || cycle.locked())) {
+            lastNote = pinned
+                    ? "the preset fixes this pose; cycling is off"
+                    : "the built cells fix this siting; cycling is off (1.5)";
             retracted = false;
             if (compute() != null) {
                 return false;
@@ -289,6 +344,7 @@ final class PreviewSession {
                 }
             }
             case cyclePart -> cyclePart(target);
+            case savePreset -> savePreset();
             case nextVariant -> {
                 if (variants == null) {
                     lastNote = "this blueprint is not a variant group";
@@ -545,7 +601,7 @@ final class PreviewSession {
                     + refused.filter().value();
             filtered.merge(key, 1, Integer::sum);
         }
-        if (cycle.anchored()) {
+        if (cycle.anchored() && !pinned) {
             built.add(new Marker(locus, "anchored pose: the formed anchor fixes the siting (1.5)", MarkerKind.info));
         }
         if (cycle.locked()) {
@@ -599,9 +655,17 @@ final class PreviewSession {
                 )
             );
         }
+        if (presetName != null) {
+            built.add(new Marker(locus, "preset " + presetName + ": the stored pose; cycling is off", MarkerKind.info));
+        }
+        built.add(new Marker(locus, "build preset: press K to save this pose and source", MarkerKind.info));
         if (lastNote != null) {
             built.add(new Marker(locus, lastNote, MarkerKind.info));
             lastNote = null;
+        }
+        if (lastRefusal != null) {
+            built.add(new Marker(locus, lastRefusal, MarkerKind.warning));
+            lastRefusal = null;
         }
         return built;
     }
@@ -803,6 +867,26 @@ final class PreviewSession {
         }
         pendingCells.sort(LatticePoint::compareTo);
         return List.copyOf(pendingCells);
+    }
+
+    /**
+     * The K control: the session's build context becomes a preset under the next default name, because
+     * the key carries no text input (design 15 §13.2). A full store refuses and names the delete verb;
+     * the session itself never changes, so a refusal costs no plan.
+     */
+    private void savePreset() {
+        PreferencesSavedData store = PreferencesSavedData.get(level);
+        String name = store.nextPresetName(playerId);
+        PreferencesSavedData.SaveResult saved = store.savePreset(
+            playerId,
+            new BuildPreset(name, blueprintId, cycle.slot().siting(), sourceForm, preferences.removalPolicy())
+        );
+        if (saved == PreferencesSavedData.SaveResult.full) {
+            lastRefusal = "preset store full (" + BuildPreset.capacity
+                    + "); delete one with /cumulus build preset delete <name>";
+            return;
+        }
+        lastNote = "preset " + name + " saved";
     }
 
     /** 2.1: picks the next legal cell of the clicked part and remembers it as an implicit signal (7.2). */

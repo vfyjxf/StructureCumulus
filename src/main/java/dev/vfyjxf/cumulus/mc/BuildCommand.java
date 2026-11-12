@@ -87,7 +87,7 @@ final class BuildCommand {
         );
         ApplyReport report = executor
                 .run(new BuildRequest(blueprint.id(), siting, items, policy, options.dry(), null, player));
-        print(source, report, id, origin, options);
+        print(source, report, id, origin, options.dry());
         boolean formed = report.status() == ApplyReport.Status.committed
                 && !hasCode(report, BuildCodes.recheckNotFormed);
         if (!options.settle() || options.dry()) {
@@ -175,12 +175,13 @@ final class BuildCommand {
         return report.findings().findings().stream().anyMatch(finding -> finding.code().equals(code));
     }
 
-    private static void print(
+    /** The report's one chat summary; the preset apply verb prints through the same line. */
+    static void print(
         CommandSourceStack source,
         ApplyReport report,
         NamespacedId id,
         LatticePoint origin,
-        Options options
+        boolean dry
     ) {
         int applied = 0;
         int skipped = 0;
@@ -194,7 +195,7 @@ final class BuildCommand {
             }
         }
         String detail = switch (report.status()) {
-            case committed -> options.dry()
+            case committed -> dry
                     ? "dry validation clean"
                     : "committed (" + applied + " applied, " + skipped + " skipped" + items(report) + ")";
             case rolledBack -> "rolled back (" + failed + " failed steps" + items(report) + ")";
