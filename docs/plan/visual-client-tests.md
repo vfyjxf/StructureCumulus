@@ -211,6 +211,15 @@ builtin) and drive the production `PreviewService` through the dev command `/cum
 | `animation` | `preview.animation` | a confirm starts the placement animator on the one cell it changed with a cue and no celebration, the three writes that finish the probe celebrate the formed run once, and the undo starts a fade-out and repeats no celebration — assertions on the animator's own state, never pixels |
 | `cinematic` | `preview.cinematic` | `C` detaches the frame and the camera sits on the program's own sample (position and angles, looking down at the subject); the cursor advances every tick and the opening orbit keeps its distance; a cursor move flies to the stage's framing shot; the stage advance spans 12 ticks with the arriving ghosts scaling in and the leaving ones fading to the done alpha; the turn key swings the old ghost set on the shortest quarter arc for 6 ticks with the baked model keeping the old pose; the playback's end pulls the frame back; a movement key hands the camera back to the player's own eye and angles; `G` and `C` kick each other; a closing session leaves the mode and fades its last ghosts; the conflict check pins every preview key and the one vanilla binding `C` claims |
 | `guided` | `preview.guided` | the crosshair's ghost answers with its expected block, properties, part and stage and goes quiet when it moves off; `G` arms the guide and its one-line formatter names the item, the count, the stage and the bay's hint; the main-hand block pulses exactly the cursor stage's ghosts and a wrong hand adds no message; hand-placed cells advance the frontier with its banner and a cursor that tracked it; `Enter` still confirms and the machine finishes the hand-started build; a second session proves a confirm that leaves the plan arms the guide, and `G` again removes the line |
+| `demo` | `preview.demo`, `preview.demo.tour` | the whole player story through the production `/cumulus preview` node run as the player: the ghost opens and the status box names the probe and its counter, the turn and flip keys re-pose it, and four confirms build the four-cell probe and close the session; the tour then walks the pack — the staged table's description, part hint and tiered progress bar, the cell step and the played-through playback, the stage banner, `C`'s cinema camera with its letterbox and its hand-back, `N`'s variant switch on the coil group, `K`'s preset save and the production `/cumulus build preset preview` re-opening the stored pose; the story forgets the probe's remembered siting choices and part pins (`/cumulus prefs forget`) before the open and after the last confirm, so it neither reads nor leaves the frequency-weighted memory |
+
+Both demo scenarios assert the same models the group scenarios prove; what they add is one continuous,
+camera-framed story whose screenshots are the presentation evidence. `preview.demo` isolates the
+preference memory on both sides (design 15 §9): a confirmation remembers the pose, and a remembered
+pose reorders the next session's candidates, so the story forgets its blueprint's history through the
+production verb at both ends instead of depending on scenario order. The demo group is therefore green
+before, after or between the other groups; its screenshots and timelines are filed under
+`Data/StructureCumulus/demo-2026-11-12/`, not in the repository.
 
 The `animation` group drives the production `/cumulus build` and `/cumulus build undo` through a
 dev-only twin, `/cumulusbuild`, because both commands need a player and a harness command source is
@@ -219,8 +228,9 @@ the console.
 Run them with `./gradlew runClientTests -PclTest=group:preview`,
 `./gradlew runClientTests -PclTest=group:jei`, `./gradlew runClientTests -PclTest=group:stage`,
 `./gradlew runClientTests -PclTest=group:animation`,
-`./gradlew runClientTests -PclTest=group:cinematic` and
-`./gradlew runClientTests -PclTest=group:guided`
+`./gradlew runClientTests -PclTest=group:cinematic`,
+`./gradlew runClientTests -PclTest=group:guided` and
+`./gradlew runClientTests -PclTest=group:demo`
 (the selector takes `group:`, not a glob); the
 scenario-harness rules of §6 apply unchanged, and `verifyHarnessIsolation`/`verifyRunIsolation`
 cover the harness staging.

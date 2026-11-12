@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewClientState;
+import dev.vfyjxf.cumulus.mc.preview.client.TransitionController;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewSyncPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import org.jspecify.annotations.Nullable;
@@ -113,5 +114,10 @@ final class PreviewProbe {
 
     static int sliceY() {
         return PreviewClientState.sliceY();
+    }
+
+    /** A session fade-in/out or a variant switch is still drawing; a screenshot waits for it to settle. */
+    static boolean fading() {
+        return TransitionController.sessionFadeActive();
     }
 }

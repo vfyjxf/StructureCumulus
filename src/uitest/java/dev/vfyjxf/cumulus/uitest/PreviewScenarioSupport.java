@@ -3,7 +3,9 @@ package dev.vfyjxf.cumulus.uitest;
 import dev.vfyjxf.cloudlib.uitest.api.ScenarioBuilder;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewControlPayload;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -40,6 +42,29 @@ final class PreviewScenarioSupport {
     static ScenarioBuilder cancel(ScenarioBuilder build) {
         return build.action("cancel the preview session", context -> send(PreviewControlPayload.Control.cancel))
                 .waitUntil("the client dropped the cancelled session", () -> !PreviewProbe.hasSession());
+    }
+
+    /**
+     * Runs one production command as the local player: the harness {@code runCommand} source is the
+     * console, and the player-owned nodes ({@code /cumulus preview}, {@code /cumulus prefs},
+     * {@code /cumulus build preset}) refuse it, so the scenario makes the player the source.
+     */
+    static ScenarioBuilder runAsPlayer(ScenarioBuilder build, String label, String command) {
+        return build.action(label, context -> {
+            Minecraft minecraft = Minecraft.getInstance();
+            MinecraftServer server = minecraft.getSingleplayerServer();
+            if (server == null) {
+                return;
+            }
+            server.execute(() -> {
+                var players = server.getPlayerList().getPlayers();
+                if (players.isEmpty()) {
+                    return;
+                }
+                server.getCommands()
+                        .performPrefixedCommand(players.get(0).createCommandSourceStack().withPermission(4), command);
+            });
+        });
     }
 
     static void send(PreviewControlPayload.Control control) {
