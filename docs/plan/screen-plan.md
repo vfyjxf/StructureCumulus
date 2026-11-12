@@ -47,6 +47,10 @@ one git index). SC4 needs SC2's playback and explode to have something to demo.
 - **Localisation** of the screen's vocabulary (design 16 §16's C.5).
 - **A display mechanism for "a small entry looks empty"** — attributed to frame-all and to the demo
   content (design 17 §3.3, §14), not to a new layout rule.
+- **The JEI page's legacy picking takes the farthest cell** — its pick ray resolves the maximum exit
+  against a camera that sits on the opposite side (noted at SC1; the screen path takes the nearest,
+  design 17 §5.3). Kept untouched at SC1 for zero regression; fixing it changes the JEI hover, so it
+  gets its own milestone rather than riding along.
 
 ## Explicitly not done
 

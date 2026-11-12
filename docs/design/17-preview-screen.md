@@ -171,12 +171,13 @@ declared box.
   this hull; the three-view mode's per-panel fit (16 §11) fits the same hull in each panel's plane.
   15 §6.2's "fitted to the blueprint's bounds" is corrected to this sentence — an entry has no bounds
   field, and a fit to a declared box would re-introduce exactly the empty page this law removes.
-- **The blank entry (R5's second half).** An entry whose every cell is air draws nothing at all: it is
-  left out of the catalogue at build time with the WARNING line that names it, in the same family as a
-  blueprint that does not compile, one over 512 cells or one over 64 material lines (15 §6.1). A page
-  that draws nothing is worse than a missing page, and both consumers — JEI and this screen — see one
-  catalogue, so they agree by construction. The material lines already drop air (`Items.AIR` yields no
-  line), so an air cell never added an item count; this law adds only the absence of a scene.
+- **The blank entry (R5's second half).** An entry with no cell that draws — every cell air, or no
+  cells at all — draws nothing at all: it is left out of the catalogue at build time with the WARNING
+  line that names it, in the same family as a blueprint that does not compile, one over 512 cells or
+  one over 64 material lines (15 §6.1). A page that draws nothing is worse than a missing page, and
+  both consumers — JEI and this screen — see one catalogue, so they agree by construction. The
+  material lines already drop air (`Items.AIR` yields no line), so an air cell never added an item
+  count; this law adds only the absence of a scene.
 - **The third cause, attributed and not "fixed".** The user's "a pile of empty structures" also has a
   plain reading that no mechanism here addresses: the current gallery is 3 pages of 4 documents, and a
   small structure inside a large page area reads as empty, which no hull rule changes. That belongs to
