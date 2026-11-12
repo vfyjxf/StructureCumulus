@@ -75,7 +75,7 @@ failure after the ledger write propagates and keeps the written rows with the ca
 `SettleCommand.settle` now releases whenever the kernel settle was attempted), the D-48 claims view
 for `/cumulus check` (§3.8), and the chat output caps — fifty claim rows and fifty finding lines per
 print, each ending with a summary of what was held back.
-`Codes.all` has 67 entries and the decision record has 91 decisions (D-92; D-29 and D-36 superseded, D-78 withdrawn). Model C, body identity,
+`Codes.all` has 67 entries and the decision record has 96 decisions (D-97; D-29 and D-36 superseded, D-78 withdrawn). Model C, body identity,
 trait capture, the generic trait providers, the nested capability, the mark counter, the
 capture-report channel, the typed host snapshot, the cached-context port and the structure-set layer
 are implemented, not pending. The

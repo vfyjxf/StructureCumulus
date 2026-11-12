@@ -1138,6 +1138,10 @@ session, the network payloads, the client overlay renderer and the JEI category 
 single structure's `--settle` flag is no longer absent: P7 chains the settle path after a committed,
 re-check-clean run (§16.2).
 
+The presentation pack (design 16, D-93…D-97) is specified and not yet built: it lands at E1–E5 (§19).
+What stays absent even then is stated there — no presentation state on the server beyond the payload
+facts, no animation or particle work on the server thread, and no second client config file.
+
 ## 15. Signatures
 
 The adapter's public types join the spec gate in batches (D-74). A type is either documented here or
@@ -1148,6 +1152,13 @@ family; the preview types landed with P3/P4, and P7 lands the plugin (batch 2), 
 and 9) and preference (batch 8) types, so `tools/spec-uncovered.txt` keeps only the remaining
 core/trait/capability batches and the non-API entries. The block compares against `src/main/java` through `AdapterIndexTest` (member-level)
 and `tools/spec-check.py` (name-level).
+
+Batch 10 is the presentation pack (§19, design 16): its types join this block in the milestone that
+lands them (E1 the stage model and the payload facts, E2 the placement feedback, E4 the view modes,
+E5 the guide), never before — a type documented here that the sources do not declare fails the gate,
+so a reserved batch is a note here and a shape in design 16, not a signature in this block. A
+landing milestone either extends this block or lists a non-API type in `tools/spec-uncovered.txt`
+with a reason; it may not leave a public presentation type in neither place.
 
 ```java
 package dev.vfyjxf.cumulus.mc;
@@ -1959,3 +1970,50 @@ a tie goes to the choice whose latest occurrence is the most recent). Every writ
   is never invented.
 - **Not persisted.** The build undo history stays in-memory (D-87); only the preferences and their
   memory are durable.
+
+## 19. Presentation (design 16, approved at E0, landing E1–E5)
+
+`dev.vfyjxf.cumulus.mc.preview` owns the stage model and the payload facts, `...preview.client` owns
+playback, the layered ghosts, the HUD tiers, the stage banner, the placement animator and the guide,
+and `...preview.jei` owns the view modes. No third package appears, and the presentation pack adds no
+module edge. The contracts are design 16's; this section states the adapter-side shape of them, and
+its signatures join §15 per milestone (the batch 10 note there).
+
+**Landed.** Nothing yet: E1–E5 are `pending` in [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
+The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
+§18's confirm path and §16's build, undo and codes.
+
+**Server side (E1, E2).**
+
+| Piece | What it is | Owner |
+| --- | --- | --- |
+| the stage model | one pure function over a compiled blueprint, producing the stage table (names, expected counts, the bay hint); no world, no siting, no clock (D-93) | `mc.preview` |
+| the payload facts | the presentation block (the blueprint's description, the stage table and the frontier stage the marks imply) on the session payload and on the catalog entry; one stage index per ghost cell; ghosts ordered by stage then definition-frame cell order | `mc.preview.net` |
+| the commit feedback | one S2C payload per committed transaction and per undo, to the invoking player only, listing the cells the transaction changed in the order it changed them, with the status and the formed flag (D-95) | `mc.preview.net`, sent by the confirm path and the build commands |
+| the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: the `hud.*` keys at E1, the `animation.*` keys at E2 | the mod entry |
+
+The server adds no presentation state: no per-player playback record, no animation queue, no tick
+handler, no map beside the session. The payload is plain data, and its handler resolves client classes
+only inside the enqueued work (§17's law, design 15 §6.4), so a dedicated server never loads one.
+
+**Client side (E1, E2, E4, E5).** The playback controller keeps three facts per session — the
+presentation block it was sent (table and frontier), the view cursor and the reveal counts — and
+derives nothing from the marks. The layered renderer multiplies the stage factor into the ghost alpha it
+already forces (§17's translucent pass) and leaves the Y slice and the distance cull in charge of
+visibility. The placement animator consumes the commit payload in its list order and draws an extra
+translucent copy of the model; it never reads the world to correct itself and nothing waits for it.
+The guide is the same session viewed differently: its automatic advance is the session's existing
+invalidation channel (§17's `LevelWatch` revision check), its next-step line is composed by one
+formatter with a fixed vocabulary, and its `Enter` is the §18 confirm unchanged — the world keeps one
+writer (D-97).
+
+**JEI side (E4).** The category gains a mode button (isometric, three-view, slice grid) beside the
+existing slider and button. All three modes draw the catalog entry's cells; the mode is per-recipe
+view state, no payload carries it, and no cap changes — the entry is already at most 512 cells or
+absent (§17's catalog law, design 15 §6.1).
+
+**Still absent.** A server-side stage or playback state; animation or particle work on the server
+thread; broadcasting another player's placement animation; a stage-number billboard in the world; a
+second client config file; localisation of the HUD and formatter vocabulary; exporting a view as an
+image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
+document string, and an invalidation stays `SC-BLD-0008`.

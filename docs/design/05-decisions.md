@@ -2033,6 +2033,148 @@ rejected, and the session already holds the outcome at every failure point (`eng
 `/cumulus explain` and the code tables readable, and the family's tag is the only place the kernel
 mints the letters — the entries themselves stay host-registered (D-87).
 
+### D-93 — A stage is derived from the declaration, and the derivation is a pure, total function
+
+A **stage** is the presentation grouping of a blueprint's expected cells (design 16 §4): with two or
+more bays the stages are the bays in the order `Blueprint.bays()` presents them (the compiler's check
+order, with the derived envelope bay last), filtered to the bays that some expected cell belongs to;
+with exactly one bay they are that bay's distinct definition-frame Y layers, ascending; a cell's stage
+is the bay whose check produced it, not the first bay that contains its coordinates; a single
+non-empty stage is one stage; `maxStages` is 256 and an overflow is a WARNING marker. The function
+reads the blueprint and nothing else — no world, no siting, no clock, no hash order — and its table is
+therefore **siting-invariant**: a rotation, a flip, an origin move or a candidate change moves world
+positions, never a cell's stage. The table, one index per ghost and the frontier stage travel on the
+payload (design 16 §5), so the client compares and draws but derives nothing.
+
+**Why declaration-derived.** The alternative sources are all worse. World-frame Y layers regroup the
+same tower differently for two poses of one session — a build whose stages move when the player turns
+it is not a stage model. The remedy plan as the grouping (one stage per plan step) does not exist for
+an already-built structure and is empty for a matched check, yet the preview must still show stages;
+it is also a *result*, not a declaration fact, and presenting a result as a structure is the same
+mistake D-66 bans for finding text. A host-chosen grouping would fork the table between the session,
+the catalog and the JEI view.
+
+**Why the compiler's bay order and not a geometry order.** That order is the authoring order — the
+order the document's checks name the parts, which is the order the author writes them to be built in.
+Sorting bays by bounds or by id would be a second opinion the document already gave.
+
+**Why the metadata is dropped rather than shown when a stage is empty.** A stage with nothing to place
+would announce itself, fill a progress segment and teach nothing; the count of stages must be the
+count of things to do.
+
+**Consequence.** A test that scrambles the ghost list and compares indices pins the determinism; a
+test that re-poses the siting and compares the table pins the invariance. Neither test needs a world.
+
+### D-94 — Presentation text is carried by the kernel and never interpreted
+
+The document gains optional string members (design 16 §3): a root `description`, a bay `description`
+(already read and carried before this round), a bay `hint`, and a check `description` (carried, not
+displayed). They are lowered into the compiled value — `BlueprintSpec`/`Blueprint`, `BaySpec`/`Bay` —
+and the compiler copies them without parsing, trimming, formatting, defaulting or localizing. No
+finding, code entry, check verdict, remedy applicability, plan step or ranking reads them, and they
+never enter `Codes.all`. The metadata is part of the compiled value's equality, so a document that
+differs only in a description compiles to a different blueprint. A definition carries no root
+description (`SC-DOC-0002`, the geometry law); a bay's text survives placement qualification with its
+bay.
+
+**Why carried, not looked up.** The adapter must not re-parse the document JSON to find a sentence
+(the preview session and the JEI catalog hold compiled blueprints, not documents). A side table would
+be a second source of truth that can disagree with the blueprint it describes.
+
+**Why opaque.** A kernel that formats, defaults or wraps text owns presentation policy it cannot
+possibly get right — it knows no locale, no font width and no surface — and the moment it validates
+content it becomes a text linter. Content is data; the shape (a string, absent = none) is the
+kernel's.
+
+**Why the text is part of equality.** Two documents that differ only in a description must not compile
+to "equal" blueprints: the catalog's change detection and any blueprint-keyed cache would silently
+keep the old text, and the determinism gate's "equal documents, equal blueprints" would be satisfied
+by a value that lost a field.
+
+**Why `description` and `hint` are separate members.** A description says what a part *is* (shown once,
+in the banner, the title and the tooltip); a hint says how to *place* it (shown while placing). One
+field would force one text to serve both moments, and the second reader would get the wrong sentence.
+
+**Consequence.** A presentation surface displays a document string verbatim or omits its line; no
+surface composes prose around it (design 16 §10, §12.3).
+
+### D-95 — Playback and animation are client presentation, with zero world writes
+
+Every stage, reveal, pop-in, fade, sound, banner and particle of the presentation pack is derived on
+the client from payload facts (design 16 §5–§9): the server adds payload fields and one build-feedback
+payload, and changes **nothing else**. No kernel API gains a render, begin or end call; no animation
+state enters the session, the transaction or the report; the only write path out of a session stays
+the confirm of design 14 §10, unchanged.
+
+**Why.** An animation is a narration of what already happened; a server that schedules it needs a
+clock, a queue and a per-player lifecycle for data no decision consumes, and a client that reads the
+world to draw a cell can draw one that was rolled back or one no plan ever asked for. The build path's
+determinism and its transaction/report laws must not gain a second observer that can disagree with
+them.
+
+**Rejected: a per-cell playout schedule from the server.** It is a second clock with its own drift,
+its own packet budget and its own notion of "finished", and the client already knows how to pace a
+list it was given.
+
+**Rejected: letting an animation gate input or a packet.** Roadmap §5's "animations never block
+operations" is a law, not a courtesy: a player who confirms during a pop-in gets the confirm.
+
+**Consequence.** `animation.enabled = false` changes pixels only; an animation that is culled, skipped
+or interrupted changes no session, no plan and no block. A reviewer rejects any presentation change
+that adds a server tick handler, a `setBlock` or a `ServerState` map.
+
+### D-96 — The JEI preview has three view modes, and the mode is view state
+
+The category gains (design 16 §11) the isometric view it has, a three-view mode (front, side and top
+orthographic panels from the front law of design 15 §9, one shared slice, the current layer
+highlighted in every panel) and a slice grid (one layer at a time, the existing slider choosing it).
+The mode is per-recipe view state like the yaw and pitch of design 15 §6.2, switched by a button in
+the category's face; no key is added and no payload carries it. Hover is resolved per panel against
+the catalog's own `GhostCell` list; no new cap is introduced, because a catalog entry is already at
+most 512 expected cells or absent.
+
+**Why more than isometric.** An isometric render reads a misplaced block as fine: a port moved one
+cell along an axis can hide behind the geometry in front of it. Front/side/top is the drafting
+convention the document is written in — the declaration frame's own axes — and the grid is the only
+view where a reader can count cells one by one.
+
+**Why view state and not a recipe field.** A camera belongs to the viewer; two players looking at one
+page must not fight over it, and a recipe field would force a payload change for a camera setting.
+
+**Rejected: a 3D orbit with cut planes.** It carries the same information as the slice grid with far
+more machinery, and the grid answers "what is on this layer" in one glance.
+
+**Consequence.** The three modes draw the same data three ways; a mode never changes what the entry
+contains, and the isometric view keeps its behaviour when the button is never touched.
+
+### D-97 — Guided mode is a view of a session, and the world still has one writer
+
+Guided build (design 16 §12) is a client-side view of an open preview session: it changes emphasis,
+the next-step line and hand awareness, entered by `G` or by a confirm that leaves the plan in the
+session, exited by `G`, by cancellation or by the session's close. Its automatic advance is the
+session's existing invalidation channel re-read (design 15 §4) — a hand-placed block inside the
+footprint invalidates, the server recomputes, and the re-sync carries a higher frontier stage (D-93),
+which the banner announces. There is no polling, no second watch and no server flag. `Enter` remains
+the confirm of design 14 §10, so a half-hand-built, half-machine-built structure is legal and the
+progress lock of design 15 §9 is unchanged.
+
+**Why a view.** The pack's promise is that every added feature can be removed without changing a plan
+or a world write (D-95). A guided *builder* would need its own policy gate, item source, transaction
+and report — a second executor — to place blocks one at a time, which is exactly the chain the build
+path already owns and the one place a refusal must stay a report.
+
+**Why the existing channel.** The session already re-syncs whenever the world under its footprint
+changes; guided mode is the first consumer that *wants* that cadence. A second watch would double the
+cost of every placement and could disagree with the first.
+
+**Rejected: a server-side guided flag.** It would be server state with no server effect — the client
+is the flag's only consumer — and it would have to survive syncs, retractions and recalls to stay
+coherent.
+
+**Consequence.** The guide can be entered in a session opened by a command, by JEI or by an anchor
+block, and leaving it leaves an ordinary session. A completion state names settle as the claim step,
+because a fully satisfied confirm is the idempotent empty report and not a formation.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2099,6 +2241,24 @@ mints the letters — the entries themselves stay host-registered (D-87).
   from finding text (D-85, D-66); the declaration description port that makes those payloads
   implementable is D-91, and an undescribable (`custom`) expectation degrades every remedy over it
   to advisory by construction.
+- A stage table is a function of the declaration (D-93), so a document whose bays are declared out of
+  building order gets out-of-order stages: a reviewer should read a document's bay order as an
+  authoring decision, not an accident of the compiler. The pack never sorts a bay list.
+- The stage order and the play order are two orders that meet in one HUD (D-93, D-95): a run's cells
+  animate in the transaction's order, which can cross stages (`SC-BLD` repairs do not know stages).
+  A reviewer should not "fix" that mismatch — the animation reports what happened, the stage bar
+  reports what the declaration asks for.
+- The pop-in redraws a cell that already holds its new block (D-95), so a fast world change during an
+  animation (an immediate re-break, a second run) leaves the animator drawing the last payload it
+  received. It converges on the next payload; it never reads the world to correct itself, and nothing
+  waits for it.
+- Presentation text is displayed verbatim (D-94), so a datapack can put anything on another player's
+  screen. The pack adds no filtering, wrapping or length limit: a server that distrusts its documents
+  removes them, it does not have the client censor a description.
+- The client derives nothing (D-93): the table, the indices and the frontier all arrive on the wire,
+  and only the view cursor, the reveal counts and the camera are the client's. A reviewer should
+  reject any presentation change that computes a stage index, a candidate, a score or a plan on the
+  client.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is

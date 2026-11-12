@@ -33,6 +33,9 @@ table defines who may emit each finding code.
     materialization, transactions, the executor and the plugin tables (implemented, P2/P6/P7).
 16. [design/15-preview.md](design/15-preview.md) — preview sessions, payloads, rendering,
     orientation ergonomics and preferences (implemented, P3–P5).
+17. [design/16-presentation.md](design/16-presentation.md) — the presentation pack: stages, playback,
+    the progress HUD, placement feedback, part text, JEI view modes and the guided build (specified,
+    not implemented; E0 is its design round).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -70,8 +73,11 @@ Then the module files, in dependency order:
   nested-extent sources into capability and attachment, superseding D-36's capability-only seam.
   [14 auto-build](design/14-auto-build.md) and [15 preview](design/15-preview.md) are approved,
   design-first extensions (D-84…D-91) tracked by
-  [plan/autobuild-preview-plan.md](plan/autobuild-preview-plan.md); they are specified, not
-  implemented, and their milestones carry the implementation status.
+  [plan/autobuild-preview-plan.md](plan/autobuild-preview-plan.md); they were specified before they
+  were built, and their milestones carry the implementation status (P2–P7 landed, below).
+  The presentation pack is the next such extension: [16 presentation](design/16-presentation.md)
+  (D-93…D-97) tracked by [plan/presentation-plan.md](plan/presentation-plan.md), specified at E0 and
+  not yet implemented — E0 is the documentation round, and no section of it claims a landed feature.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -148,8 +154,8 @@ Then the module files, in dependency order:
   containers), 548 adapter unit tests (58 containers) and 168 `@GameTest` methods; a full
   `./gradlew check` passes at this revision (643 kernel tests, 548 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 168/168 GameTests.
-  `Codes.all` has 67 entries and the decision record has 91 decisions
-  (D-92; D-29 and D-36 superseded, D-78 withdrawn).
+  `Codes.all` has 67 entries and the decision record has 96 decisions
+  (D-97; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 

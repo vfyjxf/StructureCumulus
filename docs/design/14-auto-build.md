@@ -244,6 +244,11 @@ warning code the run produced.
 A set build answers the set result of §13: `StructureSetResult.builds` carries one `ApplyReport` per
 member, so a caller juxtaposes the set lifecycle with what each member's plan asked and got.
 
+The presentation pack's commit feedback is not a second report: it is one payload derived from the
+same run and carries only the cells the transaction changed, in the order it changed them ([16](16-presentation.md)
+§9.1, D-95). The report stays the answer; the payload is the animation's input, and a refusal or an
+empty run sends nothing.
+
 Two report-text laws (expansion 6.3, 9.2):
 
 - A refusal message names the policy and the config key that gates it ("which rule, who can change
@@ -312,6 +317,9 @@ restores every member in reverse commit order; the rows a `--settle` run wrote a
 pre-image — they stay with their instances until the next settle takes them over (D-79). v1 keeps a
 one-entry history per `(player, level)`; the bounded undo/redo stack is P8 backlog (expansion 5.3).
 The history is in-memory and is not persisted across a restart; this document is the warning.
+
+An undo's visible fade is a client presentation of this reversal, not a second undo path: the
+payload lists the cells the undo restored, in restore order ([16](16-presentation.md) §9.4, D-95).
 
 ## 12. Commands
 

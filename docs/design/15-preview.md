@@ -63,6 +63,11 @@ public record PreviewControlPayload(Control control, @Nullable LatticePoint targ
   markers per payload — and an overflow adds a WARNING marker that names the shown and expected
   counts, so nothing is truncated silently; moving the caps into the server config is P8 backlog
   ([the plan](../plan/autobuild-preview-plan.md)).
+- The presentation pack extends this shape once, at E1: a presentation block (the blueprint's carried
+  description, its stage table and the frontier stage) and one stage index per ghost cell travel with
+  the same payload, and the catalog entry carries both as well
+  ([16](16-presentation.md) §5, D-93). The two payloads here remain the session's; no third session
+  payload appears.
 - A marker whose locus is not world-frame re-anchors at the overlay bounds on the client: no source
   span crosses the wire, and the client needs no document to render a label.
 
@@ -106,6 +111,11 @@ and lowers the current layer with PageUp/PageDown, fading other layers with laye
 same mental model as the JEI slice (§6). Distance culling (4.8) renders only ghosts and frames
 within reach plus a config radius; counters are not culled.
 
+The presentation pack composes with this pass rather than replacing it ([16](16-presentation.md) §6):
+the stage relation and the playback reveal multiply into the ghost alpha and the box treatment, the Y
+slice stays a drawn/not-drawn filter, problems-only stays a mark filter, and distance culling is
+unchanged. The Y-slice keys keep their meaning there; the stage keys are new.
+
 | Key | Action |
 | --- | --- |
 | `[` / `]` | Turn CW / CCW (§7) |
@@ -117,13 +127,18 @@ within reach plus a config radius; counters are not culled.
 | Enter | confirm |
 | Esc | cancel |
 
+The presentation pack adds four keys beside these — `↑`/`↓` the stage, `V` play/pause, `B` one cell
+step, and `G` the guided mode of [16](16-presentation.md) §12. No key above changes meaning, and no
+stage key reaches the server ([16](16-presentation.md) §6.3).
+
 Every key is a NeoForge `KeyMapping` in the settings screen; the defaults avoid vanilla's
 high-frequency keys, and full keyboard reach is required (8.1).
 
 Guidance, not noise:
 
 - A progress counter (`5/27`) and the next placeable group highlighted in plan dependency order
-  (4.3; the hand-aware pulse is P8 backlog).
+  (4.3; the hand-aware pulse is P8 backlog, and the presentation pack's guided mode is its home —
+  [16](16-presentation.md) §12).
 - A materials HUD listing shortage items with icon and count, naming the source container's
   position from the `ItemSource`; a creative source collapses the list to zero (4.4).
 - Refusal visualisation (4.5): a dry-run `SC-BLD-0002`/`SC-BLD-0003` paints the problem into the
@@ -159,7 +174,9 @@ from the declarations exactly as a session resolves them, and shipped as one syn
 - **What.** One entry per blueprint that compiles: its id, its expected cells in the session's
   `GhostCell` shape (block id plus serialized properties), and its material lines (the item the block
   yields and how many expected cells ask for it). Structure sets are not entries — the preview is one
-  blueprint at a time.
+  blueprint at a time. The presentation pack adds the same presentation block (§3, design 16 §5) —
+  the carried description and the stage table — so the entry's text and stage grouping come from the
+  one place a session's do ([16](16-presentation.md) §10, §11).
 - **Caps.** Every cap is a code constant and none truncates silently, the same law as the session's
   payload caps (§3): a blueprint that does not compile, or whose projection exceeds 512 expected
   cells, or whose summary exceeds 64 distinct material items, is **left out of the catalog entirely**
@@ -177,7 +194,11 @@ from the declarations exactly as a session resolves them, and shipped as one syn
 ### 6.2 The isometric view
 
 `IRecipeCategory.draw` is handed the recipe's area with the pose already translated to its origin,
-and the category owns the whole face: a scene, a slider, the material summary and the button.
+and the category owns the whole face: a scene, a slider, the material summary and the button. It is
+**one of three view modes** once the presentation pack lands ([16](16-presentation.md) §11, D-96):
+the isometric view stays the default and keeps everything below, the three-view and slice-grid modes
+add two projections of the same cells, and the mode itself is per-recipe view state — like the yaw
+and pitch below, never a payload field.
 
 - **Camera.** Yaw and pitch are per-recipe view state; dragging the viewport rotates them, the pitch
   clamps just short of the poles, and the scale is fitted to the blueprint's bounds on every frame,
@@ -367,10 +388,13 @@ public record ChoiceHistory(java.util.List<Siting> recent) {
 ## 10. Codes
 
 A session invalidation is `SC-BLD-0008` (design 14 §14). Preview allocates no code family of its
-own; everything else it shows is a finding the check, solve or build already produced.
+own; everything else it shows is a finding the check, solve or build already produced. The
+presentation pack allocates none either: its stage, HUD and animation surfaces show marks, names and
+document text, and its cap overflows stay markers ([16](16-presentation.md) §14).
 
 ## 11. Non-goals (v1)
 
 Preset scenes or hand-authored preview content; web `visual/` tooling changes; multiplayer
 co-editing of one plan; lossy orientation fallbacks (3.5); the P8 backlog listed in
-[`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md).
+[`docs/plan/autobuild-preview-plan.md`](../plan/autobuild-preview-plan.md). The presentation pack's
+own non-goals are [16](16-presentation.md) §16; the two lists do not overlap.

@@ -202,6 +202,7 @@ public interface DocumentWriter {
 | `bounds` | box | yes | the root local frame; every compiled cell is inside |
 | `envelope` | boolean | no | `true` derives the closed-world air pair over cells no bay or declared footprint covers; absent or `false` is off; root-only |
 | `envelopeEntities` | boolean | no | `true` makes that envelope count entities as foreign and adds the `entity` kind to its read scope (`structure` §4.11, D-55); absent or `false` leaves entities transparent; root-only, and `SC-DOC-0002` unless the root also declares `envelope: true` |
+| `description` | string | no | human text carried with the blueprint and never interpreted ([design/16](../design/16-presentation.md) §3, D-94); absent means none |
 | `definitions` | object id → spec | no | reusable specs, compiled on placement |
 | `placements` | placement[] | no | definitions placed into the root |
 | `bays` | bay[] | yes* | the root's own bays |
@@ -222,7 +223,22 @@ check before the "at least one check" rule (`structure` §4.11). An envelope-onl
 
 A box is `[x, y, z, sizeX, sizeY, sizeZ]` (origin + size). A bay has `box` or `boxes` plus optional
 `minus`: `cells = union(boxes) - union(minus)`. A `CuboidSet` is a cell set with a box decomposition;
-the compiler builds it through `of`.
+the compiler builds it through `of`. A bay's members:
+
+| Member | Required | Default | Meaning |
+| --- | --- | --- | --- |
+| `id` | yes | — | unique among the merged ids |
+| `box` / `boxes` | yes | — | the bay's cells |
+| `minus` | no | none | cells removed from the union |
+| `coverage` | yes | — | `every_cell`, `one_subject`, `any_subject` (`structure` §4.4) |
+| `footprint` | yes | — | the declared footprint form |
+| `sharing` | yes | — | `shared` or `exclusive` |
+| `description` | no | absent | human text for the part, carried and never interpreted (16 §3, D-94) |
+| `hint` | no | absent | "how to place this part", carried and never interpreted (16 §3, D-94) |
+
+A check accepts `description` on the same terms: carried, never interpreted, not displayed by any
+surface of the presentation pack (16 §10). Both bay members survive placement qualification with the
+bay; the root `description` is root-only (`§4.2`).
 
 A definition is the same `BlueprintSpec` shape without `schemaVersion`; its `id` is the map key. A
 placement is `{"definition": "mymod:shell", "as": "mymod:south", "at": [0,0,0]}`. A placement may
@@ -271,15 +287,15 @@ published), and the compiler honours it as declared.
 ### 4.2 Definitions in v1
 
 A `definitions` entry contributes **bays, seams and placements** only. Checks, computations, keys,
-derivations, anchors, the orientation policy, `envelope` and `envelopeEntities` are root-only; a
-definition that
-declares one is `SC-DOC-0002`. `arguments` and `extensions` are not members of a definition at all:
-the reader rejects them as unknown members (`SC-DOC-0002`). A definition's `bounds` is required and
-must contain the definition's own bays and seams; a cell outside them is `SC-DOC-0002`. This keeps a
-placed definition a pure geometry unit: its bays and
+derivations, anchors, the orientation policy, `envelope`, `envelopeEntities` and `description` are
+root-only; a definition that declares one is `SC-DOC-0002`. `arguments` and `extensions` are not
+members of a definition at all: the reader rejects them as unknown members (`SC-DOC-0002`). A
+definition's `bounds` is required and must contain the definition's own bays and seams; a cell
+outside them is `SC-DOC-0002`. This keeps a placed definition a pure geometry unit: its bays and
 seams are qualified with the alias path (`alias.path + "/" + local`) and translated by the placement
-offset, while every check and computation is written once in the root against the merged ids. Nested
-placements are allowed; a cycle is `SC-DOC-0009`.
+offset — a bay's own `description` and `hint` travel with it — while every check and computation is
+written once in the root against the merged ids. Nested placements are allowed; a cycle is
+`SC-DOC-0009`.
 
 No declaration is dropped silently. A bay no check names — root or merged — is `SC-DOC-0002`, and a
 definition no placement reaches, directly or through another placement, is `SC-DOC-0002`.
@@ -458,6 +474,12 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
 - Arguments: shallow merge over the satellite blueprint's root arguments; equal
   `(blueprint id, effective arguments)` reuse one compiled blueprint while ids and sitings stay
   per satellite.
+- Presentation text: a document without `description`/`hint` compiles with none and writes back
+  without the members (the parse/write fixed point holds); a document with all four members reads,
+  compiles and writes them verbatim; a non-string member is `SC-DOC-0002`; a definition-level root
+  `description` is `SC-DOC-0002`; two documents that differ only in a description compile to two
+  unequal blueprints; a placed bay keeps its own description and hint under the qualified id. The
+  text reaches no finding and no code (`design/16` §3, D-94).
 - Missing root/satellite documents are `SC-DOC-0011`; a set naming a set is `SC-DOC-0002`; a
   presence region outside the satellite bounds is `SC-DOC-0002`.
 
@@ -488,6 +510,9 @@ is defined in [design/09](../design/09-structure-sets.md) and [`finding`](findin
   becomes a located finding; `CompileResult.blueprint()` is null whenever an error exists.
 - A blueprint document is kindless or `blueprint`; a set document is `structure_set`. A set names
   only blueprints, never another set (no nesting).
+- Presentation text is carried, never interpreted. `description` and `hint` are strings the compiler
+  copies into the compiled value; it never parses, formats, defaults or localizes them, no finding or
+  verdict reads them, and they are part of the compiled value's equality (`design/16` §3, D-94).
 - A set compile is a pure function of `(set document, DocumentSource, CompilerContext)`. The kernel
   never executes a set; it owns no host placement, presence read, claim or rollback.
 

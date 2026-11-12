@@ -44,6 +44,10 @@ mode, 8.3 command completion, 10.2 leave-the-last-block mode.
 Outside the ergonomics numbering: config-izing the preview payload caps (design 15 §3; v1 keeps
 the code constants, 512 ghost cells and 48 markers per payload).
 
+Two entries above have moved into the presentation pack and are tracked there instead: 4.3's
+hand-aware pulse and 5.6's rollback visibility are E5 and E2 of
+[presentation-plan.md](presentation-plan.md) (design 16 §12.4, §9.4).
+
 Explicitly not done: 3.5, a lossy orientation back door (D-88).
 
 ## Open questions for the main agent
