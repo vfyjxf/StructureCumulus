@@ -213,6 +213,15 @@ public final class PlaybackController {
         revealed[selected] = Math.min(1, counts[selected]);
     }
 
+    /** Shows the cursor's stage whole, as an arrow key and the guide's own entry do (design 16 §12.1). */
+    static void revealStage() {
+        if (counts.length == 0) {
+            return;
+        }
+        selected = clamp(selected < 0 ? 0 : selected);
+        revealAll(selected);
+    }
+
     /** The frontier's stage name on one line and the bay's description on the next, or nothing. */
     public static List<String> bannerLines() {
         if (bannerTicks <= 0 || bannerName == null) {

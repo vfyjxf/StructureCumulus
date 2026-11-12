@@ -55,7 +55,8 @@ final class GhostRenderer {
             }
             float alpha = baseAlpha
                     * PreviewClientState.layerAlpha(ghost.cell().y())
-                    * PlaybackController.alphaOf(ghost);
+                    * PlaybackController.alphaOf(ghost)
+                    * GuideController.pulseFactor(ghost.cell());
             pose.pushPose();
             pose.translate(ghost.cell().x(), ghost.cell().y(), ghost.cell().z());
             minecraft.getBlockRenderer().renderSingleBlock(

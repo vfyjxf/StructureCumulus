@@ -36,6 +36,8 @@ final class PreviewOverlayRenderer {
     private static final int blocked = 0xD0B040FF;
     private static final int unknown = 0x90A0A0A0;
     private static final int pulse = 0xE0FF2020;
+    /** The guide's next group draws outside the mark's own frame, so the two never z-fight. */
+    private static final int nextGroupColor = 0xE0FFFFFF;
     private static final long pulseTicks = 40L;
     /** The done stage's frame keeps a quarter of the mark's alpha. */
     private static final float doneFrame = 0.25F;
@@ -133,7 +135,21 @@ final class PreviewOverlayRenderer {
                 }
             }
         }
+        if (GuideController.guided()) {
+            nextGroup(buffer, matrix, camera);
+        }
         draw(buffer);
+    }
+
+    /** The guide's next group: a bright ring on the cursor stage's unsatisfied cells (design 16 §12.2). */
+    private static void nextGroup(BufferBuilder buffer, Matrix4f matrix, Vec3 camera) {
+        for (LatticePoint cell : GuideController.nextGroup()) {
+            if (!PreviewClientState.inRange(cell) || !PlaybackController.revealedCell(cell)) {
+                continue;
+            }
+            float alpha = PreviewClientState.layerAlpha(cell.y()) * GuideController.pulseFactor(cell);
+            emitBox(buffer, matrix, cell, camera, withAlpha(nextGroupColor, alpha), -0.004F);
+        }
     }
 
     private static int colorOf(CellMark mark) {

@@ -209,14 +209,16 @@ builtin) and drive the production `PreviewService` through the dev command `/cum
 | `jei` | `jei.preview`, `jei.views` | the category lists the merged blueprint ids, the scene draws its frames, and "ghost to world" opens the same in-world session; the mode button cycles isometric → three-view → slice grid, the three panels each draw the entry fitted to the same bounds, a hovered cell answers with its block id, its properties and its part, and one slice moves all three panels while the isometric view stays as it was |
 | `stage` | `preview.stage` | a two-bay datapack document opens with its two stages in declaration order, the frontier is lit at open, the ghosts carry their stage index, the cell step and the playback advance the reveal counts, the arrow keys switch the cursor and fire the banner, and the progress and materials bars read the payload's numbers |
 | `animation` | `preview.animation` | a confirm starts the placement animator on the one cell it changed with a cue and no celebration, the three writes that finish the probe celebrate the formed run once, and the undo starts a fade-out and repeats no celebration — assertions on the animator's own state, never pixels |
+| `guided` | `preview.guided` | the crosshair's ghost answers with its expected block, properties, part and stage and goes quiet when it moves off; `G` arms the guide and its one-line formatter names the item, the count, the stage and the bay's hint; the main-hand block pulses exactly the cursor stage's ghosts and a wrong hand adds no message; hand-placed cells advance the frontier with its banner and a cursor that tracked it; `Enter` still confirms and the machine finishes the hand-started build; a second session proves a confirm that leaves the plan arms the guide, and `G` again removes the line |
 
 The `animation` group drives the production `/cumulus build` and `/cumulus build undo` through a
 dev-only twin, `/cumulusbuild`, because both commands need a player and a harness command source is
 the console.
 
 Run them with `./gradlew runClientTests -PclTest=group:preview`,
-`./gradlew runClientTests -PclTest=group:jei`, `./gradlew runClientTests -PclTest=group:stage` and
-`./gradlew runClientTests -PclTest=group:animation`
+`./gradlew runClientTests -PclTest=group:jei`, `./gradlew runClientTests -PclTest=group:stage`,
+`./gradlew runClientTests -PclTest=group:animation` and
+`./gradlew runClientTests -PclTest=group:guided`
 (the selector takes `group:`, not a glob); the
 scenario-harness rules of §6 apply unchanged, and `verifyHarnessIsolation`/`verifyRunIsolation`
 cover the harness staging.

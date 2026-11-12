@@ -318,6 +318,9 @@ final class PreviewHud {
         if (line.startsWith("stage ")) {
             return titleColor;
         }
+        if (line.startsWith("guide: ")) {
+            return barFill;
+        }
         return textColor;
     }
 

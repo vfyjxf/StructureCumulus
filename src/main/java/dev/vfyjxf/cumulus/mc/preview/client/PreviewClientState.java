@@ -118,6 +118,12 @@ public final class PreviewClientState {
             }
             lines.add(stageLine);
         }
+        if (GuideController.guided()) {
+            String next = GuideController.nextStep();
+            if (next != null) {
+                lines.add("guide: " + next);
+            }
+        }
         for (MaterialStatus material : presentation.materials()) {
             lines.add("material " + material.item().text() + " " + material.have() + "/" + material.need());
         }
@@ -131,8 +137,9 @@ public final class PreviewClientState {
                     + describe(siting.origin())
         );
         lines.add(
-            "mode: " + (problemsOnly ? "problems" : "all") + " · slice y=" + sliceLabel(sliceY()) + " · ghosts "
-                    + current.ghostCells().size() + " · problems " + problems
+            "mode: " + (GuideController.guided() ? "guided" : "plain") + " · " + (problemsOnly ? "problems" : "all")
+                    + " · slice y=" + sliceLabel(sliceY()) + " · ghosts " + current.ghostCells().size() + " · problems "
+                    + problems
         );
         int shown = 0;
         for (Marker marker : current.markers()) {
@@ -149,7 +156,7 @@ public final class PreviewClientState {
         }
         lines.add(
             "keys: [ ] turn · ; flip · , . origin · R reset (hold = identity) · P recall · PgUp/PgDn slice · T all/problems"
-                    + " · Up/Down stage · V play · B step · Enter confirm · Esc cancel"
+                    + " · Up/Down stage · V play · B step · G guide · Enter confirm · Esc cancel"
         );
         return List.copyOf(lines);
     }
@@ -159,6 +166,7 @@ public final class PreviewClientState {
         lastSyncTick = now();
         hoverTooltip = null;
         PlaybackController.accept(payload);
+        GuideController.accept(payload);
         if (sliceY == Integer.MIN_VALUE) {
             sliceY = payload.overlay().bounds().min().y();
         }
@@ -172,6 +180,7 @@ public final class PreviewClientState {
         sliceY = Integer.MIN_VALUE;
         resetHeldTicks = 0;
         PlaybackController.clear();
+        GuideController.clear();
         PreviewOverlayRenderer.clear();
     }
 
@@ -219,6 +228,7 @@ public final class PreviewClientState {
         }
         updateTooltip(current);
         dispatchControls();
+        GuideController.tick();
         PlaybackController.tick();
     }
 
@@ -242,6 +252,7 @@ public final class PreviewClientState {
             send(PreviewControlPayload.Control.recall, null);
         }
         if (clicked(PreviewKeys.Action.confirm)) {
+            GuideController.confirmSent();
             send(PreviewControlPayload.Control.confirm, null);
         }
         if (clicked(PreviewKeys.Action.cancel)) {
@@ -269,6 +280,9 @@ public final class PreviewClientState {
         }
         if (clicked(PreviewKeys.Action.stepCell)) {
             PlaybackController.step();
+        }
+        if (clicked(PreviewKeys.Action.guide)) {
+            GuideController.toggle();
         }
         trackReset();
     }
@@ -356,23 +370,101 @@ public final class PreviewClientState {
     private static void updateTooltip(PreviewSyncPayload current) {
         Minecraft minecraft = Minecraft.getInstance();
         hoverTooltip = null;
-        if (!(minecraft.hitResult instanceof BlockHitResult hit) || minecraft.player == null) {
+        if (minecraft.player == null) {
+            return;
+        }
+        BlockHitResult hit = minecraft.hitResult instanceof BlockHitResult block ? block : null;
+        Vec3 eye = minecraft.player.getEyePosition(1.0F);
+        double limit = renderRadius;
+        if (hit != null) {
+            limit = Math.min(limit, hit.getLocation().distanceTo(eye));
+        }
+        LatticePoint ghost = ghostUnderCrosshair(current, eye, minecraft.player.getViewVector(1.0F), limit);
+        if (ghost != null) {
+            hoverTooltip = GuideController.hoverText(ghost);
+            if (hoverTooltip != null) {
+                return;
+            }
+        }
+        if (hit == null) {
             return;
         }
         LatticePoint cell = LatticePoint
                 .of(hit.getBlockPos().getX(), hit.getBlockPos().getY(), hit.getBlockPos().getZ());
-        if (markOf(cell) != CellMark.blocked) {
-            return;
+        if (markOf(cell) == CellMark.blocked) {
+            for (Marker marker : current.markers()) {
+                if (marker.kind() != MarkerKind.warning || !marker.locus().hasCells()) {
+                    continue;
+                }
+                if (marker.locus().cells().contains(cell)) {
+                    hoverTooltip = marker.label();
+                    return;
+                }
+            }
         }
-        for (Marker marker : current.markers()) {
-            if (marker.kind() != MarkerKind.warning || !marker.locus().hasCells()) {
+        CellMark mark = markOf(cell);
+        if (mark != null && mark != CellMark.present) {
+            hoverTooltip = GuideController.markText(mark);
+        }
+    }
+
+    /**
+     * The nearest ghost cell the crosshair's ray crosses before the block it actually hits: a ghost is
+     * air in the world, so a block pick can never reach one (design 16 §11's hover rule, in the world).
+     */
+    private static @Nullable LatticePoint ghostUnderCrosshair(
+        PreviewSyncPayload current,
+        Vec3 eye,
+        Vec3 direction,
+        double limit
+    ) {
+        if (direction.lengthSqr() < 1.0E-6D) {
+            return null;
+        }
+        LatticePoint nearest = null;
+        double nearestDistance = limit;
+        for (GhostCell ghost : current.ghostCells()) {
+            double distance = crossDistance(eye, direction, ghost.cell());
+            if (distance >= 0.0D && distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = ghost.cell();
+            }
+        }
+        return nearest;
+    }
+
+    /** The slab test of one unit cell against the ray; a negative result means no crossing ahead. */
+    private static double crossDistance(Vec3 eye, Vec3 direction, LatticePoint cell) {
+        double low = 0.0D;
+        double high = Double.MAX_VALUE;
+        double[] origin = {eye.x, eye.y, eye.z};
+        double[] vector = {direction.x, direction.y, direction.z};
+        int[] base = {cell.x(), cell.y(), cell.z()};
+        for (int axis = 0; axis < 3; axis++) {
+            double start = origin[axis];
+            double move = vector[axis];
+            double min = base[axis];
+            double max = min + 1.0D;
+            if (Math.abs(move) < 1.0E-9D) {
+                if (start < min || start > max) {
+                    return -1.0D;
+                }
                 continue;
             }
-            if (marker.locus().cells().contains(cell)) {
-                hoverTooltip = marker.label();
-                return;
+            double first = (min - start) / move;
+            double second = (max - start) / move;
+            if (first > second) {
+                double swap = first;
+                first = second;
+                second = swap;
+            }
+            low = Math.max(low, first);
+            high = Math.min(high, second);
+            if (low > high) {
+                return -1.0D;
             }
         }
+        return low > 0.0D ? low : -1.0D;
     }
 
     private static boolean clicked(PreviewKeys.Action action) {
@@ -383,6 +475,11 @@ public final class PreviewClientState {
     private static long now() {
         Minecraft minecraft = Minecraft.getInstance();
         return minecraft.level == null ? 0L : minecraft.level.getGameTime();
+    }
+
+    /** The client's own tick count: the guide's pulse phase reads this and nothing else. */
+    static long gameTime() {
+        return now();
     }
 
     private static String describe(LatticePoint point) {

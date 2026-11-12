@@ -1435,10 +1435,20 @@ public final class PlacementAnimator {
 public final class PreviewKeys {
     public enum Action {
         turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
-        confirm, cancel, prevStage, nextStage, playPause, stepCell
+        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide
     }
 
     public static @Nullable KeyMapping binding(Action action);
+}
+
+public final class GuideController {
+    public static boolean guided();
+    public static java.util.List<LatticePoint> nextGroup();
+    public static @Nullable String nextStep();
+    public static boolean complete();
+    public static java.util.List<LatticePoint> pulsingCells();
+    public static boolean pulsing(LatticePoint cell);
+    public static float pulseFactor(LatticePoint cell);
 }
 
 public final class PreviewClientBridge {
@@ -2021,7 +2031,10 @@ The landed half (P3), with the wire facts a second implementation would need:
   `PreviewClientState` is the read-only model the HUD, the renderers and the scenarios share;
   `PreviewClientEvents` (a `Dist.CLIENT` `EventBusSubscriber`) owns the keys, the two render stages
   and the HUD layer. Ghost models resolve through the block renderer with a forced-alpha translucent
-  pass; no block entity, capability or world read backs them.
+  pass; no block entity, capability or world read backs them. The guided build is one more reader of
+  the same model: `GuideController` (E5, §19) holds the mode and the hand pulse, `G` is
+  `PreviewKeys.Action.guide`, and a sync after a confirm that leaves the plan arms the mode — the
+  server is told nothing about it.
 
 The JEI half (P4), with the same kind of wire and lifecycle facts:
 
@@ -2126,7 +2139,11 @@ rate-limited cues and the formed celebration. E3: the document's `description` a
 compiled value and on both payloads, the HUD title and stage lines, the JEI entry lines and the
 part-hint billboard in the world (design 16 §3, §10). E4: the category's three view modes — the
 three-view with its section band, the slice grid and the per-cell tooltip that names the owning part
-(design 16 §11). E5 is `pending` in [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
+(design 16 §11). E5: the guided build — `G`, the next-step line, the next group's emphasis, the hand
+pulse, the frontier's automatic advance through the existing invalidation channel, and the hovered
+ghost's tooltip; `Enter` stays §18's confirm, so a hand-placed stage and a machine-built one share one
+executor (design 16 §12). The milestone's state lives in
+[`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
 The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
 §18's confirm path and §16's build, undo and codes.
 

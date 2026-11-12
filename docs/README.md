@@ -35,8 +35,9 @@ table defines who may emit each finding code.
     orientation ergonomics and preferences (implemented, P3–P5).
 17. [design/16-presentation.md](design/16-presentation.md) — the presentation pack: stages, playback,
     the progress HUD, placement feedback, part text, JEI view modes and the guided build (specified
-    at E0; E1's stage model, staged playback, layered ghosts, HUD tiers, stage banner and client
-    config and E2's placement feedback are implemented, E3–E5 pending).
+    at E0; implemented through E5 — the stage model, staged playback, layered ghosts, HUD tiers,
+    stage banner, client config, the placement feedback, the carried part text, the JEI view modes
+    and the guided build).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -78,10 +79,11 @@ Then the module files, in dependency order:
   were built, and their milestones carry the implementation status (P2–P7 landed, below).
   The presentation pack is the next such extension: [16 presentation](design/16-presentation.md)
   (D-93…D-97) tracked by [plan/presentation-plan.md](plan/presentation-plan.md), specified at E0 and
-  landing one milestone at a time — E1 (the stage model, staged playback and stage switching, the
-  layered ghosts, the three HUD tiers, the stage banner, the client config) and E2 (the commit
-  feedback payload, the pop-in, the rollback and undo fade, the cues, the formed celebration) are on
-  the tree, and E3–E5 remain specified only.
+  landed one milestone at a time — E1 (the stage model, staged playback and stage switching, the
+  layered ghosts, the three HUD tiers, the stage banner, the client config), E2 (the commit feedback
+  payload, the pop-in, the rollback and undo fade, the cues, the formed celebration), E3 (the carried
+  part text and its display points), E4 (the JEI view modes) and E5 (the guided build) are on the
+  tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -142,8 +144,8 @@ Then the module files, in dependency order:
   renderers, the JEI category, the preference store and scorer, the structure-set build, and the
   plugin extension tables (`registerMaterializers`/`registerItemSources` over the loader's one
   ordering and failure policy, plus the command's `with <kind-id>` source form). The tree registers
-  643 kernel tests in 73 containers, 548 adapter unit tests in 58 containers and 168 `@GameTest`
-  methods; a full `./gradlew check` is green on this tree (643 kernel tests, 548 adapter tests) and
+  648 kernel tests in 74 containers, 584 adapter unit tests in 62 containers and 168 `@GameTest`
+  methods; a full `./gradlew check` is green on this tree (648 kernel tests, 584 adapter tests) and
   `runGameTestServer` passes 168/168. Pending only: acting on the measured kernel-side cost debts
   and the live-level review items (`07` §7), and fresh visual review screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
@@ -154,9 +156,9 @@ Then the module files, in dependency order:
   classes and their GameTest structure templates live in `src/gametest`, folded into the mod for
   every run and kept out of the published jar (D-77).
 - Verification (2026-11-12): the kernel compiles with
-  `javac --release 21` and JSpecify only. The tree registers 643 kernel JUnit 5 tests (73 test
-  containers), 548 adapter unit tests (58 containers) and 168 `@GameTest` methods; a full
-  `./gradlew check` passes at this revision (643 kernel tests, 548 adapter
+  `javac --release 21` and JSpecify only. The tree registers 648 kernel JUnit 5 tests (74 test
+  containers), 584 adapter unit tests (62 containers) and 168 `@GameTest` methods; a full
+  `./gradlew check` passes at this revision (648 kernel tests, 584 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 168/168 GameTests.
   `Codes.all` has 67 entries and the decision record has 96 decisions
   (D-97; D-29 and D-36 superseded, D-78 withdrawn).
