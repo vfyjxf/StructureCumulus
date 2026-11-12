@@ -73,7 +73,9 @@ public final class PreviewGuideScenario {
                 .check(
                     "the HUD draws the hovered ghost's line",
                     () -> PreviewProbe.hudHas("hover: minecraft:stone_bricks")
-                ).yawPitch(180.0F, -60.0F).frames(3)
+                ).yawPitch(180.0F, -60.0F)
+                // the tooltip clears on the client tick, not on a render frame — wait for the tick
+                .waitUntil("the tooltip clears", () -> PreviewGuideProbe.hover() == null)
                 .check(
                     "the tooltip goes away with the crosshair",
                     () -> PreviewGuideProbe.hover() == null,

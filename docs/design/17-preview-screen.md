@@ -757,9 +757,14 @@ face, a command, a world key, the open payload and the group's own member list.
   unknown id answers with §3.4's client message and opens nothing. Exit code 1 on opened and 0
   otherwise follows the adapter's command convention even though a client source ignores it.
 - **One shadowing consequence, stated instead of hidden.** In the `preview` node the client's literal
-  `screen` wins over the server's `<id>` argument, so a blueprint whose unqualified id is literally
-  `screen` must be typed with its namespace (`structurecumulus:screen`) from a client that has this
-  pack. Every other id is unaffected, and the server's own tree still has its `preview <id>`.
+  `screen` followed by an `<id>` wins over the server's `<id>` argument, so a blueprint whose
+  unqualified id is literally `screen` must be typed with its namespace (`structurecumulus:screen`)
+  from a client that has this pack. The bare form tells the truth about the mechanism: a client-side
+  parse that ends right after the literal (`/cumulus preview screen` with no id) is not the client
+  tree's command at all — brigadier reports the missing argument, NeoForge hands the input to the
+  server as an unknown command, and the server reads `screen` as the `<id>` and answers that the
+  document does not exist. Nothing opens and nothing starts a session, which is the safe half of the
+  overlap; every other id is unaffected, and the server's own tree still has its `preview <id>`.
 - **Why not a server command plus an S2C open payload.** A screen is a client view with client data;
   a server-initiated one would add a payload, a permission question and a server code path to open a
   window that the client can open for itself. This pack adds no S2C packet at all.
