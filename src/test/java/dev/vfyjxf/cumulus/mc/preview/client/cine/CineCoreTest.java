@@ -53,7 +53,7 @@ class CineCoreTest {
         assertTrue(shot.eye().z > 2.0, "the eye sits on the +Z approach side");
         assertTrue(shot.eye().y > 1.0, "the eye rises for the top-down read");
         assertEquals(180.0, shot.yaw(), 1.0e-3, "looking from +Z at the center faces north");
-        assertTrue(shot.pitch() < 0.0, "the read is slightly downward");
+        assertTrue(shot.pitch() > 0.0, "the read is slightly downward; Minecraft's xRot is positive down");
     }
 
     @Test

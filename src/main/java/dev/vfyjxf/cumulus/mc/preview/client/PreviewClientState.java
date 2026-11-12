@@ -167,12 +167,14 @@ public final class PreviewClientState {
         }
         lines.add(
             "keys: [ ] turn · ; flip · , . origin · R reset (hold = identity) · P recall · PgUp/PgDn slice · T all/problems"
-                    + " · Up/Down stage · V play · B step · G guide · N variant · K save preset · Enter confirm · Esc cancel"
+                    + " · Up/Down stage · V play · B step · G guide · C cinematic · N variant · K save preset"
+                    + " · Enter confirm · Esc cancel"
         );
         return List.copyOf(lines);
     }
 
     static void accept(PreviewSyncPayload payload) {
+        PreviewSyncPayload previous = session;
         session = payload;
         lastSyncTick = now();
         hoverTooltip = null;
@@ -182,14 +184,19 @@ public final class PreviewClientState {
             sliceY = payload.overlay().bounds().min().y();
         }
         PreviewOverlayRenderer.onPayload(payload);
+        TransitionController.onPayload(previous, payload);
+        CinematicController.onPayload(payload);
     }
 
     static void clear() {
+        PreviewSyncPayload previous = session;
         session = null;
         rendered = false;
         hoverTooltip = null;
         sliceY = Integer.MIN_VALUE;
         resetHeldTicks = 0;
+        CinematicController.onSessionClosed();
+        TransitionController.onSessionClosed(previous);
         PlaybackController.clear();
         GuideController.clear();
         PreviewOverlayRenderer.clear();
@@ -226,6 +233,9 @@ public final class PreviewClientState {
     static void tick() {
         PreviewSyncPayload current = session;
         if (current == null) {
+            // the hand-off fades outlive the session; the camera mode needs no session to leave
+            TransitionController.tick();
+            CinematicController.tick();
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
@@ -241,6 +251,8 @@ public final class PreviewClientState {
         dispatchControls();
         GuideController.tick();
         PlaybackController.tick();
+        TransitionController.tick();
+        CinematicController.tick();
     }
 
     private static void dispatchControls() {
@@ -301,6 +313,9 @@ public final class PreviewClientState {
         if (clicked(PreviewKeys.Action.savePreset)) {
             send(PreviewControlPayload.Control.savePreset, null);
         }
+        if (clicked(PreviewKeys.Action.cinematic)) {
+            CinematicController.toggle();
+        }
         trackReset();
     }
 
@@ -359,8 +374,11 @@ public final class PreviewClientState {
         if (minecraft.player == null) {
             return false;
         }
-        return minecraft.player.getEyePosition().distanceToSqr(cell.x() + 0.5D, cell.y() + 0.5D, cell.z() + 0.5D)
-                <= renderRadius * renderRadius;
+        // the shot is the eye once the camera leaves the player, so the cull must follow it
+        Vec3 eye = CinematicController.active()
+                ? minecraft.gameRenderer.getMainCamera().getPosition()
+                : minecraft.player.getEyePosition();
+        return eye.distanceToSqr(cell.x() + 0.5D, cell.y() + 0.5D, cell.z() + 0.5D) <= renderRadius * renderRadius;
     }
 
     /** 4.2: layers away from the slice fade out; the slice itself is fully drawn. */

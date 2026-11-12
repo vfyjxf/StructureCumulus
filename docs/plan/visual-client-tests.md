@@ -209,6 +209,7 @@ builtin) and drive the production `PreviewService` through the dev command `/cum
 | `jei` | `jei.preview`, `jei.views`, `jei.variants` | the category lists one page per standalone blueprint and per variant group, the scene draws its frames, and "ghost to world" opens the same in-world session; the mode button cycles isometric → three-view → slice grid, the three panels each draw the entry fitted to the same bounds, a hovered cell answers with its block id, its properties and its part, and one slice moves all three panels while the isometric view stays as it was; the coil group is one page keyed by its first shipped member, the row's arrows switch the member in place without adding a page, and the button opens the selected member's id |
 | `stage` | `preview.stage` | a two-bay datapack document opens with its two stages in declaration order, the frontier is lit at open, the ghosts carry their stage index, the cell step and the playback advance the reveal counts, the arrow keys switch the cursor and fire the banner, and the progress and materials bars read the payload's numbers |
 | `animation` | `preview.animation` | a confirm starts the placement animator on the one cell it changed with a cue and no celebration, the three writes that finish the probe celebrate the formed run once, and the undo starts a fade-out and repeats no celebration — assertions on the animator's own state, never pixels |
+| `cinematic` | `preview.cinematic` | `C` detaches the frame and the camera sits on the program's own sample (position and angles, looking down at the subject); the cursor advances every tick and the opening orbit keeps its distance; a cursor move flies to the stage's framing shot; the stage advance spans 12 ticks with the arriving ghosts scaling in and the leaving ones fading to the done alpha; the turn key swings the old ghost set on the shortest quarter arc for 6 ticks with the baked model keeping the old pose; the playback's end pulls the frame back; a movement key hands the camera back to the player's own eye and angles; `G` and `C` kick each other; a closing session leaves the mode and fades its last ghosts; the conflict check pins every preview key and the one vanilla binding `C` claims |
 | `guided` | `preview.guided` | the crosshair's ghost answers with its expected block, properties, part and stage and goes quiet when it moves off; `G` arms the guide and its one-line formatter names the item, the count, the stage and the bay's hint; the main-hand block pulses exactly the cursor stage's ghosts and a wrong hand adds no message; hand-placed cells advance the frontier with its banner and a cursor that tracked it; `Enter` still confirms and the machine finishes the hand-started build; a second session proves a confirm that leaves the plan arms the guide, and `G` again removes the line |
 
 The `animation` group drives the production `/cumulus build` and `/cumulus build undo` through a
@@ -217,7 +218,8 @@ the console.
 
 Run them with `./gradlew runClientTests -PclTest=group:preview`,
 `./gradlew runClientTests -PclTest=group:jei`, `./gradlew runClientTests -PclTest=group:stage`,
-`./gradlew runClientTests -PclTest=group:animation` and
+`./gradlew runClientTests -PclTest=group:animation`,
+`./gradlew runClientTests -PclTest=group:cinematic` and
 `./gradlew runClientTests -PclTest=group:guided`
 (the selector takes `group:`, not a glob); the
 scenario-harness rules of §6 apply unchanged, and `verifyHarnessIsolation`/`verifyRunIsolation`

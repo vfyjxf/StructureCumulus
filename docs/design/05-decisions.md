@@ -2248,6 +2248,44 @@ of re-reading the anchor: the preview showed that pose, so a different one would
 lie. A moved anchor therefore surfaces as the check's own finding or a refusal, never as a silently
 different build.
 
+### D-100 — The cinema mode is a pure client viewing mode, and the first input returns the frame
+
+The preview's camera mode ([design/16](16-presentation.md) §6.7, `C`) is a **view of a session**: it
+detaches the frame from the player, flies a program generated from the payload's stage table, and
+writes nothing. It adds no camera fact to the wire, no stage or animation state to the server, and no
+entity to a level: the rig that anchors the frame is a client-only entity that is never added, never
+ticked and never rendered. Every clock is the client tick plus the frame's partial tick, and every
+shot is a function of payload geometry and two local numbers.
+
+**Why.** A camera the server tells where to look would be a second animation state and a second source
+of truth; a camera the client computes is presentation, and D-93 is not bent — the stage table, its
+order and its counts arrive on the wire, and the only geometry the client aggregates is the bounding
+union of the ghost cells a stage already carries. The session remains the one thing the mode watches:
+when it closes, is invalidated or times out, the mode leaves.
+
+**Why the input law is the opposite of a lock.** A detached camera that cannot be reclaimed is worse
+than no camera: the body is still where the player left it, and not knowing whether a key moved it is
+a defect. The mode therefore owns exactly the presses that mean "I want the frame" — a movement key
+(by its current binding), a movement binding held, a right-click, a changed view angle (the mouse
+moved), a screen, and the session's close — and answers the movement ones with a five-tick `outQuad`
+flight back to the player's own eye and view direction. `Esc` is the game's pause key and is not
+claimed: the mode cuts at once and the pause opens, because a paused game stops the tick clock the
+flight would fly on ([KB 03](../kb/03-client-camera.md)). While the mode runs, movement input is
+zeroed and clicks, uses and picks are cancelled, so the shot's crosshair can never write the world.
+
+**Rejected: a server-side camera packet.** It would let a server script a lobby camera — a capability
+the pack does not have and does not want (§2 of design 16: the pack adds comprehension, not
+capability) — and it would make the frame lag the client's own timeline.
+
+**Rejected: keeping the mode alive behind a pause screen.** A paused client stops ticking, and a
+cinematic whose timeline is frozen is a still image the player cannot leave with the keys they
+expect. The mode leaves in the same press that opens the screen.
+
+**Consequence.** The guide and the cinema are mutually exclusive because one wants a hand and the
+other an eye: arming either leaves the other, one press each way. The mode allocates no finding code:
+an invalidation is still `SC-BLD-0008`, and what the mode shows is a stage, a shot and a ghost set the
+payload already carried.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2332,6 +2370,11 @@ different build.
   and only the view cursor, the reveal counts and the camera are the client's. A reviewer should
   reject any presentation change that computes a stage index, a candidate, a score or a plan on the
   client.
+- The cinema mode frames one session from the viewer's own entry side (D-100): two clients on one
+  session can open different shots, and that is not a determinism defect — the table, the counts and
+  the frontier are what must agree, the movie is a view. A reviewer should reject any camera change
+  that reads the world, adds a camera fact to the payload, or lets a screen, a movement key or a
+  closing session leave the mode running.
 - A preset stores an absolute pose and a source *form*, never a resolved source or a plan (D-99): the
   same preset applied in another place is not expressible, and one saved with a container source
   refuses when the container is gone. A reviewer should reject any preset change that writes without

@@ -286,6 +286,12 @@ public final class PlaybackController {
         return stageOfCell.get(cell);
     }
 
+    /** A cell's position inside its stage, or -1 when the cell carries no ghost. */
+    static int positionOf(LatticePoint cell) {
+        Integer position = positionOfCell.get(cell);
+        return position == null ? -1 : position;
+    }
+
     public static @Nullable PreviewPresentation presentation() {
         return presentation;
     }

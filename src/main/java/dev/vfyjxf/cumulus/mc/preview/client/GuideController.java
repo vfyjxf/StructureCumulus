@@ -45,12 +45,25 @@ public final class GuideController {
         return guided;
     }
 
-    /** `G`: on with the whole cursor stage revealed, off with the emphasis gone (design 16 §6.3, §12.1). */
+    /**
+     * `G`: on with the whole cursor stage revealed, off with the emphasis gone (design 16 §6.3, §12.1).
+     * The guide and the cinema mode look at the same session from two sides — one wants a hand, the
+     * other an eye — so arming either leaves the other (design 16 §6.7).
+     */
     static void toggle() {
+        if (!guided) {
+            CinematicController.leaveForGuide();
+        }
         guided = !guided;
         if (guided) {
             PlaybackController.revealStage();
         }
+    }
+
+    /** The cinema mode takes the frame: the guide goes quiet without a key change. */
+    static void disarm() {
+        guided = false;
+        pulsing = Set.of();
     }
 
     /** A confirm is on its way; whether the plan survives it decides the automatic entry (§12.1). */

@@ -1160,8 +1160,9 @@ E5 the guide), never before — a type documented here that the sources do not d
 so a reserved batch is a note here and a shape in design 16, not a signature in this block. A
 landing milestone either extends this block or lists a non-API type in `tools/spec-uncovered.txt`
 with a reason; it may not leave a public presentation type in neither place. The `cine` package is
-the exception that proves the rule: the cinematography core is a pure-math foundation with no
-event wiring, landed ahead of its E8 integration so the milestones above and E8 share one math.
+the exception that proves the rule: the cinematography core is a pure-math foundation with no event
+wiring, landed ahead of its E8 integration so the milestones above and E8 share one math; E8 adds
+`CinematicPrograms` there and the two client controllers beside it (§19).
 
 ```java
 package dev.vfyjxf.cumulus.mc;
@@ -1174,6 +1175,9 @@ public final class ClientConfig {
     public static boolean animationCelebrate();
     public static boolean hudProgress();
     public static boolean hudStageBanner();
+    public static boolean cinematicsEnabled();
+    public static double cinematicsSpeed();
+    public static boolean cinematicsLetterbox();
 }
 
 public final class BuildPresetCommand {
@@ -1456,10 +1460,35 @@ public final class PlacementAnimator {
 public final class PreviewKeys {
     public enum Action {
         turnCw, turnCcw, flip, prevOrigin, nextOrigin, reset, recall, sliceUp, sliceDown, toggleProblems,
-        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant, savePreset
+        confirm, cancel, prevStage, nextStage, playPause, stepCell, guide, nextVariant, savePreset, cinematic
     }
 
     public static @Nullable KeyMapping binding(Action action);
+}
+
+public final class CinematicController {
+    public static boolean active();
+    public static boolean fastReturning();
+    public static boolean closing();
+    public static float letterboxAlpha();
+    public static int programTicks();
+    public static int focusedStage();
+    public static @Nullable CameraShot sampledShot();
+}
+
+public final class TransitionController {
+    public static float ghostAlpha(GhostCell ghost, float partialTick);
+    public static float ghostScale(GhostCell ghost, float partialTick);
+    public static boolean turntableActive();
+    public static int turntableTicks();
+    public static int turntableDurationTicks();
+    public static double turntableAngleDeg();
+    public static @Nullable Turn turntableModelTurn();
+    public static boolean stageAdvanceActive();
+    public static int stageAdvanceTicks();
+    public static int stageAdvanceDurationTicks();
+    public static boolean sessionFadeActive();
+    public static int sessionFadeTicks();
 }
 
 public final class GuideController {
@@ -1940,6 +1969,14 @@ public record TurntableTransition(Turn from, Turn to, int durationTicks, Ease ea
     public Vec3 rotate(Vec3 offset, double tick);
     public Turn modelTurn(double tick);
 }
+public final class CinematicPrograms {
+    public static Vec3 centre(Cuboid bounds);
+    public static CameraProgram opening(Cuboid bounds, Vec3 approach);
+    public static CameraShot stageShot(Cuboid bounds, Vec3 approach);
+    public static CameraProgram focus(CameraShot from, Cuboid bounds, Vec3 approach);
+    public static CameraProgram closing(CameraShot from, Cuboid bounds, Vec3 approach);
+    public static Cuboid hull(java.util.List<LatticePoint> cells, Cuboid fallback);
+}
 ```
 
 ## 16. Build (design 14, P2 landed the single structure; P6 adds the set build)
@@ -2238,11 +2275,11 @@ a tie goes to the choice whose latest occurrence is the most recent). Every writ
 - **Not persisted.** The build undo history stays in-memory (D-87); the preferences, their memory and
   the presets are durable.
 
-## 19. Presentation (design 16, approved at E0, landing E1–E6)
+## 19. Presentation (design 16, approved at E0, landing E1–E8)
 
 `dev.vfyjxf.cumulus.mc.preview` owns the stage model and the payload facts, `...preview.client` owns
-playback, the layered ghosts, the HUD tiers, the stage banner, the placement animator and the guide,
-and `...preview.jei` owns the view modes. No third package appears, and the presentation pack adds no
+playback, the layered ghosts, the HUD tiers, the stage banner, the placement animator, the guide, the
+hand-off transitions and the cinema mode, and `...preview.jei` owns the view modes. No third package appears, and the presentation pack adds no
 module edge. The contracts are design 16's; this section states the adapter-side shape of them, and
 its signatures join §15 per milestone (the batch 10 note there).
 
@@ -2258,7 +2295,9 @@ pulse, the frontier's automatic advance through the existing invalidation channe
 ghost's tooltip; `Enter` stays §18's confirm, so a hand-placed stage and a machine-built one share one
 executor (design 16 §12). E6: the variant groups — the document's `variants` block in the compiled
 value, the summary on both payloads, `N`'s re-open and the JEI page's in-place switch
-(design 15 §12, D-98). The milestone's state lives in
+(design 15 §12, D-98). E8: the cinema mode — `C`, the camera program from the stage table, the
+12/6/4/8-tick hand-off transitions and the `cinematics.*` keys (design 16 §6.7, D-100). The
+milestone's state lives in
 [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md).
 The sections that already describe this ground keep their meaning — §17's session, §17's payload caps,
 §18's confirm path and §16's build, undo and codes.
@@ -2270,13 +2309,13 @@ The sections that already describe this ground keep their meaning — §17's ses
 | the stage model | one pure function over a compiled blueprint and its definition-frame expected cells, producing the stage table (names, expected and satisfied counts, the bay's description and hint); no world, no siting, no clock (D-93) | `mc.preview` |
 | the payload facts | the presentation block (the blueprint's description, the stage table, the frontier stage the marks imply, the plan's shortage lines) on the session payload and on the catalog entry; one stage index per ghost cell; ghosts ordered by stage then definition-frame cell order; the variant summary beside the presentation block on both payloads, compiled-bounded (E6) | `mc.preview.net` |
 | the commit feedback | one S2C payload per committed transaction and per undo, to the invoking player only, listing the cells the transaction changed in the order it changed them, with the status and the formed flag (D-95); `ApplyReport.changes` is where the cells come from, and `BuildFeedback` is the one sender | `mc.preview.net`, sent by the confirm path and the build commands |
-| the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: `hud.*` with `animation.enabled`/`animation.speed` at E1, `animation.sound`/`animation.celebrate` at E2 | `mc.ClientConfig`, registered by the mod entry |
+| the client config | `config/structurecumulus-client.toml`, one `CLIENT` file: `hud.*` with `animation.enabled`/`animation.speed` at E1, `animation.sound`/`animation.celebrate` at E2, `cinematics.enabled`/`cinematics.speed`/`cinematics.letterbox` at E8 | `mc.ClientConfig`, registered by the mod entry |
 
 The server adds no presentation state: no per-player playback record, no animation queue, no tick
 handler, no map beside the session. The payload is plain data, and its handler resolves client classes
 only inside the enqueued work (§17's law, design 15 §6.4), so a dedicated server never loads one.
 
-**Client side (E1, E2, E3, E4, E5).** The playback controller keeps three facts per session — the
+**Client side (E1, E2, E3, E4, E5, E8).** The playback controller keeps three facts per session — the
 presentation block it was sent (table and frontier), the view cursor and the reveal counts — and
 derives nothing from the marks. The layered renderer multiplies the stage factor into the ghost alpha it
 already forces (§17's translucent pass) and leaves the Y slice and the distance cull in charge of
@@ -2290,6 +2329,15 @@ The guide is the same session viewed differently: its automatic advance is the s
 invalidation channel (§17's `LevelWatch` revision check), its next-step line is composed by one
 formatter with a fixed vocabulary, and its `Enter` is the §18 confirm unchanged — the world keeps one
 writer (D-97).
+The cinema mode is the third view: `CinematicController` owns the one client-side camera — a rig
+entity that never joins a level, the recorded camera entity and type, the program cursor and the
+hand-back — and reads the payload and the playback cursor; `TransitionController` owns the hand-off
+animations (the stage advance, the turntable, the flip and the session fade) and is queried by the
+ghost pass for its per-cell alpha and scale and for the one old-pose layer a frame may still draw.
+Both are `Dist.CLIENT`-only state reached from `PreviewClientEvents`, `PreviewHud`, `PreviewClientState`
+and `GhostRenderer`; `CinematicPrograms` is the pure geometry the mode samples. Nothing in the mode
+sends a payload, and the only common-side change is `C`'s binding and the three `cinematics.*` config
+keys.
 
 **JEI side (E4, E6).** The category gains a mode button (isometric, three-view, slice grid) beside the
 existing slider and button. All three modes draw the catalog entry's cells; the mode is per-recipe
@@ -2306,8 +2354,8 @@ and the button opens the selected member's id through the same `openSelected` en
 `VariantSummary` and the one switch arithmetic (declaration order, wrapping); both are package-private,
 so the adapter's public surface grows by the payload record and `JeiPreview`'s five methods only.
 
-**Still absent.** A server-side stage or playback state; animation or particle work on the server
-thread; broadcasting another player's placement animation; a stage-number billboard in the world; a
-second client config file; localisation of the HUD and formatter vocabulary; exporting a view as an
-image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
+**Still absent.** A server-side stage, playback or camera state; animation or particle work on the
+server thread; a camera fact on the wire; broadcasting another player's placement animation; a
+stage-number billboard in the world; a second client config file; localisation of the HUD and
+formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.

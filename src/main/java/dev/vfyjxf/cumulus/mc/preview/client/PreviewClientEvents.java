@@ -8,9 +8,14 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
+import net.neoforged.neoforge.client.event.MovementInputUpdateEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
+import net.neoforged.neoforge.client.event.RenderPlayerEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.client.event.ViewportEvent;
 
 /**
  * The preview's client wiring. The class is only loaded on the physical client, so no preview
@@ -55,10 +60,52 @@ public final class PreviewClientEvents {
 
     @SubscribeEvent
     private static void onInteraction(InputEvent.InteractionKeyMappingTriggered event) {
-        if (!event.isUseItem() || Minecraft.getInstance().screen != null) {
+        if (CinematicController.active() || !event.isUseItem() || Minecraft.getInstance().screen != null) {
             return;
         }
         PreviewClientState.cyclePartAtCrosshair();
+    }
+
+    @SubscribeEvent
+    private static void onCameraAngles(ViewportEvent.ComputeCameraAngles event) {
+        CinematicController.onCameraAngles(event);
+    }
+
+    @SubscribeEvent
+    private static void onMovementInput(MovementInputUpdateEvent event) {
+        CinematicController.onMovementInput(event);
+    }
+
+    @SubscribeEvent
+    private static void onInteractionTriggered(InputEvent.InteractionKeyMappingTriggered event) {
+        CinematicController.onInteraction(event);
+    }
+
+    @SubscribeEvent
+    private static void onMouseButton(InputEvent.MouseButton.Pre event) {
+        CinematicController.onMouseButton(event);
+    }
+
+    @SubscribeEvent
+    private static void onKey(InputEvent.Key event) {
+        CinematicController.onKey(event);
+    }
+
+    @SubscribeEvent
+    private static void onScreenOpening(ScreenEvent.Opening event) {
+        CinematicController.onScreenOpening(event);
+    }
+
+    @SubscribeEvent
+    private static void onRenderPlayer(RenderPlayerEvent.Pre event) {
+        CinematicController.onRenderPlayer(event);
+    }
+
+    @SubscribeEvent
+    private static void onRenderHand(RenderHandEvent event) {
+        if (CinematicController.active()) {
+            event.setCanceled(true);
+        }
     }
 
     @SubscribeEvent

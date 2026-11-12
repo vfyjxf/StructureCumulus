@@ -69,6 +69,11 @@ final class PreviewHud {
         if (minecraft.level == null || minecraft.player == null) {
             return;
         }
+        if (CinematicController.active()) {
+            cinema(graphics, minecraft, session);
+            PreviewClientState.markRendered();
+            return;
+        }
         List<String> lines = PreviewClientState.hudLines();
         if (lines.isEmpty()) {
             return;
@@ -112,6 +117,40 @@ final class PreviewHud {
         banner(graphics, minecraft);
         billboards(graphics, minecraft, session);
         PreviewClientState.markRendered();
+    }
+
+    /**
+     * The cinema frame: the corner panel folds into one thin bar over the letterboxed picture, so the
+     * shot keeps the screen and the progress stays readable (design 16 §6.7).
+     */
+    private static void cinema(GuiGraphics graphics, Minecraft minecraft, PreviewSyncPayload session) {
+        int screenWidth = minecraft.getWindow().getGuiScaledWidth();
+        int screenHeight = minecraft.getWindow().getGuiScaledHeight();
+        if (ClientConfig.cinematicsLetterbox()) {
+            int bar = Math.max(8, screenHeight / 8);
+            int shade = withAlpha(0xFF000000, CinematicController.letterboxAlpha());
+            if ((shade >>> 24) != 0) {
+                graphics.fill(0, 0, screenWidth, bar, shade);
+                graphics.fill(0, screenHeight - bar, screenWidth, screenHeight, shade);
+            }
+        }
+        int expected = 0;
+        int satisfied = 0;
+        for (CellMark mark : session.overlay().cells().values()) {
+            expected++;
+            if (mark == CellMark.present) {
+                satisfied++;
+            }
+        }
+        if (!ClientConfig.hudProgress() || expected == 0) {
+            return;
+        }
+        int width = Math.max(80, screenWidth * 2 / 5);
+        int left = (screenWidth - width) / 2;
+        int top = screenHeight - Math.max(8, screenHeight / 8) - 8;
+        graphics.fill(left, top, left + width, top + 2, barTrack);
+        graphics.fill(left, top, left + Math.round(width * (float) satisfied / expected), top + 2, barFill);
+        banner(graphics, minecraft);
     }
 
     /** Tier 1: satisfied over expected, filled only by whole cells (design 16 §7.1). */

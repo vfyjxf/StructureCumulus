@@ -54,7 +54,8 @@ public record CameraShot(Vec3 eye, Vec3 target) {
     public float pitch() {
         Vec3 d = target.subtract(eye);
         double horizontal = Math.sqrt(d.x * d.x + d.z * d.z);
-        return (float) Math.toDegrees(Math.atan2(d.y, horizontal));
+        // the frame's xRot is positive when looking down (its forward is -sin(xRot) on Y)
+        return (float) -Math.toDegrees(Math.atan2(d.y, horizontal));
     }
 
     static Vec3 center(Cuboid bounds) {

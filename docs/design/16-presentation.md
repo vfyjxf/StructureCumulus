@@ -2,8 +2,9 @@
 
 > Status: approved, design first (E0, 2026-11-12). It specifies the presentation pack on top of the
 > preview of [15](15-preview.md) and the build of [14](14-auto-build.md), and lands with milestones
-> E1–E6 of [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md). The rulings are D-93…D-98;
-> the document members are §3 (D-94), and E6's variant groups are design 15 §12 (D-98), not this file.
+> E1–E8 of [`docs/plan/presentation-plan.md`](../plan/presentation-plan.md). The rulings are D-93…D-98
+> plus D-100 for the cinema mode; the document members are §3 (D-94), and E6's variant groups are
+> design 15 §12 (D-98), not this file.
 > A milestone's gate is its statement of done; which sections landed at which milestone is the plan's
 > state column and adapter §19. A "roadmap" citation
 > names the source plan's roadmap,
@@ -370,11 +371,14 @@ not hide the blueprint.
 | `B` | one cell step: reveals the next unrevealed cell of the cursor's stage; past its end, moves to the next stage and reveals its first cell | E1 |
 | `G` | guided mode on / off (§12) | E5 |
 | `N` | next variant of the group: re-opens the session on the next member at the same origin (15 §12.2) | E6 |
+| `C` | the cinema mode on / off: detaches the frame and flies the session's program; the first movement input hands it back (§6.7) | E8 |
 
 The keys of 15 §5 are unchanged and keep their meanings: `[` `]` turn, `;` flip, `,` `.` the origin
 cycle, `R` reset, `P` recall, `PgUp`/`PgDn` the Y slice, `T` all/problems, `Enter` confirm, `Esc`
-cancel. `↑`/`↓`, `V`, `B`, `G` and `N` were all unbound in the mod; the uitest conflict check
-(roadmap §5) asserts the combination rather than trusting this paragraph.
+cancel. `↑`/`↓`, `V`, `B`, `G` and `N` were all unbound in the mod, and `C` is free of every other
+preview action; vanilla binds `C` to the creative hotbar save, the one collision the cinema mode has,
+and the mode claims that binding's click on the presses it takes (§6.7). The uitest conflict check
+(roadmap §5) asserts the combination and the claim rather than trusting this paragraph.
 
 - **A key is a view move, never a control payload.** No stage key reaches the server, and no stage
   key changes a candidate, a mark or a plan. `N` is the one control key of this file: a variant
@@ -439,7 +443,131 @@ tick, the only reproducible shape):
   old pose until the final tick.
 
 The camera's rig mechanics (how a shot reaches the one `Camera` NeoForge lets an event steer) and
-the playback/camera coupling are E8's design, not specified here.
+the playback/camera coupling are §6.7.
+
+### 6.7 The cinema mode: the rig, the program and the hand-back (E8, D-100)
+
+The cine math of §6.6 is pure; this section is the mechanics that put a shot on the one `Camera`
+NeoForge lets an event steer, and the law that ties the program to the playback. The mode is a pure
+client view of an open session: there is no camera fact on the wire, no server animation state and no
+world write, and the session's close ends it.
+
+#### 6.7.1 The rig
+
+`ViewportEvent.ComputeCameraAngles` is posted at the top of `Camera.setup`, before the frame's
+position is written (`Camera.java:53`, `:57`), so a handler can turn the camera but cannot move it.
+The mode therefore anchors the frame on a **client-only rig**: an `Entity` of type `PLAYER` (for its
+1.62 eye height, so the camera's smoothed eye height has nothing to ease across the hand-over) that
+is never added to a level, never ticked and never rendered. Per frame the camera handler writes the
+rig to `shot.eye - rig.eyeHeight`, sets its rotation, and calls `setOldPosAndRot()` — the camera's own
+`lerp(partialTick, xo, x)` then reads the sample exactly rather than sliding between two ticks. The
+angles are overwritten on the same event (`setYaw`, `setPitch`, `setRoll(0)`), so the frame is the
+program's, not the player's.
+
+`Minecraft.setCameraEntity(rig)` owns the frame; the local player's body is kept out of the shot with
+`RenderPlayerEvent.Pre` (the game draws the local player whenever it is not the camera entity) and the
+first-person hand with `RenderHandEvent`. On entry the mode records the camera entity and the camera
+type and forces `FIRST_PERSON`; every exit restores both (a type the player picked with F5 during the
+mode is kept). The rig is dropped on exit and on a level change, so nothing outlives the mode.
+
+The program's clock is the client tick: an integer cursor advanced once per `ClientTickEvent.Post`,
+sampled at `cursor + partialTick` and multiplied by `cinematics.speed`. A paused game fires no client
+tick, so the frame holds. Same cursor and same partial tick give the same shot — the program is a
+function of payload geometry and two numbers.
+
+#### 6.7.2 The program law
+
+`CinematicPrograms` builds every leg from payload data; the fov is the fixed 70° framing constant, so
+a program cannot depend on a setting.
+
+| Builder | Shape |
+| --- | --- |
+| `opening(bounds, approach)` | one full turn: 17 shots at 22.5° steps about the subject's centre at its fit distance, the sixteen legs 5 ticks of `linear` each (80 ticks total), eyes raised by 0.35 of the subject's height; the last shot closes the circle on the first |
+| `stageShot(bounds, approach)` | `CameraShot.framing` of one stage: eye on the approach ray at the fit distance, target at the stage's centre |
+| `focus(from, bounds, approach)` | the current shot, then the stage's framing shot over 12 ticks of `inOutCubic`, held afterwards |
+| `closing(from, bounds, approach)` | the current shot, then a pull-back at 1.8× the fit distance and 0.9 of the height over 20 ticks of `inOutCubic`, held afterwards |
+
+- **The approach is the viewer's side.** The wire carries no door heading and the client invents no
+  blueprint front (D-93): the approach is the horizontal direction from the subject's centre to the
+  player's eye at entry, so the movie opens from the side the viewer is already standing on. A viewer
+  inside the bounds falls back to the +Z side.
+- **Stage geometry is the stage's own ghost cells.** A stage's framing bounds are the union of the
+  unit cells the payload lists for that stage (payload geometry, no stage or order is re-derived); a
+  stage whose ghosts are all present has no cells left and is framed with the whole subject's bounds.
+- **One orbit is chords, not a spline.** Each leg interpolates eye and target linearly (§6.6); the
+  sixteen steps keep a sampled circle within 1.9% of its radius. No Catmull-Rom — a uniform
+  parameterization would vary the speed per leg and overshoot.
+
+#### 6.7.3 The playback coupling
+
+The playback cursor is the one clock the camera follows. On entry the opening orbit plays. When the
+orbit ends, or the moment the cursor moves (§6.1's `↑`/`↓`, `B`, `V`, the tracked frontier), the
+camera flies from the shot it is on to the selected stage's framing shot over the design's 12 ticks
+and holds there; every later cursor move flies again. When a running playback reaches the table's
+end, the closing pull-back plays once. The camera never seeks backwards and never cuts: a program is
+swapped only from the frame that was just drawn, so the first leg starts where the last one ended.
+
+A pose change does not move the camera: `[` `]` and `;` re-sync new ghost cells and the transition
+animations of §6.7.4 swing them under the frame. The mode adds no rule to the session's keys; the HUD
+panel folds into one thin bar at the bottom of the screen, and the letterbox (§13) fades in over 8
+ticks.
+
+#### 6.7.4 The transition table
+
+| Transition | Trigger | Shape | Span |
+| --- | --- | --- | --- |
+| stage advance | the playback cursor moves | the leaving stage fades from its current alpha to the done alpha (0.25); the arriving stage's ghosts pop in at 0.5→1.0 scale and 0→full alpha, staggered two ticks per cell with a six-tick cell span (the E2 pop-in atom), capped inside the span; the banner's own crossfade (§8) runs beside it | 12t |
+| turntable | the candidate's `turn` changes | the **previous** ghost set swings about the placement's vertical axis from the old turn to the new on the shortest signed arc (±90° or 180°), `inOutCubic`; the block model keeps the old pose for the whole swing, and the new set appears on the tick the swing ends | 6t |
+| flip | the candidate's mirror changes and the turn does not | the previous ghost set crossfades out while the new one crossfades in (`smoothstep`) | 4t |
+| session | the first sync, a different blueprint id, or the session's close | the ghost set fades in, crossfades to the new blueprint, or fades out from the last payload | 8t |
+
+- **The turntable's pivot is the placement's own axis**: the siting's origin plus its placement
+  offset, the point a turn actually rotates about. A structure's bounding-box centre coincides with
+  it only when the structure is centred, so using the centre would land the swing off the new cells.
+- Only cell *positions* interpolate during a swing; the block states are the previous payload's, so
+  no model is re-baked per frame. The new payload's cells are hidden until the swing ends, and the
+  tick the swing ends is the tick the new pose draws — one switch, not a per-frame blend.
+- The close fade keeps the last payload's ghost list for its eight ticks; the session is already
+  gone from every other view, so a closed session's ghosts are the only thing that outlives it.
+- Animations are view state with no clock of their own: they advance on the client tick, die with the
+  session, and sample the render's partial tick.
+
+#### 6.7.5 The hand-back law
+
+The frame belongs to the player, and the first sign that the viewer wants it returns it:
+
+| Input | Answer |
+| --- | --- |
+| a movement key (`forward`/`back`/`left`/`right`/`jump`/`sneak`, by its current binding), a movement binding held, or a right-click | a 5-tick (0.25 s) flight from the current shot to the player's own eye and view direction, one `outQuad` leg; the recorded camera entity and type are restored when it lands |
+| `C` again | the same five-tick flight out: the toggle is a request for the frame, not an escape |
+| `Esc` | a cut: the mode leaves at once and the pause screen opens. `Esc` is the game's pause key, not a preview key, and a paused game stops the tick clock the flight would fly on (KB 03) |
+| the player's view angles changed since entry (the mouse moved) | the mode leaves at once — v1 has no drag-to-orbit and no manual takeover; the camera never fights the hand |
+| the camera type changed (F5) | the mode leaves at once and keeps the type the player picked; it only undoes the first-person it forced |
+| any screen opening (pause, inventory, chat) | the mode leaves at once; a screen is a hand |
+| the session closes or is invalidated (the `SC-BLD-0008` channel, a confirm, a cancel, a timeout, a logout) | the mode leaves at once; a closed session is nothing to watch |
+| a movement input while running | the input is zeroed (`MovementInputUpdateEvent`) and the press starts the hand-back; the player's body never moves under the camera |
+| a click, a use or a pick while running | cancelled (`InputEvent.MouseButton.Pre`, `InteractionKeyMappingTriggered`), so the shot's crosshair can never write the world; every preview key stays live (§6.3) |
+| `cinematics.enabled` turned off while running | the next tick leaves |
+
+The hand-back animates for `C`, a movement key and a right-click — the presses that ask for the frame.
+Every other departure (the mouse already moving it, a screen, a closing session, a changed camera
+type) cuts, because those are the player's own actions arriving from elsewhere and the frame must be
+theirs before the next frame.
+
+#### 6.7.6 The key and the mutual exclusion
+
+`C` is the mode's own binding. It is free of every other preview action; vanilla binds it to the
+creative hotbar save, and that is the mode's one collision. A press the mode claims — a running mode,
+or an open session it is about to enter — also drops the queued click of every non-preview binding on
+that key, so a `C` that enters or leaves the cinema never saves a toolbar. A `C` with no session claims
+nothing and the vanilla action keeps its key. The uitest asserts both the uniqueness of every preview
+binding and the claim.
+
+The guide and the cinema are mutually exclusive, because the first wants a hand and the second wants
+an eye: pressing `C` while guided disarms the guide (and clears its hand pulse), and pressing `G`
+while in the cinema leaves it at once — a cut, not a flight — and arms the guide, because the guide's
+very next action is a key press that must land on the first attempt. Either mode is one press away
+from the other, never a chord.
 
 ## 7. The progress HUD (E.1, E.2, E.3)
 
@@ -763,6 +891,9 @@ No second client config file is ever registered.
 | `animation.celebrate` | bool | `true` | — | the formed celebration (§9.5) |
 | `hud.progress` | bool | `true` | — | the three tiers (§7); `false` leaves the stage line |
 | `hud.stageBanner` | bool | `true` | — | the banner (§8) |
+| `cinematics.enabled` | bool | `true` | — | the cinema mode's `C` (§6.7); `false` leaves the key inert and the mode unreachable |
+| `cinematics.speed` | double | `1.0` | 0.25–4.0 | multiplies the camera program's playback; never a shot, a leg or an order |
+| `cinematics.letterbox` | bool | `true` | — | the cinema frame's black bars (§6.7) |
 
 - **The file lands with E1**: `animation.enabled` and `animation.speed` govern the staged playback,
   which E1 ships, together with the two `hud.*` keys. **E2 adds** `animation.sound` and
@@ -816,6 +947,9 @@ never a presentation surface, and belong to the module whose schema they check �
   (512, §9.1).
 - **The text is data.** No branch in the kernel, the solver or the check path reads a description or
   a hint; equality of compiled blueprints includes them (§3.2, D-94).
+- **The camera is a view.** The cinema mode reads the payload and the playback cursor; its program is
+  a function of payload geometry and two client numbers, it sends nothing, writes nothing and adds no
+  payload field, and every exit restores the player's camera entity and type (D-100, §6.7).
 
 ## 16. Non-goals (v1)
 
@@ -823,9 +957,9 @@ never a presentation surface, and belong to the module whose schema they check �
 number, and is in scope at E3); broadcasting another player's placement animation (B.5); particle
 trails or beams (B.6); localisation of the UI vocabulary (C.5 — the formatter and the HUD keep literal
 English); exporting a view as an image (D.4); the half-automatic "shall I build it" dialogue (F.5);
-hints on a part that is a focus id rather than a bay (v1 hints are bay-scoped, §3); a stage or
-playback state on the server; a second client config file; and any synchronisation of the staged
-playback into the web `visual/` traces (roadmap §6).
+hints on a part that is a focus id rather than a bay (v1 hints are bay-scoped, §3); a stage, playback
+or camera state on the server (a scripted camera is a client view, §6.7); a second client config
+file; and any synchronisation of the staged playback into the web `visual/` traces (roadmap §6).
 
 ## 17. Milestones
 
@@ -836,6 +970,7 @@ playback into the web `visual/` traces (roadmap §6).
 | E3 | §3 the document members and the carry law, §10 the display points |
 | E4 | §11 the view modes |
 | E5 | §12 guided mode, plus the count and plan close-out |
+| E8 | §6.7 the cinema mode, §13's `cinematics.*` keys (design 15 §12's variant summary is E6, not this file) |
 
 E6 lands [15](15-preview.md) §12's variant groups; this file contributes no section of its own, and
 the summary it puts on both payloads is described there.
