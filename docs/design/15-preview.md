@@ -197,7 +197,8 @@ from the declarations exactly as a session resolves them, and shipped as one syn
   one place a session's do ([16](16-presentation.md) §10, §11).
 - **Caps.** Every cap is a code constant and none truncates silently, the same law as the session's
   payload caps (§3): a blueprint that does not compile, or whose projection exceeds 512 expected
-  cells, or whose summary exceeds 64 distinct material items, is **left out of the catalog entirely**
+  cells, or whose summary exceeds 64 distinct material items, or whose every expected cell is air and
+  would draw nothing ([17](17-preview-screen.md) §3.3), is **left out of the catalog entirely**
   and named in a WARNING log line. A partial scene or a partial material list would lie about the
   blueprint, so the entry is absent rather than wrong. One whole-catalog cap (4096 expected cells)
   keeps a single payload inside the network frame limit; the ids it leaves out are named the same
@@ -219,8 +220,9 @@ add two projections of the same cells, and the mode itself is per-recipe view st
 and pitch below, never a payload field.
 
 - **Camera.** Yaw and pitch are per-recipe view state; dragging the viewport rotates them, the pitch
-  clamps just short of the poles, and the scale is fitted to the blueprint's bounds on every frame,
-  so a 1×1×1 cell and a 40-block tower both fill the viewport.
+  clamps just short of the poles, and the scale is fitted to the drawn cells' hull on every frame
+  ([17](17-preview-screen.md) §3.3 — an entry carries no bounds, and a fit to them would draw the
+  padding instead of the structure), so a 1×1×1 cell and a 40-block tower both fill the viewport.
 - **Geometry.** One expected cell is one block model rendered by `BlockRenderDispatcher` at full
   brightness, resolved from the wire block id plus its property strings against the client's block
   registry (an id or value this client does not know leaves the property at its default). Rendering

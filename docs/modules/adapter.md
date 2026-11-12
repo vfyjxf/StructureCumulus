@@ -2073,7 +2073,8 @@ The command's source forms are the single build's (§16.1), `with <kind-id>` inc
 ## 17. Preview (design 15, approved, landing with P3/P4)
 
 `dev.vfyjxf.cumulus.mc.preview` (server and payloads), `...preview.client` (`Dist.CLIENT`) and
-`...preview.jei` (a conditional built-in plugin, D-90) own the preview. A session is keyed by
+`...preview.jei` (a conditional built-in plugin, D-90) own the preview; the scene core they share lives
+in `...preview.scene` since the screen pack (§20, design 17 §10). A session is keyed by
 `(player, level)`, keeps its candidates, overlay and ghosts server-side, invalidates on the
 `LevelWatch` mark counter (`SC-BLD-0008`), retracts its ghosts on timeout and recalls (design 15
 §4), and never writes the world; confirm is the build flow (§16). Design 15 owns the payload
@@ -2359,3 +2360,78 @@ server thread; a camera fact on the wire; broadcasting another player's placemen
 stage-number billboard in the world; a second client config file; localisation of the HUD and
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
+
+## 20. Preview screen (design 17, approved at SC0, landing SC1–SC4)
+
+Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
+core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
+axis gizmo — and `...preview.client.screen` (a subpackage of the client one), which holds the screen
+itself. `...preview.jei` keeps only the mezz.jei half: the category, its input handler, the
+conditional plugin and its loader pass, `JeiPreview` and its client events. The contracts are design
+17's; this section states the adapter-side shape of them, and its members join §15 per milestone
+(the same batch discipline §19 used).
+
+**Landed, and landing.** SC0 lands this section, [design/17](../design/17-preview-screen.md) and
+D-101…D-105. SC1 lands the migration, `PreviewScreen`, the camera and projection, the four viewports,
+the axes and the drawn-hull fit (the JEI view takes the same hull change). SC2 lands the staged
+playback, the delta treatments and the exploded view. SC3 lands the links: the JEI button, the client
+command, the `openScreen` key, the open payload's heading and the in-screen variant switch. SC4 lands
+the demo documents. The milestone state lives in
+[`docs/plan/screen-plan.md`](../plan/screen-plan.md).
+
+**Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
+record every surface shares.
+
+| Shape | Component | Direction | Cap |
+| --- | --- | --- | --- |
+| `net.Stage` | `NamespacedId bay`, the bay the stage derives from | S2C on both the session payload and every catalog entry | none of its own: a bay with a drawn cell owns at least one stage, and the table is capped at `maxStages` = 256, so the distinct bays cannot exceed the stages |
+| `net.PreviewOpenPayload` | `@Nullable Heading facing`, the direction the viewer faces | C2S, the existing open channel | an enum, never a list; the four horizons are accepted and `up`/`down` read as absent |
+
+`PreviewService.open` keeps its two entry points: the player-facing one passes the player's own facing
+as today, and the ghost-to-world one passes the payload's heading where that facing goes, so the
+session's cycle start and its facing weight follow the screen's side and nothing else moves. No third
+payload, no S2C open and no second open path appear.
+
+**Public shape promises.** Member-level signatures are not listed here yet; they join §15 at the
+milestone that lands the code (SC1 for the scene and the screen's skeleton, SC2 for the player and
+the explode, SC3 for the action and the command), and a name that exists in neither §15 nor
+`tools/spec-uncovered.txt` is a gate failure until then. The types are:
+
+| Package | Type | What it is |
+| --- | --- | --- |
+| `preview.scene` | `PreviewScene` (with its `View` and `LayerRule`) | one page's cells resolved against the client registry, drawn through a rectangle and a camera; moved from `preview.jei` |
+| `preview.scene` | `BlueprintPreviewRecipe` | the page model: the shipped members, the selected index, the scene, the materials, the presentation; the per-surface view state stays with JEI |
+| `preview.scene` | `PreviewViewMode` | the scene's projection vocabulary, for the JEI face to select |
+| `preview.scene` | `SceneCamera` (with `Projection` and `Snap`) | the orbit camera value: target, yaw, pitch, distance, zoom, projection; pure operations only |
+| `preview.scene` | `Hull` | the drawn hull of design 17 §3.3, the input of every fit |
+| `preview.scene` | `ExplodeModel` | the per-bay offset function of design 17 §8.1 |
+| `preview.scene` | `AxisGizmo` | the three axes and their label anchors, projected through a camera |
+| `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
+| `preview.client.screen` | `PreviewScreen` | the one `Screen`: the layout, the four viewports, the widgets, the input and the one world action |
+| `preview.client.screen` | `ViewportWidget` | one viewport's rectangle, its camera derivation, its draw and its picking |
+| `preview.client.screen` | `CameraController` | the input table of design 17 §4.4 translated into `SceneCamera` operations, plus the stage framing and its hand-back |
+| `preview.client.screen` | `StagePlayerWidget` | the stage bar, the cursor and reveal counts, the summary line and the clock |
+| `preview.client.screen` | `ScreenButtons` | the button row of design 17 §4.5, one button per action |
+| `preview.client.screen` | `GhostToWorldAction` | the one C2S send, with the camera's heading |
+
+**What the screen never does.** It reads no world state (no `Level`, no `ClientLevel`, no
+`getBlockState`, no camera entity) and no session: its only input is `PreviewCatalogClient`'s
+snapshot, plus its own view state. It sends one packet — the open of design 17 §9.4 — and adds no
+server-side state, no tick handler, no map, no config file and no finding code (design 17 §12). It
+names no `mezz.jei` type, so it loads with JEI absent; neither package is nameable from the common
+side, and the dedicated-server runs load neither. The client tick is not the screen's clock: a screen
+pauses the game, so the screen accumulates the frame's real-time tick delta and samples it, and no
+screen animation reads the game tick.
+
+**Config and keys.** The screen obeys `animation.enabled` and `animation.speed` (the client file of
+§19) and adds no key of its own to that file. The preview keys gain exactly one `KeyMapping` action —
+`openScreen`, default `O`, the world's key for opening the screen on the open session's blueprint —
+and every key the screen itself uses (design 17 §4.4) is a `Screen` key, not a binding: a screen owns
+the keyboard while it is open, and no world binding fires through it.
+
+**Still absent.** A session behind the screen; a server-side screen, camera or explode state; a second
+cell, stage or open payload; a slice, a material list or a camera memory in the screen; an S2C screen
+request or a server-side `screen` verb; a second scene renderer or a second face for another mod's
+browser; a screen-specific config key; and any world-space work (a `RenderLevelStageEvent` handler, a
+stage-number billboard, a screen overlay in the world) for a screen that is not in the world.
+

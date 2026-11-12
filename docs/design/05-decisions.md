@@ -2286,6 +2286,185 @@ other an eye: arming either leaves the other, one press each way. The mode alloc
 an invalidation is still `SC-BLD-0008`, and what the mode shows is a stage, a shot and a ghost set the
 payload already carried.
 
+### D-101 — The preview screen is a client catalogue view, and the catalogue carries the bay
+
+The preview screen ([design/17](17-preview-screen.md) §2–§3) is a `Screen` over the last catalogue
+payload this client received: no session, no world read, no server round trip to open it, no server
+state to close it, no world write. Every fact it draws is an entry field — the cells and their stage
+indices, the stage table, the variant summary and, added by this ruling, one bay id per stage
+(`net.Stage.bay`, on both the session and the catalogue payload) — and one C2S field rides the
+existing open payload (`PreviewOpenPayload.facing`, an optional horizontal heading, absent = the
+player's own facing). The bay needs no cap of its own: a bay with a drawn cell owns at least one stage
+and the table is capped at 256 (`maxStages`, design 16 §4.1.8), so the distinct bays can never exceed
+the stages. The fit is over the cells that draw a model — a cell whose expected state `isAir()`
+contributes no corner — and an entry whose every cell is air is left out of the catalogue at build
+time with the existing WARNING line (design 15 §6.1, §6.2 corrected).
+
+**Why the catalogue and not a session.** The data is already client-side and pushed on join and on
+`/reload` (design 15 §6.1, E1/E6's wire shapes); a session per screen would add server state that no
+server decision consumes (D-95's rejection, one surface larger), would need an origin and a siting a
+catalogue page does not have, and would fork the marks and candidates the session already owns. A
+catalogue view also works on a dedicated-server client, with JEI absent and with no world loaded at
+all — which is exactly the surface R6 asked for.
+
+**Why the bay rides on the stage, and not on the cell.** The exploded view separates parts and a part
+is a bay ([design/17](17-preview-screen.md) §8); a cell's bay is the bay of the stage that owns it
+because provenance is exact (design 16 §4.1.2: one cell, one producing check, one bay). One id per
+stage therefore carries the relation for every cell, at 256 ids against 512 per-cell indices, and it
+is the string a label needs. A per-cell index would enlarge `GhostCell`, the one shape the session,
+the catalogue and the JEI tooltip share; a parallel bay list beside `ghostCells` would be the
+alignment rule no type enforces that design 16 §5 already rejected.
+
+**Rejected: an S2C "open the screen" packet and a server command.** A window the client can open for
+itself does not need a payload, a permission question and a server code path; the command is the
+client's (`RegisterClientCommandsEvent`, [design/17](17-preview-screen.md) §9.2) and the world key
+opens the same screen from the client's own session state.
+
+**Consequence.** A reviewer rejects any `Level` reference, any server map, any server tick handler and
+any payload addition beyond the two fields above — and rejects a new cap, because the screen adds no
+list of its own. An id the snapshot does not carry opens nothing and says so in one client message; a
+page that draws nothing is never shipped instead of being drawn empty. The heading can only order a
+session's own candidates: the cycle, the lock and the scoring stay design 15 §7/§9's.
+
+### D-102 — The JEI-free scene core moves to `mc.preview.scene`, and JEI keeps a thin shell
+
+`PreviewScene` (with its nested cell, layer rule, view and panel types), `BlueprintPreviewRecipe` and
+`PreviewViewMode` move from `mc.preview.jei` to the new `mc.preview.scene`; `CellStates` and
+`TintedBuffers` move from `mc.preview.client` to the same package. The JEI package keeps the mezz.jei
+half — the category, its input handler, the conditional plugin and its loader pass, `JeiPreview` and
+its client events — and gains one `open in screen` button. The page model moves; the JEI page's own
+view state (yaw, pitch, slice, mode) does not, because a screen must not inherit another surface's
+camera. The types are raised to public where a second package consumes them, and their members join
+adapter §15 at the milestone that lands the code (SC1, adapter §20).
+
+**Why.** The screen must work with JEI absent (D-90's conditional law), and code two surfaces share
+cannot live in the optional package: an import of `preview.jei` from the screen would make the screen's
+compile classpath depend on a package whose other classes name mezz.jei. The move also pays for
+itself — the world ghost pass and the screen need one forced-alpha mechanism (`TintedBuffers`), and
+`PreviewScene` already carries a private duplicate of `CellStates`' payload-to-state resolution that
+the move deletes.
+
+**Rejected: the screen importing `preview.jei`.** It would work in a dev runtime and fail the moment a
+player has no JEI; the package boundary is exactly what keeps D-90 true.
+
+**Rejected: a second scene implementation for the screen.** Two renderers would drift on the same
+five hundred lines of projection, depth, picking and pass rules (design 15 §6.2), and the screen's
+only claim is that it draws the catalogue's cells — the one thing a second renderer cannot be trusted
+to keep.
+
+**Consequence.** A public-shape change lands docs-first: this decision, [design/17](17-preview-screen.md)
+§10 and adapter §20 today, adapter §15's members with SC1's code. The dependency direction is one way
+(`preview.jei` → `preview.scene`, `preview.client.screen` → `preview.scene`), neither consumer names the
+other, and the dedicated-server runs stay free of both packages. A reviewer rejects any `mezz.jei`
+import in `preview.scene` or `preview.client.screen`.
+
+### D-103 — Orthographic 45° is the screen's default, and the camera is a pure value
+
+The screen's camera is a value — `SceneCamera` (target, yaw, pitch, distance, zoom, projection) — whose
+operations are pure ([design/17](17-preview-screen.md) §4). The default is the true isometric: yaw 45°
+and pitch `atan(1/√2)` ≈ 35.264°; perspective is the alternate, with the fixed 70° fov of design 16
+§6.7.2; pitch, yaw, zoom and distance clamp as the design's constant table says. The input table is the
+modelling tool's (drag orbit, Shift/middle drag pan, wheel zoom, double-click/`F` frame all, `Home`
+reset, `1`/`3`/`7` with `Ctrl` for the six snaps, `Space` play), every action has a button (R2), and
+the screen's clock is its own: `isPauseScreen()` stays the default, so the client tick stops, and a
+real-time tick accumulator (`DeltaTracker.getRealtimeDeltaTicks()`, clamped) drives the same 20-tick
+cadence design 16 §6.4 defines.
+
+**Why orthographic by default.** A blueprint is read, not photographed: parallel edges stay parallel,
+so a 3×3 square reads as a square and a one-cell offset cannot hide behind a vanishing point. The JEI
+isometric view is already orthographic (design 15 §6.2), so the screen's default agrees with the view
+a player already knows, and perspective stays a second button.
+
+**Why a value and not a panel.** Four viewports and two projections are cheap when the camera is a
+record: each panel derives its own projection from the shared value and a rectangle, and every gesture
+is testable without a client. A camera stored per panel, or on the server, buys nothing and costs the
+determinism the pack is built on (design 16 §15).
+
+**Rejected: driving the screen's playback from the game tick.** A screen pauses single-player, so
+there is no game tick to drive it; the alternative — opting out of the pause
+(`isPauseScreen() = false`) — would let a mob hit a player who is reading a manual, which this design
+will not buy for an animation. **Rejected: a millisecond timeline**, which would fork the pack's tick
+durations into a second cadence.
+
+**Consequence.** The camera never reaches the wire, every gesture is a pure function with a unit test,
+and no camera is remembered across opens. A reviewer rejects a per-panel camera, a camera fact on a
+payload, or a screen that borrows the game tick by refusing the pause.
+
+### D-104 — The exploded view is a per-bay offset function, and a zero direction falls back to +Y
+
+The exploded view ([design/17](17-preview-screen.md) §8) separates the page's bays. Each bay's
+displacement direction is `bay centroid − structure centroid`, both summed over the drawn cells'
+centres in the kernel's canonical cell order; when the two centroids are equal, component by
+component, the direction is exactly `+Y` — the zero case only, with no epsilon and no near-zero
+threshold. Every group moves `0.5 × diagonal(drawnHull) × t` along its own direction, one distance for
+all groups so the parts keep their relative layout; `t` is animated over 12 ticks with the cine core's
+`Ease.inOutCubic`/`Tween`, sampled at the screen's clock, and a second press reverses the same tween.
+The label of a group is the bay's own name (`bay.text()`), anchored at the group's own centroid. A
+page whose drawn cells belong to one bay has nothing to separate: the button reports `one part` and
+`t` stays 0.
+
+**Why a bay.** A part is the smallest unit a document declares and a build orders by (design 16 §4.1's
+provenance); a layer is not a part — splitting a tower by its Y layers would call three slices of one
+bay three parts, and a stage can be a subset of a bay. The bay is also what the payload can name
+(D-101), so the grouping needs no second derivation.
+
+**Why the exact-zero fallback.** The two centroids are sums of the same cell centres in one canonical
+order, so a single-bay document's centroids are the same sum: the vector is exactly zero by
+construction. An epsilon would make the direction depend on float noise and on the order arithmetic
+happened to run in — the one thing design 16 §15 forbids. A bay whose direction is collinear with
+another's is not a special case: two parts on opposite sides of the centre separate in opposite
+directions, which is what an exploded view is for.
+
+**Rejected: splitting by stage.** A layer-mode document would become a pile of layers (design 17 §8.1's
+one-part case is the honest answer, not a workaround); the document author who wants parts declares
+bays, and the demo content does ([design/17](17-preview-screen.md) §11).
+
+**Rejected: per-bay distances.** Parts would keep their balance only by accident; one distance is what
+makes the picture grow by a half-diagonal instead of exploding to the horizon.
+
+**Consequence.** The offsets are a pure function with a t=0/t=1/mid-tween test; nothing about the
+explode is on the wire or on the server; a hidden stage cell is not offset; the hover's ray test uses
+the offset positions so the picked cell is the one drawn; and the axes stay at the structure's origin
+because the gizmo is the structure's frame, not a part's.
+
+### D-105 — The demo content ships in `src/main/resources` as a marked builtin datapack
+
+R1's two themes ship as three documents in the mod's own resources —
+`structurecumulus:demo_machine` and `structurecumulus:demo_machine_compact` (one variant group, two
+members) and `structurecumulus:demo_tower` — under
+`data/structurecumulus/cumulus/structure/*.json`, so every player's catalogue carries them through the
+ordinary datapack source. The marking law is the id's `demo_` segment plus a root `description` that
+says the document is a demonstration: no new schema member, no code, no filter and no hidden flag. The
+authoring laws are part of the contract: identity-expressible, one bay per part, at least one
+directional block, at least three stages, and two group members that differ in shape
+([design/17](17-preview-screen.md) §11).
+
+**Why the mod's resources.** The catalogue is built from the merged document source (design 15 §6.1),
+so a demo in a test source set would be invisible to players and would prove nothing about the
+released mod; R1 is a complaint about *content*, and content has to ship. This is the pack's only
+production-resource change.
+
+**Why three documents for two themes.** A variant group needs at least two members (`SC-DOC-0002`,
+D-98): the machine theme is a group of two, and the tower is standalone. "Two documents" in the
+roadmap counts themes, not files.
+
+**Why a marking law and not a flag.** The `description` is the one channel the kernel already carries
+and the surfaces already display (D-94, design 16 §10); a `demo` extension member or a config toggle
+would add schema or configuration for a documentation concern, and a flag is a second source of truth
+about a file the source already names.
+
+**Rejected: a demo-only datapack loaded by a dev flag.** It would be off in every normal install —
+the opposite of R1 — and would make the demo a harness artifact rather than content.
+
+**Rejected: naming them `probe_*` or `test_*`.** They are examples for players, not scenarios for the
+harness; the two kinds must be distinguishable by their ids, and `demo_` says what they are.
+
+**Consequence.** SC4's gate is a document compile unit test over the three files (compiles, identity
+projection unfiltered, the declared bay and stage counts, the group's members agreeing) plus a
+catalogue test that all three ids reach the payload. A reviewer rejects a demo that cannot express the
+identity orientation — it would be absent from every page — and one that declares a single bay for
+several parts, which would leave the exploded view with nothing to separate.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2382,6 +2561,26 @@ payload already carried.
 - The preset store is explicit data beside the LRU memory (D-99, design 15 §13.1): a full store refuses
   the next new name instead of evicting one, and `prefs forget` never deletes a preset. A reviewer
   should not "unify" the two bounds — one is a convenience window, the other is the user's artifact.
+- The preview screen reads only the client's catalogue snapshot (D-101), so a client that never
+  received one — an old server, a server without the mod's half — has no page and no screen. That is
+  the price of a client view, and a reviewer should not answer it with a session: a screen that needed
+  the server would lose the one property R6 asked for.
+- `Stage.bay` is carried on both payloads and read only by the screen (D-101): the session pays a field
+  with no session consumer because one `Stage` shape must mean one thing, the same law that keeps
+  `GhostCell` shared. A reviewer should reject a forked stage record or a per-cell bay index to save
+  the byte.
+- The screen's clock is a real-time accumulator because a screen pauses the game (D-103): a reviewer
+  should check that no screen animation reads the game tick, and that the accumulator is the only time
+  source — two time sources make two frames from one state.
+- The exploded view's zero-direction fallback is exact (D-104): a reviewer should reject any epsilon or
+  near-zero threshold, and should expect a single-bay document's explode button to report `one part`
+  rather than invent a second group.
+- The demo documents ship in `src/main/resources` (D-105), so they are in every player's catalogue: a
+  reviewer should check the whole-catalogue cell cap (4096, design 15 §6.1) and the warning-log budget
+  still hold with three documents added, and that no test treats them as harness fixtures.
+- The client command's `screen` literal shadows a server blueprint whose unqualified id is literally
+  `screen` (D-101, design 17 §9.2): one id pays for a command with no packet and no permission model,
+  and a reviewer should not "fix" it by moving the command to the server.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is

@@ -39,6 +39,11 @@ table defines who may emit each finding code.
     HUD tiers, stage banner, client config, the placement feedback, the carried part text, the JEI
     view modes, the guided build, the variant groups, the build presets and the camera program with
     its hand-off transitions).
+18. [design/17-preview-screen.md](design/17-preview-screen.md) — the preview screen pack: the client
+    catalogue view, the camera and its projections, four linked viewports, the axis gizmo, stage
+    playback and its delta, the per-bay exploded view, the five entry links and the demo content
+    (specified at SC0; landing through SC4 — SC1 the screen skeleton and the package migration, SC2
+    the playback and the explode, SC3 the links, SC4 the demo).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -88,6 +93,13 @@ Then the module files, in dependency order:
   transitions and the C/G exclusion) and E9 (the demo: the whole player story through the production
   preview command, the pack tour, and the preference-memory isolation that keeps the demo independent
   of scenario order) are on the tree.
+  The preview screen pack is the next extension: [17 preview-screen](design/17-preview-screen.md)
+  (D-101…D-105) tracked by [plan/screen-plan.md](plan/screen-plan.md), specified at SC0 and landing one
+  milestone at a time — SC1 the screen skeleton (the `mc.preview.scene` migration, the 45° orthographic
+  camera, four linked viewports, the axes, the drawn-hull fit in both consumers), SC2 the staged
+  playback and the per-bay exploded view, SC3 the five entry links (JEI's button, the client command,
+  the `O` world key, ghost to world with the screen's heading, the in-screen variant switch) and SC4
+  the demo documents. Nothing of it is on the tree yet: SC0 is the design revision alone.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -164,8 +176,8 @@ Then the module files, in dependency order:
   containers), 608 adapter unit tests (64 containers) and 173 `@GameTest` methods; a full
   `./gradlew check` passes at this revision (657 kernel tests, 608 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 173/173 GameTests.
-  `Codes.all` has 69 entries and the decision record has 99 decisions
-  (D-100; D-29 and D-36 superseded, D-78 withdrawn).
+  `Codes.all` has 69 entries and the decision record has 104 decisions
+  (D-105; D-29 and D-36 superseded, D-78 withdrawn).
 
 ## The one rule
 
