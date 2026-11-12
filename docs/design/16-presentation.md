@@ -410,6 +410,30 @@ cancel. `↑`/`↓`, `V`, `B` and `G` were all unbound in the mod; the uitest co
 - **Distance culling (15 §5) is unchanged**: counters and bars are never culled, ghosts and frames
   are.
 
+### 6.6 The cine math (landed ahead of E8)
+
+The `mc.preview.client.cine` package is the cinematography foundation every later animation and
+the E8 camera work share. It holds no event wiring and no Minecraft rendering call — six pure
+types whose behaviour is a function of the continuous tick (integer ticks plus the frame's partial
+tick, the only reproducible shape):
+
+- `Ease` — the shared easing curves over a clamped unit interval; overshoot exists only in
+  `outBack`, reserved for pop-in.
+- `Tween` / `VecTween` — scalar and vector interpolation over a tick span.
+- `CameraShot` — an eye/target framing plus the framing law: the eye sits on the approach ray at
+  the distance where the subject's largest dimension fits the vertical fov (overscan 1.2), raised
+  by 0.6 of the subject's height for the mild top-down read; a directionless approach falls back
+  to the +Z side.
+- `CameraProgram` — an ordered dwell/fly leg sequence; sampling is a pure function of the tick,
+  legs interpolate eye and target linearly under the leg's ease (no Catmull-Rom: a uniform
+  parameter would vary the speed per leg and overshoot).
+- `TurntableTransition` — the pose-switch swing: the shortest signed arc between two turns (±90°
+  or 180°), cell offsets rotating about the pivot's vertical axis while the baked model keeps the
+  old pose until the final tick.
+
+The camera's rig mechanics (how a shot reaches the one `Camera` NeoForge lets an event steer) and
+the playback/camera coupling are E8's design, not specified here.
+
 ## 7. The progress HUD (E.1, E.2, E.3)
 
 Three tiers of information, of which the first is always drawn and the other two add detail. All

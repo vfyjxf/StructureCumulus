@@ -1159,7 +1159,9 @@ lands them (E1 the stage model and the payload facts, E2 the placement feedback,
 E5 the guide), never before — a type documented here that the sources do not declare fails the gate,
 so a reserved batch is a note here and a shape in design 16, not a signature in this block. A
 landing milestone either extends this block or lists a non-API type in `tools/spec-uncovered.txt`
-with a reason; it may not leave a public presentation type in neither place.
+with a reason; it may not leave a public presentation type in neither place. The `cine` package is
+the exception that proves the rule: the cinematography core is a pure-math foundation with no
+event wiring, landed ahead of its E8 integration so the milestones above and E8 share one math.
 
 ```java
 package dev.vfyjxf.cumulus.mc;
@@ -1818,6 +1820,38 @@ public final class SetPresence {
     public static List<StructureSet.Satellite> requiredFirst(List<StructureSet.Satellite> satellites);
     public static Probe probe(StructureSet.Satellite satellite, WorldView view, Budget budget);
     public static Finding unreadable(StructureSet.Satellite satellite, Probe probe);
+}
+
+package dev.vfyjxf.cumulus.mc.preview.client.cine;
+
+public enum Ease {
+    linear, smoothstep, inOutCubic, outQuad, outBack;
+    public final double applyClamped(double t);
+}
+public record Tween(double from, double to, int durationTicks, Ease ease) {
+    public double at(double tick);
+    public boolean done(double tick);
+}
+public record VecTween(Vec3 from, Vec3 to, int durationTicks, Ease ease) {
+    public Vec3 at(double tick);
+    public boolean done(double tick);
+}
+public record CameraShot(Vec3 eye, Vec3 target) {
+    public static CameraShot framing(Cuboid bounds, Vec3 approach, double fovDeg);
+    public float yaw();
+    public float pitch();
+}
+public record CameraProgram(java.util.List<Leg> legs) {
+    public record Leg(CameraShot shot, int dwellTicks, int moveTicks, Ease moveEase) {
+    }
+    public int totalTicks();
+    public CameraShot at(double tick);
+}
+public record TurntableTransition(Turn from, Turn to, int durationTicks, Ease ease) {
+    public int shortestArc();
+    public double angleDeg(double tick);
+    public Vec3 rotate(Vec3 offset, double tick);
+    public Turn modelTurn(double tick);
 }
 ```
 
