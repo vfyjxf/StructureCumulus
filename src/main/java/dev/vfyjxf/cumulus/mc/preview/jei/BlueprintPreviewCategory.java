@@ -154,12 +154,14 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             }
         }
         List<JeiPreview.Panel> panels = new ArrayList<>(views.length);
+        List<PreviewScene.Shading> shadings = new ArrayList<>(views.length);
         for (int index = 0; index < views.length; index++) {
             PreviewScene.View view = views[index];
             PreviewScene.Panel drawn = recipe.scene().draw(graphics, view, page.slice(), band(page.mode(), index));
             panels.add(
                 new JeiPreview.Panel(drawn.cells(), drawn.layer(), view.x(), view.y(), view.width(), view.height())
             );
+            shadings.add(PreviewScene.shading(view));
             graphics.drawString(
                 Minecraft.getInstance().font,
                 panelName(page.mode(), index),
@@ -169,7 +171,7 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
                 false
             );
         }
-        JeiPreview.recordFrame(panels);
+        JeiPreview.recordFrame(panels, shadings);
         if (recipe.scene().cellCount() == 0) {
             graphics.drawString(
                 Minecraft.getInstance().font,

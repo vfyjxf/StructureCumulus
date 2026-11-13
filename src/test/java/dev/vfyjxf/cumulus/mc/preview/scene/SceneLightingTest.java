@@ -69,6 +69,52 @@ class SceneLightingTest {
     }
 
     @Test
+    void theJeiViewArmKeepsTheWorldLaw() {
+        PreviewScene.View view = new PreviewScene.View(0, 0, 160, 100, 135.0F, 30.0F, PreviewScene.LayerRule.upTo);
+        PreviewScene.Shading shading = PreviewScene.shading(view);
+        assertEquals(1.0F, shading.up(), 1.0e-3F, "up");
+        assertEquals(0.74F, shading.north(), 1.0e-3F, "north");
+        assertEquals(0.74F, shading.south(), 1.0e-3F, "south");
+        assertEquals(0.497F, shading.east(), 1.0e-3F, "east");
+        assertEquals(0.497F, shading.west(), 1.0e-3F, "west");
+        assertEquals(0.4F, shading.down(), 1.0e-3F, "down");
+        assertEquals(shading, PreviewScene.shading(view), "the same view gives the same six numbers, bit for bit");
+    }
+
+    @Test
+    void theJeiNormalMatrixIsTheViewRotationWithTheGuiMirror() {
+        PreviewScene.View view = new PreviewScene.View(
+            0,
+            0,
+            160,
+            100,
+            45.0F,
+            SceneCamera.defaultPitch,
+            PreviewScene.LayerRule.upTo
+        );
+        Matrix3f normals = SceneLighting.normals(PreviewScene.rotation(view).get(new Matrix3f()));
+        for (Vector3f face : faces) {
+            assertEquals(1.0F, normals.transform(new Vector3f(face)).length(), 1.0e-5F);
+        }
+        assertEquals(-1.0F, normals.determinant(), 1.0e-5F, "the GUI's y-down axis is a mirror");
+        assertTrue(normals.transform(new Vector3f(0.0F, 1.0F, 0.0F)).y < 0.0F);
+    }
+
+    @Test
+    void theTwoPreviewSurfacesShadeTheSameFacesTheSameWay() {
+        SceneCamera camera = SceneCamera.isometric();
+        PreviewScene.Shading jei = PreviewScene.shading(
+            new PreviewScene.View(0, 0, 160, 100, camera.yaw(), camera.pitch(), PreviewScene.LayerRule.upTo)
+        );
+        assertEquals(shaded(camera, faces[0]), jei.down(), eps, "down");
+        assertEquals(shaded(camera, faces[1]), jei.up(), eps, "up");
+        assertEquals(shaded(camera, faces[2]), jei.north(), eps, "north");
+        assertEquals(shaded(camera, faces[3]), jei.south(), eps, "south");
+        assertEquals(shaded(camera, faces[4]), jei.west(), eps, "west");
+        assertEquals(shaded(camera, faces[5]), jei.east(), eps, "east");
+    }
+
+    @Test
     void everyPanelTypeShadesTheSameFaceTheSameWay() {
         SceneCamera isometric = SceneCamera.isometric();
         SceneCamera front = new SceneCamera(

@@ -24,7 +24,11 @@ public final class SceneLighting {
 
     /** The two shader-space light directions of one camera, in the order the scene installs them. */
     public static Vector3f[] forCamera(SceneCamera camera) {
-        Matrix3f normals = normals(camera);
+        return forCamera(normals(camera));
+    }
+
+    /** The two shader-space light directions of one already-built pass normal matrix. */
+    public static Vector3f[] forCamera(Matrix3f normals) {
         return new Vector3f[]{normals.transform(new Vector3f(world0)), normals.transform(new Vector3f(world1))};
     }
 
@@ -49,7 +53,15 @@ public final class SceneLighting {
             zAxis[1] - origin[1],
             zAxis[2] - origin[2]
         );
-        return new Matrix3f().scale(1.0F, -1.0F, 1.0F).mul(view);
+        return normals(view);
+    }
+
+    /**
+     * The normal matrix of a pass whose rotation is already the world-to-view one (the JEI face's
+     * pose): the same y-down mirror, so both preview surfaces shade a face by the face.
+     */
+    public static Matrix3f normals(Matrix3f rotation) {
+        return new Matrix3f().scale(1.0F, -1.0F, 1.0F).mul(rotation);
     }
 
     /** The brightness of one world-space face normal under the two world lights, 0.4 to 1.0. */

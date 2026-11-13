@@ -5,6 +5,8 @@ import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.jei.BlueprintPreviewCategory.PageView;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
 import dev.vfyjxf.cumulus.mc.preview.scene.BlueprintPreviewRecipe;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene.Shading;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewViewMode;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +33,7 @@ public final class JeiPreview {
     private static volatile int drawnFrames;
     private static volatile int drawnCells;
     private static volatile List<Panel> drawnPanels = List.of();
+    private static volatile List<PreviewScene.Shading> drawnShading = List.of();
 
     private JeiPreview() {}
 
@@ -52,6 +55,15 @@ public final class JeiPreview {
     /** The panels the last drawn frame covered; one in the isometric view, three in the three-view. */
     public static List<Panel> drawnPanels() {
         return drawnPanels;
+    }
+
+    /**
+     * The shading one panel installed in the last drawn frame, or null before its first draw: the six
+     * world faces in {@code Direction}'s order, the same law the preview screen keeps (design 15 §6.2).
+     */
+    public static @Nullable Shading shading(int panel) {
+        List<Shading> shadings = drawnShading;
+        return panel < 0 || panel >= shadings.size() ? null : shadings.get(panel);
     }
 
     /** The entry's tooltip text: its root description and one line per part (design 16 §10). */
@@ -105,6 +117,22 @@ public final class JeiPreview {
         return view == null ? -1 : view.slice();
     }
 
+    /** The page's yaw in degrees; the drag mutates it, never a payload field (design 15 §6.2). */
+    public static float yaw(NamespacedId blueprintId) {
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        return view == null ? Float.NaN : view.yaw();
+    }
+
+    /** Sets the page's yaw, the value a horizontal drag writes; false when the page is unknown. */
+    public static boolean setYaw(NamespacedId blueprintId, float yaw) {
+        PageView view = JeiPreviewPlugin.view(blueprintId);
+        if (view == null) {
+            return false;
+        }
+        view.yaw(yaw);
+        return true;
+    }
+
     /** Moves the page's layer; false when the entry is unknown, clamped to the entry's own layers. */
     public static boolean setSlice(NamespacedId blueprintId, int layer) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
@@ -152,12 +180,13 @@ public final class JeiPreview {
         return JeiPreviewPlugin.show(blueprintId);
     }
 
-    static void recordFrame(List<Panel> panels) {
+    static void recordFrame(List<Panel> panels, List<PreviewScene.Shading> shading) {
         int cells = 0;
         for (Panel panel : panels) {
             cells += panel.cells();
         }
         drawnPanels = List.copyOf(panels);
+        drawnShading = List.copyOf(shading);
         drawnCells = cells;
         drawnFrames++;
     }
@@ -166,5 +195,6 @@ public final class JeiPreview {
         drawnFrames = 0;
         drawnCells = 0;
         drawnPanels = List.of();
+        drawnShading = List.of();
     }
 }

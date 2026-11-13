@@ -1541,6 +1541,8 @@ public final class PreviewScene {
 
     public record Panel(int cells, int layer, int plateTiles) { }
 
+    public record Shading(float down, float up, float north, float south, float west, float east) { }
+
     public record Sight(float alpha, float scale, float dx, float dy, float dz) {
         public static final Sight full;
     }
@@ -1558,6 +1560,7 @@ public final class PreviewScene {
     public @Nullable Cell hover(double mouseX, double mouseY, View view, int layer);
     public @Nullable Vector2f point(View view, int layer, LatticePoint at);
     public Panel draw(GuiGraphics graphics, View view, int layer, boolean band);
+    public static Shading shading(View view);
     public @Nullable Cell hover(double mouseX, double mouseY, Fit fit);
     public @Nullable Cell hover(double mouseX, double mouseY, Fit fit, Treatment treatment);
     public @Nullable Vector2f point(Fit fit, LatticePoint at);
@@ -1568,12 +1571,15 @@ public final class PreviewScene {
 }
 
 // The scene's directional light of design 17 §4.1: the level pass's two world directions seen through
-// one panel's camera, and the camera's rotation and mirror as the pass's normal matrix.
+// one panel's camera, and the camera's rotation and mirror as the pass's normal matrix. The JEI face
+// enters through the world-to-view rotation it already holds, so both surfaces keep the one law.
 public final class SceneLighting {
     public static final float ambient;
     public static final float diffuse;
     public static Vector3f[] forCamera(SceneCamera camera);
+    public static Vector3f[] forCamera(Matrix3f normals);
     public static Matrix3f normals(SceneCamera camera);
+    public static Matrix3f normals(Matrix3f rotation);
     public static float brightness(float x, float y, float z);
     public static float brightness(Vector3f normal, Vector3f light0, Vector3f light1);
 }
@@ -1655,16 +1661,22 @@ public record Hull(float minX, float minY, float minZ, float maxX, float maxY, f
     public float radius();
 }
 
-// The page's base plate of design 17 §4.7: one-cell checkerboard tiles in two light greys, one tile past
-// the drawn hull's footprint on every side and in the plane of its floor. Scene geometry, never a cell.
+// The page's base plate of design 17 §4.7: a platform of slab blocks, two cells on a side and half a
+// cell thick, whose tops lie in the drawn hull's floor and whose grid extends one tile past its
+// footprint on every side. Scene geometry, never a cell.
 public record BasePlate(int minX, int minZ, int maxX, int maxZ, int y) {
+    public static final int tileSize;
+    public static final float thickness;
+    public static final int facesPerTile;
     public static final int lightTile;
     public static final int darkTile;
     public static BasePlate of(Hull hull);
     public static BasePlate empty();
     public boolean isEmpty();
     public int tiles();
+    public int quads();
     public int color(int x, int z);
+    public Hull tile(int x, int z);
     public int draw(GuiGraphics graphics);
 }
 
@@ -1891,10 +1903,13 @@ public final class JeiPreview {
     public static int drawnCells();
     public static java.util.List<Panel> drawnPanels();
     public static java.util.List<String> lines(NamespacedId blueprintId);
+    public static @Nullable PreviewScene.Shading shading(int panel);
     public static @Nullable PreviewViewMode viewMode(NamespacedId blueprintId);
     public static boolean cycleViewMode(NamespacedId blueprintId);
     public static int slice(NamespacedId blueprintId);
     public static boolean setSlice(NamespacedId blueprintId, int layer);
+    public static float yaw(NamespacedId blueprintId);
+    public static boolean setYaw(NamespacedId blueprintId, float yaw);
     public static java.util.Optional<CellPoint> cellPoint(NamespacedId blueprintId, int panel, int cellIndex);
     public static java.util.List<String> hoverText(NamespacedId blueprintId, double mouseX, double mouseY);
     public static void openWorld(NamespacedId blueprintId);
@@ -2538,7 +2553,9 @@ The JEI half (P4), with the same kind of wire and lifecycle facts:
 - **View.** `BlueprintPreviewCategory.draw` owns the whole face: `PreviewScene` renders the cells as
   block models under its own orthographic camera, far-to-near by depth, and flushes with
   `BufferSource.endBatch()` rather than `GuiGraphics.flush()` (whose contract disables the depth test
-  around the batch). `PreviewInputHandler` is the one input surface — drag rotates, the slider and
+  around the batch), and it installs the world-fixed light the screen keeps (`SceneLighting.
+  normals(rotation)` and `forCamera(Matrix3f)`) instead of vanilla's `setupFor3DItems` frame.
+  `PreviewInputHandler` is the one input surface — drag rotates, the slider and
   the wheel move the Y slice, the button calls `JeiPreview.openSelected`, the mode button and the
   variant row switch their own view state. `JeiPreview` is the public face: listed ids, the frame
   counters the harness asserts on, `show(id)`, `openWorld(id)`, the variant selection
@@ -2721,7 +2738,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC4)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC8)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -2749,23 +2766,29 @@ the whole/staged presentation). SC4 has landed the demo documents: `demo_machine
 landed the rendering fixes: the world-fixed scene light and its normal matrix (`SceneLighting`), the
 bounded depth band both projections share, the silhouette hover/future outline (`CellOutline`, with
 `PreviewScreen.hoverOutline` and `shading` telling the harness what was drawn) and the staged
-playback's pop-in (`PopIn`, with `scaleOf` and `animatingCells`). The JEI face keeps its own fixed-frame
-shading; that change is backlog, not this milestone (§13, D-106). SC6 has landed the presentation
+playback's pop-in (`PopIn`, with `scaleOf` and `animatingCells`). The JEI face kept its own
+fixed-frame shading at SC5 (backlog, D-106) and leaves it at SC8. SC6 has landed the presentation
 rework (D-107): a play reveals a stage as one batch into empty slots (`StagePlayback` drops the
 unrevealed factor and its span becomes the stage's dwell), the outlines are `ChromeStroke`'s 1.5-px
 quad strips on `RenderType.guiOverlay()` at `chromeDepth` — smooth and reading through the models —
 with the cursor's stage stroked as a set (`drawnStageOutlines`, and `drawnSlotOutlines` for outline
 mode's not-drawn cells), and the gizmo is the corner compass `AxisGizmo.of(camera, rect)` instead of
 scene geometry at the hull's origin. SC7 has landed the third presentation pass (D-108): the page
-stands on a base plate (`BasePlate`, an unlit checkerboard of the drawn hull's footprint plus one
-tile a side, in the hull's own floor plane, drawn in the scene pass before the cells), a reveal drops
+stands on a base plate (`BasePlate`, an unlit plate of the drawn hull's footprint plus one tile a
+side, in the hull's own floor plane, drawn in the scene pass before the cells), a reveal drops
 in (`DropIn` replaces SC5's `PopIn`: the stamp machinery stays, the leg becomes a 2.5-cell fall with
 `Ease.outCubic` and its alpha fades in, over 5 ticks, with `PreviewScreen.dropOffsetOf` and
 `animatingCells` telling the harness what is still falling), the cadence retunes to Ponder's pace
 (`StagePlayback`'s constants to 1/6/40/5, roughly a third of SC6's), and the compass's three axes are
 `ChromeStroke`'s vector strokes instead of pixel rows — a two-point stroke is now the one open
-segment the compass draws. The milestone state lives in
-[`docs/plan/screen-plan.md`](../plan/screen-plan.md).
+segment the compass draws. SC8 has landed the fourth pass's rendering truths (D-109): the JEI face's
+three view modes install the same world-fixed light as the screen (`PreviewScene.shading` is the pure
+six-face law, `JeiPreview.shading(panel)` tells the harness what the last frame installed, and
+`JeiPreview.yaw`/`setYaw` expose the drag's page state so the harness can prove a face keeps its
+brightness across a turn), and the flat checkerboard became a platform of slab blocks (`BasePlate`'s
+`tileSize` 2, `thickness` 0.5, `tile(x, z)`'s closed box and `quads()` counting its six faces; the
+grid snaps the footprint out to the two-cell lattice and extends one tile past it). The milestone
+state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
 record every surface shares.
@@ -2795,13 +2818,13 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `PreviewViewMode` | the scene's projection vocabulary, for the JEI face to select |
 | `preview.scene` | `SceneCamera` (with `Projection` and `Snap`) | the orbit camera value: target, yaw, pitch, distance, zoom, projection; pure operations only |
 | `preview.scene` | `Hull` | the drawn hull of design 17 §3.3, the input of every fit |
-| `preview.scene` | `BasePlate` | the page's floor of design 17 §4.7: the drawn hull's footprint plus one tile a side, two alternating chrome greys, unlit and never a cell |
+| `preview.scene` | `BasePlate` | the page's floor of design 17 §4.7: a platform of two-cell slab blocks half a cell thick, snapped one tile past the drawn hull's footprint, two alternating chrome greys, unlit and never a cell |
 | `preview.scene` | `Fit` | the fit of design 17 §4.3: one hull into one viewport through one camera, the scale and the 2D projection the scene, the gizmo and the picking share |
 | `preview.scene` | `ExplodeModel` (with `Group`, `Label`, `Offset`) | the per-bay offset function of design 17 §8.1: the groups, the direction, the half-diagonal distance and the moved label anchors |
 | `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the delta treatments and the reveal counts of design 17 §7, as a pure state machine: a play reveals a stage as one batch, an unrevealed cell is not drawn |
 | `preview.scene` | `NextStepLine` | 16 §12.3's next-step line, the pack's one formatter: the world's HUD and the screen's summary line both read it |
 | `preview.scene` | `AxisGizmo` | the corner compass of design 17 §6: the fixed-pixel triad pinned to the main viewport's top-right corner, a pure function of (camera, rect) |
-| `preview.scene` | `SceneLighting` | the scene's world-fixed two-light law of design 17 §4.1, as a pure function of a camera |
+| `preview.scene` | `SceneLighting` | the scene's world-fixed two-light law of design 17 §4.1, as a pure function of a camera or of a pass's world-to-view rotation, so the screen and the JEI face share it |
 | `preview.scene` | `CellOutline` | one cell's projected silhouette (the convex hull of its eight projected corners), the outline geometry of design 17 §5.3 |
 | `preview.scene` | `ChromeStroke` | the stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded endpoints, drawn at `chromeDepth` with the depth test off |
 | `preview.scene` | `DropIn` | the staged playback's drop-in of design 17 §7.6: per-cell reveal stamps, the `outCubic` fall onto the plate and the fade that runs with it |

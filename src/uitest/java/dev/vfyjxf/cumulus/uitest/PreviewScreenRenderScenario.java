@@ -10,9 +10,11 @@ import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
+import dev.vfyjxf.cumulus.mc.preview.scene.BasePlate;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
 import dev.vfyjxf.cumulus.mc.preview.scene.DropIn;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
+import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
 import net.minecraft.client.Minecraft;
@@ -75,6 +77,10 @@ public final class PreviewScreenRenderScenario {
                             && screen().drawnCells() == 16,
                     () -> "plate=" + screen().drawnPlateTiles() + " tiles=" + screen().scene().plate().tiles()
                             + " drawn=" + screen().drawnCells()
+                ).check(
+                    "the plate is a platform of two-cell boxes half a cell thick, one tile past the hull",
+                    () -> slabPlatform(),
+                    PreviewScreenRenderScenario::describePlate
                 ).action("hover the nearest cell at the default iso", PreviewScreenRenderScenario::hoverMain).frames(3)
                 .check(
                     "the iso outline is the cell's six-vertex silhouette",
@@ -275,6 +281,36 @@ public final class PreviewScreenRenderScenario {
             );
         }
         return corners;
+    }
+
+    /** The plate's pure geometry: two-cell boxes, half a cell thick, one tile past the hull on every side. */
+    private static boolean slabPlatform() {
+        BasePlate plate = screen().scene().plate();
+        Hull hull = screen().scene().hull();
+        if (plate.isEmpty()) {
+            return false;
+        }
+        Hull tile = plate.tile(plate.minX(), plate.minZ());
+        return plate.y() == (int) hull.minY()
+                && tile.maxY() == plate.y()
+                && tile.minY() == plate.y() - BasePlate.thickness
+                && (int) (tile.maxX() - tile.minX()) == BasePlate.tileSize
+                && (int) (tile.maxZ() - tile.minZ()) == BasePlate.tileSize
+                && plate.quads() == plate.tiles() * BasePlate.facesPerTile
+                && Math.floorMod(plate.minX(), BasePlate.tileSize) == 0
+                && Math.floorMod(plate.maxX(), BasePlate.tileSize) == 0
+                && Math.floorMod(plate.minZ(), BasePlate.tileSize) == 0
+                && Math.floorMod(plate.maxZ(), BasePlate.tileSize) == 0
+                && plate.minX() < (int) Math.floor(hull.minX())
+                && plate.maxX() > (int) Math.ceil(hull.maxX())
+                && plate.minZ() < (int) Math.floor(hull.minZ())
+                && plate.maxZ() > (int) Math.ceil(hull.maxZ());
+    }
+
+    private static String describePlate() {
+        BasePlate plate = screen().scene().plate();
+        return "plate [" + plate.minX() + "," + plate.minZ() + ".." + plate.maxX() + "," + plate.maxZ() + "] y="
+                + plate.y() + " tiles=" + plate.tiles() + " quads=" + plate.quads();
     }
 
     private static float largestDrop() {

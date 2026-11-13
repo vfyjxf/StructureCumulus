@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.client.model.data.ModelData;
+import org.joml.Matrix3f;
 import org.joml.Quaternionf;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
@@ -43,6 +44,9 @@ public final class PreviewScene {
 
     /** What one panel drew: its cell count, the Y layer it isolates or highlights and its plate tiles. */
     public record Panel(int cells, int layer, int plateTiles) {}
+
+    /** The six world faces in {@code Direction}'s declaration order, shaded in one panel's frame. */
+    public record Shading(float down, float up, float north, float south, float west, float east) {}
 
     /** How one cell is drawn this frame: its alpha factor, its scale and its displacement (§7.2, §7.6, §8.1). */
     public record Sight(float alpha, float scale, float dx, float dy, float dz) {
@@ -210,41 +214,67 @@ public final class PreviewScene {
         }
         Projection projection = projection(view);
         drawn.sort(Comparator.comparingDouble(cell -> projection.depth(cell.ghost().cell())));
+        Matrix3f normals = SceneLighting.normals(projection.rotation().get(new Matrix3f()));
+        Vector3f[] lights = SceneLighting.forCamera(normals);
         PoseStack pose = graphics.pose();
         pose.pushPose();
         pose.translate(projection.screenX(), projection.screenY(), sceneDepth);
         pose.scale(projection.scale(), -projection.scale(), projection.scale());
         pose.mulPose(projection.rotation());
         pose.translate(-projection.shiftX(), -projection.shiftY(), -projection.shiftZ());
-        Lighting.setupFor3DItems();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(true);
-        for (Cell cell : drawn) {
-            BlockState state = cell.state();
-            if (state == null) {
-                continue;
+        pose.last().normal().set(normals);
+        try {
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthMask(true);
+            RenderSystem.setShaderLights(lights[0], lights[1]);
+            for (Cell cell : drawn) {
+                BlockState state = cell.state();
+                if (state == null) {
+                    continue;
+                }
+                LatticePoint at = cell.ghost().cell();
+                pose.pushPose();
+                pose.translate(at.x(), at.y(), at.z());
+                Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
+                    state,
+                    pose,
+                    graphics.bufferSource(),
+                    LightTexture.FULL_BRIGHT,
+                    OverlayTexture.NO_OVERLAY,
+                    ModelData.EMPTY,
+                    null
+                );
+                pose.popPose();
             }
-            LatticePoint at = cell.ghost().cell();
-            pose.pushPose();
-            pose.translate(at.x(), at.y(), at.z());
-            Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
-                state,
-                pose,
-                graphics.bufferSource(),
-                LightTexture.FULL_BRIGHT,
-                OverlayTexture.NO_OVERLAY,
-                ModelData.EMPTY,
-                null
-            );
+            // GuiGraphics.flush() disables the depth test around the batch, which would drop this scene's occlusion.
+            graphics.bufferSource().endBatch();
+        } finally {
+            // JEI draws its item icons after this face and needs its own fixed item frame back.
+            Lighting.setupFor3DItems();
             pose.popPose();
         }
-        // GuiGraphics.flush() disables the depth test around the batch, which would drop this scene's occlusion.
-        graphics.bufferSource().endBatch();
-        pose.popPose();
         if (band) {
             drawBand(graphics, view, projection, layer);
         }
         return new Panel(drawn.size(), layer, 0);
+    }
+
+    /** The six world faces' brightness in one panel's own frame (design 17 §4.1), a pure function. */
+    public static Shading shading(View view) {
+        Matrix3f normals = SceneLighting.normals(rotation(view).get(new Matrix3f()));
+        Vector3f[] lights = SceneLighting.forCamera(normals);
+        return new Shading(
+            face(normals, lights, 0.0F, -1.0F, 0.0F),
+            face(normals, lights, 0.0F, 1.0F, 0.0F),
+            face(normals, lights, 0.0F, 0.0F, -1.0F),
+            face(normals, lights, 0.0F, 0.0F, 1.0F),
+            face(normals, lights, -1.0F, 0.0F, 0.0F),
+            face(normals, lights, 1.0F, 0.0F, 0.0F)
+        );
+    }
+
+    private static float face(Matrix3f normals, Vector3f[] lights, float x, float y, float z) {
+        return SceneLighting.brightness(normals.transform(new Vector3f(x, y, z)), lights[0], lights[1]);
     }
 
     /**
@@ -454,8 +484,7 @@ public final class PreviewScene {
     private Projection projection(View view) {
         int width = view.width();
         int height = view.height();
-        Quaternionf rotation = new Quaternionf().rotateY((float) Math.toRadians(view.yaw()))
-                .rotateX((float) Math.toRadians(view.pitch()));
+        Quaternionf rotation = rotation(view);
         Hull box = hull.fitBox();
         float shiftX = box.centreX();
         float shiftY = box.centreY();
@@ -488,6 +517,12 @@ public final class PreviewScene {
             view.x() + width * 0.5F,
             view.y() + height * 0.5F
         );
+    }
+
+    /** The world-to-view rotation of one panel's pose: yaw about the world's up, then the pitch. */
+    static Quaternionf rotation(View view) {
+        return new Quaternionf().rotateY((float) Math.toRadians(view.yaw()))
+                .rotateX((float) Math.toRadians(view.pitch()));
     }
 
     private static float exit(Vector3f origin, Vector3f direction, LatticePoint at, Projection projection) {

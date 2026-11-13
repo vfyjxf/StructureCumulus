@@ -5,6 +5,7 @@ import dev.vfyjxf.cloudlib.uitest.api.ScenarioBuilder;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.jei.JeiPreview;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
+import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewViewMode;
 
 import java.util.ArrayList;
@@ -40,6 +41,8 @@ public final class PreviewJeiViewsScenario {
 
         // one panel width captured from the default view, so the grid's full-size claim compares to it
         int[] isometricWidth = {-1};
+        PreviewScene.Shading[] beforeDrag = {null};
+        double[][] pointBeforeDrag = {null};
 
         build.waitUntil("the server pushed the catalog", PreviewJeiProbe::catalogReady)
                 .action(
@@ -56,7 +59,33 @@ public final class PreviewJeiViewsScenario {
                     isometricWidth[0] = panels.get(0).width();
                     return JeiPreview.viewMode(staged) == PreviewViewMode.isometric && panels.get(0).cells() == 12;
                 }, PreviewJeiViewsScenario::panels)
-                .action("cycle the view button once", context -> JeiPreview.cycleViewMode(staged)).frames(6)
+                .check("the isometric face installs the world's two lights, never the item frame", () -> {
+                    PreviewScene.Shading shading = JeiPreview.shading(0);
+                    beforeDrag[0] = shading;
+                    pointBeforeDrag[0] = point(staged, 0, PreviewJeiProbe.cellIndex(staged, 0, 0, 0));
+                    return shading != null && worldLaw(shading) && pointBeforeDrag[0] != null;
+                }, () -> describeShading(JeiPreview.shading(0)))
+                .action(
+                    "turn the page's yaw as a drag does",
+                    context -> JeiPreview.setYaw(staged, JeiPreview.yaw(staged) + 40.0F)
+                ).frames(6)
+                .check("the same world faces keep their brightness after the drag, and the camera turned", () -> {
+                    PreviewScene.Shading after = JeiPreview.shading(0);
+                    double[] afterPoint = point(staged, 0, PreviewJeiProbe.cellIndex(staged, 0, 0, 0));
+                    return beforeDrag[0] != null
+                            && after != null
+                            && sameShading(beforeDrag[0], after)
+                            && pointBeforeDrag[0] != null
+                            && afterPoint != null
+                            && !same(pointBeforeDrag[0], afterPoint);
+                },
+                    () -> "yaw=" + JeiPreview.yaw(staged) + " before=" + describeShading(beforeDrag[0]) + " after="
+                            + describeShading(JeiPreview.shading(0))
+                )
+                .action(
+                    "turn the page's yaw back",
+                    context -> JeiPreview.setYaw(staged, JeiPreview.yaw(staged) - 40.0F)
+                ).frames(6).action("cycle the view button once", context -> JeiPreview.cycleViewMode(staged)).frames(6)
                 .check("the button lands on the three-view: front, side and top in one row", () -> {
                     List<JeiPreview.Panel> panels = JeiPreview.drawnPanels();
                     return JeiPreview.viewMode(staged) == PreviewViewMode.threeView
@@ -71,6 +100,22 @@ public final class PreviewJeiViewsScenario {
                             && panels.get(0).x() < panels.get(1).x()
                             && panels.get(1).x() < panels.get(2).x();
                 }, PreviewJeiViewsScenario::panels)
+                .check("all three axis panels shade a face by the world, not by their own camera", () -> {
+                    PreviewScene.Shading front = JeiPreview.shading(0);
+                    PreviewScene.Shading side = JeiPreview.shading(1);
+                    PreviewScene.Shading top = JeiPreview.shading(2);
+                    return front != null
+                            && side != null
+                            && top != null
+                            && worldLaw(front)
+                            && worldLaw(side)
+                            && worldLaw(top)
+                            && sameShading(front, side)
+                            && sameShading(front, top);
+                },
+                    () -> "front=" + describeShading(JeiPreview.shading(0)) + " side="
+                            + describeShading(JeiPreview.shading(1)) + " top=" + describeShading(JeiPreview.shading(2))
+                )
                 .check(
                     "all three panels highlight the page's one slice",
                     () -> sameLayer(JeiPreview.slice(staged)),
@@ -189,6 +234,34 @@ public final class PreviewJeiViewsScenario {
                 && right != null
                 && Math.abs(left[0] - right[0]) < 0.01D
                 && Math.abs(left[1] - right[1]) < 0.01D;
+    }
+
+    /** The screen's own six numbers (design 17 §4.1): up 1.0, north/south 0.74, east/west 0.497, down 0.4. */
+    private static boolean worldLaw(PreviewScene.Shading shading) {
+        return Math.abs(shading.up() - 1.0F) < 0.01F
+                && Math.abs(shading.north() - 0.74F) < 0.01F
+                && Math.abs(shading.south() - 0.74F) < 0.01F
+                && Math.abs(shading.east() - 0.497F) < 0.01F
+                && Math.abs(shading.west() - 0.497F) < 0.01F
+                && Math.abs(shading.down() - 0.4F) < 0.01F;
+    }
+
+    private static boolean sameShading(PreviewScene.Shading left, PreviewScene.Shading right) {
+        return left != null
+                && right != null
+                && Math.abs(left.up() - right.up()) < 1.0E-4F
+                && Math.abs(left.north() - right.north()) < 1.0E-4F
+                && Math.abs(left.south() - right.south()) < 1.0E-4F
+                && Math.abs(left.east() - right.east()) < 1.0E-4F
+                && Math.abs(left.west() - right.west()) < 1.0E-4F
+                && Math.abs(left.down() - right.down()) < 1.0E-4F;
+    }
+
+    private static String describeShading(PreviewScene.Shading shading) {
+        return shading == null
+                ? "none"
+                : "up=" + shading.up() + " n/s=" + shading.north() + "/" + shading.south() + " e/w=" + shading.east()
+                        + "/" + shading.west() + " down=" + shading.down();
     }
 
     private static boolean inside(JeiPreview.Panel panel, double[] point) {
