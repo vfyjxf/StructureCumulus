@@ -385,7 +385,8 @@ one list read twice, and SC1's `screen` uitest counts them.
 | front · side · top | the three snaps (`1`, `3`, `7`) |
 | ortho / perspective | the projection toggle (§4.1) |
 | all · explode | the whole view / the exploded view (§7.1, §8) |
-| play / pause · step · ‹ · › | the stage player (§7.3) |
+| play / pause / replay · step · ‹ · › | the stage player (§7.3) |
+| stage outline | the cursor stage's set stroke, off by default (§5.3) |
 | hidden · outline | the future cells' treatment (§7.2) |
 | drop · rise | the reveal's direction (§7.6) |
 | ‹ variant · variant › | the group's members (§9.5) |
@@ -536,12 +537,15 @@ What is shared and what is not, stated once:
   about a cell, and a statement that disappears behind the picture is not readable. SC5's
   nearest-depth rule made the line honest geometry and made it useless exactly where the structure is
   dense; the user's reading — the highlight must not be occluded — is the law.
-- **The cursor's stage is outlined as a set.** In the staged view every drawn cell of the cursor's
-  stage carries the stage outline — the same silhouette stroke in the stage's chrome colour, in every
-  viewport that shows the cell — so selecting a stage (a click, an arrow, a play's advance) highlights
-  exactly the blocks that stage places, and the done stages' dimmed cells stay bare. The whole view
-  has no cursor and outlines nothing; the hover keeps its own brighter accent on the one cell under
-  the pointer.
+- **The cursor's stage can be outlined as a set — and the default is bare.** The `stage outline`
+  button (§4.5) toggles it: on, every drawn cell of the cursor's stage carries the stage outline —
+  the same silhouette stroke in the stage's chrome colour, in every viewport that shows the cell —
+  so selecting a stage (a click, an arrow, a play's advance) highlights exactly the blocks that
+  stage places, and the done stages' dimmed cells stay bare. Off — the default, and every fresh
+  screen opens off — the delta treatments alone carry the stage (§7.2): the cursor's stage is the
+  full-brightness set between the dimmed done and the hidden future, and the eye does not need a
+  second signal. The whole view outlines nothing either way; the hover keeps its own brighter
+  accent on the one cell under the pointer. The toggle is view state and dies with the screen.
 - **The tooltip is 15 §6.2's content plus the owning stage's name** — block id, property values, and
   the stage that owns the cell (16 §11's own tooltip) — drawn near the cursor inside the screen. It is
   a rendering of payload fields and a stage name, not document text: no 16 §10 display point is added.
@@ -605,8 +609,8 @@ structure first"; the staged view is R10's "what changed at this stage".
   starts (or resumes) the staged view; from the whole view the cursor lands on the first stage with
   no cell revealed — the page is its base plate alone, the zero state the story starts from — and
   the first batch lands only after the opening hold (§7.5), so the viewer watches nothing become
-  stage one, never stage one already standing. A stage click or `↑`/`↓` enters the staged view with
-  that stage whole and paused. The whole view is not a third state of the playback — it is the
+  stage one, never stage one already standing. A replay from §7.3's finished state enters the same
+  way. A stage click or `↑`/`↓` enters the staged view with that stage whole and paused. The whole view is not a third state of the playback — it is the
   absence of a cursor.
 - **`all` returns to the whole view.** The button drops the cursor and the reveal counts and draws
   every stage again; the playback stops. `Home` does not: it resets the camera and leaves the
@@ -658,7 +662,7 @@ hidden — a page must stay legible — and later ones are hidden, because the d
 
 | Control | Key | Button | Action |
 | --- | --- | --- | --- |
-| play / pause | `Space` | play / pause | from the whole view: enter the staged view at stage 1 and play; otherwise toggle the running play |
+| play / pause / replay | `Space` | play / pause / replay | from the whole view: enter the staged view at stage 1 and play; otherwise toggle the running play; from the finished state: start over from the zero state (§7.1) |
 | previous / next stage | `↑` / `↓` | ‹ / › | move the cursor and show that stage whole; pauses a running play |
 | one cell step | `B` | step | reveal the next unrevealed cell of the cursor's stage; past its end, move to the next stage and reveal its first cell (16 §6.3's `B`) |
 | jump to a stage | — | the stage bar's segment | set the cursor to that stage, show it whole, pause |
@@ -673,6 +677,11 @@ hidden — a page must stay legible — and later ones are hidden, because the d
   cadence and moves the cursor when a stage ends; at the table's end it stops with everything
   revealed (16 §6.3's "playback never leaves the session" is about a session — here it stops on the
   page).
+- **The finished play replays.** The end of the table is the *finished* state: stopped, every stage
+  fully revealed. `Space` or the button there starts the play over from the zero state — the opening
+  hold on the empty page, exactly as a play from the whole view — and the button reads replay there.
+  A paused last stage is not finished: a stage jump that lands on the last stage leaves earlier
+  stages dimmed, so replay never fires mid-story.
 - **Every control is view state.** Nothing here sends a packet, changes a candidate or writes a
   block; the controls move a cursor and two counters.
 - **No input is locked.** The camera keeps working during a play, a stage jump and an explode, and a
@@ -1147,11 +1156,12 @@ document module's own `SC-DOC-*` family (15 §12, D-98).
   the panel's fill for exactly that reason, and no test caught it until SC5's multi-angle pass — and
   rejects an outline that depth-tests against the models: SC6's law is that a highlight reads
   through.
-- **The stage outline is the cursor's shadow.** In the staged view every drawn cell of the cursor's
-  stage carries the silhouette stroke (§5.3), in all four viewports; the whole view has no cursor
-  and no stage outline, and a stage click, an arrow and a play's advance all move the same set. A
-  reviewer rejects a stage highlight that tints or re-shades the cells (the palette is 15 §5's) or
-  one that appears in the whole view.
+- **The stage outline is the cursor's shadow, worn only on request.** With the §5.3 toggle on, every
+  drawn cell of the cursor's stage carries the silhouette stroke, in all four viewports; the whole
+  view has no cursor and no stage outline, and a stage click, an arrow and a play's advance all move
+  the same set. A reviewer rejects a stage highlight that tints or re-shades the cells (the palette
+  is 15 §5's), one that appears in the whole view, and a toggle state that survives the screen or
+  opens on.
 - **The reveal reads the screen's clock, and only its stamp set.** A cell's offset and alpha are
   derived from its reveal stamp — the tick and the direction together — and the accumulator (§7.6);
   the same stamps and the same clock give the same frame, a whole view has no stamps at all, and
@@ -1249,6 +1259,8 @@ stays the one place a build is planned (15 §4, 16 §2).
 | SC8 | §4.1 the JEI face's world light (15 §6.2), §4.7 the slab-block platform |
 | SC9 | §7.1/§7.5 the play's zero state (the hold before the first batch), §7.6 the reveal's two directions and the stamp that carries them, §4.5 the drop/rise button |
 | SC10 | §11 the flagship station, the generator law and the campus set |
+| SC11 | §7.3/§7.1 the finished play's replay, §5.3 the stage outline as an opt-in toggle (off by default), §4.5 the button rows |
+| SC12 | [18](18-set-preview.md) — the set entries, the composite set page, the constraint overlay and the drill-down (D-112) |
 
 SC0 is this file; the gates are the milestone table of
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md), and this file owns the contracts they test.

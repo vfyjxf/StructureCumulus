@@ -2607,6 +2607,17 @@ block structure belongs on, and a checker the eye parses as paving rather than s
 content — a cell the blueprint never declared — and would collide with the no-marks palette law;
 the plate stays unlit chrome grey.
 
+### D-110 — Both reveal directions stay, and the drop is the default
+
+The viewer watched both narrations through SC9's comparison toggle and ruled (2026-11-13): both
+stay — each is useful — and the drop is the default. The toggle remains a §4.5 button of
+[design/17](17-preview-screen.md): view state, no key, no config, no memory; a fresh screen opens
+on the drop. This resolves §7.6's open default.
+
+**Why the drop.** The fall's landing is the one beat a placement gets for free (§7.6), and the
+viewer's pick confirms it. The rise stays one button away because it reads better for tall cells
+emerging from the platform — which is exactly why both stay.
+
 ### D-111 — The flagship demo is generated, its satellites are orientations, and the campus is a set
 
 The viewer asked for something bigger and more complex — satellite structures, recursive
@@ -2639,8 +2650,33 @@ module to serve demo content; the generator answers the same authoring pain with
 schema. **Not attempted: demoing nested extents.** They are a capture-time host capability the
 adapter deliberately ships no provider for (adapter §14); no document can conjure one.
 
-(D-110 is reserved for the viewer's drop/rise reveal pick, which lands after SC9's comparison
-toggle is watched; it is recorded when the pick arrives.)
+(D-110, recorded after this one was numbered, holds the viewer's drop/rise reveal pick: both stay,
+the drop is the default.)
+
+### D-112 — Sets join the catalogue as composite entries, composed server-side
+
+The viewer asked to watch a set's satellites and their constraints in the preview (2026-11-13) and
+chose the composite scene over an information panel. That reverses the one-sentence exclusion in
+[design/15](15-preview.md) §6.1 ("structure sets are not entries") and the matching refusal in
+D-111: the catalogue gains a set entry — every member's expected cells resolved under identity and
+composed through the kernel's `Placement`/`Siting` on the server, shipped as pure geometry — and the
+screen gains the set page ([design/18](18-set-preview.md)): the composite scene, members as the
+explode's parts, members as the stages in build order, the constraint overlay (links as labelled
+lines, required/optional, presence probes), and a one-deep drill-down with a breadcrumb.
+
+**Why server-side composition.** The screen's first law is that it derives nothing (17 §2): a
+client that re-composed placements would re-implement the orientation group on the wrong side of
+the wire. The server already sits on the kernel; the wire carries the result, trailing-optional so
+an older client simply never sees sets.
+
+**Why a composite cap of 1024.** A campus is bigger than a machine; the 4096 whole-catalogue cap
+that guards the network frame is unchanged and counts set entries, so the per-entry band is the
+only new number.
+
+**Rejected: an information panel.** The viewer was offered the table-only form and chose the scene;
+the constraint overlay keeps the facts (links, distances, required flags) on the picture they
+constrain. **Rejected: presence checking on the page.** The page shows the set as declared; whether
+a built campus satisfies it is `/cumulus set check`'s question, in a world.
 
 ## 3. Consequences a reviewer should attack
 

@@ -191,15 +191,17 @@ from the declarations exactly as a session resolves them, and shipped as one syn
   an open client without a reconnect, and nothing polls.
 - **What.** One entry per blueprint that compiles: its id, its expected cells in the session's
   `GhostCell` shape (block id plus serialized properties), and its material lines (the item the block
-  yields and how many expected cells ask for it). Structure sets are not entries — the preview is one
-  blueprint at a time. The presentation pack adds the same presentation block (§3, design 16 §5) —
+  yields and how many expected cells ask for it). Structure sets are entries too — one composite
+  entry per set, composed server-side into pure geometry ([18](18-set-preview.md) §3, a 2026-11-13
+  reversal of this bullet's first reading). The presentation pack adds the same presentation block (§3, design 16 §5) —
   the carried description and the stage table — so the entry's text and stage grouping come from the
   one place a session's do ([16](16-presentation.md) §10, §11).
 - **Caps.** Every cap is a code constant and none truncates silently, the same law as the session's
   payload caps (§3): a blueprint that does not compile, or whose projection exceeds 512 expected
   cells, or whose summary exceeds 64 distinct material items, or whose every expected cell is air and
   would draw nothing ([17](17-preview-screen.md) §3.3), is **left out of the catalog entirely**
-  and named in a WARNING log line. A partial scene or a partial material list would lie about the
+  and named in a WARNING log line. A set entry's composite cap is 1024 cells over the same material
+  and catalogue caps ([18](18-set-preview.md) §3). A partial scene or a partial material list would lie about the
   blueprint, so the entry is absent rather than wrong. One whole-catalog cap (4096 expected cells)
   keeps a single payload inside the network frame limit; the ids it leaves out are named the same
   way, in catalog order, so the same source always drops the same entries.

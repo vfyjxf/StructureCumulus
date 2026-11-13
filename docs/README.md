@@ -46,6 +46,9 @@ table defines who may emit each finding code.
     the playback and the per-bay exploded view, SC3 the five entry links, SC4 the demo content, and
     SC10 the flagship station content: the generated `demo_station` variant group with its `--check`
     gate and the `demo_campus` structure set).
+19. [design/18-set-preview.md](design/18-set-preview.md) — the set preview (SC12): structure sets as
+    catalogue entries composed server-side, the composite set page, the constraint overlay and the
+    member drill-down.
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
