@@ -227,8 +227,14 @@ and pitch below, never a payload field.
   brightness, resolved from the wire block id plus its property strings against the client's block
   registry (an id or value this client does not know leaves the property at its default). Rendering
   happens inside the GUI pass: Minecraft's GUI pass is an orthographic 3D pass with the depth buffer
-  cleared at its start and the 3D item lighting already set up, which is the same path vanilla uses
-  to draw a block model as an item icon.
+  cleared at its start, which is the same path vanilla uses to draw a block model as an item icon.
+- **Light.** The scene is lit by the world, not by the GUI's item frame: the pass installs the level
+  pass's two world diffuse directions rotated into the view's own camera and the camera's rotation
+  (with the GUI's y-down mirror) as the pass's normal matrix — the same law the preview screen keeps
+  ([17](17-preview-screen.md) §4.1), so a face's brightness is a property of the face in JEI too.
+  Vanilla's `Lighting.setupFor3DItems` pins the light to the inventory-item frame and would shade a
+  face by the camera's accident — flat and shifting as the view is dragged, which is the defect SC8
+  fixes; the JEI face used it until then.
 - **Depth.** Cells are drawn far-to-near by their camera depth and the depth buffer resolves the
   opaque cubes; the batch is flushed with `BufferSource.endBatch()` and **not** `GuiGraphics.flush()`,
   whose contract temporarily disables the depth test around the batch and would drop the scene's

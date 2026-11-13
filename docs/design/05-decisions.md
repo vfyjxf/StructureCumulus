@@ -2582,6 +2582,31 @@ what was slow was the arithmetic — a 2-tick per-cell dwell share, a 100-tick c
 pause made a nine-cell stage a two-second lecture. The new constants keep the dwell proportional
 to the stage's size at roughly a third of the old pace.
 
+### D-109 — The JEI face shares the world's light, and the plate is a slab platform
+
+Two rendering truths from the same playtest round. The JEI preview face (all three of its view
+modes) installs the same world-fixed light the screen does
+([design/15](15-preview.md) §6.2, [design/17](17-preview-screen.md) §4.1): the level pass's two
+diffuse directions rotated into the JEI camera's frame, and the camera's rotation with the GUI's
+y-down mirror as the pass's normal matrix. And the screen's base plate is rebuilt as a **platform
+of slab blocks** — tiles two cells on a side and half a cell thick, drawn as boxes with tops, sides
+and bottoms — instead of SC7's flat checkerboard plane.
+
+**Why the JEI face moves.** SC5 deliberately left the JEI face on vanilla's `setupFor3DItems` and
+parked the change as backlog until the user's word (D-106); the word arrived as "the three-view's
+lighting is still broken". The fixed item frame shades a face by the camera's accident — flat, and
+shifting as the view is dragged — which is the same defect class SC5 fixed on the screen, and
+keeping one preview surface on a lie the other one dropped was never a principle, only a wait.
+
+**Why the slab platform.** SC7's plate was a flat plane of one-cell alternating squares; the user
+read it as "just a flat face" and asked for blocks — big ones. A plate with no thickness disappears
+edge-on and a one-cell checker reads as noise; two-cell slabs give the floor a rim, a scale a
+block structure belongs on, and a checker the eye parses as paving rather than static.
+
+**Rejected: texturing the plate as real blocks.** Stone or deepslate tiles would read as document
+content — a cell the blueprint never declared — and would collide with the no-marks palette law;
+the plate stays unlit chrome grey.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2715,6 +2740,9 @@ to the stage's size at roughly a third of the old pace.
   reviewer should reject a plate tile inside any hull, stage count, pick ray or explode group, a lit
   or textured plate, a reveal that scales or rises instead of falling, and the SC6 dwell constants
   returning — the pace is a law, not a tuning knob.
+- The JEI face and the plate share the screen's truths (D-109, design 15 §6.2, 17 §4.7): a reviewer
+  should reject a `setupFor3DItems` call in any preview scene pass, and a plate that is a flat plane
+  or a one-cell checker — the slabs are two-cell boxes with a visible rim.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is

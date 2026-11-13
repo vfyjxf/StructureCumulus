@@ -431,11 +431,15 @@ Every page stands on a base plate — the sample ground every assembly instructi
 included) puts under the machine, so the structure reads as *placed on something* instead of floating
 in the panel's void.
 
-- **What it is.** A flat checkerboard of one-cell tiles in two light greys, lying in the plane
-  `y = hullMinY` directly under the drawn hull, extended one cell past the hull's footprint on every
-  side. It is scene geometry: it orbits, zooms and pans with the cells in all four viewports and in
-  both projections, and the depth test treats it like any model — a cell on the plate occludes the
-  tile under it.
+- **What it is.** A platform of **slab blocks**, not a painted plane: square tiles two cells on a
+  side and half a cell thick, their tops at `y = hullMinY` directly under the drawn hull, the grid
+  extended one tile past the hull's footprint on every side, two light greys alternating by tile.
+  Each tile is drawn as a box — top, sides and bottom — so the platform has a visible thickness at
+  its rim and reads as masonry the structure stands on, which is exactly what the flat one-cell
+  checkerboard failed to read as (SC7's first plate was a plane of small alternating squares, and
+  the user sent it back). It is scene geometry: it orbits, zooms and pans with the cells in all
+  four viewports and in both projections, and the depth test treats it like any model — a cell on
+  the plate occludes the slab top under it.
 - **It is the picture's floor, never a cell.** The plate is not a cell: it joins no stage, no bay,
   no material line and no hull (§3.3's hull stays the drawn cells' own, so the fit, the framing and
   the explode never see it), it is not pickable (§5.3's ray ignores it) and it pops nothing. It
@@ -698,7 +702,8 @@ no second vocabulary:
 
 ### 7.5 Cadence and the clock
 
-The durations are 16 §6.4's, unchanged, and the clock is the screen's own §4.6 accumulator.
+The durations are the screen's own — 16 §6.4's in-world cadence stays untouched — and the clock is
+the screen's own §4.6 accumulator.
 
 | Constant | Value | Meaning here |
 | --- | --- | --- |
@@ -1078,8 +1083,8 @@ document module's own `SC-DOC-*` family (15 §12, D-98).
   (§4.1): the scene installs the world's two lights in each panel's frame, and it installs its own
   normal matrix. A call to `Lighting.setupFor3DItems()` in the scene pass, a normal matrix taken from
   the pose's inverse transpose, or a `Fit` z scale that disagrees with its x/y scale is the defect
-  this law exists to catch. Vanilla's GUI item lights stay out of the screen; the JEI face keeps its
-  own fixed-frame shading and is on the plan's backlog rather than silently sharing the fix.
+  this law exists to catch. Vanilla's GUI item lights stay out of both preview surfaces: the JEI
+  face shares this law (15 §6.2, D-109).
 - **A projection's depth stays in the pass's band.** Both arms map their models into
   `[0, sceneSpan]` above `sceneDepth`, and the chrome — the gizmo, the labels and every outline
   stroke — draws above it with the depth test off (§4.1, §5.3). A reviewer rejects a hard-coded
@@ -1097,10 +1102,11 @@ document module's own `SC-DOC-*` family (15 §12, D-98).
   the same frame, a whole view has no stamps at all, and nothing about a fall reaches the wire, the
   world or the session. A reviewer rejects a fall that reads the game tick (a screen pauses it) or a
   tick counter of its own (a second clock beside §4.6).
-- **The base plate is the picture's floor and nothing else.** Every page draws the checkerboard
-  under the drawn hull (§4.7): it joins no hull, no stage, no pick ray and no explode, and it is
-  drawn unlit as chrome. A reviewer rejects a plate cell in any stage's count, a plate in the fit's
-  hull, and a lit or textured plate (it would read as a document block).
+- **The base plate is the picture's floor and nothing else.** Every page stands on the slab
+  platform under the drawn hull (§4.7): it joins no hull, no stage, no pick ray and no explode, and
+  it is drawn unlit as chrome. A reviewer rejects a plate cell in any stage's count, a plate in the
+  fit's hull, a lit or textured plate (it would read as a document block), and a plate that is a
+  flat plane again — the slabs' thickness is the reading.
 - **A play's stage is one batch out of empty slots.** The tick a play begins a stage, every cell of
   the stage is revealed at once (§7.5), and a cell that is not revealed is not drawn at all — no
   alpha floor, no ghost, no placeholder (§7.2). A reviewer rejects a per-cell drip inside a play's
