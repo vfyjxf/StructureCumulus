@@ -1539,7 +1539,7 @@ public final class PreviewScene {
 
     public record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) { }
 
-    public record Panel(int cells, int layer) { }
+    public record Panel(int cells, int layer, int plateTiles) { }
 
     public record Sight(float alpha, float scale, float dx, float dy, float dz) {
         public static final Sight full;
@@ -1551,6 +1551,7 @@ public final class PreviewScene {
 
     public static PreviewScene of(PreviewCatalogPayload.Entry entry);
     public Hull hull();
+    public BasePlate plate();
     public int cellCount();
     public java.util.List<Cell> cells();
     public int layers();
@@ -1584,7 +1585,8 @@ public record CellOutline(java.util.List<Vector2f> points) {
 }
 
 // The chrome stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded
-// endpoints, one batch at chromeDepth on RenderType.guiOverlay() (no depth test).
+// endpoints, one batch at chromeDepth on RenderType.guiOverlay() (no depth test). A two-point stroke is
+// one open segment, the compass's axis of design 17 §6.
 public final class ChromeStroke {
     public static final float widthPx;
     public record Stroke(java.util.List<Vector2f> points, int color) { }
@@ -1593,17 +1595,17 @@ public final class ChromeStroke {
     public static void draw(GuiGraphics graphics, java.util.List<Stroke> strokes);
 }
 
-// The staged playback's pop-in of design 17 §7.6: one stamp per revealed cell, two eased legs sampled
-// from the screen's clock.
-public final class PopIn {
-    public static final float startScale;
-    public static final int popInTicks;
-    public static PopIn none();
-    public static Tween scaleLeg(int durationTicks);
+// The staged playback's drop-in of design 17 §7.6: one stamp per revealed cell, a fall leg from
+// dropInCells onto the cell's own slot and an alpha leg, both sampled from the screen's clock.
+public final class DropIn {
+    public static final float dropInCells;
+    public static final int dropInTicks;
+    public static DropIn none();
+    public static Tween fallLeg(int durationTicks);
     public static Tween alphaLeg(int durationTicks);
-    public PopIn advance(java.util.Set<GhostCell> revealed, double now);
+    public DropIn advance(java.util.Set<GhostCell> revealed, double now);
     public boolean animating(GhostCell cell, double now, int durationTicks);
-    public float scale(GhostCell cell, double now, Tween leg);
+    public float drop(GhostCell cell, double now, Tween leg);
     public float alpha(GhostCell cell, double now, Tween leg);
     public int count();
 }
@@ -1651,6 +1653,19 @@ public record Hull(float minX, float minY, float minZ, float maxX, float maxY, f
     public Hull union(Hull other);
     public boolean isEmpty();
     public float radius();
+}
+
+// The page's base plate of design 17 §4.7: one-cell checkerboard tiles in two light greys, one tile past
+// the drawn hull's footprint on every side and in the plane of its floor. Scene geometry, never a cell.
+public record BasePlate(int minX, int minZ, int maxX, int maxZ, int y) {
+    public static final int lightTile;
+    public static final int darkTile;
+    public static BasePlate of(Hull hull);
+    public static BasePlate empty();
+    public boolean isEmpty();
+    public int tiles();
+    public int color(int x, int z);
+    public int draw(GuiGraphics graphics);
 }
 
 // One viewport's orbit camera (design 17 §4.2): a pure value whose every operation returns a new one.
@@ -1706,7 +1721,7 @@ public record Fit(Hull hull, SceneCamera camera, int x, int y, int width, int he
 
 // The staged playback of design 17 §7: no cursor is the whole view, a cursor is the staged view. A
 // play reveals a stage as one batch and the span is that stage's dwell (§7.5); only a manual step
-// drips one cell. An unrevealed cell's alpha is zero: the pop-in fills an empty slot (§7.2).
+// drips one cell. An unrevealed cell's alpha is zero: the drop-in fills an empty slot (§7.2).
 public record StagePlayback(java.util.List<Stage> stages, java.util.List<Placed> cells, int cursor,
                             java.util.List<Integer> revealed, boolean playing, float elapsed, float pause) {
     public static final float doneAlpha;
@@ -1806,6 +1821,7 @@ public final class PreviewScreen extends Screen {
     public PreviewScene scene();
     public @Nullable SceneCamera panelCamera(int panel);
     public int drawnCells();
+    public int drawnPlateTiles();
     public @Nullable PreviewScene.Cell hovered();
     public ScreenClock clock();
     public @Nullable AxisGizmo gizmo();
@@ -1826,7 +1842,7 @@ public final class PreviewScreen extends Screen {
     public int drawnStageOutlines();
     public @Nullable Shading shading(int panel);
     public @Nullable CellOutline hoverOutline(int panel);
-    public float scaleOf(GhostCell ghost);
+    public float dropOffsetOf(GhostCell ghost);
     public int animatingCells();
     public @Nullable Rect buttonRect(String label);
     public java.util.List<String> buttonLabels();
@@ -2283,7 +2299,7 @@ public final class SetPresence {
 package dev.vfyjxf.cumulus.mc.preview.client.cine;
 
 public enum Ease {
-    linear, smoothstep, inOutCubic, outQuad, outBack;
+    linear, smoothstep, inOutCubic, outCubic, outQuad, outBack;
     public final double applyClamped(double t);
 }
 public record Tween(double from, double to, int durationTicks, Ease ease) {
@@ -2740,7 +2756,15 @@ unrevealed factor and its span becomes the stage's dwell), the outlines are `Chr
 quad strips on `RenderType.guiOverlay()` at `chromeDepth` — smooth and reading through the models —
 with the cursor's stage stroked as a set (`drawnStageOutlines`, and `drawnSlotOutlines` for outline
 mode's not-drawn cells), and the gizmo is the corner compass `AxisGizmo.of(camera, rect)` instead of
-scene geometry at the hull's origin. The milestone state lives in
+scene geometry at the hull's origin. SC7 has landed the third presentation pass (D-108): the page
+stands on a base plate (`BasePlate`, an unlit checkerboard of the drawn hull's footprint plus one
+tile a side, in the hull's own floor plane, drawn in the scene pass before the cells), a reveal drops
+in (`DropIn` replaces SC5's `PopIn`: the stamp machinery stays, the leg becomes a 2.5-cell fall with
+`Ease.outCubic` and its alpha fades in, over 5 ticks, with `PreviewScreen.dropOffsetOf` and
+`animatingCells` telling the harness what is still falling), the cadence retunes to Ponder's pace
+(`StagePlayback`'s constants to 1/6/40/5, roughly a third of SC6's), and the compass's three axes are
+`ChromeStroke`'s vector strokes instead of pixel rows — a two-point stroke is now the one open
+segment the compass draws. The milestone state lives in
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
@@ -2771,6 +2795,7 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `PreviewViewMode` | the scene's projection vocabulary, for the JEI face to select |
 | `preview.scene` | `SceneCamera` (with `Projection` and `Snap`) | the orbit camera value: target, yaw, pitch, distance, zoom, projection; pure operations only |
 | `preview.scene` | `Hull` | the drawn hull of design 17 §3.3, the input of every fit |
+| `preview.scene` | `BasePlate` | the page's floor of design 17 §4.7: the drawn hull's footprint plus one tile a side, two alternating chrome greys, unlit and never a cell |
 | `preview.scene` | `Fit` | the fit of design 17 §4.3: one hull into one viewport through one camera, the scale and the 2D projection the scene, the gizmo and the picking share |
 | `preview.scene` | `ExplodeModel` (with `Group`, `Label`, `Offset`) | the per-bay offset function of design 17 §8.1: the groups, the direction, the half-diagonal distance and the moved label anchors |
 | `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the delta treatments and the reveal counts of design 17 §7, as a pure state machine: a play reveals a stage as one batch, an unrevealed cell is not drawn |
@@ -2779,7 +2804,7 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `SceneLighting` | the scene's world-fixed two-light law of design 17 §4.1, as a pure function of a camera |
 | `preview.scene` | `CellOutline` | one cell's projected silhouette (the convex hull of its eight projected corners), the outline geometry of design 17 §5.3 |
 | `preview.scene` | `ChromeStroke` | the stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded endpoints, drawn at `chromeDepth` with the depth test off |
-| `preview.scene` | `PopIn` | the staged playback's pop-in of design 17 §7.6: per-cell reveal stamps and the two eased legs |
+| `preview.scene` | `DropIn` | the staged playback's drop-in of design 17 §7.6: per-cell reveal stamps, the `outCubic` fall onto the plate and the fade that runs with it |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
 | `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
 | `preview.client.screen` | `ScreenClock` | the screen's own two-number clock of design 17 §4.6, advanced by the frame's real-time tick delta |
@@ -2810,9 +2835,16 @@ into: the orthographic arm compresses the page's own view depth, and the perspec
 near/far planes to the drawn hull so its ndc depth lands in the same band. The chrome rides above the
 band at `PreviewScene.chromeDepth`: the compass, the part labels and every outline stroke — the
 strokes draw on `RenderType.guiOverlay()` with the depth test off, so a highlight reads through the
-models (design 17 §5.3, D-107). The lighting is design 17 §4.1's: the pass installs the world's two
-diffuse directions in the panel's frame and the camera's rotation as the normal matrix
-(`SceneLighting`), never the pose's inverse transpose and never `Lighting.setupFor3DItems()`.
+models (design 17 §5.3, D-107); the compass's axes are those same strokes, one open segment each, so
+no axis is a row of GUI pixels (design 17 §6). The base plate is the one exception to the band's
+"chrome above the models" rule, because it is not chrome geometry but the scene's own floor: it is
+drawn inside the model pass, in the shared fit matrix and the shared batch, on
+`RenderType.debugQuads()` — unlit position-colour quads that depth-test and depth-write like any
+model, so a cell occludes the tile under it (design 17 §4.7, D-108). The JEI face draws no plate: its
+`View` picture is design 15's, and the plate is the screen's floor. The lighting is design 17 §4.1's:
+the pass installs the world's two diffuse directions in the panel's frame and the camera's rotation as
+the normal matrix (`SceneLighting`), never the pose's inverse transpose and never
+`Lighting.setupFor3DItems()`.
 
 **What the screen never does.** It reads no world state (no `Level`, no `ClientLevel`, no
 `getBlockState`, no camera entity) and no session: its only input is `PreviewCatalogClient`'s

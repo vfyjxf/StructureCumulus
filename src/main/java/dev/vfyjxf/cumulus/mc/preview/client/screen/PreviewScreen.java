@@ -17,11 +17,11 @@ import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import dev.vfyjxf.cumulus.mc.preview.scene.AxisGizmo;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
 import dev.vfyjxf.cumulus.mc.preview.scene.ChromeStroke;
+import dev.vfyjxf.cumulus.mc.preview.scene.DropIn;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
 import dev.vfyjxf.cumulus.mc.preview.scene.NextStepLine;
-import dev.vfyjxf.cumulus.mc.preview.scene.PopIn;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene.Cell;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
@@ -98,6 +98,7 @@ public final class PreviewScreen extends Screen {
     private ScreenLayout layout;
     private boolean listening;
     private int drawnCells;
+    private int drawnPlateTiles;
     private int drawnLabels;
     private int drawnSlotOutlines;
     private int drawnStageOutlines;
@@ -121,9 +122,9 @@ public final class PreviewScreen extends Screen {
     private @Nullable StageFraming framing;
     private boolean framingArmed = true;
     private int framedCursor = -1;
-    private PopIn popIn = PopIn.none();
-    private Tween popScaleLeg = PopIn.scaleLeg(0);
-    private Tween popAlphaLeg = PopIn.alphaLeg(0);
+    private DropIn dropIn = DropIn.none();
+    private Tween dropFallLeg = DropIn.fallLeg(0);
+    private Tween dropAlphaLeg = DropIn.alphaLeg(0);
     private int animatingCells;
     private final Map<Panel, Shading> shading = new EnumMap<>(Panel.class);
     private final Map<Panel, CellOutline> outlines = new EnumMap<>(Panel.class);
@@ -197,7 +198,7 @@ public final class PreviewScreen extends Screen {
         float delta = Minecraft.getInstance().getTimer().getRealtimeDeltaTicks();
         clock = clock.advance(delta);
         playback = playback.advance(delta, cadence());
-        tickPopIn();
+        tickDropIn();
         tickExplode();
         tickFraming();
         double cursorX = pointerX < 0.0D ? mouseX : pointerX;
@@ -209,6 +210,7 @@ public final class PreviewScreen extends Screen {
             graphics.drawString(font, variant, 8 + font.width(blueprintId.text()), 6, chromeColor, false);
         }
         drawnCells = 0;
+        drawnPlateTiles = 0;
         drawnLabels = 0;
         drawnSlotOutlines = 0;
         drawnStageOutlines = 0;
@@ -556,7 +558,7 @@ public final class PreviewScreen extends Screen {
     }
 
     /**
-     * One cell's treatment: the stage's alpha, the pop-in's scale and the explode's offset (§7.2, §7.6,
+     * One cell's treatment: the stage's alpha, the drop-in's fall and the explode's offset (§7.2, §7.6,
      * §8.1). A cell that is not drawn and not revealed is null: the scene never sees an empty slot.
      */
     private PreviewScene.@Nullable Sight sightOf(Cell cell) {
@@ -570,31 +572,31 @@ public final class PreviewScreen extends Screen {
         ExplodeModel.Offset offset = explode.offset(cell.ghost(), explodeT);
         double now = clock.time();
         GhostCell ghost = cell.ghost();
-        float alpha = playback.alpha(placedCell) * popIn.alpha(ghost, now, popAlphaLeg);
-        float scale = popIn.scale(ghost, now, popScaleLeg);
-        return new PreviewScene.Sight(alpha, scale, offset.x(), offset.y(), offset.z());
+        float alpha = playback.alpha(placedCell) * dropIn.alpha(ghost, now, dropAlphaLeg);
+        float drop = dropIn.drop(ghost, now, dropFallLeg);
+        return new PreviewScene.Sight(alpha, 1.0F, offset.x(), offset.y() + drop, offset.z());
     }
 
     /**
-     * One frame of the pop-in (design 17 §7.6): a cell newly revealed since the last frame takes the
-     * clock's current tick as its reveal stamp, and a whole view pops nothing.
+     * One frame of the drop-in (design 17 §7.6): a cell newly revealed since the last frame takes the
+     * clock's current tick as its reveal stamp, and a whole view drops nothing.
      */
-    private void tickPopIn() {
-        int duration = popInTicks();
-        popScaleLeg = PopIn.scaleLeg(duration);
-        popAlphaLeg = PopIn.alphaLeg(duration);
+    private void tickDropIn() {
+        int duration = dropInTicks();
+        dropFallLeg = DropIn.fallLeg(duration);
+        dropAlphaLeg = DropIn.alphaLeg(duration);
         double now = clock.time();
-        popIn = playback.wholeView() ? PopIn.none() : popIn.advance(revealedNow(), now);
+        dropIn = playback.wholeView() ? DropIn.none() : dropIn.advance(revealedNow(), now);
         int animating = 0;
         for (StagePlayback.Placed cell : placed.values()) {
-            if (playback.drawn(cell) && popIn.animating(cell.ghost(), now, duration)) {
+            if (playback.drawn(cell) && dropIn.animating(cell.ghost(), now, duration)) {
                 animating++;
             }
         }
         animatingCells = animating;
     }
 
-    /** The page's drawn-and-revealed cells: the set the pop-in stamps. */
+    /** The page's drawn-and-revealed cells: the set the drop-in stamps. */
     private Set<GhostCell> revealedNow() {
         Set<GhostCell> revealed = new HashSet<>();
         for (StagePlayback.Placed cell : placed.values()) {
@@ -605,10 +607,10 @@ public final class PreviewScreen extends Screen {
         return revealed;
     }
 
-    /** The pop-in's span, speed divided, zero when the animation is off (design 17 §7.5). */
-    private int popInTicks() {
+    /** The drop-in's span, speed divided, zero when the animation is off (design 17 §7.5). */
+    private int dropInTicks() {
         return ClientConfig.animationEnabled()
-                ? Math.max(1, (int) Math.ceil(PopIn.popInTicks / ClientConfig.animationSpeed()))
+                ? Math.max(1, (int) Math.ceil(DropIn.dropInTicks / ClientConfig.animationSpeed()))
                 : 0;
     }
 
@@ -768,7 +770,9 @@ public final class PreviewScreen extends Screen {
         graphics.fill(rect.x(), rect.y(), rect.x() + rect.width(), rect.y() + rect.height(), panelColor);
         Fit fit = fitFor(panel);
         graphics.enableScissor(rect.x(), rect.y(), rect.x() + rect.width(), rect.y() + rect.height());
-        drawnCells += scene.draw(graphics, fit, this::sightOf).cells();
+        PreviewScene.Panel drawn = scene.draw(graphics, fit, this::sightOf);
+        drawnCells += drawn.cells();
+        drawnPlateTiles += drawn.plateTiles();
         shading.put(panel, shadingOf(fit.camera()));
         outlines.remove(panel);
         List<ChromeStroke.Stroke> strokes = new ArrayList<>();
@@ -785,10 +789,7 @@ public final class PreviewScreen extends Screen {
         }
         ChromeStroke.draw(graphics, strokes);
         if (panel == Panel.main) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
             drawGizmo(graphics, fit.camera(), rect);
-            graphics.pose().popPose();
         }
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
@@ -906,19 +907,18 @@ public final class PreviewScreen extends Screen {
         return false;
     }
 
-    /** The main viewport's corner compass, far-to-near, its labels at the segment ends (design 17 §6). */
+    /** The main viewport's corner compass, far-to-near, its axes as vector strokes and its labels as text. */
     private void drawGizmo(GuiGraphics graphics, SceneCamera panelCamera, Rect rect) {
         AxisGizmo axes = AxisGizmo.of(panelCamera, rect.x(), rect.y(), rect.width(), rect.height());
         gizmo = axes;
+        List<ChromeStroke.Stroke> strokes = new ArrayList<>(3);
         for (AxisGizmo.Segment axis : axes.ordered()) {
-            line(
-                graphics,
-                Math.round(axis.start().x),
-                Math.round(axis.start().y),
-                Math.round(axis.end().x),
-                Math.round(axis.end().y),
-                axis.color()
-            );
+            strokes.add(new ChromeStroke.Stroke(List.of(axis.start(), axis.end()), axis.color()));
+        }
+        ChromeStroke.draw(graphics, strokes);
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
+        for (AxisGizmo.Segment axis : axes.ordered()) {
             graphics.drawString(
                 font,
                 axis.name(),
@@ -928,19 +928,7 @@ public final class PreviewScreen extends Screen {
                 false
             );
         }
-    }
-
-    private static void line(GuiGraphics graphics, int x0, int y0, int x1, int y1, int color) {
-        int steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-        if (steps == 0) {
-            graphics.fill(x0, y0, x0 + 1, y0 + 1, color);
-            return;
-        }
-        for (int step = 0; step <= steps; step++) {
-            int x = x0 + Math.round((x1 - x0) * (step / (float) steps));
-            int y = y0 + Math.round((y1 - y0) * (step / (float) steps));
-            graphics.fill(x, y, x + 1, y + 1, color);
-        }
+        graphics.pose().popPose();
     }
 
     /** The six world faces in {@code Direction}'s declaration order, shaded as the panel installed them. */
@@ -1077,7 +1065,7 @@ public final class PreviewScreen extends Screen {
         }
         placed = index(playback);
         ghostAt = ghosts(updated.cells());
-        popIn = PopIn.none();
+        dropIn = DropIn.none();
         explode = explodeModel();
         if (!explode.separable()) {
             explodeT = 0.0F;
@@ -1224,6 +1212,11 @@ public final class PreviewScreen extends Screen {
         return drawnCells;
     }
 
+    /** The base-plate tiles drawn in the last frame, summed over the panels; never a cell (§4.7). */
+    public int drawnPlateTiles() {
+        return drawnPlateTiles;
+    }
+
     /** The cell under the cursor in the viewport it is over, or null when none is (design 17 §5.3). */
     public @Nullable Cell hovered() {
         return hovered;
@@ -1331,12 +1324,12 @@ public final class PreviewScreen extends Screen {
         return panel < 0 || panel >= panels.length ? null : outlines.get(panels[panel]);
     }
 
-    /** The pop-in scale of one cell as of the last frame; 1.0 when it is not popping (§7.6). */
-    public float scaleOf(GhostCell ghost) {
-        return popIn.scale(ghost, clock.time(), popScaleLeg);
+    /** The height one cell still has to fall as of the last frame; zero once it has landed (§7.6). */
+    public float dropOffsetOf(GhostCell ghost) {
+        return dropIn.drop(ghost, clock.time(), dropFallLeg);
     }
 
-    /** How many drawn cells were inside their pop-in in the last frame (§7.6). */
+    /** How many drawn cells were inside their fall in the last frame (§7.6). */
     public int animatingCells() {
         return animatingCells;
     }

@@ -11,6 +11,7 @@ import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
+import dev.vfyjxf.cumulus.mc.preview.scene.DropIn;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
@@ -24,7 +25,7 @@ import java.util.List;
 /**
  * The screen's rendering law (design 17 §4.1, §5.3, §7.6): the world-fixed directional shading of
  * every panel at every snap, the hover outline as the hovered cell's projected silhouette, and the
- * staged playback's pop-in from its stamp to its settle.
+ * staged playback's drop-in from its stamp to its landing.
  */
 @ClientScenario(
     name = "screen.render",
@@ -41,7 +42,7 @@ public final class PreviewScreenRenderScenario {
 
     public void define(ScenarioBuilder build) {
         build = PreviewScenarioSupport.stage(build)
-                .log("screen.render: the world-fixed shading at six snaps, the silhouette outline, the pop-in");
+                .log("screen.render: the world-fixed shading at six snaps, the silhouette outline, the drop-in");
 
         PreviewScenarioSupport.open(build)
                 .waitUntil("a world session is open behind the screen", PreviewScenarioSupport::synced)
@@ -67,7 +68,14 @@ public final class PreviewScreenRenderScenario {
                             && Math.abs(shading.west() - 0.497F) < eps
                             && Math.abs(shading.down() - 0.4F) < eps;
                 }, () -> describeShading())
-                .action("hover the nearest cell at the default iso", PreviewScreenRenderScenario::hoverMain).frames(3)
+                .check(
+                    "every panel draws the base plate under the page, and no plate tile is a cell",
+                    () -> screen().drawnPlateTiles() == 4 * screen().scene().plate().tiles()
+                            && screen().drawnPlateTiles() > 0
+                            && screen().drawnCells() == 16,
+                    () -> "plate=" + screen().drawnPlateTiles() + " tiles=" + screen().scene().plate().tiles()
+                            + " drawn=" + screen().drawnCells()
+                ).action("hover the nearest cell at the default iso", PreviewScreenRenderScenario::hoverMain).frames(3)
                 .check(
                     "the iso outline is the cell's six-vertex silhouette",
                     () -> outline(mainPanel) != null && outline(mainPanel).points().size() == 6,
@@ -156,41 +164,47 @@ public final class PreviewScreenRenderScenario {
                     () -> Integer.toString(screen().drawnCells())
                 ).screenshot("render-perspective").frames(2).checkCaptured("render-perspective")
                 .key(GLFW.GLFW_KEY_HOME, 0).frames(2)
-                .action("open the staged page for the pop-in", context -> PreviewScreen.open(staged)).frames(3)
+                .action("open the staged page for the drop-in", context -> PreviewScreen.open(staged)).frames(3)
                 .check(
-                    "the staged page opens without a pop",
-                    () -> screen().animatingCells() == 0,
-                    () -> "animating=" + screen().animatingCells()
+                    "the staged page opens with nothing falling",
+                    () -> screen().animatingCells() == 0 && largestDrop() == 0.0F,
+                    () -> "animating=" + screen().animatingCells() + " highest=" + largestDrop()
                 ).key(GLFW.GLFW_KEY_B, 0).frames(2)
                 .check(
-                    "a stepped cell pops out of an empty slot: it alone is drawn, in every panel",
+                    "a stepped cell falls into an empty slot: it alone is drawn, in every panel",
                     () -> screen().playback().cursor() == 0
                             && screen().playback().revealed(0) == 1
                             && screen().drawnCells() == 4
-                            && screen().animatingCells() > 0,
+                            && screen().animatingCells() > 0
+                            && largestDrop() <= DropIn.dropInCells,
                     () -> "drawn=" + screen().drawnCells() + " revealed=" + screen().playback().revealed(0)
-                            + " animating=" + screen().animatingCells()
-                ).waitUntil("the step's pop settles", () -> screen().animatingCells() == 0).key(GLFW.GLFW_KEY_SPACE, 0)
+                            + " animating=" + screen().animatingCells() + " highest=" + largestDrop()
+                ).frames(1)
+                .check(
+                    "the falling cell hangs between the plate and its slot, never at either end",
+                    () -> largestDrop() > 0.0F && largestDrop() < DropIn.dropInCells,
+                    () -> "highest=" + largestDrop()
+                ).waitUntil("the step's cell lands", () -> screen().animatingCells() == 0).key(GLFW.GLFW_KEY_SPACE, 0)
                 .waitUntil("the play reveals the rest of the stage", () -> screen().animatingCells() > 0)
                 .check(
-                    "the play reveals the stage as one batch: every remaining cell pops together",
-                    () -> screen().animatingCells() == 8 && smallestScale() < 1.0F,
-                    () -> "animating=" + screen().animatingCells() + " smallest=" + smallestScale()
-                )
+                    "the play reveals the stage as one batch: every remaining cell falls together",
+                    () -> screen().animatingCells() == 8 && largestDrop() <= DropIn.dropInCells,
+                    () -> "animating=" + screen().animatingCells() + " highest=" + largestDrop()
+                ).frames(1)
                 .check(
                     "the cursor's stage carries the outline on every drawn cell in every panel",
                     () -> screen().drawnStageOutlines() == 36,
                     () -> "stageOutlines=" + screen().drawnStageOutlines()
                 ).screenshot("render-play").frames(2).checkCaptured("render-play")
-                .waitUntil("the batch's pops settle four ticks after the reveal", () -> screen().animatingCells() == 0)
+                .waitUntil("the batch lands five ticks after the reveal", () -> screen().animatingCells() == 0)
                 .check(
-                    "every cell is back at full size",
-                    () -> screen().animatingCells() == 0 && smallestScale() == 1.0F,
-                    () -> "animating=" + screen().animatingCells() + " smallest=" + smallestScale()
+                    "every cell is back on its slot",
+                    () -> screen().animatingCells() == 0 && largestDrop() == 0.0F,
+                    () -> "animating=" + screen().animatingCells() + " highest=" + largestDrop()
                 )
                 .timelineRecord(
                     "screen-render",
-                    () -> "smallest=" + smallestScale() + ", animating=" + screen().animatingCells()
+                    () -> "highest=" + largestDrop() + ", animating=" + screen().animatingCells()
                 ).action("Esc closes the screen", context -> {
                     PreviewScreen open = (PreviewScreen) context.screenOrThrow();
                     context.driver().keyDown(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
@@ -263,12 +277,12 @@ public final class PreviewScreenRenderScenario {
         return corners;
     }
 
-    private static float smallestScale() {
-        float smallest = 1.0F;
+    private static float largestDrop() {
+        float highest = 0.0F;
         for (PreviewScene.Cell cell : screen().scene().cells()) {
-            smallest = Math.min(smallest, screen().scaleOf(cell.ghost()));
+            highest = Math.max(highest, screen().dropOffsetOf(cell.ghost()));
         }
-        return smallest;
+        return highest;
     }
 
     private static void hoverMain(TestContext context) {

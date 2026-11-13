@@ -25,10 +25,10 @@ public record StagePlayback(
     public static final float doneAlpha = 0.25F;
     /** The cursor's revealed factor of design 17 §7.2. */
     public static final float currentAlpha = 1.0F;
-    public static final int cellRevealTicks = 2;
-    public static final int stageRevealMinTicks = 10;
-    public static final int stageRevealMaxTicks = 100;
-    public static final int stagePauseTicks = 10;
+    public static final int cellRevealTicks = 1;
+    public static final int stageRevealMinTicks = 6;
+    public static final int stageRevealMaxTicks = 40;
+    public static final int stagePauseTicks = 5;
 
     /** One page cell with the facts the treatments read: its stage and its position inside it. */
     public record Placed(GhostCell ghost, int stage, int position) {}
@@ -123,7 +123,7 @@ public record StagePlayback(
 
     /**
      * The cell's alpha factor over the scene's base alpha (design 17 §7.2). An unrevealed cell is zero:
-     * the scene is asked for no model, so the pop-in fills an empty slot.
+     * the scene is asked for no model, so the drop-in fills an empty slot.
      */
     public float alpha(Placed cell) {
         if (cursor < 0) {
@@ -252,7 +252,7 @@ public record StagePlayback(
         return new StagePlayback(stages, cells, next, revealOnly(next, cellCount(next)), true, 0.0F, 0.0F);
     }
 
-    /** The stage's dwell: the span one stage is held over once its batch has popped (design 17 §7.5). */
+    /** The stage's dwell: the span one stage is held over once its batch has landed (design 17 §7.5). */
     public int revealSpan(int stage, Cadence cadence) {
         if (!cadence.enabled()) {
             return 0;

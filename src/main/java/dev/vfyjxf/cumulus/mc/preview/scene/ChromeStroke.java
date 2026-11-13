@@ -14,14 +14,15 @@ import java.util.List;
 /**
  * The chrome stroke of design 17 §5.3: each edge of a projected silhouette as a quad strip between its
  * unrounded endpoints, above the scene at the chrome depth with the depth test off, so a highlight
- * reads through the models and lands where the projection put it.
+ * reads through the models and lands where the projection put it. A two-point stroke is one open
+ * segment, the compass's axis (design 17 §6), never a closed polygon of two edges.
  */
 public final class ChromeStroke {
 
     /** The stroke's width in GUI pixels: a vector line, not a row of GUI pixels (§5.3). */
     public static final float widthPx = 1.5F;
 
-    /** One stroke: a closed projected silhouette and its chrome colour. */
+    /** One stroke: a closed projected silhouette, or one open segment, and its chrome colour. */
     public record Stroke(List<Vector2f> points, int color) {
 
         public Stroke {
@@ -34,10 +35,14 @@ public final class ChromeStroke {
 
     private ChromeStroke() {}
 
-    /** The quads of one closed stroke, one per edge, in a winding the GUI's back-face cull keeps. */
+    /** The quads of one stroke, one per edge, in a winding the GUI's back-face cull keeps. */
     public static List<Quad> quads(List<Vector2f> points) {
         if (points.size() < 2) {
             return List.of();
+        }
+        if (points.size() == 2) {
+            Quad edge = quad(points.get(0), points.get(1));
+            return edge == null ? List.of() : List.of(edge);
         }
         List<Vector2f> ordered = area(points) > 0.0F ? reversed(points) : points;
         List<Quad> quads = new ArrayList<>(ordered.size());

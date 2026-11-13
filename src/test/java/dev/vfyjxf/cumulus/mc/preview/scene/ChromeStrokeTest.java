@@ -17,13 +17,25 @@ class ChromeStrokeTest {
     void anEdgeBecomesAQuadOfTheFixedWidth() {
         List<ChromeStroke.Quad> quads = ChromeStroke
                 .quads(List.of(new Vector2f(10.3F, 20.7F), new Vector2f(40.9F, 20.7F)));
-        assertEquals(2, quads.size(), "an open two-point stroke is that edge, both ways round");
+        assertEquals(1, quads.size(), "an open two-point stroke is that one edge, not a two-edge loop");
         ChromeStroke.Quad edge = quads.get(0);
         assertEquals(10.3F, edge.a().x, eps, "the endpoints are never rounded");
         assertEquals(20.7F - ChromeStroke.widthPx * 0.5F, edge.a().y, eps, "half the stroke lies above the edge");
         assertEquals(40.9F, edge.c().x, eps);
         assertEquals(20.7F + ChromeStroke.widthPx * 0.5F, edge.b().y, eps, "and half below it");
         assertEquals(ChromeStroke.widthPx, Math.abs(edge.b().y - edge.a().y), eps);
+    }
+
+    @Test
+    void aVerticalCompassAxisStrokesAsWideAsAHorizontalOne() {
+        List<ChromeStroke.Quad> quads = ChromeStroke
+                .quads(List.of(new Vector2f(50.0F, 10.0F), new Vector2f(50.0F, 40.0F)));
+        assertEquals(1, quads.size(), "a compass axis is that one segment");
+        ChromeStroke.Quad axis = quads.get(0);
+        assertEquals(ChromeStroke.widthPx, Math.abs(axis.a().x - axis.b().x), eps, "the stroke widens across x");
+        assertEquals(50.0F - ChromeStroke.widthPx * 0.5F, Math.min(axis.a().x, axis.b().x), eps);
+        assertEquals(40.0F, Math.max(axis.b().y, axis.c().y), eps, "the segment's own ends are kept");
+        assertTrue(area(axis) < 0.0F, "the axis winds the way every GUI quad does");
     }
 
     @Test

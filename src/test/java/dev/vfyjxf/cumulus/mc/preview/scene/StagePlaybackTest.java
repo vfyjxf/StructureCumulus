@@ -93,13 +93,14 @@ class StagePlaybackTest {
 
     @Test
     void theSpanIsClampedFlooredAndSpeedDivided() {
-        assertEquals(10, pageOf(4).revealSpan(0, normal), "a four-cell stage takes the floor");
-        assertEquals(24, pageOf(12).revealSpan(0, normal), "twelve cells dwell 24 ticks");
-        assertEquals(100, pageOf(400).revealSpan(0, normal), "a huge stage takes the ceiling");
-        assertEquals(12, pageOf(12).revealSpan(0, StagePlayback.Cadence.of(2.0D, true)), "speed divides the span");
-        assertEquals(50, pageOf(400).revealSpan(0, StagePlayback.Cadence.of(2.0D, true)));
+        assertEquals(6, pageOf(4).revealSpan(0, normal), "a four-cell stage takes the floor");
+        assertEquals(12, pageOf(12).revealSpan(0, normal), "twelve cells dwell twelve ticks");
+        assertEquals(40, pageOf(400).revealSpan(0, normal), "a huge stage takes the ceiling");
+        assertEquals(6, pageOf(12).revealSpan(0, StagePlayback.Cadence.of(2.0D, true)), "speed divides the span");
+        assertEquals(20, pageOf(400).revealSpan(0, StagePlayback.Cadence.of(2.0D, true)));
         assertEquals(0, pageOf(4).revealSpan(0, StagePlayback.Cadence.of(1.0D, false)), "no animation, no span");
-        assertEquals(10, pageOf(4).pauseSpan(normal), "the pause is the cadence's own");
+        assertEquals(5, pageOf(4).pauseSpan(normal), "the pause is the cadence's own");
+        assertEquals(3, pageOf(4).pauseSpan(StagePlayback.Cadence.of(2.0D, true)));
         assertEquals(0, pageOf(4).pauseSpan(StagePlayback.Cadence.of(1.0D, false)));
     }
 
@@ -131,14 +132,15 @@ class StagePlaybackTest {
     void theBatchDwellsThenPausesThenMovesOn() {
         StagePlayback playback = page().togglePlay(normal).advance(1.0F, normal);
         assertEquals(3, playback.revealed(0));
-        StagePlayback dwell = playback.advance(8.0F, normal);
+        StagePlayback dwell = playback.advance(4.0F, normal);
         assertEquals(0, dwell.cursor(), "the stage still holds its dwell");
         assertEquals(0.0F, dwell.pause(), eps);
         StagePlayback paused = dwell.advance(1.0F, normal);
         assertEquals(0, paused.cursor(), "the dwell is over; the pause holds the cursor");
-        assertEquals(10.0F, paused.elapsed(), eps, "the dwell stops at its span and the hold begins");
-        StagePlayback held = paused.advance(9.0F, normal);
+        assertEquals(6.0F, paused.elapsed(), eps, "the dwell stops at its span and the hold begins");
+        StagePlayback held = paused.advance(4.0F, normal);
         assertEquals(0, held.cursor());
+        assertEquals(4.0F, held.pause(), eps);
         StagePlayback next = held.advance(1.0F, normal);
         assertEquals(1, next.cursor(), "the pause's end moves the cursor on");
         assertEquals(2, next.revealed(1), "the next stage arrives whole");

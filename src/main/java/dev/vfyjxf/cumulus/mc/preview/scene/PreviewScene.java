@@ -41,10 +41,10 @@ public final class PreviewScene {
     /** One panel's rectangle and the camera its mode gives it; the fit is always the drawn hull. */
     public record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) {}
 
-    /** What one panel drew: its cell count and the Y layer it isolates or highlights. */
-    public record Panel(int cells, int layer) {}
+    /** What one panel drew: its cell count, the Y layer it isolates or highlights and its plate tiles. */
+    public record Panel(int cells, int layer, int plateTiles) {}
 
-    /** How one cell is drawn this frame: its alpha factor, its pop scale and its displacement (§7.2, §8.1). */
+    /** How one cell is drawn this frame: its alpha factor, its scale and its displacement (§7.2, §7.6, §8.1). */
     public record Sight(float alpha, float scale, float dx, float dy, float dz) {
 
         public static final Sight full = new Sight(1.0F, 1.0F, 0.0F, 0.0F, 0.0F);
@@ -70,12 +70,14 @@ public final class PreviewScene {
 
     private final List<Cell> cells;
     private final Hull hull;
+    private final BasePlate plate;
     private final int minY;
     private final int maxY;
 
     private PreviewScene(List<Cell> cells) {
         this.cells = List.copyOf(cells);
         this.hull = hullOf(cells, PreviewScene::draws);
+        this.plate = BasePlate.of(this.hull);
         if (this.hull.isEmpty()) {
             this.minY = 0;
             this.maxY = -1;
@@ -121,6 +123,11 @@ public final class PreviewScene {
     /** The drawn hull of §3.3: the fit input of every panel, never the declared bounds. */
     public Hull hull() {
         return hull;
+    }
+
+    /** The floor the page stands on (§4.7): the drawn hull's own, so no fit, frame or explode sees it. */
+    public BasePlate plate() {
+        return plate;
     }
 
     /** The drawn hull of one stage's cells: the stage framing's fit box (design 17 §7.5). */
@@ -199,7 +206,7 @@ public final class PreviewScene {
             }
         }
         if (drawn.isEmpty()) {
-            return new Panel(0, layer);
+            return new Panel(0, layer, 0);
         }
         Projection projection = projection(view);
         drawn.sort(Comparator.comparingDouble(cell -> projection.depth(cell.ghost().cell())));
@@ -237,7 +244,7 @@ public final class PreviewScene {
         if (band) {
             drawBand(graphics, view, projection, layer);
         }
-        return new Panel(drawn.size(), layer);
+        return new Panel(drawn.size(), layer, 0);
     }
 
     /**
@@ -324,8 +331,8 @@ public final class PreviewScene {
             }
             drawn.add(new Drawable(cell, sight));
         }
-        if (drawn.isEmpty()) {
-            return new Panel(0, 0);
+        if (drawn.isEmpty() && plate.isEmpty()) {
+            return new Panel(0, 0, 0);
         }
         drawn.sort(Comparator.comparingDouble(drawable -> {
             LatticePoint at = drawable.cell().ghost().cell();
@@ -338,10 +345,12 @@ public final class PreviewScene {
         pose.mulPose(fit.matrix());
         pose.last().normal().set(SceneLighting.normals(fit.camera()));
         Vector3f[] lights = SceneLighting.forCamera(fit.camera());
+        int plateTiles;
         try {
-            RenderSystem.setShaderLights(lights[0], lights[1]);
             RenderSystem.enableDepthTest();
             RenderSystem.depthMask(true);
+            plateTiles = plate.draw(graphics);
+            RenderSystem.setShaderLights(lights[0], lights[1]);
             for (Drawable drawable : drawn) {
                 Cell cell = drawable.cell();
                 Sight sight = drawable.sight();
@@ -375,7 +384,7 @@ public final class PreviewScene {
             Lighting.setupFor3DItems();
             pose.popPose();
         }
-        return new Panel(drawn.size(), 0);
+        return new Panel(drawn.size(), 0, plateTiles);
     }
 
     private void drawBand(GuiGraphics graphics, View view, Projection projection, int layer) {

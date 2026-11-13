@@ -5,6 +5,7 @@ import dev.vfyjxf.cloudlib.uitest.api.ScenarioBuilder;
 import dev.vfyjxf.cloudlib.uitest.api.TestContext;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
+import dev.vfyjxf.cumulus.mc.ClientConfig;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
@@ -13,6 +14,7 @@ import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
+import dev.vfyjxf.cumulus.mc.preview.scene.StagePlayback;
 import net.minecraft.client.Minecraft;
 import org.joml.Vector2f;
 import org.lwjgl.glfw.GLFW;
@@ -46,6 +48,7 @@ public final class PreviewScreenStagesScenario {
     private static float zoomBeforeExplode;
     private static float displacedX;
     private static float displacedY;
+    private static double playStart;
 
     public void define(ScenarioBuilder build) {
         build = PreviewScenarioSupport.stage(build).log(
@@ -140,7 +143,13 @@ public final class PreviewScreenStagesScenario {
                             && screen().drawnCells() == 48
                             && screen().summaryLine() == null
                             && screen().drawnStageOutlines() == 0
-                ).key(GLFW.GLFW_KEY_SPACE, 0).frames(1).check(
+                ).action("start the play and note the screen's clock", context -> {
+                    playStart = screen().clock().time();
+                    var open = context.screenOrThrow();
+                    context.driver().keyDown(open, GLFW.GLFW_KEY_SPACE, 0, 0);
+                    context.driver().keyUp(open, GLFW.GLFW_KEY_SPACE, 0, 0);
+                }).frames(1)
+                .check(
                     "a play enters the staged view at the first stage and starts the stage framing",
                     () -> screen().playback().playing()
                             && screen().playback().cursor() == 0
@@ -170,6 +179,10 @@ public final class PreviewScreenStagesScenario {
                     drawnAfterDrag = screen().drawnCells();
                 }).waitUntil("the play stops at the table's end", () -> !screen().playback().playing()).frames(2)
                 .check(
+                    "the whole play fits the new pace: its clock span stays inside the table's own dwells",
+                    () -> screen().clock().time() - playStart <= paceTicks() + 5.0D,
+                    () -> "ticks=" + (screen().clock().time() - playStart) + " dwells=" + paceTicks()
+                ).check(
                     "the play walked both stages and stopped with everything revealed",
                     () -> screen().playback().cursor() == 1
                             && screen().playback().revealed(0) == 9
@@ -291,6 +304,18 @@ public final class PreviewScreenStagesScenario {
                 }).waitUntil("Esc closes the page", () -> Minecraft.getInstance().screen == null).frames(2);
 
         PreviewScenarioSupport.cleanup(build);
+    }
+
+    /** A whole play's span from the page's own table: every stage's dwell plus every pause (§7.5). */
+    private static int paceTicks() {
+        StagePlayback playback = screen().playback();
+        StagePlayback.Cadence cadence = StagePlayback.Cadence
+                .of(ClientConfig.animationSpeed(), ClientConfig.animationEnabled());
+        int total = 0;
+        for (int stage = 0; stage < playback.stageCount(); stage++) {
+            total += playback.revealSpan(stage, cadence) + playback.pauseSpan(cadence);
+        }
+        return total;
     }
 
     private static void click(String label, TestContext context) {
