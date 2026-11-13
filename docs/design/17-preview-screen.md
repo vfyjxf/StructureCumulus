@@ -425,6 +425,28 @@ fire. The screen therefore keeps one clock of its own:
   (16 §6, §9) still run on the game tick and are untouched; a session behind the screen simply does
   not advance while the screen pauses it.
 
+### 4.7 The base plate
+
+Every page stands on a base plate — the sample ground every assembly instruction (Ponder's scenes
+included) puts under the machine, so the structure reads as *placed on something* instead of floating
+in the panel's void.
+
+- **What it is.** A flat checkerboard of one-cell tiles in two light greys, lying in the plane
+  `y = hullMinY` directly under the drawn hull, extended one cell past the hull's footprint on every
+  side. It is scene geometry: it orbits, zooms and pans with the cells in all four viewports and in
+  both projections, and the depth test treats it like any model — a cell on the plate occludes the
+  tile under it.
+- **It is the picture's floor, never a cell.** The plate is not a cell: it joins no stage, no bay,
+  no material line and no hull (§3.3's hull stays the drawn cells' own, so the fit, the framing and
+  the explode never see it), it is not pickable (§5.3's ray ignores it) and it pops nothing. It
+  carries no outline of its own; a hovered cell's stroke simply meets it.
+- **It is chrome, not a block.** The tiles are drawn unlit in the scene pass, in the two greys of the
+  panel chrome family — the plate reads as the drawing's ground plane, not as part of the document's
+  bill of materials, and no document block can accidentally match it.
+- **It is why the drop-in reads.** §7.6's reveal drops each cell onto this floor: a falling block
+  that lands on a visible ground is a placement, which is the reading the whole screen exists to
+  teach.
+
 ## 5. The viewports (R3)
 
 One main viewport and three axis-locked ones, all four drawn from one page and one shared camera
@@ -549,8 +571,10 @@ matter where the structure is panned or how far it is zoomed.
 - **How it is drawn.** Each unit axis is rotated by the viewport camera's own rotation (the same
   rotation §4.1's normal matrix carries, GUI y-down mirror included), the three segments are drawn
   far-to-near by their view depth so a nearer axis overdraws a farther one, and `X`, `Y`, `Z` are
-  drawn as GUI text at the segment ends with no depth test (§5.3's label rule). The triad draws at
-  `chromeDepth` like the rest of the chrome.
+  drawn as GUI text at the segment ends with no depth test (§5.3's label rule). The segments are
+  §5.3's vector strokes, never pixel rows: a compass drawn as a stair-stepped pixel line reads as
+  dirt on the chrome, which is the pixelation SC7 removes. The triad draws at `chromeDepth` like the
+  rest of the chrome.
 - **The colours are chrome.** The three axes take the conventional red/green/blue of a 3D editor's
   gizmo. They are scene chrome, never a cell mark colour: 15 §5 owns the mark palette and this document
   adds nothing to it.
@@ -601,8 +625,8 @@ hidden — a page must stay legible — and later ones are hidden, because the d
   factor; a play advances the counts at §7.5's cadence, a stage jump reveals the whole stage, and a
   step reveals one more cell — the same three facts the world's playback keeps, seeded differently
   (§7.1).
-- **A cell pops out of an empty slot.** Where a cell is not yet drawn there is *nothing* — no ghost,
-  no faint copy, no placeholder — so the reveal pop-in (§7.6) reads as a placement into empty space.
+- **A cell drops into an empty slot.** Where a cell is not yet drawn there is *nothing* — no ghost,
+  no faint copy, no placeholder — so the reveal drop-in (§7.6) reads as a placement into empty space.
   The screen once kept the cursor stage's unrevealed cells at the session's 0.08 faint factor, and the
   user read the result as "the block is already there, then it gets placed": a faint model is still a
   model, and it contradicts the empty slot the pop-in is supposed to fill. The unrevealed factor is
@@ -678,23 +702,28 @@ The durations are 16 §6.4's, unchanged, and the clock is the screen's own §4.6
 
 | Constant | Value | Meaning here |
 | --- | --- | --- |
-| `cellRevealTicks` | 2 | one cell's share of its stage's dwell at speed 1.0 |
-| `stageRevealMinTicks` | 10 | the floor of one stage's dwell |
-| `stageRevealMaxTicks` | 100 | the ceiling of one stage's dwell, so a 400-cell stage does not linger |
-| `stagePauseTicks` | 10 | the hold between a finished stage and the next one |
+| `cellRevealTicks` | 1 | one cell's share of its stage's dwell at speed 1.0 |
+| `stageRevealMinTicks` | 6 | the floor of one stage's dwell |
+| `stageRevealMaxTicks` | 40 | the ceiling of one stage's dwell, so a 400-cell stage does not linger |
+| `stagePauseTicks` | 5 | the hold between a finished stage and the next one |
 | `explodeTicks` | 12 | one full explode or collapse (§8.1) |
 | `stageFocusTicks` | 12 | the stage-framing leg below |
-| `popInTicks` | 4 | one cell's own pop-in leg (§7.6) |
-| `popInStartScale` | 0.55 | the scale a popping cell starts at (§7.6) |
+| `dropInTicks` | 5 | one cell's own drop-in leg (§7.6) |
+| `dropInCells` | 2.5 | the height a dropping cell falls from (§7.6) |
+
+- **The pace is Ponder's, not a slideshow's.** A stage is a beat: the batch drops in (§7.6), the page
+  holds for the dwell, and the next beat lands. The dwells above are roughly a third of SC6's first
+  values, which the user watched and called too slow — a manual is read at the speed of the build it
+  teaches, and a second per stage is a lecture, not a demonstration.
 
 - **A play reveals a stage as one batch, then dwells.** The tick a stage begins, every one of its
-  cells is revealed at once — one stage is one placement beat, so the whole batch pops in together
+  cells is revealed at once — one stage is one placement beat, so the whole batch drops in together
   (§7.6) and the stage reads as a step, not a trickle. Spreading the cells across the span in payload
   order (16 §6.4's session formula) was the screen's first reading of the cadence, and the user read
   the result as "the blocks arrive one by one" — a document's stage is an atomic step of the build's
   story, and a play that drips it cell by cell narrates an order the document never declared. The
   span `clamp(stageCells × cellRevealTicks, stageRevealMinTicks, stageRevealMaxTicks)` survives as the
-  stage's **dwell**: the batch pops, the stage holds for the span so a big stage gets more viewing
+  stage's **dwell**: the batch lands, the stage holds for the span so a big stage gets more viewing
   time, `stagePauseTicks` separates it from the next beat, and the cursor moves on. The playback's
   total time is still bounded by the stage count, not the cell count.
 - **A step is the one exception, and it is manual.** `B` still reveals one cell (§7.3): the viewer
@@ -716,35 +745,42 @@ The durations are 16 §6.4's, unchanged, and the clock is the screen's own §4.6
   a frame that consumed no game tick still advances the screen's accumulator, which is exactly why
   the screen has one.
 
-### 7.6 The reveal pop-in (R8)
+### 7.6 The reveal drop-in (R8)
 
-A cell that becomes revealed is **placed**, not switched on: it grows from `popInStartScale` = 0.55 to
-1.0 about its own centre while its alpha fades from 0 to the treatment's factor, over `popInTicks` = 4
-ticks, sampled from the screen's clock. The two legs are the cine core's — `Ease.outBack` for the
-scale (so it overshoots a hair before it settles) and `Tween` for both legs — and the constants divide
-by `animation.speed` like every other span (§7.5); `animation.enabled = false` leaves a zero-length
-leg, so every cell appears at once.
+A cell that becomes revealed is **placed from above**, not switched on and not scaled in: it falls
+from `dropInCells` = 2.5 cells above its own slot onto §4.7's base plate (or onto the cells under
+it) while its alpha fades from 0 to the treatment's factor, over `dropInTicks` = 5 ticks, sampled
+from the screen's clock. The two legs are the cine core's — `Ease.outCubic` for the fall (a fast
+start and a dead stop, the way a set block lands) and `Tween` for both legs — and the constants
+divide by `animation.speed` like every other span (§7.5); `animation.enabled = false` leaves a
+zero-length leg, so every cell appears at once.
 
-- **The stamp is the reveal, and a stage pops as one batch.** A cell's pop starts at the tick its
+- **The stamp is the reveal, and a stage drops as one batch.** A cell's fall starts at the tick its
   reveal happened: the screen records that tick the frame a cell enters the drawn-and-revealed set.
   A play reveals a stage at one tick (§7.5), a stage jump and a stage click do the same, so every
   cell of the stage shares one stamp and the batch's legs run in lockstep — the stage lands as a
   single placement, which is exactly what "one step completes a batch" means. A `B` step stamps its
-  one cell alone. Nothing else starts a pop.
-- **The whole view pops nothing.** Opening a page, `all`, a variant switch and a page change are the
-  whole view or a fresh picture (§7.1, §3.4): every cell is simply there. A cell that leaves the
-  revealed set forgets its stamp, so a stage entered again pops again.
-- **The scale is about the cell's centre.** The model is scaled uniformly around the centre of its
-  unit cube, so a popping cell shrinks toward its own middle rather than toward a corner; the pass's
-  light is unaffected because a uniform scale is not a normal transform (§4.1).
-- **It is view state and it dies with the screen.** The stamps are the screen's, never the payload's:
-  the wire carries cells and stages, and a pop-in is a way of showing a reveal, not a new fact about
-  the document. The pop composes with the explode (a popping cell is drawn at its offset) and with the
-  hover outline (the outline follows the shrunken silhouette).
-- **It is the world pop-in read for a screen, not a second animation system.** The world's E2 pop-in
-  (16 §9.2) grows a ghost 0.5 → 1.0 over 6 ticks in the level pass; the screen's is the same idea with
-  its own constant and its own channel (a scale inside the GUI pose), and neither reuses the other's
-  code.
+  one cell alone. Nothing else starts a fall.
+- **The fall ignores collision, because it is a presentation.** A dropping cell passes through
+  whatever is already drawn between it and its slot; the alternative — per-cell pathing around the
+  structure — is a build simulation, and this screen narrates a document, it does not re-run it.
+- **The whole view drops nothing.** Opening a page, `all`, a variant switch and a page change are
+  the whole view or a fresh picture (§7.1, §3.4): every cell is simply there. A cell that leaves
+  the revealed set forgets its stamp, so a stage entered again falls again.
+- **It is view state and it dies with the screen.** The stamps are the screen's, never the
+  payload's: the wire carries cells and stages, and a drop-in is a way of showing a reveal, not a
+  new fact about the document. The fall composes with the explode (a falling cell is drawn at its
+  offset) and with the outlines (a cell's stroke follows it down).
+- **Why the fall and not the swell.** SC6's pop-in grew the cell from 0.55 about its centre; the
+  user's reading was that a block does not inflate into existence — it is *placed*, and a placement
+  has a direction. The fall gives the reveal the base plate's direction (§4.7): down, onto the
+  ground the page stands on. "Emerging from the void" — rising out of the floor — was the
+  alternative the same report offered; it reads as the ground growing the block, and it loses the
+  one beat a fall gives for free: the landing.
+- **It is the world pop-in read for a screen, not a second animation system.** The world's E2
+  pop-in (16 §9.2) grows a ghost 0.5 → 1.0 over 6 ticks in the level pass; the screen's drop-in is
+  the same stamp machinery with its own constants and its own channel (an offset inside the GUI
+  pose), and neither reuses the other's code.
 
 ## 8. The exploded view (R9)
 
@@ -1056,11 +1092,15 @@ document module's own `SC-DOC-*` family (15 §12, D-98).
   and no stage outline, and a stage click, an arrow and a play's advance all move the same set. A
   reviewer rejects a stage highlight that tints or re-shades the cells (the palette is 15 §5's) or
   one that appears in the whole view.
-- **The pop-in reads the screen's clock, and only its stamp set.** A cell's scale and alpha are
+- **The drop-in reads the screen's clock, and only its stamp set.** A cell's fall and alpha are
   derived from its reveal stamp and the accumulator (§7.6); the same stamps and the same clock give
-  the same frame, a whole view has no stamps at all, and nothing about a pop reaches the wire, the
-  world or the session. A reviewer rejects a pop that reads the game tick (a screen pauses it) or a
+  the same frame, a whole view has no stamps at all, and nothing about a fall reaches the wire, the
+  world or the session. A reviewer rejects a fall that reads the game tick (a screen pauses it) or a
   tick counter of its own (a second clock beside §4.6).
+- **The base plate is the picture's floor and nothing else.** Every page draws the checkerboard
+  under the drawn hull (§4.7): it joins no hull, no stage, no pick ray and no explode, and it is
+  drawn unlit as chrome. A reviewer rejects a plate cell in any stage's count, a plate in the fit's
+  hull, and a lit or textured plate (it would read as a document block).
 - **A play's stage is one batch out of empty slots.** The tick a play begins a stage, every cell of
   the stage is revealed at once (§7.5), and a cell that is not revealed is not drawn at all — no
   alpha floor, no ghost, no placeholder (§7.2). A reviewer rejects a per-cell drip inside a play's
@@ -1140,6 +1180,7 @@ stays the one place a build is planned (15 §4, 16 §2).
 | SC4 | §11 the demo content, and the count and documentation close-out |
 | SC5 | §4.1 the lighting law and the depth band, §5.3 the silhouette outline, §7.6 the reveal pop-in |
 | SC6 | §6 the corner compass, §7.2 the empty slot, §7.5 the batch reveal, §5.3 the through-model vector stroke and the stage outline |
+| SC7 | §4.7 the base plate, §7.5 the Ponder pace, §7.6 the reveal drop-in, §6 the compass as vector strokes |
 
 SC0 is this file; the gates are the milestone table of
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md), and this file owns the contracts they test.

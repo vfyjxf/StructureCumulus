@@ -2548,6 +2548,40 @@ of a scattered stage is a new geometry problem with no vocabulary behind it.
 one question; the corner compass is the one that survives a pan, a zoom and a framing flight, so the
 scene carries no axes at all.
 
+### D-108 — The page stands on a base plate, and a reveal drops onto it
+
+Four presentation changes from the user's third pass over the screen
+([design/17](17-preview-screen.md) §4.7, §7.5, §7.6, §6). Every page draws a **base plate**: an
+unlit checkerboard of one-cell tiles in the plane under the drawn hull, extended one cell past the
+footprint, scene geometry that orbits with the cells but joins no hull, stage, pick or explode. The
+reveal animation is a **drop-in**: a revealed cell falls from 2.5 cells above its slot onto that
+floor, fading in over 5 ticks with an `outCubic` stop, replacing SC6's scale pop-in. The cadence
+retunes to **Ponder's pace** (a stage's dwell is `clamp(cells × 1, 6, 40)` ticks plus a 5-tick
+pause, roughly a third of SC6's). The compass's axes draw with §5.3's vector strokes, not pixel
+rows.
+
+**Why a plate.** The user asked for "a good base, a sample ground": a structure floating in the
+panel's void reads as a diagram, and the screen's whole job is to read as a build. The checkerboard
+is the assembly-instruction convention (Ponder's scenes stand on it), it gives the eye the
+structure's footprint and orientation for free, and — not a side effect — it is what makes the
+drop-in a *landing*. It is drawn unlit in the chrome family so no document block can be mistaken
+for it, and it stays out of the hull so the fit, the framing and the explode are untouched.
+
+**Why the fall.** "A block does not inflate into existence — it is placed, and a placement has a
+direction." The fall's direction is the plate's: down, onto the ground. `outCubic` over a bounce
+because a placed block stops dead; a bounce reads as rubber. The fall ignores collision — a
+dropping cell passes through drawn cells — because pathing around the structure is a build
+simulation, and the screen narrates a document rather than re-running it.
+
+**Rejected: rising from the void.** The same report offered "emerging from below" as the
+alternative; it reads as the ground growing the block and loses the landing beat the fall gives
+for free.
+
+**Rejected: drip-feeding the pace instead of retuning the constants.** The batch law (D-107) stays;
+what was slow was the arithmetic — a 2-tick per-cell dwell share, a 100-tick ceiling and a 10-tick
+pause made a nine-cell stage a two-second lecture. The new constants keep the dwell proportional
+to the stage's size at roughly a third of the old pace.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2677,6 +2711,10 @@ scene carries no axes at all.
 - The outlines are strokes that read through (D-107, design 17 §5.3): a reviewer should reject a
   depth-tested or pixel-snapped outline, and a stage outline in the whole view; the gizmo is a pure
   function of (camera, rect), and a hull in its argument list is the old scene axes returning.
+- The page stands on the base plate and reveals drop onto it (D-108, design 17 §4.7/§7.6): a
+  reviewer should reject a plate tile inside any hull, stage count, pick ray or explode group, a lit
+  or textured plate, a reveal that scales or rises instead of falling, and the SC6 dwell constants
+  returning — the pace is a law, not a tuning knob.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is
