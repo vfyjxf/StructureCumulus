@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:demo_machine_compact",
+  "description": "a demonstration document: the compact 3x3x6 machine - the same four parts stacked into a tall column, so a variant switch changes the picture and not only the item list",
+  "bounds": [0, 0, 0, 3, 6, 3],
+  "variants": {
+    "group": "demo_machine",
+    "members": [
+      {
+        "id": "structurecumulus:demo_machine",
+        "label": "full"
+      },
+      {
+        "id": "structurecumulus:demo_machine_compact",
+        "label": "compact"
+      }
+    ]
+  },
+  "bays": [
+    {
+      "id": "base",
+      "box": [0, 0, 0, 3, 1, 3],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the stone base plate",
+      "hint": "lay the nine-cell plate before the shell"
+    },
+    {
+      "id": "shell",
+      "boxes": [[0, 1, 0, 3, 4, 3]],
+      "minus": [[1, 1, 1, 1, 4, 1]],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the four-high glazed shell",
+      "hint": "raise the glass column around the empty middle"
+    },
+    {
+      "id": "boiler",
+      "box": [1, 1, 1, 1, 4, 1],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the copper boiler shaft",
+      "hint": "drop the boiler into the shell's middle"
+    },
+    {
+      "id": "cap",
+      "box": [0, 5, 0, 3, 1, 3],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the stair cap",
+      "hint": "cap the shaft, the hopper goes over the boiler"
+    }
+  ],
+  "checks": [
+    {
+      "id": "base_corner_north_west",
+      "bay": "base",
+      "focus": {"kind": "occupant", "cell": [0, 0, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "base_corner_north_east",
+      "bay": "base",
+      "focus": {"kind": "occupant", "cell": [2, 0, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "base_corner_south_west",
+      "bay": "base",
+      "focus": {"kind": "occupant", "cell": [0, 0, 2]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "base_corner_south_east",
+      "bay": "base",
+      "focus": {"kind": "occupant", "cell": [2, 0, 2]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "base_plate",
+      "bay": "base",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone_bricks"}}
+    },
+    {
+      "id": "shell_mullion_north",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [1, 1, 0]},
+      "expect": {"kind": "block", "id": "minecraft:iron_bars"}
+    },
+    {
+      "id": "shell_mullion_south",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [1, 1, 2]},
+      "expect": {"kind": "block", "id": "minecraft:iron_bars"}
+    },
+    {
+      "id": "shell_mullion_west",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [0, 1, 1]},
+      "expect": {"kind": "block", "id": "minecraft:iron_bars"}
+    },
+    {
+      "id": "shell_mullion_east",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [2, 1, 1]},
+      "expect": {"kind": "block", "id": "minecraft:iron_bars"}
+    },
+    {
+      "id": "shell_wall",
+      "bay": "shell",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:glass"}}
+    },
+    {
+      "id": "boiler_lamp",
+      "bay": "boiler",
+      "focus": {"kind": "occupant", "cell": [1, 4, 1]},
+      "expect": {"kind": "block", "id": "minecraft:sea_lantern"}
+    },
+    {
+      "id": "boiler_shaft",
+      "bay": "boiler",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:copper_block"}}
+    },
+    {
+      "id": "cap_hopper",
+      "bay": "cap",
+      "focus": {"kind": "occupant", "cell": [1, 5, 1]},
+      "expect": {"kind": "block", "id": "minecraft:hopper"}
+    },
+    {
+      "id": "cap_stairs",
+      "bay": "cap",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:oak_stairs"}}
+    }
+  ]
+}

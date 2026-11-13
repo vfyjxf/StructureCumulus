@@ -2,19 +2,24 @@ package dev.vfyjxf.cumulus.uitest;
 
 import dev.vfyjxf.cloudlib.uitest.api.ClientScenario;
 import dev.vfyjxf.cloudlib.uitest.api.ScenarioBuilder;
+import dev.vfyjxf.cloudlib.uitest.api.TestContext;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.Siting;
 import dev.vfyjxf.cumulus.mc.pref.PreferencesSavedData;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewKeys;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.MinecraftServer;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
 /**
  * The pack tour beside the build story: the staged table and its banner, the playback and its tiered
- * bar, the cinema camera, the variant switch and the preset re-open, all through the production
- * commands and keys. It asserts models, never pixels, and the screenshots are the demo's presentation.
+ * bar, the cinema camera, the variant switch, the preset re-open and the catalogue page over the three
+ * shipped demonstration documents. It asserts models, never pixels, and the screenshots are the demo's
+ * presentation.
  *
  * <p>Boundary: the tour shows the pack's viewing surfaces. It confirms nothing, so it writes no world
  * and no preference memory; the one store it touches is one preset, which it deletes again. The build
@@ -30,6 +35,9 @@ import java.util.List;
 public final class PreviewDemoTourScenario {
 
     private static final NamespacedId staged = NamespacedId.of("structurecumulus", "preview_stages");
+    private static final NamespacedId demoMachine = NamespacedId.of("structurecumulus", "demo_machine");
+    private static final NamespacedId demoCompact = NamespacedId.of("structurecumulus", "demo_machine_compact");
+    private static final NamespacedId demoTower = NamespacedId.of("structurecumulus", "demo_tower");
     private static final String floorDescription = "the brick floor";
     private static final String floorHint = "lay the brick ring before the corners";
     private static final String documentDescription = "the staged demo: a brick floor with a chimney above it";
@@ -50,6 +58,7 @@ public final class PreviewDemoTourScenario {
         build = stagesAct(build);
         build = variantsAct(build);
         build = presetAct(build);
+        build = demoContentAct(build);
         PreviewScenarioSupport.cleanup(build).runCommand("cumulusvisual hud show");
     }
 
@@ -177,6 +186,93 @@ public final class PreviewDemoTourScenario {
     }
 
     /** The preset: close the session, re-open it through the production verb, then delete it again. */
+    /**
+     * The catalogue page over the three shipped demonstration documents (design 17 §11): the machine
+     * group opens in the whole view with four stages, the in-screen switch changes the picture to the
+     * compact member, and the standalone tower opens as its own three-stage page.
+     */
+    private static ScenarioBuilder demoContentAct(ScenarioBuilder build) {
+        float[] camera = new float[2];
+        build = build.waitUntil(
+            "the catalogue carries the three demonstration documents",
+            () -> PreviewJeiProbe.catalogIds().containsAll(List.of(demoMachine, demoCompact, demoTower))
+        ).check("the tour left no preview session behind", () -> !PreviewProbe.hasSession()).openScreen(() -> {
+            PreviewScreen.open(demoMachine);
+            return Minecraft.getInstance().screen;
+        }).awaitScreen(PreviewScreen.class).frames(3)
+                .check(
+                    "the machine page opens in the whole view with its four stages",
+                    () -> !screen().staged()
+                            && screen().playback().wholeView()
+                            && screen().summaryLine() == null
+                            && screen().stageBar().segments().size() == 4
+                            && screen().drawnCells() == 400,
+                    () -> "staged=" + screen().staged() + " summary=" + screen().summaryLine() + " stages="
+                            + screen().stageBar().segments().size() + " drawn=" + screen().drawnCells()
+                )
+                .check(
+                    "the page names its group member",
+                    () -> "variant 1/2: full".equals(screen().variantLine()),
+                    () -> String.valueOf(screen().variantLine())
+                ).action("capture the page camera before the switch", context -> {
+                    camera[0] = screen().camera().yaw();
+                    camera[1] = screen().camera().zoom();
+                }).frames(2).screenshot("08-demo-machine-full").checkCaptured("08-demo-machine-full")
+                .action("click the group's next member", context -> clickButton(context, "variant \u203A")).frames(2)
+                .check(
+                    "the switch changes the picture to the compact member and keeps the camera",
+                    () -> screen().variantIndex() == 1
+                            && "variant 2/2: compact".equals(screen().variantLine())
+                            && screen().drawnCells() == 216
+                            && screen().camera().yaw() == camera[0]
+                            && screen().camera().zoom() == camera[1],
+                    () -> "index=" + screen().variantIndex() + " line=" + screen().variantLine() + " drawn="
+                            + screen().drawnCells() + " yaw=" + screen().camera().yaw() + "/" + camera[0]
+                ).screenshot("08b-demo-machine-compact").frames(2).checkCaptured("08b-demo-machine-compact")
+                .action("Esc closes the machine page", context -> {
+                    PreviewScreen open = (PreviewScreen) context.screenOrThrow();
+                    context.driver().keyDown(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
+                    context.driver().keyUp(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
+                }).waitUntil("the page closed without a session", () -> Minecraft.getInstance().screen == null)
+                .check("opening the page created no world session", () -> !PreviewProbe.hasSession()).openScreen(() -> {
+                    PreviewScreen.open(demoTower);
+                    return Minecraft.getInstance().screen;
+                }).awaitScreen(PreviewScreen.class).frames(3)
+                .check(
+                    "the standalone tower opens as its own three-stage page",
+                    () -> screen().variantCount() == 1
+                            && screen().variantLine() == null
+                            && screen().stageBar().segments().size() == 3
+                            && screen().drawnCells() == 512,
+                    () -> "variants=" + screen().variantCount() + " line=" + screen().variantLine() + " stages="
+                            + screen().stageBar().segments().size() + " drawn=" + screen().drawnCells()
+                ).screenshot("09-demo-tower").frames(2).checkCaptured("09-demo-tower")
+                .action("Esc closes the tower page", context -> {
+                    PreviewScreen open = (PreviewScreen) context.screenOrThrow();
+                    context.driver().keyDown(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
+                    context.driver().keyUp(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
+                }).waitUntil("the tower page closed", () -> Minecraft.getInstance().screen == null).timelineRecord(
+                    "preview-demo-tour-demo-content",
+                    () -> "pages=" + PreviewJeiProbe.catalogIds() + ", session=" + PreviewProbe.hasSession()
+                );
+        return build;
+    }
+
+    /** Clicks a control-strip button by its label; the rect comes from the screen's own layout. */
+    private static void clickButton(TestContext context, String label) {
+        PreviewScreen open = (PreviewScreen) context.screenOrThrow();
+        ScreenLayout.Rect rect = open.buttonRect(label);
+        if (rect == null) {
+            throw new IllegalStateException("no " + label + " button in " + open.buttonLabels());
+        }
+        context.driver().mouseDown(open, rect.x() + rect.width() / 2, rect.y() + rect.height() / 2, 0);
+        context.driver().mouseUp(open, rect.x() + rect.width() / 2, rect.y() + rect.height() / 2, 0);
+    }
+
+    private static PreviewScreen screen() {
+        return (PreviewScreen) Minecraft.getInstance().screen;
+    }
+
     private static ScenarioBuilder presetAct(ScenarioBuilder build) {
         int[] pose = new int[4];
         build = build.action("record the reinforced pose the preset stores", context -> recordPose(pose));

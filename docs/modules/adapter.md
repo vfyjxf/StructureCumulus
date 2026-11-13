@@ -2647,7 +2647,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landing SC1–SC4)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC4)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -2657,7 +2657,7 @@ conditional plugin and its loader pass, `JeiPreview` and its client events. The 
 17's; this section states the adapter-side shape of them, and its members join §15 per milestone
 (the same batch discipline §19 used).
 
-**Landed, and landing.** SC0 landed this section, [design/17](../design/17-preview-screen.md) and
+**Landed.** SC0 landed this section, [design/17](../design/17-preview-screen.md) and
 D-101…D-105. SC1 has landed the migration, the stage's `bay` on both payloads, `PreviewScreen`, the
 camera and projection, the four viewports, the axes, the screen's own clock, the hover and the
 drawn-hull fit (the JEI view takes the same hull change and keeps its own camera). SC2 has landed the
@@ -2669,8 +2669,10 @@ member and with no packet), the client command (`/cumulus preview screen <id>` r
 `openScreen` key (`O`, polled with the other preview controls and inert without a session), the open
 payload's `facing` (a trailing optional byte, so an older client's open reads as absent) and the
 in-screen variant switch (a client-side entry replacement that keeps the camera, the explode `t` and
-the whole/staged presentation). SC4 lands the demo documents. The milestone state lives in
-[`docs/plan/screen-plan.md`](../plan/screen-plan.md).
+the whole/staged presentation). SC4 has landed the demo documents: `demo_machine` and
+`demo_machine_compact` as one variant group and the standalone `demo_tower`, shipped under
+`data/structurecumulus/cumulus/structure/` so every catalogue carries them (design 17 §11). The
+milestone state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
 record every surface shares.

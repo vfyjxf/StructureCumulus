@@ -42,8 +42,8 @@ table defines who may emit each finding code.
 18. [design/17-preview-screen.md](design/17-preview-screen.md) — the preview screen pack: the client
     catalogue view, the camera and its projections, four linked viewports, the axis gizmo, stage
     playback and its delta, the per-bay exploded view, the five entry links and the demo content
-    (specified at SC0; SC1 the screen skeleton and the package migration, SC2 the playback and the
-    explode and SC3 the five links are on the tree, landing through SC4 — SC4 the demo).
+    (specified at SC0 and landed through SC4 — SC1 the screen skeleton and the package migration, SC2
+    the playback and the per-bay exploded view, SC3 the five entry links and SC4 the demo content).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -93,14 +93,14 @@ Then the module files, in dependency order:
   transitions and the C/G exclusion) and E9 (the demo: the whole player story through the production
   preview command, the pack tour, and the preference-memory isolation that keeps the demo independent
   of scenario order) are on the tree.
-  The preview screen pack is the next extension: [17 preview-screen](design/17-preview-screen.md)
-  (D-101…D-105) tracked by [plan/screen-plan.md](plan/screen-plan.md), specified at SC0 and landing one
-  milestone at a time — SC1 the screen skeleton (the `mc.preview.scene` migration, the 45° orthographic
-  camera, four linked viewports, the axes, the drawn-hull fit in both consumers), SC2 the staged
-  playback and the per-bay exploded view, SC3 the five entry links (JEI's button, the client command,
-  the `O` world key, ghost to world with the screen's heading, the in-screen variant switch; on the
-  tree) and SC4 the demo documents. Of it, SC0's design revision, SC1's skeleton, SC2's playback and
-  exploded view and SC3's links are on the tree.
+  The preview screen pack extends it: [17 preview-screen](design/17-preview-screen.md) (D-101…D-105)
+  tracked by [plan/screen-plan.md](plan/screen-plan.md), specified at SC0 and landed one milestone at a
+  time — SC1 the screen skeleton (the `mc.preview.scene` migration, the 45° orthographic camera, four
+  linked viewports, the axes, the drawn-hull fit in both consumers), SC2 the staged playback and the
+  per-bay exploded view, SC3 the five entry links (JEI's button, the client command, the `O` world key,
+  ghost to world with the screen's heading, the in-screen variant switch) and SC4 the demo content
+  (three demonstration documents in `src/main/resources`, their compile and catalogue tests, and the
+  tour's catalogue act) are on the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -161,8 +161,8 @@ Then the module files, in dependency order:
   renderers, the JEI category, the preference store and scorer, the structure-set build, and the
   plugin extension tables (`registerMaterializers`/`registerItemSources` over the loader's one
   ordering and failure policy, plus the command's `with <kind-id>` source form). The tree registers
-  657 kernel tests in 75 containers, 608 adapter unit tests in 64 containers and 173 `@GameTest`
-  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 608 adapter tests) and
+  657 kernel tests in 75 containers, 711 adapter unit tests in 82 containers and 173 `@GameTest`
+  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 711 adapter tests) and
   `runGameTestServer` passes 173/173. Pending only: acting on the measured kernel-side cost debts
   and the live-level review items (`07` §7), and fresh visual review screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
@@ -174,8 +174,8 @@ Then the module files, in dependency order:
   every run and kept out of the published jar (D-77).
 - Verification (2026-11-12): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 657 kernel JUnit 5 tests (75 test
-  containers), 608 adapter unit tests (64 containers) and 173 `@GameTest` methods; a full
-  `./gradlew check` passes at this revision (657 kernel tests, 608 adapter
+  containers), 711 adapter unit tests (82 containers) and 173 `@GameTest` methods; a full
+  `./gradlew check` passes at this revision (657 kernel tests, 711 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 173/173 GameTests.
   `Codes.all` has 69 entries and the decision record has 104 decisions
   (D-105; D-29 and D-36 superseded, D-78 withdrawn).

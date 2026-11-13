@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:demo_tower",
+  "description": "a demonstration document: the three-bay tower - a stone plinth, a five-high shell with a doorway on the identity front and a stair roof, one bay per stage",
+  "bounds": [0, 0, 0, 5, 7, 5],
+  "bays": [
+    {
+      "id": "plinth",
+      "box": [0, 0, 0, 5, 1, 5],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the stone plinth",
+      "hint": "lay the outer ring first, then the four chiselled corners"
+    },
+    {
+      "id": "shell",
+      "boxes": [[0, 1, 0, 5, 5, 5]],
+      "minus": [[1, 1, 1, 3, 5, 3], [2, 1, 0, 1, 2, 1]],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the hollow shell with its north doorway",
+      "hint": "raise the four walls and leave the two-cell doorway open"
+    },
+    {
+      "id": "roof",
+      "box": [0, 6, 0, 5, 1, 5],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the stair roof",
+      "hint": "close the tower with the stair cap"
+    }
+  ],
+  "checks": [
+    {
+      "id": "plinth_corner_north_west",
+      "bay": "plinth",
+      "focus": {"kind": "occupant", "cell": [0, 0, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "plinth_corner_north_east",
+      "bay": "plinth",
+      "focus": {"kind": "occupant", "cell": [4, 0, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "plinth_corner_south_west",
+      "bay": "plinth",
+      "focus": {"kind": "occupant", "cell": [0, 0, 4]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "plinth_corner_south_east",
+      "bay": "plinth",
+      "focus": {"kind": "occupant", "cell": [4, 0, 4]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "plinth_floor",
+      "bay": "plinth",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:stone_bricks"}}
+    },
+    {
+      "id": "shell_window_north",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [2, 3, 0]},
+      "expect": {"kind": "block", "id": "minecraft:glass"}
+    },
+    {
+      "id": "shell_window_south",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [2, 3, 4]},
+      "expect": {"kind": "block", "id": "minecraft:glass"}
+    },
+    {
+      "id": "shell_window_west",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [0, 3, 2]},
+      "expect": {"kind": "block", "id": "minecraft:glass"}
+    },
+    {
+      "id": "shell_window_east",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [4, 3, 2]},
+      "expect": {"kind": "block", "id": "minecraft:glass"}
+    },
+    {
+      "id": "shell_door_jamb_west_low",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [1, 1, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "shell_door_jamb_west_high",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [1, 2, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "shell_door_jamb_east_low",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [3, 1, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "shell_door_jamb_east_high",
+      "bay": "shell",
+      "focus": {"kind": "occupant", "cell": [3, 2, 0]},
+      "expect": {"kind": "block", "id": "minecraft:chiseled_stone_bricks"}
+    },
+    {
+      "id": "shell_wall",
+      "bay": "shell",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:oak_planks"}}
+    },
+    {
+      "id": "roof_cap",
+      "bay": "roof",
+      "focus": {"kind": "bay"},
+      "expect": {"kind": "each_cell", "element": {"kind": "block", "id": "minecraft:oak_stairs"}}
+    }
+  ]
+}
