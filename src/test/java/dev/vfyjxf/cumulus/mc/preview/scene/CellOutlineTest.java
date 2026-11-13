@@ -2,7 +2,6 @@ package dev.vfyjxf.cumulus.mc.preview.scene;
 
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import org.joml.Vector2f;
-import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -61,27 +60,6 @@ class CellOutlineTest {
     }
 
     @Test
-    void theOutlineCarriesTheNearestCornerOfItsOwnCell() {
-        Fit fit = Fit.of(page, 0, 0, 400, 300, orthographic(45.0F, SceneCamera.defaultPitch));
-        CellOutline outline = CellOutline.of(fit, cell, 0.0F, 0.0F, 0.0F, 1.0F);
-        float nearest = Float.NEGATIVE_INFINITY;
-        float farthest = Float.POSITIVE_INFINITY;
-        for (int corner = 0; corner < 8; corner++) {
-            Vector3f point = new Vector3f(
-                cell.x() + ((corner & 1) == 0 ? 0.0F : 1.0F),
-                cell.y() + ((corner & 2) == 0 ? 0.0F : 1.0F),
-                cell.z() + ((corner & 4) == 0 ? 0.0F : 1.0F)
-            );
-            float depth = fit.matrix().transformPosition(point, new Vector3f()).z;
-            nearest = Math.max(nearest, depth);
-            farthest = Math.min(farthest, depth);
-        }
-        assertEquals(nearest, outline.depth(), eps);
-        assertTrue(outline.depth() > 0.0F && outline.depth() < PreviewScene.sceneSpan, "inside the scene's band");
-        assertTrue(nearest > farthest, "the cell has depth, larger is nearer");
-    }
-
-    @Test
     void theDisplacedCellOutlinesWhereItIsDrawn() {
         Fit fit = Fit.of(page, 0, 0, 400, 300, orthographic(45.0F, SceneCamera.defaultPitch));
         CellOutline shifted = CellOutline.of(fit, cell, 0.0F, 2.0F, 0.0F, 1.0F);
@@ -92,12 +70,11 @@ class CellOutlineTest {
     }
 
     @Test
-    void thePerspectiveOutlineAlsoStaysInsideTheBand() {
+    void thePerspectiveOutlineAlsoProjectsTheEightCorners() {
         SceneCamera camera = orthographic(45.0F, SceneCamera.defaultPitch)
                 .withProjection(SceneCamera.Projection.perspective, page).frame(page, 1.0F);
         Fit fit = Fit.of(page, 0, 0, 400, 300, camera);
         CellOutline outline = CellOutline.of(fit, cell, 0.0F, 0.0F, 0.0F, 1.0F);
         assertEquals(6, outline.points().size());
-        assertTrue(outline.depth() > 0.0F && outline.depth() < PreviewScene.sceneSpan, "inside the scene's band");
     }
 }

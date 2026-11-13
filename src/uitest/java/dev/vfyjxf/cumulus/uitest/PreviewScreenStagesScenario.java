@@ -118,24 +118,28 @@ public final class PreviewScreenStagesScenario {
                     return line != null
                             && line.startsWith("place 9\u00D7 minecraft:stone_bricks (stage 1/2: " + floorName + ")")
                             && line.endsWith("lay the brick ring before the corners");
-                }, () -> String.valueOf(screen().summaryLine())).screenshot("screen-stages").frames(2)
-                .checkCaptured("screen-stages")
+                }, () -> String.valueOf(screen().summaryLine()))
                 .check(
+                    "the selected stage's whole set is outlined in every panel",
+                    () -> screen().drawnStageOutlines() == 36,
+                    () -> "stageOutlines=" + screen().drawnStageOutlines()
+                ).screenshot("screen-stages").frames(2).checkCaptured("screen-stages").check(
                     "hidden is the default and draws no box for the future cells",
-                    () -> !screen().outlineMode() && screen().drawnFutureBoxes() == 0,
-                    () -> "outline=" + screen().outlineMode() + " boxes=" + screen().drawnFutureBoxes()
+                    () -> !screen().outlineMode() && screen().drawnSlotOutlines() == 0,
+                    () -> "outline=" + screen().outlineMode() + " boxes=" + screen().drawnSlotOutlines()
                 ).action("press the future-cells toggle", context -> click("hidden", context)).frames(2).check(
                     "outline mode boxes each future cell in every panel",
-                    () -> screen().outlineMode() && screen().drawnFutureBoxes() == 12,
-                    () -> "outline=" + screen().outlineMode() + " boxes=" + screen().drawnFutureBoxes()
+                    () -> screen().outlineMode() && screen().drawnSlotOutlines() == 12,
+                    () -> "outline=" + screen().outlineMode() + " boxes=" + screen().drawnSlotOutlines()
                 ).action("press the future-cells toggle again", context -> click("outline", context)).frames(2).check(
                     "the same button exits outline mode",
-                    () -> !screen().outlineMode() && screen().drawnFutureBoxes() == 0
+                    () -> !screen().outlineMode() && screen().drawnSlotOutlines() == 0
                 ).action("press the whole-view button", context -> click("all", context)).frames(2).check(
-                    "all drops the cursor and draws every stage again",
+                    "all drops the cursor and draws every stage again, with no stage outline",
                     () -> screen().playback().wholeView()
                             && screen().drawnCells() == 48
                             && screen().summaryLine() == null
+                            && screen().drawnStageOutlines() == 0
                 ).key(GLFW.GLFW_KEY_SPACE, 0).frames(1).check(
                     "a play enters the staged view at the first stage and starts the stage framing",
                     () -> screen().playback().playing()

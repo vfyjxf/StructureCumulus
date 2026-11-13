@@ -88,14 +88,21 @@ public final class PreviewScreenRenderScenario {
                             && outlineMatchesCell(2)
                             && outlineMatchesCell(3),
                     () -> describeOutline(mainPanel)
-                ).check("the outline carries its own cell's depth inside the scene's band", () -> {
+                ).check("the stroke's vertices are the raw projections, never pixel-snapped", () -> {
                     CellOutline outline = outline(mainPanel);
-                    return outline != null && outline.depth() > 0.0F && outline.depth() <= PreviewScene.sceneSpan;
-                },
-                    () -> "depth=" + (outline(mainPanel) == null ? "none" : outline(mainPanel).depth()) + " span="
-                            + PreviewScene.sceneSpan
-                ).screenshot("render-iso").frames(2).checkCaptured("render-iso").key(GLFW.GLFW_KEY_1, 0)
-                .action("hover at the front snap", PreviewScreenRenderScenario::hoverMain).frames(3)
+                    if (outline == null) {
+                        return false;
+                    }
+                    for (Vector2f point : outline.points()) {
+                        if (Math.abs(point.x - Math.rint(point.x)) > 1.0E-3F
+                                || Math.abs(point.y - Math.rint(point.y)) > 1.0E-3F) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }, () -> describeOutline(mainPanel)).screenshot("render-iso").frames(2).checkCaptured("render-iso")
+                .key(GLFW.GLFW_KEY_1, 0).action("hover at the front snap", PreviewScreenRenderScenario::hoverMain)
+                .frames(3)
                 .check(
                     "the front snap still shades every face by the world",
                     () -> sameShading(0) && sameShading(1) && sameShading(2) && sameShading(3),
@@ -133,15 +140,13 @@ public final class PreviewScreenRenderScenario {
                     context.driver().mouseUp(open, rect.x() + rect.width() / 2, rect.y() + rect.height() / 2, 0);
                 }).frames(3).action("hover in perspective", PreviewScreenRenderScenario::hoverMain).frames(3)
                 .check(
-                    "the perspective arm shades by the same world law and keeps its outline in the band",
+                    "the perspective arm shades by the same world law and keeps the hovered outline",
                     () -> screen().camera().projection() == SceneCamera.Projection.perspective
                             && sameShading(0)
                             && sameShading(1)
                             && sameShading(2)
                             && sameShading(3)
-                            && outline(mainPanel) != null
-                            && outline(mainPanel).depth() > 0.0F
-                            && outline(mainPanel).depth() < PreviewScene.sceneSpan,
+                            && outline(mainPanel) != null,
                     () -> "projection=" + screen().camera().projection() + " outline=" + describeOutline(mainPanel)
                             + " shading=" + describeShading()
                 )
@@ -156,14 +161,28 @@ public final class PreviewScreenRenderScenario {
                     "the staged page opens without a pop",
                     () -> screen().animatingCells() == 0,
                     () -> "animating=" + screen().animatingCells()
-                ).key(GLFW.GLFW_KEY_SPACE, 0)
-                .waitUntil("a newly revealed cell is popping", () -> screen().animatingCells() > 0)
+                ).key(GLFW.GLFW_KEY_B, 0).frames(2)
                 .check(
-                    "a popping cell is drawn below full size",
-                    () -> screen().animatingCells() > 0 && smallestScale() < 1.0F,
+                    "a stepped cell pops out of an empty slot: it alone is drawn, in every panel",
+                    () -> screen().playback().cursor() == 0
+                            && screen().playback().revealed(0) == 1
+                            && screen().drawnCells() == 4
+                            && screen().animatingCells() > 0,
+                    () -> "drawn=" + screen().drawnCells() + " revealed=" + screen().playback().revealed(0)
+                            + " animating=" + screen().animatingCells()
+                ).waitUntil("the step's pop settles", () -> screen().animatingCells() == 0).key(GLFW.GLFW_KEY_SPACE, 0)
+                .waitUntil("the play reveals the rest of the stage", () -> screen().animatingCells() > 0)
+                .check(
+                    "the play reveals the stage as one batch: every remaining cell pops together",
+                    () -> screen().animatingCells() == 8 && smallestScale() < 1.0F,
                     () -> "animating=" + screen().animatingCells() + " smallest=" + smallestScale()
+                )
+                .check(
+                    "the cursor's stage carries the outline on every drawn cell in every panel",
+                    () -> screen().drawnStageOutlines() == 36,
+                    () -> "stageOutlines=" + screen().drawnStageOutlines()
                 ).screenshot("render-play").frames(2).checkCaptured("render-play")
-                .waitUntil("the pops settle four ticks after their reveal", () -> screen().animatingCells() == 0)
+                .waitUntil("the batch's pops settle four ticks after the reveal", () -> screen().animatingCells() == 0)
                 .check(
                     "every cell is back at full size",
                     () -> screen().animatingCells() == 0 && smallestScale() == 1.0F,
@@ -292,7 +311,7 @@ public final class PreviewScreenRenderScenario {
 
     private static String describeOutline(int panel) {
         CellOutline outline = outline(panel);
-        return outline == null ? "none" : outline.points().size() + " points, depth " + outline.depth();
+        return outline == null ? "none" : outline.points().size() + " points";
     }
 
     private static PreviewScreen screen() {

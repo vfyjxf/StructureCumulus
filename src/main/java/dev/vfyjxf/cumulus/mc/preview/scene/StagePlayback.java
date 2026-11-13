@@ -8,7 +8,8 @@ import java.util.List;
 
 /**
  * The staged playback of one page (design 17 §7): no cursor is the whole view, a cursor is the
- * staged view, and the reveal counts are what a play, a step and a jump move.
+ * staged view, and the reveal counts are what a play, a step and a jump move. A play reveals a stage
+ * as one batch and the span is that stage's dwell (§7.5); only a manual step drips one cell.
  */
 public record StagePlayback(
     List<Stage> stages,
@@ -24,8 +25,6 @@ public record StagePlayback(
     public static final float doneAlpha = 0.25F;
     /** The cursor's revealed factor of design 17 §7.2. */
     public static final float currentAlpha = 1.0F;
-    /** The cursor's unrevealed factor of design 17 §7.2. */
-    public static final float unrevealedAlpha = 0.08F;
     public static final int cellRevealTicks = 2;
     public static final int stageRevealMinTicks = 10;
     public static final int stageRevealMaxTicks = 100;
@@ -117,12 +116,15 @@ public record StagePlayback(
         return cell.position() < revealed(cell.stage());
     }
 
-    /** True when the treatment draws the cell at all: a future stage is hidden (design 17 §7.2). */
+    /** True when the stage treatment draws the cell at all: a future stage is hidden (design 17 §7.2). */
     public boolean drawn(Placed cell) {
         return cursor < 0 || cell.stage() <= cursor;
     }
 
-    /** The cell's alpha factor over the scene's base alpha (design 17 §7.2). */
+    /**
+     * The cell's alpha factor over the scene's base alpha (design 17 §7.2). An unrevealed cell is zero:
+     * the scene is asked for no model, so the pop-in fills an empty slot.
+     */
     public float alpha(Placed cell) {
         if (cursor < 0) {
             return currentAlpha;
@@ -133,7 +135,7 @@ public record StagePlayback(
         if (cell.stage() > cursor) {
             return 0.0F;
         }
-        return revealed(cell) ? currentAlpha : unrevealedAlpha;
+        return revealed(cell) ? currentAlpha : 0.0F;
     }
 
     /** `all`: drops the cursor, draws every stage again and stops the play (design 17 §7.1). */
@@ -213,7 +215,11 @@ public record StagePlayback(
         );
     }
 
-    /** One frame of a running play; a stopped play, the whole view and no delta change nothing. */
+    /**
+     * One frame of a running play; a stopped play, the whole view and no delta change nothing. The
+     * tick a stage begins, its whole batch is revealed, then the stage dwells for its span, holds the
+     * pause and the cursor moves on (design 17 §7.5).
+     */
     public StagePlayback advance(float deltaTicks, Cadence cadence) {
         if (!playing || cursor < 0 || stages.isEmpty() || !(deltaTicks > 0.0F)) {
             return this;
@@ -222,25 +228,31 @@ public record StagePlayback(
             return everythingRevealed();
         }
         int count = cellCount(cursor);
-        if (revealed(cursor) >= count) {
-            float hold = pause + deltaTicks;
-            if (hold < pauseSpan(cadence)) {
-                return new StagePlayback(stages, cells, cursor, revealed, true, elapsed, hold);
-            }
-            if (cursor + 1 >= stages.size()) {
-                return everythingRevealed();
-            }
-            int next = cursor + 1;
-            return new StagePlayback(stages, cells, next, revealOnly(next, 0), true, 0.0F, 0.0F);
+        List<Integer> counts = revealed;
+        float elapsedNow = elapsed;
+        float pauseNow = pause;
+        if (revealed(cursor) < count) {
+            counts = revealOnly(cursor, count);
+            elapsedNow = 0.0F;
+            pauseNow = 0.0F;
         }
-        float nextElapsed = elapsed + deltaTicks;
-        int span = revealSpan(cursor, cadence);
-        int now = span <= 0 ? count : Math.min(count, (int) (nextElapsed * count / span));
-        int shown = Math.max(revealed(cursor), now);
-        return new StagePlayback(stages, cells, cursor, revealOnly(cursor, shown), true, nextElapsed, 0.0F);
+        elapsedNow += deltaTicks;
+        int dwell = revealSpan(cursor, cadence);
+        if (elapsedNow < dwell) {
+            return new StagePlayback(stages, cells, cursor, counts, true, elapsedNow, 0.0F);
+        }
+        float hold = pauseNow + (elapsedNow - dwell);
+        if (hold < pauseSpan(cadence)) {
+            return new StagePlayback(stages, cells, cursor, counts, true, dwell, hold);
+        }
+        if (cursor + 1 >= stages.size()) {
+            return everythingRevealed();
+        }
+        int next = cursor + 1;
+        return new StagePlayback(stages, cells, next, revealOnly(next, cellCount(next)), true, 0.0F, 0.0F);
     }
 
-    /** The span one stage is revealed over, speed divided (design 17 §7.5). */
+    /** The stage's dwell: the span one stage is held over once its batch has popped (design 17 §7.5). */
     public int revealSpan(int stage, Cadence cadence) {
         if (!cadence.enabled()) {
             return 0;

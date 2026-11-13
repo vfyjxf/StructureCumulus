@@ -12,6 +12,7 @@ import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
 import net.minecraft.client.Minecraft;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -39,6 +40,7 @@ public final class PreviewScreenScenario {
     private static float zoomBefore;
     private static float movedX;
     private static float movedY;
+    private static @Nullable AxisGizmo gizmoBeforeZoom;
 
     public void define(ScenarioBuilder build) {
         build = PreviewScenarioSupport.stage(build)
@@ -72,11 +74,33 @@ public final class PreviewScreenScenario {
                             && !layout.side().isEmpty()
                             && layout.top() != null
                             && !layout.top().isEmpty();
-                }, () -> String.valueOf(screen().layout())).check("the main viewport carries the axes", () -> {
+                }, () -> String.valueOf(screen().layout()))
+                .check("the main viewport carries the corner compass", () -> {
                     AxisGizmo gizmo = screen().gizmo();
-                    return gizmo != null
-                            && gizmo.x().start().equals(gizmo.y().start())
-                            && gizmo.y().start().equals(gizmo.z().start());
+                    ScreenLayout.Rect main = screen().layout().main();
+                    if (gizmo == null || main == null) {
+                        return false;
+                    }
+                    float centreX = main.x() + main.width() - AxisGizmo.insetPx;
+                    float centreY = main.y() + AxisGizmo.insetPx;
+                    return gizmo.x().start().equals(gizmo.y().start())
+                            && gizmo.y().start().equals(gizmo.z().start())
+                            && Math.abs(gizmo.x().start().x - centreX) < 0.01F
+                            && Math.abs(gizmo.x().start().y - centreY) < 0.01F
+                            && gizmo.ordered().size() == 3;
+                }).action("zoom in with the wheel and read the compass again", context -> {
+                    gizmoBeforeZoom = screen().gizmo();
+                    PreviewScreen open = (PreviewScreen) context.screenOrThrow();
+                    ScreenLayout.Rect main = open.layout().main();
+                    context.driver().placeCursor(main.x() + main.width() / 2, main.y() + main.height() / 2);
+                    context.driver().scroll(open, main.x() + main.width() / 2, main.y() + main.height() / 2, 1.0D);
+                }).frames(2).check("a zoom turns the picture and never the compass", () -> {
+                    AxisGizmo after = screen().gizmo();
+                    return gizmoBeforeZoom != null
+                            && after != null
+                            && after.x().start().equals(gizmoBeforeZoom.x().start())
+                            && after.x().end().equals(gizmoBeforeZoom.x().end())
+                            && after.z().end().equals(gizmoBeforeZoom.z().end());
                 }).action("put the cursor on the cell nearest the viewer", context -> {
                     PreviewScreen open = (PreviewScreen) context.screenOrThrow();
                     ScreenLayout.Rect main = open.layout().main();

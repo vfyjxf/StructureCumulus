@@ -1577,10 +1577,20 @@ public final class SceneLighting {
     public static float brightness(Vector3f normal, Vector3f light0, Vector3f light1);
 }
 
-// One cell's chrome outline of design 17 §5.3: the convex hull of the eight projected corners and the
-// nearest corner's GUI depth, so the outline wraps its own cell and a nearer model still hides it.
-public record CellOutline(java.util.List<Vector2f> points, float depth) {
+// One cell's chrome outline of design 17 §5.3: the convex hull of the eight projected corners, drawn
+// by ChromeStroke above the models with the depth test off, so a highlight reads through.
+public record CellOutline(java.util.List<Vector2f> points) {
     public static CellOutline of(Fit fit, LatticePoint at, float dx, float dy, float dz, float scale);
+}
+
+// The chrome stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded
+// endpoints, one batch at chromeDepth on RenderType.guiOverlay() (no depth test).
+public final class ChromeStroke {
+    public static final float widthPx;
+    public record Stroke(java.util.List<Vector2f> points, int color) { }
+    public record Quad(Vector2f a, Vector2f b, Vector2f c, Vector2f d) { }
+    public static java.util.List<Quad> quads(java.util.List<Vector2f> points);
+    public static void draw(GuiGraphics graphics, java.util.List<Stroke> strokes);
 }
 
 // The staged playback's pop-in of design 17 §7.6: one stamp per revealed cell, two eased legs sampled
@@ -1666,14 +1676,20 @@ public record SceneCamera(float targetX, float targetY, float targetZ, float yaw
     public SceneCamera withProjection(Projection next, Hull hull);
 }
 
-// The three axes of design 17 §6: the drawn hull's minimum corner as origin, one segment and one
-// label anchor per axis, projected through one viewport's camera.
+// The corner compass of design 17 §6: a fixed-pixel triad pinned to the main viewport's top-right
+// corner, rotated by the camera only, a pure function of the camera and the viewport rectangle.
 public record AxisGizmo(Segment x, Segment y, Segment z) {
-    public record Segment(Vector2f start, Vector2f end, Vector2f label) { }
+    public record Segment(Vector2f start, Vector2f end, Vector2f label, float depth, String name,
+                          int color) { }
+    public static final int chromeMarginPx;
+    public static final int labelPadPx;
+    public static final int gizmoAxisPx;
     public static final int xColor;
     public static final int yColor;
     public static final int zColor;
-    public static AxisGizmo of(Hull hull, SceneCamera camera, int x, int y, int width, int height);
+    public static final int insetPx;
+    public static AxisGizmo of(SceneCamera camera, int x, int y, int width, int height);
+    public java.util.List<Segment> ordered();
 }
 
 // The fit of design 17 §4.3: one hull into one rectangle through one camera, with the 2D projection
@@ -1688,13 +1704,13 @@ public record Fit(Hull hull, SceneCamera camera, int x, int y, int width, int he
     public org.joml.Matrix4f matrix();
 }
 
-// The staged playback of design 17 §7: no cursor is the whole view, a cursor is the staged view, and
-// the reveal counts are what a play, a step and a jump move.
+// The staged playback of design 17 §7: no cursor is the whole view, a cursor is the staged view. A
+// play reveals a stage as one batch and the span is that stage's dwell (§7.5); only a manual step
+// drips one cell. An unrevealed cell's alpha is zero: the pop-in fills an empty slot (§7.2).
 public record StagePlayback(java.util.List<Stage> stages, java.util.List<Placed> cells, int cursor,
                             java.util.List<Integer> revealed, boolean playing, float elapsed, float pause) {
     public static final float doneAlpha;
     public static final float currentAlpha;
-    public static final float unrevealedAlpha;
     public static final int cellRevealTicks;
     public static final int stageRevealMinTicks;
     public static final int stageRevealMaxTicks;
@@ -1806,7 +1822,8 @@ public final class PreviewScreen extends Screen {
     public boolean framingActive();
     public boolean framingArmed();
     public int drawnLabels();
-    public int drawnFutureBoxes();
+    public int drawnSlotOutlines();
+    public int drawnStageOutlines();
     public @Nullable Shading shading(int panel);
     public @Nullable CellOutline hoverOutline(int panel);
     public float scaleOf(GhostCell ghost);
@@ -2717,7 +2734,13 @@ landed the rendering fixes: the world-fixed scene light and its normal matrix (`
 bounded depth band both projections share, the silhouette hover/future outline (`CellOutline`, with
 `PreviewScreen.hoverOutline` and `shading` telling the harness what was drawn) and the staged
 playback's pop-in (`PopIn`, with `scaleOf` and `animatingCells`). The JEI face keeps its own fixed-frame
-shading; that change is backlog, not this milestone (§13, D-106). The milestone state lives in
+shading; that change is backlog, not this milestone (§13, D-106). SC6 has landed the presentation
+rework (D-107): a play reveals a stage as one batch into empty slots (`StagePlayback` drops the
+unrevealed factor and its span becomes the stage's dwell), the outlines are `ChromeStroke`'s 1.5-px
+quad strips on `RenderType.guiOverlay()` at `chromeDepth` — smooth and reading through the models —
+with the cursor's stage stroked as a set (`drawnStageOutlines`, and `drawnSlotOutlines` for outline
+mode's not-drawn cells), and the gizmo is the corner compass `AxisGizmo.of(camera, rect)` instead of
+scene geometry at the hull's origin. The milestone state lives in
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
@@ -2750,11 +2773,12 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `Hull` | the drawn hull of design 17 §3.3, the input of every fit |
 | `preview.scene` | `Fit` | the fit of design 17 §4.3: one hull into one viewport through one camera, the scale and the 2D projection the scene, the gizmo and the picking share |
 | `preview.scene` | `ExplodeModel` (with `Group`, `Label`, `Offset`) | the per-bay offset function of design 17 §8.1: the groups, the direction, the half-diagonal distance and the moved label anchors |
-| `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the four delta treatments and the reveal counts of design 17 §7, as a pure state machine |
+| `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the delta treatments and the reveal counts of design 17 §7, as a pure state machine: a play reveals a stage as one batch, an unrevealed cell is not drawn |
 | `preview.scene` | `NextStepLine` | 16 §12.3's next-step line, the pack's one formatter: the world's HUD and the screen's summary line both read it |
-| `preview.scene` | `AxisGizmo` | the three axes and their label anchors, projected through a camera |
+| `preview.scene` | `AxisGizmo` | the corner compass of design 17 §6: the fixed-pixel triad pinned to the main viewport's top-right corner, a pure function of (camera, rect) |
 | `preview.scene` | `SceneLighting` | the scene's world-fixed two-light law of design 17 §4.1, as a pure function of a camera |
-| `preview.scene` | `CellOutline` | one cell's projected silhouette and its nearest GUI depth, the hover and future-cell chrome outline of design 17 §5.3 |
+| `preview.scene` | `CellOutline` | one cell's projected silhouette (the convex hull of its eight projected corners), the outline geometry of design 17 §5.3 |
+| `preview.scene` | `ChromeStroke` | the stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded endpoints, drawn at `chromeDepth` with the depth test off |
 | `preview.scene` | `PopIn` | the staged playback's pop-in of design 17 §7.6: per-cell reveal stamps and the two eased legs |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
 | `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
@@ -2783,10 +2807,10 @@ for the rest of that play-through without pausing the play.
 (the same 150 the JEI view uses) so the whole scene sits in front of the screen's background and of a
 panel's own fill, inside a bounded band (`PreviewScene.sceneSpan` above it) that both projections map
 into: the orthographic arm compresses the page's own view depth, and the perspective arm fits its
-near/far planes to the drawn hull so its ndc depth lands in the same band. The gizmo and the part
-labels ride above the band at `PreviewScene.chromeDepth`; the hover outline and the future-cell
-outlines carry their own cell's nearest depth inside the band, so a nearer model still hides an
-outline that belongs behind it. The lighting is design 17 §4.1's: the pass installs the world's two
+near/far planes to the drawn hull so its ndc depth lands in the same band. The chrome rides above the
+band at `PreviewScene.chromeDepth`: the compass, the part labels and every outline stroke — the
+strokes draw on `RenderType.guiOverlay()` with the depth test off, so a highlight reads through the
+models (design 17 §5.3, D-107). The lighting is design 17 §4.1's: the pass installs the world's two
 diffuse directions in the panel's frame and the camera's rotation as the normal matrix
 (`SceneLighting`), never the pose's inverse transpose and never `Lighting.setupFor3DItems()`.
 

@@ -1,19 +1,17 @@
 package dev.vfyjxf.cumulus.mc.preview.scene;
 
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
-import org.joml.Matrix4f;
 import org.joml.Vector2f;
-import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 /**
- * One cell's chrome outline (design 17 §5.3): the convex hull of the eight projected corners, and the
- * nearest corner's GUI depth, so the outline rides on its own cell and a nearer model still hides it.
+ * One cell's chrome outline (design 17 §5.3): the convex hull of the eight projected corners, drawn
+ * as a smooth vector stroke at the chrome depth so the outline reads through the models.
  */
-public record CellOutline(List<Vector2f> points, float depth) {
+public record CellOutline(List<Vector2f> points) {
 
     /** Below this many pixels two projected corners are the same point (an axis-locked view). */
     private static final float sameCorner = 1.0E-3F;
@@ -24,17 +22,14 @@ public record CellOutline(List<Vector2f> points, float depth) {
 
     /** The outline of one cell, displaced and scaled by this frame's treatment (§7.2, §7.6, §8.1). */
     public static CellOutline of(Fit fit, LatticePoint at, float dx, float dy, float dz, float scale) {
-        Matrix4f matrix = fit.matrix();
         List<Vector2f> corners = new ArrayList<>(8);
-        float depth = Float.NEGATIVE_INFINITY;
         for (int corner = 0; corner < 8; corner++) {
             float x = at.x() + dx + 0.5F + (((corner & 1) == 0 ? 0.0F : 1.0F) - 0.5F) * scale;
             float y = at.y() + dy + 0.5F + (((corner & 2) == 0 ? 0.0F : 1.0F) - 0.5F) * scale;
             float z = at.z() + dz + 0.5F + (((corner & 4) == 0 ? 0.0F : 1.0F) - 0.5F) * scale;
             corners.add(fit.project(x, y, z));
-            depth = Math.max(depth, matrix.transformPosition(new Vector3f(x, y, z)).z);
         }
-        return new CellOutline(hull(corners), depth);
+        return new CellOutline(hull(corners));
     }
 
     /** The convex hull of the projected corners, in drawing order (monotone chain). */

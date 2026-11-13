@@ -16,6 +16,7 @@ import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import dev.vfyjxf.cumulus.mc.preview.scene.AxisGizmo;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
+import dev.vfyjxf.cumulus.mc.preview.scene.ChromeStroke;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
@@ -66,7 +67,10 @@ public final class PreviewScreen extends Screen {
     private static final int buttonTextColor = 0xFFF0F0F0;
     private static final int tooltipColor = 0xE0101010;
     private static final int tooltipTextColor = 0xFFF0F0F0;
-    private static final int outlineColor = 0xFFE8E8E8;
+    /** The hover's accent: the brightest chrome, one cell under the pointer (design 17 §5.3). */
+    private static final int hoverOutlineColor = 0xFFE8E8E8;
+    /** The cursor stage's outline: the chrome family's steel blue, a set rather than one cell (§5.3). */
+    private static final int stageOutlineColor = 0xFF8FB4D9;
     private static final int barColor = 0x60484848;
     private static final int barHoverColor = 0x906A6A6A;
     private static final int barCursorColor = 0xFFE8E8E8;
@@ -95,7 +99,8 @@ public final class PreviewScreen extends Screen {
     private boolean listening;
     private int drawnCells;
     private int drawnLabels;
-    private int drawnFutureBoxes;
+    private int drawnSlotOutlines;
+    private int drawnStageOutlines;
     private boolean dragging;
     private boolean panning;
     private boolean draggedSinceClick;
@@ -122,6 +127,7 @@ public final class PreviewScreen extends Screen {
     private int animatingCells;
     private final Map<Panel, Shading> shading = new EnumMap<>(Panel.class);
     private final Map<Panel, CellOutline> outlines = new EnumMap<>(Panel.class);
+    private List<Cell> stageSet = List.of();
 
     private PreviewScreen(Entry entry) {
         super(Component.literal(entry.blueprintId().text()));
@@ -204,7 +210,9 @@ public final class PreviewScreen extends Screen {
         }
         drawnCells = 0;
         drawnLabels = 0;
-        drawnFutureBoxes = 0;
+        drawnSlotOutlines = 0;
+        drawnStageOutlines = 0;
+        stageSet = cursorStage();
         drawPanel(graphics, layout.main(), Panel.main, false);
         drawPanel(graphics, layout.front(), Panel.front, true);
         drawPanel(graphics, layout.side(), Panel.side, true);
@@ -547,13 +555,16 @@ public final class PreviewScreen extends Screen {
         return ExplodeModel.of(stages(), drawn, scene.hull());
     }
 
-    /** One cell's treatment: the stage's alpha, the pop-in's scale and the explode's offset (§7.2, §7.6, §8.1). */
+    /**
+     * One cell's treatment: the stage's alpha, the pop-in's scale and the explode's offset (§7.2, §7.6,
+     * §8.1). A cell that is not drawn and not revealed is null: the scene never sees an empty slot.
+     */
     private PreviewScene.@Nullable Sight sightOf(Cell cell) {
         StagePlayback.Placed placedCell = placed.get(cell.ghost());
         if (placedCell == null) {
             return PreviewScene.Sight.full;
         }
-        if (!playback.drawn(placedCell)) {
+        if (!playback.drawn(placedCell) || !playback.revealed(placedCell)) {
             return null;
         }
         ExplodeModel.Offset offset = explode.offset(cell.ghost(), explodeT);
@@ -760,21 +771,24 @@ public final class PreviewScreen extends Screen {
         drawnCells += scene.draw(graphics, fit, this::sightOf).cells();
         shading.put(panel, shadingOf(fit.camera()));
         outlines.remove(panel);
-        drawFutureBoxes(graphics, fit);
-        if (panel == Panel.main) {
-            graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
-            drawGizmo(graphics, fit.camera(), rect);
-            graphics.pose().popPose();
-        }
+        List<ChromeStroke.Stroke> strokes = new ArrayList<>();
+        stageStrokes(fit, strokes);
+        slotStrokes(fit, strokes);
         if (hovered != null) {
             PreviewScene.Sight sight = sightOf(hovered);
             if (sight != null) {
                 CellOutline outline = CellOutline
                         .of(fit, hovered.ghost().cell(), sight.dx(), sight.dy(), sight.dz(), sight.scale());
                 outlines.put(panel, outline);
-                drawOutline(graphics, outline, outlineColor);
+                strokes.add(new ChromeStroke.Stroke(outline.points(), hoverOutlineColor));
             }
+        }
+        ChromeStroke.draw(graphics, strokes);
+        if (panel == Panel.main) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
+            drawGizmo(graphics, fit.camera(), rect);
+            graphics.pose().popPose();
         }
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
@@ -804,8 +818,41 @@ public final class PreviewScreen extends Screen {
         return SceneLighting.brightness(normals.transform(new Vector3f(x, y, z)), lights[0], lights[1]);
     }
 
-    /** Outline mode's 1-px chrome outline at a future cell (design 17 §7.2). */
-    private void drawFutureBoxes(GuiGraphics graphics, Fit fit) {
+    /** The cursor stage's cells that draw this frame: the set the stage outline strokes (§5.3). */
+    private List<Cell> cursorStage() {
+        int cursor = playback.cursor();
+        List<Cell> cells = new ArrayList<>();
+        if (cursor < 0) {
+            return List.copyOf(cells);
+        }
+        for (Cell cell : scene.cells()) {
+            if (cell.ghost().stageIndex() != cursor || !PreviewScene.draws(cell)) {
+                continue;
+            }
+            StagePlayback.Placed placedCell = placed.get(cell.ghost());
+            if (placedCell != null && playback.drawn(placedCell) && playback.revealed(placedCell)) {
+                cells.add(cell);
+            }
+        }
+        return List.copyOf(cells);
+    }
+
+    /** The whole cursor stage stroked in the stage colour, so a stage click highlights its blocks (§5.3). */
+    private void stageStrokes(Fit fit, List<ChromeStroke.Stroke> strokes) {
+        for (Cell cell : stageSet) {
+            PreviewScene.Sight sight = sightOf(cell);
+            if (sight == null) {
+                continue;
+            }
+            CellOutline outline = CellOutline
+                    .of(fit, cell.ghost().cell(), sight.dx(), sight.dy(), sight.dz(), sight.scale());
+            strokes.add(new ChromeStroke.Stroke(outline.points(), stageOutlineColor));
+            drawnStageOutlines++;
+        }
+    }
+
+    /** Outline mode's chrome stroke at every not-drawn cell: the cursor's unrevealed and the future (§7.2). */
+    private void slotStrokes(Fit fit, List<ChromeStroke.Stroke> strokes) {
         if (!outline) {
             return;
         }
@@ -814,26 +861,13 @@ public final class PreviewScreen extends Screen {
                 continue;
             }
             StagePlayback.Placed placedCell = placed.get(cell.ghost());
-            if (placedCell == null || playback.drawn(placedCell)) {
+            if (placedCell == null || playback.revealed(placedCell)) {
                 continue;
             }
-            drawOutline(graphics, CellOutline.of(fit, cell.ghost().cell(), 0.0F, 0.0F, 0.0F, 1.0F), chromeColor);
-            drawnFutureBoxes++;
+            CellOutline outline = CellOutline.of(fit, cell.ghost().cell(), 0.0F, 0.0F, 0.0F, 1.0F);
+            strokes.add(new ChromeStroke.Stroke(outline.points(), chromeColor));
+            drawnSlotOutlines++;
         }
-    }
-
-    /** One cell's chrome outline: a 1-px polygon on the cell's own silhouette, at its nearest depth. */
-    private static void drawOutline(GuiGraphics graphics, CellOutline outline, int color) {
-        graphics.pose().pushPose();
-        graphics.pose()
-                .translate(0.0F, 0.0F, PreviewScene.sceneDepth + outline.depth() + PreviewScene.sceneSpan * 0.002F);
-        List<Vector2f> points = outline.points();
-        for (int index = 0; index < points.size(); index++) {
-            Vector2f from = points.get(index);
-            Vector2f to = points.get((index + 1) % points.size());
-            line(graphics, Math.round(from.x), Math.round(from.y), Math.round(to.x), Math.round(to.y), color);
-        }
-        graphics.pose().popPose();
     }
 
     /** Every part's name on its moved centroid, faded with `t` (design 17 §8.2). */
@@ -872,24 +906,28 @@ public final class PreviewScreen extends Screen {
         return false;
     }
 
+    /** The main viewport's corner compass, far-to-near, its labels at the segment ends (design 17 §6). */
     private void drawGizmo(GuiGraphics graphics, SceneCamera panelCamera, Rect rect) {
-        AxisGizmo axes = AxisGizmo.of(scene.hull(), panelCamera, rect.x(), rect.y(), rect.width(), rect.height());
+        AxisGizmo axes = AxisGizmo.of(panelCamera, rect.x(), rect.y(), rect.width(), rect.height());
         gizmo = axes;
-        drawAxis(graphics, axes.x(), "X", AxisGizmo.xColor);
-        drawAxis(graphics, axes.y(), "Y", AxisGizmo.yColor);
-        drawAxis(graphics, axes.z(), "Z", AxisGizmo.zColor);
-    }
-
-    private void drawAxis(GuiGraphics graphics, AxisGizmo.Segment axis, String name, int color) {
-        line(
-            graphics,
-            Math.round(axis.start().x),
-            Math.round(axis.start().y),
-            Math.round(axis.end().x),
-            Math.round(axis.end().y),
-            color
-        );
-        graphics.drawString(font, name, Math.round(axis.label().x) + 1, Math.round(axis.label().y) - 4, color, false);
+        for (AxisGizmo.Segment axis : axes.ordered()) {
+            line(
+                graphics,
+                Math.round(axis.start().x),
+                Math.round(axis.start().y),
+                Math.round(axis.end().x),
+                Math.round(axis.end().y),
+                axis.color()
+            );
+            graphics.drawString(
+                font,
+                axis.name(),
+                Math.round(axis.label().x) + 1,
+                Math.round(axis.label().y) - 4,
+                axis.color(),
+                false
+            );
+        }
     }
 
     private static void line(GuiGraphics graphics, int x0, int y0, int x1, int y1, int color) {
@@ -1268,9 +1306,14 @@ public final class PreviewScreen extends Screen {
         return drawnLabels;
     }
 
-    /** The number of future-cell outline boxes drawn in the last frame (§7.2). */
-    public int drawnFutureBoxes() {
-        return drawnFutureBoxes;
+    /** The number of not-drawn cells stroke-framed in the last frame, summed over the panels (§7.2). */
+    public int drawnSlotOutlines() {
+        return drawnSlotOutlines;
+    }
+
+    /** The number of cursor-stage silhouettes stroked in the last frame, summed over the panels (§5.3). */
+    public int drawnStageOutlines() {
+        return drawnStageOutlines;
     }
 
     /**
