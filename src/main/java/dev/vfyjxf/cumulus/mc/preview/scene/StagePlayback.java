@@ -148,7 +148,15 @@ public record StagePlayback(
         if (stage < 0 || stage >= stages.size()) {
             return this;
         }
-        return new StagePlayback(stages, cells, stage, revealOnly(stage, cellCount(stage)), false, 0.0F, 0.0F);
+        return new StagePlayback(
+            stages,
+            cells,
+            stage,
+            revealOnly(revealed, stage, cellCount(stage)),
+            false,
+            0.0F,
+            0.0F
+        );
     }
 
     public StagePlayback previous() {
@@ -159,7 +167,10 @@ public record StagePlayback(
         return cursor < 0 ? enter(0) : enter(Math.min(stages.size() - 1, cursor + 1));
     }
 
-    /** `Space`: from the whole view the first stage and a play, otherwise the running play toggles. */
+    /**
+     * `Space`: from the whole view the first stage and a play, whose first frames are the empty page
+     * (§7.1); otherwise the running play toggles.
+     */
     public StagePlayback togglePlay(Cadence cadence) {
         if (stages.isEmpty()) {
             return this;
@@ -186,7 +197,7 @@ public record StagePlayback(
                 stages,
                 cells,
                 stage,
-                revealOnly(stage, revealed(stage) + 1),
+                revealOnly(revealed, stage, revealed(stage) + 1),
                 playing,
                 elapsed,
                 pause
@@ -197,7 +208,7 @@ public record StagePlayback(
                 stages,
                 cells,
                 stage,
-                revealOnly(stage, cellCount(stage)),
+                revealOnly(revealed, stage, cellCount(stage)),
                 playing,
                 elapsed,
                 pause
@@ -208,7 +219,7 @@ public record StagePlayback(
             stages,
             cells,
             next,
-            revealOnly(next, Math.min(1, cellCount(next))),
+            revealOnly(revealed, next, Math.min(1, cellCount(next))),
             playing,
             0.0F,
             0.0F
@@ -216,9 +227,11 @@ public record StagePlayback(
     }
 
     /**
-     * One frame of a running play; a stopped play, the whole view and no delta change nothing. The
-     * tick a stage begins, its whole batch is revealed, then the stage dwells for its span, holds the
-     * pause and the cursor moves on (design 17 §7.5).
+     * One frame of a running play; a stopped play, the whole view and no delta change nothing. Every
+     * stage is hold, batch, dwell (design 17 §7.5): the hold runs {@link #pauseSpan} first — the play's
+     * opening frame is the empty page — then the whole batch lands at one tick, then the stage dwells.
+     * A frame that overruns a hold carries the rest into the dwell, and the dwell's overrun is the next
+     * stage's hold, so no time is lost. The last stage's dwell ends the play with no trailing hold.
      */
     public StagePlayback advance(float deltaTicks, Cadence cadence) {
         if (!playing || cursor < 0 || stages.isEmpty() || !(deltaTicks > 0.0F)) {
@@ -227,29 +240,43 @@ public record StagePlayback(
         if (!cadence.enabled()) {
             return everythingRevealed();
         }
-        int count = cellCount(cursor);
+        int stage = cursor;
         List<Integer> counts = revealed;
-        float elapsedNow = elapsed;
-        float pauseNow = pause;
-        if (revealed(cursor) < count) {
-            counts = revealOnly(cursor, count);
-            elapsedNow = 0.0F;
-            pauseNow = 0.0F;
+        float dwellElapsed = elapsed;
+        float holdElapsed = pause;
+        float remaining = deltaTicks;
+        while (remaining > 0.0F) {
+            int count = cellCount(stage);
+            if (count > 0 && counts.get(stage) == 0) {
+                float held = holdElapsed + remaining;
+                int hold = pauseSpan(cadence);
+                if (held < hold) {
+                    return new StagePlayback(stages, cells, stage, counts, true, 0.0F, held);
+                }
+                remaining = held - hold;
+                counts = revealOnly(counts, stage, count);
+                dwellElapsed = 0.0F;
+                holdElapsed = 0.0F;
+            } else if (counts.get(stage) < count) {
+                counts = revealOnly(counts, stage, count);
+                dwellElapsed = 0.0F;
+                holdElapsed = 0.0F;
+            }
+            int dwell = revealSpan(stage, cadence);
+            float dwelled = dwellElapsed + remaining;
+            if (dwelled < dwell) {
+                return new StagePlayback(stages, cells, stage, counts, true, dwelled, 0.0F);
+            }
+            remaining = dwelled - dwell;
+            if (stage + 1 >= stages.size()) {
+                return new StagePlayback(stages, cells, stage, everythingCounts(), false, dwellElapsed, 0.0F);
+            }
+            stage++;
+            counts = revealOnly(counts, stage, 0);
+            dwellElapsed = 0.0F;
+            holdElapsed = 0.0F;
         }
-        elapsedNow += deltaTicks;
-        int dwell = revealSpan(cursor, cadence);
-        if (elapsedNow < dwell) {
-            return new StagePlayback(stages, cells, cursor, counts, true, elapsedNow, 0.0F);
-        }
-        float hold = pauseNow + (elapsedNow - dwell);
-        if (hold < pauseSpan(cadence)) {
-            return new StagePlayback(stages, cells, cursor, counts, true, dwell, hold);
-        }
-        if (cursor + 1 >= stages.size()) {
-            return everythingRevealed();
-        }
-        int next = cursor + 1;
-        return new StagePlayback(stages, cells, next, revealOnly(next, cellCount(next)), true, 0.0F, 0.0F);
+        return new StagePlayback(stages, cells, stage, counts, true, dwellElapsed, holdElapsed);
     }
 
     /** The stage's dwell: the span one stage is held over once its batch has landed (design 17 §7.5). */
@@ -261,7 +288,7 @@ public record StagePlayback(
         return Math.max(1, (int) Math.ceil(raw / cadence.speed()));
     }
 
-    /** The hold between a finished stage and the next one, speed divided (design 17 §7.5). */
+    /** The hold before a stage's batch — the pause between beats, and the play's opening zero state. */
     public int pauseSpan(Cadence cadence) {
         if (!cadence.enabled()) {
             return 0;
@@ -270,19 +297,24 @@ public record StagePlayback(
     }
 
     private StagePlayback everythingRevealed() {
+        return new StagePlayback(stages, cells, cursor < 0 ? 0 : cursor, everythingCounts(), false, elapsed, 0.0F);
+    }
+
+    private List<Integer> everythingCounts() {
         List<Integer> counts = new ArrayList<>(stages.size());
         for (int stage = 0; stage < stages.size(); stage++) {
             counts.add(cellCount(stage));
         }
-        return new StagePlayback(stages, cells, cursor < 0 ? 0 : cursor, counts, false, elapsed, 0.0F);
+        return counts;
     }
 
+    /** Pausing keeps the elapsed dwell and the hold in flight, so a resume never re-runs a passed hold. */
     private StagePlayback withPlaying(boolean running) {
-        return new StagePlayback(stages, cells, cursor, revealed, running, elapsed, 0.0F);
+        return new StagePlayback(stages, cells, cursor, revealed, running, elapsed, pause);
     }
 
-    private List<Integer> revealOnly(int stage, int value) {
-        List<Integer> counts = new ArrayList<>(revealed);
+    private List<Integer> revealOnly(List<Integer> base, int stage, int value) {
+        List<Integer> counts = new ArrayList<>(base);
         counts.set(stage, Math.max(0, Math.min(cellCount(stage), value)));
         return counts;
     }

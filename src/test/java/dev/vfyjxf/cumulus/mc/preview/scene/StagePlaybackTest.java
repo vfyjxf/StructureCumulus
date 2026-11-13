@@ -113,37 +113,51 @@ class StagePlaybackTest {
     }
 
     @Test
-    void aPlayRevealsItsStageAsOneBatch() {
+    void thePlayOpensOnTheEmptyPageAndTheFirstBatchLandsAfterTheHold() {
         StagePlayback opened = page().togglePlay(normal);
-        assertEquals(0, opened.revealed(0), "the play opens with no cell revealed yet");
+        assertEquals(0, opened.revealed(0), "the play opens with no cell revealed");
         StagePlayback firstFrame = opened.advance(1.0F, normal);
-        assertEquals(3, firstFrame.revealed(0), "the tick the stage begins, its whole batch is revealed");
-        assertEquals(0.0F, firstFrame.pause(), eps, "the batch opens the dwell, not the pause");
-        assertEquals(0, firstFrame.cursor());
-        assertTrue(firstFrame.playing());
-        for (StagePlayback.Placed cell : firstFrame.cells()) {
+        assertEquals(0, firstFrame.revealed(0), "nothing lands on the play's first frame");
+        assertEquals(1.0F, firstFrame.pause(), eps, "the opening hold is the zero state");
+        assertEquals(0.0F, firstFrame.elapsed(), eps);
+        assertEquals(4.0F, firstFrame.advance(3.0F, normal).pause(), eps);
+        StagePlayback landed = firstFrame.advance(4.0F, normal);
+        assertEquals(3, landed.revealed(0), "the hold's end lands the whole batch at one tick");
+        assertEquals(0.0F, landed.pause(), eps, "the batch opens the dwell, not the pause");
+        assertEquals(0.0F, landed.elapsed(), eps);
+        assertEquals(0, landed.cursor());
+        assertTrue(landed.playing());
+        for (StagePlayback.Placed cell : landed.cells()) {
             if (cell.stage() == 0) {
-                assertEquals(StagePlayback.currentAlpha, firstFrame.alpha(cell), eps, "every cell lands at once");
+                assertEquals(StagePlayback.currentAlpha, landed.alpha(cell), eps, "every cell lands at once");
             }
         }
     }
 
     @Test
-    void theBatchDwellsThenPausesThenMovesOn() {
-        StagePlayback playback = page().togglePlay(normal).advance(1.0F, normal);
-        assertEquals(3, playback.revealed(0));
-        StagePlayback dwell = playback.advance(4.0F, normal);
+    void aHoldThatOverrunsSpendsTheRestOfTheFrameInTheDwell() {
+        StagePlayback firstFrame = page().togglePlay(normal).advance(1.0F, normal);
+        StagePlayback held = firstFrame.advance(6.0F, normal);
+        assertEquals(3, held.revealed(0), "the batch is in");
+        assertEquals(0.0F, held.pause(), eps);
+        assertEquals(2.0F, held.elapsed(), eps, "one tick of hold plus six is five held and two dwelt");
+    }
+
+    @Test
+    void everyStageIsHeldBeforeItsBatchAndTheLastDwellEndsThePlay() {
+        StagePlayback landed = page().togglePlay(normal).advance(5.0F, normal);
+        assertEquals(3, landed.revealed(0));
+        StagePlayback dwell = landed.advance(5.0F, normal);
         assertEquals(0, dwell.cursor(), "the stage still holds its dwell");
-        assertEquals(0.0F, dwell.pause(), eps);
-        StagePlayback paused = dwell.advance(1.0F, normal);
-        assertEquals(0, paused.cursor(), "the dwell is over; the pause holds the cursor");
-        assertEquals(6.0F, paused.elapsed(), eps, "the dwell stops at its span and the hold begins");
-        StagePlayback held = paused.advance(4.0F, normal);
-        assertEquals(0, held.cursor());
-        assertEquals(4.0F, held.pause(), eps);
-        StagePlayback next = held.advance(1.0F, normal);
-        assertEquals(1, next.cursor(), "the pause's end moves the cursor on");
-        assertEquals(2, next.revealed(1), "the next stage arrives whole");
+        assertEquals(5.0F, dwell.elapsed(), eps);
+        StagePlayback empty = dwell.advance(2.0F, normal);
+        assertEquals(1, empty.cursor(), "the dwell's end moves the cursor to the next stage");
+        assertEquals(1.0F, empty.pause(), eps, "the dwell's overrun is the next stage's hold");
+        assertEquals(0, empty.revealed(1), "the next stage begins empty, like the play's opening");
+        StagePlayback landedNext = empty.advance(4.0F, normal);
+        assertEquals(2, landedNext.revealed(1), "the next stage's batch lands after its own hold");
+        assertEquals(0.0F, landedNext.advance(6.0F, normal).elapsed(), eps);
+        assertFalse(landedNext.advance(6.0F, normal).playing(), "the last dwell ends the play, no trailing hold");
     }
 
     @Test
@@ -159,11 +173,7 @@ class StagePlaybackTest {
             StagePlayback next = playback.advance(1.0F, normal);
             if (next.cursor() != playback.cursor()) {
                 heldPause = true;
-                assertEquals(
-                    next.cellCount(next.cursor()),
-                    next.revealed(next.cursor()),
-                    "a stage that begins is revealed whole, never cell by cell"
-                );
+                assertEquals(0, next.revealed(next.cursor()), "a stage that begins is the empty page");
             } else {
                 assertTrue(next.revealed(playback.cursor()) >= before, "the reveal count never moves back");
             }
@@ -178,9 +188,51 @@ class StagePlaybackTest {
 
     @Test
     void theDwellIsNotTheCellDrip() {
-        StagePlayback playback = page().togglePlay(normal).advance(1.0F, normal).advance(4.0F, normal);
+        StagePlayback playback = page().togglePlay(normal).advance(5.0F, normal).advance(4.0F, normal);
         assertEquals(3, playback.revealed(0), "four ticks into the dwell the stage is still whole");
         assertEquals(0, playback.cursor());
+        assertEquals(4.0F, playback.elapsed(), eps);
+    }
+
+    @Test
+    void aResumedPlayDoesNotReRunAHoldThatHasPassed() {
+        StagePlayback landed = page().togglePlay(normal).advance(5.0F, normal);
+        assertEquals(3, landed.revealed(0));
+        StagePlayback paused = landed.togglePlay(normal);
+        assertFalse(paused.playing());
+        StagePlayback resumed = paused.togglePlay(normal);
+        assertEquals(3, resumed.revealed(0), "the batch stays landed across the pause");
+        StagePlayback dwell = resumed.advance(1.0F, normal);
+        assertEquals(3, dwell.revealed(0), "the resume does not empty the stage");
+        assertEquals(1.0F, dwell.elapsed(), eps, "the dwell resumes; no second hold is run");
+        assertEquals(0.0F, dwell.pause(), eps);
+    }
+
+    @Test
+    void aManualStepDripsThenThePlayFillsTheBatchWithoutAHold() {
+        StagePlayback stepped = page().step();
+        assertEquals(1, stepped.revealed(0));
+        StagePlayback play = stepped.togglePlay(normal).advance(1.0F, normal);
+        assertEquals(3, play.revealed(0), "the step's stage fills its whole batch");
+        assertEquals(1.0F, play.elapsed(), eps, "a dripped stage carries no lead-in");
+        assertEquals(0.0F, play.pause(), eps);
+    }
+
+    @Test
+    void aWholePlayTakesExactlyItsHoldsAndDwells() {
+        StagePlayback playback = page().togglePlay(normal);
+        int total = page().pauseSpan(normal) * page().stageCount()
+                + page().revealSpan(0, normal)
+                + page().revealSpan(1, normal);
+        int ticks = 0;
+        while (playback.playing() && ticks < 400) {
+            playback = playback.advance(1.0F, normal);
+            ticks++;
+        }
+        assertFalse(playback.playing(), "the play ends at the table's end");
+        assertEquals(total, ticks, "the whole play is the sum of its holds and dwells, with no trailing hold");
+        assertEquals(3, playback.revealed(0));
+        assertEquals(2, playback.revealed(1));
     }
 
     @Test

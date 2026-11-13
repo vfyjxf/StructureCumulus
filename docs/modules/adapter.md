@@ -1601,18 +1601,19 @@ public final class ChromeStroke {
     public static void draw(GuiGraphics graphics, java.util.List<Stroke> strokes);
 }
 
-// The staged playback's drop-in of design 17 §7.6: one stamp per revealed cell, a fall leg from
-// dropInCells onto the cell's own slot and an alpha leg, both sampled from the screen's clock.
-public final class DropIn {
-    public static final float dropInCells;
-    public static final int dropInTicks;
-    public static DropIn none();
-    public static Tween fallLeg(int durationTicks);
+// The staged playback's reveal of design 17 §7.6: one stamp per revealed cell, carrying the tick its
+// reveal happened and the direction it was narrated from — a drop from dropCells or a rise from the
+// base plate's underside — plus the alpha leg, both sampled from the screen's clock.
+public final class Reveal {
+    public enum Direction { drop, rise }
+    public static final float dropCells;
+    public static final int revealTicks;
+    public static Reveal none();
     public static Tween alphaLeg(int durationTicks);
-    public DropIn advance(java.util.Set<GhostCell> revealed, double now);
+    public Reveal advance(java.util.Set<GhostCell> revealed, double now, Direction direction);
     public boolean animating(GhostCell cell, double now, int durationTicks);
-    public float drop(GhostCell cell, double now, Tween leg);
-    public float alpha(GhostCell cell, double now, Tween leg);
+    public float offset(GhostCell cell, double now, int durationTicks, float plateBottom);
+    public float alpha(GhostCell cell, double now, int durationTicks);
     public int count();
 }
 
@@ -1731,9 +1732,10 @@ public record Fit(Hull hull, SceneCamera camera, int x, int y, int width, int he
     public org.joml.Matrix4f matrix();
 }
 
-// The staged playback of design 17 §7: no cursor is the whole view, a cursor is the staged view. A
-// play reveals a stage as one batch and the span is that stage's dwell (§7.5); only a manual step
-// drips one cell. An unrevealed cell's alpha is zero: the drop-in fills an empty slot (§7.2).
+// The staged playback of design 17 §7: no cursor is the whole view, a cursor is the staged view. Every
+// stage is hold, batch, dwell: a play holds the pause before a batch lands (the opening hold is the
+// empty page), reveals the stage as one batch, then dwells its span (§7.5); only a manual step drips
+// one cell. An unrevealed cell's alpha is zero: the reveal fills an empty slot (§7.2).
 public record StagePlayback(java.util.List<Stage> stages, java.util.List<Placed> cells, int cursor,
                             java.util.List<Integer> revealed, boolean playing, float elapsed, float pause) {
     public static final float doneAlpha;
@@ -1854,7 +1856,8 @@ public final class PreviewScreen extends Screen {
     public int drawnStageOutlines();
     public @Nullable Shading shading(int panel);
     public @Nullable CellOutline hoverOutline(int panel);
-    public float dropOffsetOf(GhostCell ghost);
+    public Reveal.Direction revealDirection();
+    public float revealOffsetOf(GhostCell ghost);
     public int animatingCells();
     public @Nullable Rect buttonRect(String label);
     public java.util.List<String> buttonLabels();
@@ -2738,7 +2741,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC8)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC9)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -2787,7 +2790,17 @@ six-face law, `JeiPreview.shading(panel)` tells the harness what the last frame 
 `JeiPreview.yaw`/`setYaw` expose the drag's page state so the harness can prove a face keeps its
 brightness across a turn), and the flat checkerboard became a platform of slab blocks (`BasePlate`'s
 `tileSize` 2, `thickness` 0.5, `tile(x, z)`'s closed box and `quads()` counting its six faces; the
-grid snaps the footprint out to the two-cell lattice and extends one tile past it). The milestone
+grid snaps the footprint out to the two-cell lattice and extends one tile past it). SC9 has landed
+the play's zero state and the reveal's two directions: every stage is hold, batch, dwell
+(`StagePlayback.advance` runs the `stagePauseTicks` hold before a batch lands — the play's opening
+hold is the empty page, its first frames draw the base plate alone — then reveals the whole batch at
+one tick and dwells the stage's span, carrying a frame's overrun into the next segment and ending on
+the last dwell with no trailing hold), and the reveal is `Reveal` instead of `DropIn`: the stamp
+still carries its tick, now with the direction, the drop falls 2.5 cells and the rise climbs from the
+plate's underside (the offset leg starts at `plateBottom − cellY`, so one batch's legs differ in
+length and share their span), and the screen's `drop`/`rise` button is view state with no key, no
+config and no memory (`PreviewScreen.revealDirection` and `revealOffsetOf` tell the harness which
+direction a new stamp takes and how far a cell still has to travel). The milestone
 state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
@@ -2821,13 +2834,13 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `BasePlate` | the page's floor of design 17 §4.7: a platform of two-cell slab blocks half a cell thick, snapped one tile past the drawn hull's footprint, two alternating chrome greys, unlit and never a cell |
 | `preview.scene` | `Fit` | the fit of design 17 §4.3: one hull into one viewport through one camera, the scale and the 2D projection the scene, the gizmo and the picking share |
 | `preview.scene` | `ExplodeModel` (with `Group`, `Label`, `Offset`) | the per-bay offset function of design 17 §8.1: the groups, the direction, the half-diagonal distance and the moved label anchors |
-| `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the delta treatments and the reveal counts of design 17 §7, as a pure state machine: a play reveals a stage as one batch, an unrevealed cell is not drawn |
+| `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the delta treatments and the reveal counts of design 17 §7, as a pure state machine: every stage is hold, batch, dwell (the opening hold is the empty page), an unrevealed cell is not drawn |
 | `preview.scene` | `NextStepLine` | 16 §12.3's next-step line, the pack's one formatter: the world's HUD and the screen's summary line both read it |
 | `preview.scene` | `AxisGizmo` | the corner compass of design 17 §6: the fixed-pixel triad pinned to the main viewport's top-right corner, a pure function of (camera, rect) |
 | `preview.scene` | `SceneLighting` | the scene's world-fixed two-light law of design 17 §4.1, as a pure function of a camera or of a pass's world-to-view rotation, so the screen and the JEI face share it |
 | `preview.scene` | `CellOutline` | one cell's projected silhouette (the convex hull of its eight projected corners), the outline geometry of design 17 §5.3 |
 | `preview.scene` | `ChromeStroke` | the stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded endpoints, drawn at `chromeDepth` with the depth test off |
-| `preview.scene` | `DropIn` | the staged playback's drop-in of design 17 §7.6: per-cell reveal stamps, the `outCubic` fall onto the plate and the fade that runs with it |
+| `preview.scene` | `Reveal` (with `Direction`) | the staged playback's reveal of design 17 §7.6: per-cell stamps carrying their tick and their direction, the `outCubic` drop from 2.5 cells or the rise from the base plate's underside to the slot, and the fade that runs with it |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
 | `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
 | `preview.client.screen` | `ScreenClock` | the screen's own two-number clock of design 17 §4.6, advanced by the frame's real-time tick delta |

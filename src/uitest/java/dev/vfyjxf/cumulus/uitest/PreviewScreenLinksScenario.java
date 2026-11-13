@@ -180,6 +180,19 @@ public final class PreviewScreenLinksScenario {
                     "the switch wraps the other way without re-opening",
                     () -> screen().variantIndex() == 1,
                     () -> "index=" + screen().variantIndex()
+                ).key(GLFW.GLFW_KEY_DOWN, 0).frames(2)
+                .waitUntil(
+                    "the entered stage settles before the switch",
+                    () -> screen().playback().cursor() == 0 && screen().animatingCells() == 0
+                ).action("press variant next from the staged view", context -> click("variant \u203A", context))
+                .frames(3)
+                .check(
+                    "a rebuilt page is a fresh picture: the kept stage is simply there, never re-narrated",
+                    () -> !screen().playback().wholeView()
+                            && screen().playback().cursor() == 0
+                            && screen().animatingCells() == 0,
+                    () -> "whole=" + screen().playback().wholeView() + " cursor=" + screen().playback().cursor()
+                            + " animating=" + screen().animatingCells()
                 ).action("Esc closes the JEI page", PreviewScreenLinksScenario::escape).frames(2)
                 .waitUntil("the world is the frame again", () -> Minecraft.getInstance().screen == null)
                 .check("the JEI page opened and closed with no session at all", () -> !PreviewProbe.hasSession());

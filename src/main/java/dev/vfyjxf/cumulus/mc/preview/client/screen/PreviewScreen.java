@@ -15,15 +15,16 @@ import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import dev.vfyjxf.cumulus.mc.preview.scene.AxisGizmo;
+import dev.vfyjxf.cumulus.mc.preview.scene.BasePlate;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
 import dev.vfyjxf.cumulus.mc.preview.scene.ChromeStroke;
-import dev.vfyjxf.cumulus.mc.preview.scene.DropIn;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
 import dev.vfyjxf.cumulus.mc.preview.scene.NextStepLine;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene.Cell;
+import dev.vfyjxf.cumulus.mc.preview.scene.Reveal;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneLighting;
 import dev.vfyjxf.cumulus.mc.preview.scene.StagePlayback;
@@ -122,9 +123,9 @@ public final class PreviewScreen extends Screen {
     private @Nullable StageFraming framing;
     private boolean framingArmed = true;
     private int framedCursor = -1;
-    private DropIn dropIn = DropIn.none();
-    private Tween dropFallLeg = DropIn.fallLeg(0);
-    private Tween dropAlphaLeg = DropIn.alphaLeg(0);
+    private Reveal reveal = Reveal.none();
+    private Reveal.Direction revealDirection = Reveal.Direction.drop;
+    private int revealLegTicks;
     private int animatingCells;
     private final Map<Panel, Shading> shading = new EnumMap<>(Panel.class);
     private final Map<Panel, CellOutline> outlines = new EnumMap<>(Panel.class);
@@ -198,7 +199,7 @@ public final class PreviewScreen extends Screen {
         float delta = Minecraft.getInstance().getTimer().getRealtimeDeltaTicks();
         clock = clock.advance(delta);
         playback = playback.advance(delta, cadence());
-        tickDropIn();
+        tickReveal();
         tickExplode();
         tickFraming();
         double cursorX = pointerX < 0.0D ? mouseX : pointerX;
@@ -442,6 +443,11 @@ public final class PreviewScreen extends Screen {
         camera = camera.snap(snap);
     }
 
+    /** The reveal's direction is view state: no key, no config and no memory (design 17 §7.6). */
+    private void toggleRevealDirection() {
+        revealDirection = revealDirection == Reveal.Direction.drop ? Reveal.Direction.rise : Reveal.Direction.drop;
+    }
+
     private void toggleProjection() {
         handOnCamera();
         SceneCamera.Projection next = camera.projection() == SceneCamera.Projection.orthographic
@@ -558,8 +564,8 @@ public final class PreviewScreen extends Screen {
     }
 
     /**
-     * One cell's treatment: the stage's alpha, the drop-in's fall and the explode's offset (§7.2, §7.6,
-     * §8.1). A cell that is not drawn and not revealed is null: the scene never sees an empty slot.
+     * One cell's treatment: the stage's alpha, the reveal's offset and the explode's offset (§7.2,
+     * §7.6, §8.1). A cell that is not drawn and not revealed is null: the scene never sees an empty slot.
      */
     private PreviewScene.@Nullable Sight sightOf(Cell cell) {
         StagePlayback.Placed placedCell = placed.get(cell.ghost());
@@ -572,31 +578,34 @@ public final class PreviewScreen extends Screen {
         ExplodeModel.Offset offset = explode.offset(cell.ghost(), explodeT);
         double now = clock.time();
         GhostCell ghost = cell.ghost();
-        float alpha = playback.alpha(placedCell) * dropIn.alpha(ghost, now, dropAlphaLeg);
-        float drop = dropIn.drop(ghost, now, dropFallLeg);
-        return new PreviewScene.Sight(alpha, 1.0F, offset.x(), offset.y() + drop, offset.z());
+        float alpha = playback.alpha(placedCell) * reveal.alpha(ghost, now, revealLegTicks);
+        float climb = reveal.offset(ghost, now, revealLegTicks, plateBottom());
+        return new PreviewScene.Sight(alpha, 1.0F, offset.x(), offset.y() + climb, offset.z());
+    }
+
+    /** The base plate's underside: the height a rising cell starts from (design 17 §4.7, §7.6). */
+    private float plateBottom() {
+        return scene.plate().y() - BasePlate.thickness;
     }
 
     /**
-     * One frame of the drop-in (design 17 §7.6): a cell newly revealed since the last frame takes the
-     * clock's current tick as its reveal stamp, and a whole view drops nothing.
+     * One frame of the reveal (design 17 §7.6): a cell newly revealed since the last frame takes the
+     * clock's tick and the current direction as its stamp, and a whole view moves nothing.
      */
-    private void tickDropIn() {
-        int duration = dropInTicks();
-        dropFallLeg = DropIn.fallLeg(duration);
-        dropAlphaLeg = DropIn.alphaLeg(duration);
+    private void tickReveal() {
+        revealLegTicks = revealTicks();
         double now = clock.time();
-        dropIn = playback.wholeView() ? DropIn.none() : dropIn.advance(revealedNow(), now);
+        reveal = playback.wholeView() ? Reveal.none() : reveal.advance(revealedNow(), now, revealDirection);
         int animating = 0;
         for (StagePlayback.Placed cell : placed.values()) {
-            if (playback.drawn(cell) && dropIn.animating(cell.ghost(), now, duration)) {
+            if (playback.drawn(cell) && reveal.animating(cell.ghost(), now, revealLegTicks)) {
                 animating++;
             }
         }
         animatingCells = animating;
     }
 
-    /** The page's drawn-and-revealed cells: the set the drop-in stamps. */
+    /** The page's drawn-and-revealed cells: the set the reveal stamps. */
     private Set<GhostCell> revealedNow() {
         Set<GhostCell> revealed = new HashSet<>();
         for (StagePlayback.Placed cell : placed.values()) {
@@ -607,10 +616,10 @@ public final class PreviewScreen extends Screen {
         return revealed;
     }
 
-    /** The drop-in's span, speed divided, zero when the animation is off (design 17 §7.5). */
-    private int dropInTicks() {
+    /** The reveal leg's span, speed divided, zero when the animation is off (design 17 §7.5). */
+    private int revealTicks() {
         return ClientConfig.animationEnabled()
-                ? Math.max(1, (int) Math.ceil(DropIn.dropInTicks / ClientConfig.animationSpeed()))
+                ? Math.max(1, (int) Math.ceil(Reveal.revealTicks / ClientConfig.animationSpeed()))
                 : 0;
     }
 
@@ -654,6 +663,8 @@ public final class PreviewScreen extends Screen {
                 () -> outline = !outline
             )
         );
+        String revealName = revealDirection == Reveal.Direction.drop ? "drop" : "rise";
+        specs.add(new ButtonSpec(revealName, "the reveal's direction: " + revealName, this::toggleRevealDirection));
         return List.copyOf(specs);
     }
 
@@ -1065,13 +1076,21 @@ public final class PreviewScreen extends Screen {
         }
         placed = index(playback);
         ghostAt = ghosts(updated.cells());
-        dropIn = DropIn.none();
+        reveal = rebuiltReveal();
         explode = explodeModel();
         if (!explode.separable()) {
             explodeT = 0.0F;
             explodeTarget = 0.0F;
             explodeTween = null;
         }
+    }
+
+    /**
+     * A rebuilt page is a fresh picture (§7.6, §3.4, §9.5): the kept presentation's cells are simply
+     * there, so their stamps sit past the leg instead of re-narrating them.
+     */
+    private Reveal rebuiltReveal() {
+        return Reveal.none().advance(revealedNow(), clock.time() - revealTicks(), revealDirection);
     }
 
     /**
@@ -1324,12 +1343,17 @@ public final class PreviewScreen extends Screen {
         return panel < 0 || panel >= panels.length ? null : outlines.get(panels[panel]);
     }
 
-    /** The height one cell still has to fall as of the last frame; zero once it has landed (§7.6). */
-    public float dropOffsetOf(GhostCell ghost) {
-        return dropIn.drop(ghost, clock.time(), dropFallLeg);
+    /** The reveal's current direction; a new stamp takes it, an existing stamp keeps its own (§7.6). */
+    public Reveal.Direction revealDirection() {
+        return revealDirection;
     }
 
-    /** How many drawn cells were inside their fall in the last frame (§7.6). */
+    /** One cell's height above its slot (drop) or below it (rise) as of the last frame (§7.6). */
+    public float revealOffsetOf(GhostCell ghost) {
+        return reveal.offset(ghost, clock.time(), revealLegTicks, plateBottom());
+    }
+
+    /** How many drawn cells were inside their reveal leg in the last frame (§7.6). */
     public int animatingCells() {
         return animatingCells;
     }

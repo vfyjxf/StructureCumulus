@@ -12,10 +12,10 @@ import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.scene.BasePlate;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
-import dev.vfyjxf.cumulus.mc.preview.scene.DropIn;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
+import dev.vfyjxf.cumulus.mc.preview.scene.Reveal;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
 import net.minecraft.client.Minecraft;
 import org.joml.Vector2f;
@@ -182,19 +182,19 @@ public final class PreviewScreenRenderScenario {
                             && screen().playback().revealed(0) == 1
                             && screen().drawnCells() == 4
                             && screen().animatingCells() > 0
-                            && largestDrop() <= DropIn.dropInCells,
+                            && largestDrop() <= Reveal.dropCells,
                     () -> "drawn=" + screen().drawnCells() + " revealed=" + screen().playback().revealed(0)
                             + " animating=" + screen().animatingCells() + " highest=" + largestDrop()
                 ).frames(1)
                 .check(
                     "the falling cell hangs between the plate and its slot, never at either end",
-                    () -> largestDrop() > 0.0F && largestDrop() < DropIn.dropInCells,
+                    () -> largestDrop() > 0.0F && largestDrop() < Reveal.dropCells,
                     () -> "highest=" + largestDrop()
                 ).waitUntil("the step's cell lands", () -> screen().animatingCells() == 0).key(GLFW.GLFW_KEY_SPACE, 0)
                 .waitUntil("the play reveals the rest of the stage", () -> screen().animatingCells() > 0)
                 .check(
                     "the play reveals the stage as one batch: every remaining cell falls together",
-                    () -> screen().animatingCells() == 8 && largestDrop() <= DropIn.dropInCells,
+                    () -> screen().animatingCells() == 8 && largestDrop() <= Reveal.dropCells,
                     () -> "animating=" + screen().animatingCells() + " highest=" + largestDrop()
                 ).frames(1)
                 .check(
@@ -316,7 +316,7 @@ public final class PreviewScreenRenderScenario {
     private static float largestDrop() {
         float highest = 0.0F;
         for (PreviewScene.Cell cell : screen().scene().cells()) {
-            highest = Math.max(highest, screen().dropOffsetOf(cell.ghost()));
+            highest = Math.max(highest, screen().revealOffsetOf(cell.ghost()));
         }
         return highest;
     }
