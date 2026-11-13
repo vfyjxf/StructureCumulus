@@ -246,10 +246,10 @@ value plus a number.
   "unshaded, then black" defect SC5 fixes.
 - **The pass's depth band.** The model pass occupies a bounded band above `sceneDepth` in both
   projections: the orthographic arm compresses the page's own view depth into it, and the perspective
-  arm fits its near/far planes to the drawn hull and maps its ndc depth into the same band. Chrome that
-  must be readable — the gizmo and the part labels — draws above the band (`chromeDepth`), and the
-  hover and future-cell outlines carry their own cell's nearest depth inside it, so a nearer model
-  still hides an outline that belongs behind it. A projection's depth never leaks into another draw:
+  arm fits its near/far planes to the drawn hull and maps its ndc depth into the same band. Chrome
+  draws above the band (`chromeDepth`): the gizmo and the part labels always did, and the outlines do
+  too — the hover, the stage and the outline-mode strokes draw at `chromeDepth` with the depth test
+  off, so they read through the models (§5.3). A projection's depth never leaks into another draw:
   the band is the one contract both arms keep (§13).
 
 ### 4.2 `SceneCamera`
@@ -492,55 +492,73 @@ What is shared and what is not, stated once:
   therefore not pickable, exactly as 15 §6.2 refuses to pick a hidden slice layer). The nearest
   visible cell whose box the ray crosses wins (15 §6.2's rule), using the cells' current positions,
   so an exploded cell is picked where it is drawn.
-- **The outline is drawn in all four.** The hovered cell gets a 1-px chrome outline in every viewport
-  it appears in (a panel that does not contain it draws nothing), because the point of four views is
-  to find one cell in three planes at once.
+- **The outline is drawn in all four.** The hovered cell gets a chrome outline in every viewport it
+  appears in (a panel that does not contain it draws nothing), because the point of four views is to
+  find one cell in three planes at once.
 - **The outline is the cell's silhouette, not its screen box.** The outline is the convex hull of the
   eight projected corners of the cell's cube — six vertices at the isometric default, four in an
-  axis-locked view — drawn as a 1-px chrome polygon. The bounding rectangle of those corners is not
-  the cell: at 45° it is a wider rectangle whose corners float in empty space, which is the frame the
-  SC5 defect report named.
-- **The outline rides at its own cell's nearest depth.** It carries the largest GUI depth of the
-  cell's eight corners (larger is nearer), so it is not swallowed by the cell it wraps while a nearer
-  model still hides it (§4.1's band, adapter §20).
+  axis-locked view. The bounding rectangle of those corners is not the cell: at 45° it is a wider
+  rectangle whose corners float in empty space, which is the frame the SC5 defect report named.
+- **The outline is a smooth vector line, not a pixel row.** Each silhouette edge is drawn as a
+  1.5-px-wide quad strip between its two *unrounded* projected endpoints — the same vector stroke a
+  modelling tool draws — never as a row of GUI pixels between rounded coordinates. A pixel-snapped
+  line stair-steps across a diagonal silhouette and reads as part of the block texture, which is the
+  pixelation the SC6 report named; the quad strip's edges land where the projection put them.
+- **The outline reads through the models.** It draws at `chromeDepth` with the depth test off, so a
+  cell's outline is whole even when a nearer block stands in front of it — an outline is a statement
+  about a cell, and a statement that disappears behind the picture is not readable. SC5's
+  nearest-depth rule made the line honest geometry and made it useless exactly where the structure is
+  dense; the user's reading — the highlight must not be occluded — is the law.
+- **The cursor's stage is outlined as a set.** In the staged view every drawn cell of the cursor's
+  stage carries the stage outline — the same silhouette stroke in the stage's chrome colour, in every
+  viewport that shows the cell — so selecting a stage (a click, an arrow, a play's advance) highlights
+  exactly the blocks that stage places, and the done stages' dimmed cells stay bare. The whole view
+  has no cursor and outlines nothing; the hover keeps its own brighter accent on the one cell under
+  the pointer.
 - **The tooltip is 15 §6.2's content plus the owning stage's name** — block id, property values, and
   the stage that owns the cell (16 §11's own tooltip) — drawn near the cursor inside the screen. It is
   a rendering of payload fields and a stage name, not document text: no 16 §10 display point is added.
 - **The axes are not pickable.** A press on the gizmo orbits the main viewport like a press on empty
   space; nothing in the scene has a click action except the screen's own widgets.
 - **Nothing is selected.** The screen has no selection model, no part pin and no click-to-cycle: a
-  page is read, not edited (15 §8's pins are a session's).
+  page is read, not edited (15 §8's pins are a session's). The stage outline above is the cursor's
+  own presentation (§7), not a selection.
 
 ## 6. The axes (R7)
 
-R7's gizmo is scene geometry, not a screen-space compass: three unit axes drawn from the structure's
-own frame origin, through the same camera as the cells, with the axis names at their projected ends.
+R7's gizmo is a screen-space compass, the way Blender's navigation gizmo is: a small fixed-size triad
+pinned to the main viewport's top-right corner, rotating with the camera and never with the picture.
+It answers one question — *which way is the document's X, Y, Z right now* — and it answers it no
+matter where the structure is panned or how far it is zoomed.
 
 - **The frame it shows is the frame being drawn.** A catalogue page is the identity projection
   (15 §6.1), so the gizmo is the declaration frame: X, Y, Z as the document's axes, not world
   north/east/up. If a surface later draws a posed blueprint, the gizmo reads the drawing's own frame
   and rotates with it — the gizmo never shows a frame the picture does not use.
-- **It is drawn, so it orbits.** The axes are geometry in the scene, transformed by the viewport's
-  camera: orbiting the view turns the axes, zooming scales them with the cells, and they never sit
-  screen-fixed. That is the whole difference between a gizmo and a legend, and it is what makes a
-  rotated view readable.
-- **Where and how big.** The origin is the drawn hull's minimum corner (the structure's own zero), and
-  each axis runs `max(1, 0.25 × diagonal)` cells along its direction. The length follows the structure,
-  not the viewport, so the axes shrink into the picture rather than growing over it; a one-cell page
-  gets one-cell axes.
-- **The labels.** `X`, `Y`, `Z` are drawn as GUI text at each axis's projected end, after the models,
-  with no depth test — a label must be readable through the block in front of it, and a depth-tested
-  label is unreadable exactly where the gizmo is dense (the same choice 16 §10's billboards avoid by
-  drawing in screen space).
+- **It is chrome, not geometry.** The triad lives in the viewport's corner in screen space: an orbit
+  turns it (the camera's rotation is its only input), and a pan, a zoom, a framing flight and a
+  projection switch leave it exactly where it sits. A gizmo that moves with the picture is a second
+  structure to track; a compass that holds its corner is readable at a glance, which is why every
+  modelling tool pins it. The scene carries no axes at the structure's origin — an origin triad
+  collides with the cells it sits inside and zooms away with them, which is the presentation SC6
+  replaces.
+- **Where and how big.** The triad's centre is inset from the main viewport's top-right corner by the
+  chrome margin plus one axis length plus the label pad, so every axis tip and label stays inside the
+  panel; the axis length is a fixed pixel count (`gizmoAxisPx` = 18), independent of the structure,
+  the viewport size and the zoom. A one-cell page and a 400-cell page get the same compass.
+- **How it is drawn.** Each unit axis is rotated by the viewport camera's own rotation (the same
+  rotation §4.1's normal matrix carries, GUI y-down mirror included), the three segments are drawn
+  far-to-near by their view depth so a nearer axis overdraws a farther one, and `X`, `Y`, `Z` are
+  drawn as GUI text at the segment ends with no depth test (§5.3's label rule). The triad draws at
+  `chromeDepth` like the rest of the chrome.
 - **The colours are chrome.** The three axes take the conventional red/green/blue of a 3D editor's
   gizmo. They are scene chrome, never a cell mark colour: 15 §5 owns the mark palette and this document
   adds nothing to it.
 - **The gizmo is the main viewport's.** The three small panels are axis-locked views and are named by
-  their corner label (`front`, `side`, `top`); a second gizmo in a second axis-locked view would be
+  their corner label (`front`, `side`, `top`); a second compass in a second axis-locked view would be
   the same three arrows three more times. R7 asks for the axes, and one honest gizmo is one.
-- **`AxisGizmo` is a pure function of (hull, camera, rect)**: it returns three segments and three label
-  anchors, so a unit test projects a known hull through a known camera and compares the pixels without
-  a client.
+- **`AxisGizmo` is a pure function of (camera, rect)**: it returns three segments and three label
+  anchors, so a unit test turns a known camera and compares the pixels without a client.
 
 ## 7. Stage playback (R8, R10)
 
@@ -576,21 +594,28 @@ hidden — a page must stay legible — and later ones are hidden, because the d
 | any stage | × 1.0 | — |
 | a stage before the cursor (done) | — | × 0.25, the done factor of 16 §6.2 |
 | the cursor's stage, revealed | — | × 1.0 |
-| the cursor's stage, not yet revealed | — | × 0.08, the unrevealed factor of 16 §6.2 |
-| a stage after the cursor (future) | — | not drawn; in **outline** mode a 1-px chrome box at the cell instead |
+| the cursor's stage, not yet revealed | — | not drawn; in **outline** mode a chrome silhouette stroke at the cell instead (§5.3) |
+| a stage after the cursor (future) | — | not drawn; in **outline** mode a chrome silhouette stroke at the cell instead (§5.3) |
 
 - **The reveal set is 16 §6.1's.** The cursor plus the reveal counts decide what is drawn and at which
   factor; a play advances the counts at §7.5's cadence, a stage jump reveals the whole stage, and a
   step reveals one more cell — the same three facts the world's playback keeps, seeded differently
   (§7.1).
+- **A cell pops out of an empty slot.** Where a cell is not yet drawn there is *nothing* — no ghost,
+  no faint copy, no placeholder — so the reveal pop-in (§7.6) reads as a placement into empty space.
+  The screen once kept the cursor stage's unrevealed cells at the session's 0.08 faint factor, and the
+  user read the result as "the block is already there, then it gets placed": a faint model is still a
+  model, and it contradicts the empty slot the pop-in is supposed to fill. The unrevealed factor is
+  gone; "not drawn" means the scene is not asked to draw the cell at all.
 - **Where this table differs from the session's, and why.** 16 §6.2 keeps future cells at 0.08 so the
   blueprint "stays faintly visible"; the screen hides them, because R10's question is *what changed at
   this stage* and a future cell that is merely faint still gives the answer away. The difference is
   deliberate, is confined to this screen, and changes nothing in 16 §6.2 — a session's HUD is about a
   build in progress, a page is about a document.
-- **The outline is chrome, not a mark.** A future cell's box in outline mode is a 1-px outline in the
-  same neutral chrome as the axes and the panel frames, drawn on the cell's projected silhouette like
-  the hover outline (§5.3); 15 §5's mark palette is untouched, and a page has no marks to colour.
+- **The outline is chrome, not a mark.** A not-drawn cell's outline in outline mode is the same
+  smooth silhouette stroke as the hover outline (§5.3), in the same neutral chrome as the axes and
+  the panel frames; 15 §5's mark palette is untouched, and a page has no marks
+  to colour. An outline frames an empty slot without filling it, so it does not break the rule above.
 - **The treatment composes with the explode.** The offset of §8 applies to whichever cells are drawn;
   a hidden cell has no position to offset. It also composes with the hover outline: a hovered cell is
   outlined in every panel, and the outline does not change a cell's alpha.
@@ -653,19 +678,28 @@ The durations are 16 §6.4's, unchanged, and the clock is the screen's own §4.6
 
 | Constant | Value | Meaning here |
 | --- | --- | --- |
-| `cellRevealTicks` | 2 | the nominal gap between two cells of one stage at speed 1.0 |
-| `stageRevealMinTicks` | 10 | the floor for revealing one stage |
-| `stageRevealMaxTicks` | 100 | the ceiling for one stage, so a 400-cell stage does not crawl |
+| `cellRevealTicks` | 2 | one cell's share of its stage's dwell at speed 1.0 |
+| `stageRevealMinTicks` | 10 | the floor of one stage's dwell |
+| `stageRevealMaxTicks` | 100 | the ceiling of one stage's dwell, so a 400-cell stage does not linger |
 | `stagePauseTicks` | 10 | the hold between a finished stage and the next one |
 | `explodeTicks` | 12 | one full explode or collapse (§8.1) |
 | `stageFocusTicks` | 12 | the stage-framing leg below |
 | `popInTicks` | 4 | one cell's own pop-in leg (§7.6) |
 | `popInStartScale` | 0.55 | the scale a popping cell starts at (§7.6) |
 
-- **A stage is revealed over a span, not a per-cell rate.**
-  `clamp(stageCells × cellRevealTicks, stageRevealMinTicks, stageRevealMaxTicks)`, the stage's cells
-  spread evenly across it (16 §6.4's formula, verbatim). The playback's total time is bounded by the
-  stage count, not the cell count.
+- **A play reveals a stage as one batch, then dwells.** The tick a stage begins, every one of its
+  cells is revealed at once — one stage is one placement beat, so the whole batch pops in together
+  (§7.6) and the stage reads as a step, not a trickle. Spreading the cells across the span in payload
+  order (16 §6.4's session formula) was the screen's first reading of the cadence, and the user read
+  the result as "the blocks arrive one by one" — a document's stage is an atomic step of the build's
+  story, and a play that drips it cell by cell narrates an order the document never declared. The
+  span `clamp(stageCells × cellRevealTicks, stageRevealMinTicks, stageRevealMaxTicks)` survives as the
+  stage's **dwell**: the batch pops, the stage holds for the span so a big stage gets more viewing
+  time, `stagePauseTicks` separates it from the next beat, and the cursor moves on. The playback's
+  total time is still bounded by the stage count, not the cell count.
+- **A step is the one exception, and it is manual.** `B` still reveals one cell (§7.3): the viewer
+  asking for a single cell is asking for the drip the play no longer performs, and the batch law is
+  about what the *play* does on its own.
 - **`animation.speed` divides every span** (`ceil(span / speed)`), and `animation.enabled = false`
   reveals a stage, a step and a whole play at once with no fade. Neither key changes a cap, a count or
   an order (16 §13's law; the screen adds no config key of its own).
@@ -691,10 +725,12 @@ scale (so it overshoots a hair before it settles) and `Tween` for both legs — 
 by `animation.speed` like every other span (§7.5); `animation.enabled = false` leaves a zero-length
 leg, so every cell appears at once.
 
-- **The stamp is the reveal.** A cell's pop starts at the tick its reveal happened: the screen records
-  that tick the frame a cell enters the drawn-and-revealed set, so a play staggers the pops by §7.5's
-  own reveal cadence (a stage's cells are spread over its span, in the payload's order) and a stage
-  jump reveals its stage at one tick, so that stage pops together. Nothing else starts a pop.
+- **The stamp is the reveal, and a stage pops as one batch.** A cell's pop starts at the tick its
+  reveal happened: the screen records that tick the frame a cell enters the drawn-and-revealed set.
+  A play reveals a stage at one tick (§7.5), a stage jump and a stage click do the same, so every
+  cell of the stage shares one stamp and the batch's legs run in lockstep — the stage lands as a
+  single placement, which is exactly what "one step completes a batch" means. A `B` step stamps its
+  one cell alone. Nothing else starts a pop.
 - **The whole view pops nothing.** Opening a page, `all`, a variant switch and a page change are the
   whole view or a fresh picture (§7.1, §3.4): every cell is simply there. A cell that leaves the
   revealed set forgets its stamp, so a stage entered again pops again.
@@ -1009,15 +1045,27 @@ document module's own `SC-DOC-*` family (15 §12, D-98).
   this law exists to catch. Vanilla's GUI item lights stay out of the screen; the JEI face keeps its
   own fixed-frame shading and is on the plan's backlog rather than silently sharing the fix.
 - **A projection's depth stays in the pass's band.** Both arms map their models into
-  `[0, sceneSpan]` above `sceneDepth`, the chrome that must stay readable draws above it, and a
-  chrome outline carries its own cell's depth inside it (§4.1, §5.3). A reviewer rejects a hard-coded
+  `[0, sceneSpan]` above `sceneDepth`, and the chrome — the gizmo, the labels and every outline
+  stroke — draws above it with the depth test off (§4.1, §5.3). A reviewer rejects a hard-coded
   depth constant that only makes sense in one arm — the SC1 perspective arm drew its models behind
-  the panel's fill for exactly that reason, and no test caught it until SC5's multi-angle pass.
+  the panel's fill for exactly that reason, and no test caught it until SC5's multi-angle pass — and
+  rejects an outline that depth-tests against the models: SC6's law is that a highlight reads
+  through.
+- **The stage outline is the cursor's shadow.** In the staged view every drawn cell of the cursor's
+  stage carries the silhouette stroke (§5.3), in all four viewports; the whole view has no cursor
+  and no stage outline, and a stage click, an arrow and a play's advance all move the same set. A
+  reviewer rejects a stage highlight that tints or re-shades the cells (the palette is 15 §5's) or
+  one that appears in the whole view.
 - **The pop-in reads the screen's clock, and only its stamp set.** A cell's scale and alpha are
   derived from its reveal stamp and the accumulator (§7.6); the same stamps and the same clock give
   the same frame, a whole view has no stamps at all, and nothing about a pop reaches the wire, the
   world or the session. A reviewer rejects a pop that reads the game tick (a screen pauses it) or a
   tick counter of its own (a second clock beside §4.6).
+- **A play's stage is one batch out of empty slots.** The tick a play begins a stage, every cell of
+  the stage is revealed at once (§7.5), and a cell that is not revealed is not drawn at all — no
+  alpha floor, no ghost, no placeholder (§7.2). A reviewer rejects a per-cell drip inside a play's
+  stage (16 §6.4's spread is a session cadence, not the screen's), any nonzero "unrevealed" alpha
+  constant, and a placeholder drawn where a cell will land.
 - **No world read.** The screen names no `Level`, no `ClientLevel`, no `getBlockState` and no camera
   entity: its only inputs are the catalogue snapshot and its own view state. A reviewer rejects any
   `level` reference in `preview.scene` or `preview.client.screen`.
@@ -1091,6 +1139,7 @@ stays the one place a build is planned (15 §4, 16 §2).
 | SC3 | §9 the links: the JEI button, the client command, the world key, ghost to world and the variant switch |
 | SC4 | §11 the demo content, and the count and documentation close-out |
 | SC5 | §4.1 the lighting law and the depth band, §5.3 the silhouette outline, §7.6 the reveal pop-in |
+| SC6 | §6 the corner compass, §7.2 the empty slot, §7.5 the batch reveal, §5.3 the through-model vector stroke and the stage outline |
 
 SC0 is this file; the gates are the milestone table of
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md), and this file owns the contracts they test.

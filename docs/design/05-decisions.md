@@ -2509,6 +2509,45 @@ recorded as backlog ([docs/plan/screen-plan.md](../plan/screen-plan.md)) rather 
 at all. SC5 gives both arms the same bounded band above the scene's floor (§4.1) and puts the chrome
 above it; the toggle is on the UI, so "exists but draws nothing" is not an acceptable reading of §4.1.
 
+### D-107 — A play reveals a stage as one batch into empty slots, and the chrome reads through
+
+Three presentation laws the user set after watching SC5's build ([design/17](17-preview-screen.md)
+§6, §7.2, §7.5, §5.3). A running play reveals the cursor's stage **as one batch at one tick** — every
+cell pops in together, the span survives only as the stage's dwell — and a cell that is not revealed
+is **not drawn at all**: no faint copy, no placeholder, the pop fills an empty slot. The outlines are
+**smooth vector strokes that read through the models**: each silhouette edge is a 1.5-px quad strip
+between unrounded projected endpoints, drawn at `chromeDepth` with the depth test off, and the
+cursor's stage carries the stroke on every one of its drawn cells so selecting a stage highlights
+exactly the blocks it places. The gizmo leaves the scene for the main viewport's **top-right corner**:
+a fixed-pixel triad rotated by the camera only, Blender's compass, replacing the origin axes that
+zoomed away with the picture.
+
+**Why the batch.** The screen's first cadence spread a stage's cells across the span in payload
+order (16 §6.4's session formula), and the user read it as "the blocks arrive one by one, not one
+step completing a batch". A document's stage is an atomic step of the build's story; a drip narrates
+an order the document never declared, and the stagger made the pop-in invisible in a crowd. The
+manual `B` step keeps the per-cell drip for the viewer who asks for it.
+
+**Why the empty slot.** SC5 kept the session's 0.08 unrevealed alpha on the cursor stage, and the
+user read it as "the block is already there, then it gets placed". A faint model is still a model;
+a placement animation needs an empty place to fill, and 16 §6.2's faint-ghost law is a session's
+answer (the blueprint must stay findable in the world), not a page's.
+
+**Why the stroke reads through.** SC5 put each outline at its cell's nearest depth, so a nearer model
+hid it — honest geometry, and useless exactly where the structure is dense. The outline is a
+statement about a cell, and a statement that vanishes behind the picture is not readable; the same
+report rejected the pixel-row stroke (rounded endpoints stair-step across a diagonal silhouette) in
+favour of the vector strip every modelling tool draws.
+
+**Rejected: outlining the stage's union silhouette instead of its cells.** One outer boundary reads
+cleaner, but it answers "where is the stage's footprint" when the user asked "which blocks are this
+stage's"; per-cell strokes compose with the explode and the pop-in for free, and a union silhouette
+of a scattered stage is a new geometry problem with no vocabulary behind it.
+
+**Rejected: keeping the origin axes beside the compass.** Two axis presentations teach two answers to
+one question; the corner compass is the one that survives a pan, a zoom and a framing flight, so the
+scene carries no axes at all.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2632,6 +2671,12 @@ above it; the toggle is on the UI, so "exists but draws nothing" is not an accep
 - The reveal pop-in is the screen's own stamp set (D-106, design 17 §7.6): a reviewer should reject a
   pop that the payload carries, a pop that reads the game tick, and a whole view that animates on
   open; the JEI face's fixed-frame lighting stays recorded as backlog, not as a reason to change it.
+- A play's stage is one batch into empty slots (D-107, design 17 §7.2/§7.5): a reviewer should reject
+  any per-cell spread inside a running play's stage, any nonzero unrevealed alpha, and a stage whose
+  cells carry different reveal stamps; `B`'s single-cell step is the only drip left.
+- The outlines are strokes that read through (D-107, design 17 §5.3): a reviewer should reject a
+  depth-tested or pixel-snapped outline, and a stage outline in the whole view; the gizmo is a pure
+  function of (camera, rect), and a hull in its argument list is the old scene axes returning.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is
