@@ -1528,6 +1528,8 @@ package dev.vfyjxf.cumulus.mc.preview.scene;
 public final class PreviewScene {
 
     public static final int sceneDepth;
+    public static final int sceneSpan;
+    public static final int chromeDepth;
 
     public record Cell(GhostCell ghost, @Nullable BlockState state) { }
 
@@ -1539,7 +1541,7 @@ public final class PreviewScene {
 
     public record Panel(int cells, int layer) { }
 
-    public record Sight(float alpha, float dx, float dy, float dz) {
+    public record Sight(float alpha, float scale, float dx, float dy, float dz) {
         public static final Sight full;
     }
 
@@ -1562,6 +1564,38 @@ public final class PreviewScene {
     public Panel draw(GuiGraphics graphics, Fit fit, Treatment treatment);
     public Hull hull(int stage);
     public static boolean draws(Cell cell);
+}
+
+// The scene's directional light of design 17 §4.1: the level pass's two world directions seen through
+// one panel's camera, and the camera's rotation and mirror as the pass's normal matrix.
+public final class SceneLighting {
+    public static final float ambient;
+    public static final float diffuse;
+    public static Vector3f[] forCamera(SceneCamera camera);
+    public static Matrix3f normals(SceneCamera camera);
+    public static float brightness(float x, float y, float z);
+    public static float brightness(Vector3f normal, Vector3f light0, Vector3f light1);
+}
+
+// One cell's chrome outline of design 17 §5.3: the convex hull of the eight projected corners and the
+// nearest corner's GUI depth, so the outline wraps its own cell and a nearer model still hides it.
+public record CellOutline(java.util.List<Vector2f> points, float depth) {
+    public static CellOutline of(Fit fit, LatticePoint at, float dx, float dy, float dz, float scale);
+}
+
+// The staged playback's pop-in of design 17 §7.6: one stamp per revealed cell, two eased legs sampled
+// from the screen's clock.
+public final class PopIn {
+    public static final float startScale;
+    public static final int popInTicks;
+    public static PopIn none();
+    public static Tween scaleLeg(int durationTicks);
+    public static Tween alphaLeg(int durationTicks);
+    public PopIn advance(java.util.Set<GhostCell> revealed, double now);
+    public boolean animating(GhostCell cell, double now, int durationTicks);
+    public float scale(GhostCell cell, double now, Tween leg);
+    public float alpha(GhostCell cell, double now, Tween leg);
+    public int count();
 }
 
 public final class BlueprintPreviewRecipe {
@@ -1754,6 +1788,7 @@ public final class PreviewScreen extends Screen {
     public SceneCamera camera();
     public ScreenLayout layout();
     public PreviewScene scene();
+    public @Nullable SceneCamera panelCamera(int panel);
     public int drawnCells();
     public @Nullable PreviewScene.Cell hovered();
     public ScreenClock clock();
@@ -1772,12 +1807,18 @@ public final class PreviewScreen extends Screen {
     public boolean framingArmed();
     public int drawnLabels();
     public int drawnFutureBoxes();
+    public @Nullable Shading shading(int panel);
+    public @Nullable CellOutline hoverOutline(int panel);
+    public float scaleOf(GhostCell ghost);
+    public int animatingCells();
     public @Nullable Rect buttonRect(String label);
     public java.util.List<String> buttonLabels();
     public Heading heading();
     public @Nullable String variantLine();
     public int variantCount();
     public int variantIndex();
+
+    public record Shading(float down, float up, float north, float south, float west, float east) { }
 }
 
 // The screen's own clock of design 17 §4.6: a fractional tick accumulator, fed by the frame's
@@ -2671,8 +2712,13 @@ payload's `facing` (a trailing optional byte, so an older client's open reads as
 in-screen variant switch (a client-side entry replacement that keeps the camera, the explode `t` and
 the whole/staged presentation). SC4 has landed the demo documents: `demo_machine` and
 `demo_machine_compact` as one variant group and the standalone `demo_tower`, shipped under
-`data/structurecumulus/cumulus/structure/` so every catalogue carries them (design 17 §11). The
-milestone state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
+`data/structurecumulus/cumulus/structure/` so every catalogue carries them (design 17 §11). SC5 has
+landed the rendering fixes: the world-fixed scene light and its normal matrix (`SceneLighting`), the
+bounded depth band both projections share, the silhouette hover/future outline (`CellOutline`, with
+`PreviewScreen.hoverOutline` and `shading` telling the harness what was drawn) and the staged
+playback's pop-in (`PopIn`, with `scaleOf` and `animatingCells`). The JEI face keeps its own fixed-frame
+shading; that change is backlog, not this milestone (§13, D-106). The milestone state lives in
+[`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
 record every surface shares.
@@ -2707,6 +2753,9 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the four delta treatments and the reveal counts of design 17 §7, as a pure state machine |
 | `preview.scene` | `NextStepLine` | 16 §12.3's next-step line, the pack's one formatter: the world's HUD and the screen's summary line both read it |
 | `preview.scene` | `AxisGizmo` | the three axes and their label anchors, projected through a camera |
+| `preview.scene` | `SceneLighting` | the scene's world-fixed two-light law of design 17 §4.1, as a pure function of a camera |
+| `preview.scene` | `CellOutline` | one cell's projected silhouette and its nearest GUI depth, the hover and future-cell chrome outline of design 17 §5.3 |
+| `preview.scene` | `PopIn` | the staged playback's pop-in of design 17 §7.6: per-cell reveal stamps and the two eased legs |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
 | `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
 | `preview.client.screen` | `ScreenClock` | the screen's own two-number clock of design 17 §4.6, advanced by the frame's real-time tick delta |
@@ -2732,8 +2781,14 @@ for the rest of that play-through without pausing the play.
 
 **The scene's GUI depth layer.** Every screen viewport draws its models at `PreviewScene.sceneDepth`
 (the same 150 the JEI view uses) so the whole scene sits in front of the screen's background and of a
-panel's own fill; the gizmo, the part labels, the hover box and the future-cell boxes ride just in
-front of the models, and a chrome box carries its own cell's depth so a nearer model still hides it.
+panel's own fill, inside a bounded band (`PreviewScene.sceneSpan` above it) that both projections map
+into: the orthographic arm compresses the page's own view depth, and the perspective arm fits its
+near/far planes to the drawn hull so its ndc depth lands in the same band. The gizmo and the part
+labels ride above the band at `PreviewScene.chromeDepth`; the hover outline and the future-cell
+outlines carry their own cell's nearest depth inside the band, so a nearer model still hides an
+outline that belongs behind it. The lighting is design 17 §4.1's: the pass installs the world's two
+diffuse directions in the panel's frame and the camera's rotation as the normal matrix
+(`SceneLighting`), never the pose's inverse transpose and never `Lighting.setupFor3DItems()`.
 
 **What the screen never does.** It reads no world state (no `Level`, no `ClientLevel`, no
 `getBlockState`, no camera entity) and no session: its only input is `PreviewCatalogClient`'s

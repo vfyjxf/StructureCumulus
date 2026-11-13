@@ -4,6 +4,8 @@ import org.joml.Vector2f;
 import org.joml.Vector4f;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -115,6 +117,30 @@ class FitTest {
         Vector4f near = fit.matrix().transform(new Vector4f(2.0F, 2.0F, 4.0F, 1.0F));
         Vector4f far = fit.matrix().transform(new Vector4f(2.0F, 2.0F, 0.0F, 1.0F));
         assertTrue(near.z / near.w > far.z / far.w, "the perspective depth says nearer is larger");
+    }
+
+    @Test
+    void bothProjectionsKeepTheModelsInsideTheSceneBand() {
+        Hull big = new Hull(0.0F, 0.0F, 0.0F, 4.0F, 4.0F, 4.0F);
+        SceneCamera orthographic = SceneCamera.isometric().frame(big, 1.0F);
+        SceneCamera perspective = SceneCamera.isometric().withProjection(SceneCamera.Projection.perspective, big)
+                .frame(big, 1.0F);
+        for (SceneCamera camera : List.of(orthographic, perspective)) {
+            Fit fit = Fit.of(big, 0, 0, 200, 200, camera);
+            for (int corner = 0; corner < 8; corner++) {
+                Vector4f clip = fit.matrix().transform(
+                    new Vector4f(
+                        (corner & 1) == 0 ? 2.0F : 3.0F,
+                        (corner & 2) == 0 ? 2.0F : 3.0F,
+                        (corner & 4) == 0 ? 2.0F : 3.0F,
+                        1.0F
+                    )
+                );
+                float z = clip.z / clip.w;
+                assertTrue(z > 0.0F && z < PreviewScene.sceneSpan, camera.projection() + " z=" + z);
+            }
+        }
+        assertTrue(PreviewScene.chromeDepth > PreviewScene.sceneDepth + PreviewScene.sceneSpan);
     }
 
     private static void assertMatrixPoint(float x, float y, Fit fit, float worldX, float worldY, float worldZ) {

@@ -233,6 +233,24 @@ value plus a number.
   far-to-near by depth inside the GUI pass, flushed with `BufferSource.endBatch()` and **not**
   `GuiGraphics.flush()` (whose contract disables the depth test around the batch). The screen adds no
   renderer of its own: it hands the scene a rectangle and a camera.
+- **The scene's light is the world's, not the GUI item's.** A cell is lit by the level pass's two
+  world diffuse directions (the same pair `Lighting.setupLevel` installs), rotated into each panel's
+  camera frame and mirrored by the GUI's y-down axis, so a face's brightness is a property of the face:
+  the top is the brightest, the two north/south sides the mid tone, the two east/west sides the dark
+  tone, and the floor the ambient floor — identical in all four viewports and unchanged by any orbit,
+  zoom or projection switch. Vanilla's GUI item lighting (`Lighting.setupFor3DItems`) pins the light
+  directions to the fixed inventory-item frame, so a rotated scene would shade a face by accident; the
+  screen does not use it. The normal matrix the pass installs is the camera's rotation and mirror, not
+  the pose's inverse transpose — the pose also carries the pixel scale and the projection, and their
+  normal transform would rotate every face toward the view's depth axis, which is exactly the
+  "unshaded, then black" defect SC5 fixes.
+- **The pass's depth band.** The model pass occupies a bounded band above `sceneDepth` in both
+  projections: the orthographic arm compresses the page's own view depth into it, and the perspective
+  arm fits its near/far planes to the drawn hull and maps its ndc depth into the same band. Chrome that
+  must be readable — the gizmo and the part labels — draws above the band (`chromeDepth`), and the
+  hover and future-cell outlines carry their own cell's nearest depth inside it, so a nearer model
+  still hides an outline that belongs behind it. A projection's depth never leaks into another draw:
+  the band is the one contract both arms keep (§13).
 
 ### 4.2 `SceneCamera`
 
@@ -477,6 +495,14 @@ What is shared and what is not, stated once:
 - **The outline is drawn in all four.** The hovered cell gets a 1-px chrome outline in every viewport
   it appears in (a panel that does not contain it draws nothing), because the point of four views is
   to find one cell in three planes at once.
+- **The outline is the cell's silhouette, not its screen box.** The outline is the convex hull of the
+  eight projected corners of the cell's cube — six vertices at the isometric default, four in an
+  axis-locked view — drawn as a 1-px chrome polygon. The bounding rectangle of those corners is not
+  the cell: at 45° it is a wider rectangle whose corners float in empty space, which is the frame the
+  SC5 defect report named.
+- **The outline rides at its own cell's nearest depth.** It carries the largest GUI depth of the
+  cell's eight corners (larger is nearer), so it is not swallowed by the cell it wraps while a nearer
+  model still hides it (§4.1's band, adapter §20).
 - **The tooltip is 15 §6.2's content plus the owning stage's name** — block id, property values, and
   the stage that owns the cell (16 §11's own tooltip) — drawn near the cursor inside the screen. It is
   a rendering of payload fields and a stage name, not document text: no 16 §10 display point is added.
@@ -562,9 +588,9 @@ hidden — a page must stay legible — and later ones are hidden, because the d
   this stage* and a future cell that is merely faint still gives the answer away. The difference is
   deliberate, is confined to this screen, and changes nothing in 16 §6.2 — a session's HUD is about a
   build in progress, a page is about a document.
-- **The outline is chrome, not a mark.** A future cell's box in outline mode is a 1-px box in the same
-  neutral chrome as the axes and the panel frames; 15 §5's mark palette is untouched, and a page has
-  no marks to colour.
+- **The outline is chrome, not a mark.** A future cell's box in outline mode is a 1-px outline in the
+  same neutral chrome as the axes and the panel frames, drawn on the cell's projected silhouette like
+  the hover outline (§5.3); 15 §5's mark palette is untouched, and a page has no marks to colour.
 - **The treatment composes with the explode.** The offset of §8 applies to whichever cells are drawn;
   a hidden cell has no position to offset. It also composes with the hover outline: a hovered cell is
   outlined in every panel, and the outline does not change a cell's alpha.
@@ -633,6 +659,8 @@ The durations are 16 §6.4's, unchanged, and the clock is the screen's own §4.6
 | `stagePauseTicks` | 10 | the hold between a finished stage and the next one |
 | `explodeTicks` | 12 | one full explode or collapse (§8.1) |
 | `stageFocusTicks` | 12 | the stage-framing leg below |
+| `popInTicks` | 4 | one cell's own pop-in leg (§7.6) |
+| `popInStartScale` | 0.55 | the scale a popping cell starts at (§7.6) |
 
 - **A stage is revealed over a span, not a per-cell rate.**
   `clamp(stageCells × cellRevealTicks, stageRevealMinTicks, stageRevealMaxTicks)`, the stage's cells
@@ -653,6 +681,34 @@ The durations are 16 §6.4's, unchanged, and the clock is the screen's own §4.6
 - **The clock is advanced once per frame from the real-time delta** (§4.6), never from a render count:
   a frame that consumed no game tick still advances the screen's accumulator, which is exactly why
   the screen has one.
+
+### 7.6 The reveal pop-in (R8)
+
+A cell that becomes revealed is **placed**, not switched on: it grows from `popInStartScale` = 0.55 to
+1.0 about its own centre while its alpha fades from 0 to the treatment's factor, over `popInTicks` = 4
+ticks, sampled from the screen's clock. The two legs are the cine core's — `Ease.outBack` for the
+scale (so it overshoots a hair before it settles) and `Tween` for both legs — and the constants divide
+by `animation.speed` like every other span (§7.5); `animation.enabled = false` leaves a zero-length
+leg, so every cell appears at once.
+
+- **The stamp is the reveal.** A cell's pop starts at the tick its reveal happened: the screen records
+  that tick the frame a cell enters the drawn-and-revealed set, so a play staggers the pops by §7.5's
+  own reveal cadence (a stage's cells are spread over its span, in the payload's order) and a stage
+  jump reveals its stage at one tick, so that stage pops together. Nothing else starts a pop.
+- **The whole view pops nothing.** Opening a page, `all`, a variant switch and a page change are the
+  whole view or a fresh picture (§7.1, §3.4): every cell is simply there. A cell that leaves the
+  revealed set forgets its stamp, so a stage entered again pops again.
+- **The scale is about the cell's centre.** The model is scaled uniformly around the centre of its
+  unit cube, so a popping cell shrinks toward its own middle rather than toward a corner; the pass's
+  light is unaffected because a uniform scale is not a normal transform (§4.1).
+- **It is view state and it dies with the screen.** The stamps are the screen's, never the payload's:
+  the wire carries cells and stages, and a pop-in is a way of showing a reveal, not a new fact about
+  the document. The pop composes with the explode (a popping cell is drawn at its offset) and with the
+  hover outline (the outline follows the shrunken silhouette).
+- **It is the world pop-in read for a screen, not a second animation system.** The world's E2 pop-in
+  (16 §9.2) grows a ghost 0.5 → 1.0 over 6 ticks in the level pass; the screen's is the same idea with
+  its own constant and its own channel (a scale inside the GUI pose), and neither reuses the other's
+  code.
 
 ## 8. The exploded view (R9)
 
@@ -945,6 +1001,23 @@ document module's own `SC-DOC-*` family (15 §12, D-98).
 - **The clock is the screen's two numbers.** The accumulator and its fraction are the only time the
   screen has (§4.6); the same accumulator and the same fraction give the same frame, and nothing on
   the screen reads `System.currentTimeMillis` or a frame count.
+- **The shading is a function of the face, not of the camera.** A reviewer verifies that a world
+  face's brightness is the same in all four panels and under every orbit, zoom and projection
+  (§4.1): the scene installs the world's two lights in each panel's frame, and it installs its own
+  normal matrix. A call to `Lighting.setupFor3DItems()` in the scene pass, a normal matrix taken from
+  the pose's inverse transpose, or a `Fit` z scale that disagrees with its x/y scale is the defect
+  this law exists to catch. Vanilla's GUI item lights stay out of the screen; the JEI face keeps its
+  own fixed-frame shading and is on the plan's backlog rather than silently sharing the fix.
+- **A projection's depth stays in the pass's band.** Both arms map their models into
+  `[0, sceneSpan]` above `sceneDepth`, the chrome that must stay readable draws above it, and a
+  chrome outline carries its own cell's depth inside it (§4.1, §5.3). A reviewer rejects a hard-coded
+  depth constant that only makes sense in one arm — the SC1 perspective arm drew its models behind
+  the panel's fill for exactly that reason, and no test caught it until SC5's multi-angle pass.
+- **The pop-in reads the screen's clock, and only its stamp set.** A cell's scale and alpha are
+  derived from its reveal stamp and the accumulator (§7.6); the same stamps and the same clock give
+  the same frame, a whole view has no stamps at all, and nothing about a pop reaches the wire, the
+  world or the session. A reviewer rejects a pop that reads the game tick (a screen pauses it) or a
+  tick counter of its own (a second clock beside §4.6).
 - **No world read.** The screen names no `Level`, no `ClientLevel`, no `getBlockState` and no camera
   entity: its only inputs are the catalogue snapshot and its own view state. A reviewer rejects any
   `level` reference in `preview.scene` or `preview.client.screen`.
@@ -1017,6 +1090,7 @@ stays the one place a build is planned (15 §4, 16 §2).
 | SC2 | §7 the stage playback, §8 the exploded view |
 | SC3 | §9 the links: the JEI button, the client command, the world key, ghost to world and the variant switch |
 | SC4 | §11 the demo content, and the count and documentation close-out |
+| SC5 | §4.1 the lighting law and the depth band, §5.3 the silhouette outline, §7.6 the reveal pop-in |
 
 SC0 is this file; the gates are the milestone table of
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md), and this file owns the contracts they test.

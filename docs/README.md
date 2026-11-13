@@ -100,7 +100,9 @@ Then the module files, in dependency order:
   per-bay exploded view, SC3 the five entry links (JEI's button, the client command, the `O` world key,
   ghost to world with the screen's heading, the in-screen variant switch) and SC4 the demo content
   (three demonstration documents in `src/main/resources`, their compile and catalogue tests, and the
-  tour's catalogue act) are on the tree.
+  tour's catalogue act), and SC5 the rendering fixes (the world-fixed scene light and its normal
+  matrix, the silhouette hover outline, the bounded depth band both projections share, and the staged
+  playback's reveal pop-in) are on the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`

@@ -15,13 +15,16 @@ import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
 import dev.vfyjxf.cumulus.mc.preview.scene.AxisGizmo;
+import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
 import dev.vfyjxf.cumulus.mc.preview.scene.NextStepLine;
+import dev.vfyjxf.cumulus.mc.preview.scene.PopIn;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene.Cell;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
+import dev.vfyjxf.cumulus.mc.preview.scene.SceneLighting;
 import dev.vfyjxf.cumulus.mc.preview.scene.StagePlayback;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -29,14 +32,19 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
+import org.joml.Matrix3f;
 import org.joml.Vector2f;
+import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The catalogue page as a room (design 17 §5): one main viewport the viewer owns and three
@@ -108,6 +116,12 @@ public final class PreviewScreen extends Screen {
     private @Nullable StageFraming framing;
     private boolean framingArmed = true;
     private int framedCursor = -1;
+    private PopIn popIn = PopIn.none();
+    private Tween popScaleLeg = PopIn.scaleLeg(0);
+    private Tween popAlphaLeg = PopIn.alphaLeg(0);
+    private int animatingCells;
+    private final Map<Panel, Shading> shading = new EnumMap<>(Panel.class);
+    private final Map<Panel, CellOutline> outlines = new EnumMap<>(Panel.class);
 
     private PreviewScreen(Entry entry) {
         super(Component.literal(entry.blueprintId().text()));
@@ -177,6 +191,7 @@ public final class PreviewScreen extends Screen {
         float delta = Minecraft.getInstance().getTimer().getRealtimeDeltaTicks();
         clock = clock.advance(delta);
         playback = playback.advance(delta, cadence());
+        tickPopIn();
         tickExplode();
         tickFraming();
         double cursorX = pointerX < 0.0D ? mouseX : pointerX;
@@ -532,7 +547,7 @@ public final class PreviewScreen extends Screen {
         return ExplodeModel.of(stages(), drawn, scene.hull());
     }
 
-    /** One cell's treatment: the stage's alpha and the explode's displacement (design 17 §7.2, §8.1). */
+    /** One cell's treatment: the stage's alpha, the pop-in's scale and the explode's offset (§7.2, §7.6, §8.1). */
     private PreviewScene.@Nullable Sight sightOf(Cell cell) {
         StagePlayback.Placed placedCell = placed.get(cell.ghost());
         if (placedCell == null) {
@@ -542,7 +557,48 @@ public final class PreviewScreen extends Screen {
             return null;
         }
         ExplodeModel.Offset offset = explode.offset(cell.ghost(), explodeT);
-        return new PreviewScene.Sight(playback.alpha(placedCell), offset.x(), offset.y(), offset.z());
+        double now = clock.time();
+        GhostCell ghost = cell.ghost();
+        float alpha = playback.alpha(placedCell) * popIn.alpha(ghost, now, popAlphaLeg);
+        float scale = popIn.scale(ghost, now, popScaleLeg);
+        return new PreviewScene.Sight(alpha, scale, offset.x(), offset.y(), offset.z());
+    }
+
+    /**
+     * One frame of the pop-in (design 17 §7.6): a cell newly revealed since the last frame takes the
+     * clock's current tick as its reveal stamp, and a whole view pops nothing.
+     */
+    private void tickPopIn() {
+        int duration = popInTicks();
+        popScaleLeg = PopIn.scaleLeg(duration);
+        popAlphaLeg = PopIn.alphaLeg(duration);
+        double now = clock.time();
+        popIn = playback.wholeView() ? PopIn.none() : popIn.advance(revealedNow(), now);
+        int animating = 0;
+        for (StagePlayback.Placed cell : placed.values()) {
+            if (playback.drawn(cell) && popIn.animating(cell.ghost(), now, duration)) {
+                animating++;
+            }
+        }
+        animatingCells = animating;
+    }
+
+    /** The page's drawn-and-revealed cells: the set the pop-in stamps. */
+    private Set<GhostCell> revealedNow() {
+        Set<GhostCell> revealed = new HashSet<>();
+        for (StagePlayback.Placed cell : placed.values()) {
+            if (playback.drawn(cell) && playback.revealed(cell)) {
+                revealed.add(cell.ghost());
+            }
+        }
+        return revealed;
+    }
+
+    /** The pop-in's span, speed divided, zero when the animation is off (design 17 §7.5). */
+    private int popInTicks() {
+        return ClientConfig.animationEnabled()
+                ? Math.max(1, (int) Math.ceil(PopIn.popInTicks / ClientConfig.animationSpeed()))
+                : 0;
     }
 
     private List<ButtonSpec> buttonSpecs() {
@@ -702,25 +758,26 @@ public final class PreviewScreen extends Screen {
         Fit fit = fitFor(panel);
         graphics.enableScissor(rect.x(), rect.y(), rect.x() + rect.width(), rect.y() + rect.height());
         drawnCells += scene.draw(graphics, fit, this::sightOf).cells();
+        shading.put(panel, shadingOf(fit.camera()));
+        outlines.remove(panel);
         drawFutureBoxes(graphics, fit);
         if (panel == Panel.main) {
             graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + 10.0F);
+            graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
             drawGizmo(graphics, fit.camera(), rect);
             graphics.pose().popPose();
         }
         if (hovered != null) {
             PreviewScene.Sight sight = sightOf(hovered);
             if (sight != null) {
-                Box box = boxOf(fit, hovered, sight);
-                graphics.pose().pushPose();
-                graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + box.depth());
-                drawBox(graphics, box.left(), box.top(), box.width(), box.height(), outlineColor);
-                graphics.pose().popPose();
+                CellOutline outline = CellOutline
+                        .of(fit, hovered.ghost().cell(), sight.dx(), sight.dy(), sight.dz(), sight.scale());
+                outlines.put(panel, outline);
+                drawOutline(graphics, outline, outlineColor);
             }
         }
         graphics.pose().pushPose();
-        graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + 10.0F);
+        graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
         drawLabels(graphics, fit);
         graphics.pose().popPose();
         graphics.disableScissor();
@@ -729,7 +786,25 @@ public final class PreviewScreen extends Screen {
         }
     }
 
-    /** Outline mode's 1-px chrome box at a future cell (design 17 §7.2). */
+    /** The shading one panel installed this frame: the six world faces, in {@code Direction}'s order. */
+    private static Shading shadingOf(SceneCamera camera) {
+        Matrix3f normals = SceneLighting.normals(camera);
+        Vector3f[] lights = SceneLighting.forCamera(camera);
+        return new Shading(
+            face(normals, lights, 0.0F, -1.0F, 0.0F),
+            face(normals, lights, 0.0F, 1.0F, 0.0F),
+            face(normals, lights, 0.0F, 0.0F, -1.0F),
+            face(normals, lights, 0.0F, 0.0F, 1.0F),
+            face(normals, lights, -1.0F, 0.0F, 0.0F),
+            face(normals, lights, 1.0F, 0.0F, 0.0F)
+        );
+    }
+
+    private static float face(Matrix3f normals, Vector3f[] lights, float x, float y, float z) {
+        return SceneLighting.brightness(normals.transform(new Vector3f(x, y, z)), lights[0], lights[1]);
+    }
+
+    /** Outline mode's 1-px chrome outline at a future cell (design 17 §7.2). */
     private void drawFutureBoxes(GuiGraphics graphics, Fit fit) {
         if (!outline) {
             return;
@@ -742,13 +817,23 @@ public final class PreviewScreen extends Screen {
             if (placedCell == null || playback.drawn(placedCell)) {
                 continue;
             }
-            Box box = boxOf(fit, cell, new PreviewScene.Sight(1.0F, 0.0F, 0.0F, 0.0F));
-            graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, PreviewScene.sceneDepth + box.depth());
-            drawBox(graphics, box.left(), box.top(), box.width(), box.height(), chromeColor);
-            graphics.pose().popPose();
+            drawOutline(graphics, CellOutline.of(fit, cell.ghost().cell(), 0.0F, 0.0F, 0.0F, 1.0F), chromeColor);
             drawnFutureBoxes++;
         }
+    }
+
+    /** One cell's chrome outline: a 1-px polygon on the cell's own silhouette, at its nearest depth. */
+    private static void drawOutline(GuiGraphics graphics, CellOutline outline, int color) {
+        graphics.pose().pushPose();
+        graphics.pose()
+                .translate(0.0F, 0.0F, PreviewScene.sceneDepth + outline.depth() + PreviewScene.sceneSpan * 0.002F);
+        List<Vector2f> points = outline.points();
+        for (int index = 0; index < points.size(); index++) {
+            Vector2f from = points.get(index);
+            Vector2f to = points.get((index + 1) % points.size());
+            line(graphics, Math.round(from.x), Math.round(from.y), Math.round(to.x), Math.round(to.y), color);
+        }
+        graphics.pose().popPose();
     }
 
     /** Every part's name on its moved centroid, faded with `t` (design 17 §8.2). */
@@ -820,40 +905,8 @@ public final class PreviewScreen extends Screen {
         }
     }
 
-    /** The 1-px chrome box around one cell at its current displacement. */
-                                                                           /** One cell's 2D chrome box: the rectangle and the depth the model of that cell draws at. */
-    private record Box(int left, int top, int width, int height, float depth) {}
-
-    private static Box boxOf(Fit fit, Cell cell, PreviewScene.Sight sight) {
-        LatticePoint at = cell.ghost().cell();
-        float minX = Float.MAX_VALUE;
-        float minY = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE;
-        float maxY = -Float.MAX_VALUE;
-        for (int corner = 0; corner < 8; corner++) {
-            Vector2f point = fit.project(
-                at.x() + sight.dx() + ((corner & 1) == 0 ? 0.0F : 1.0F),
-                at.y() + sight.dy() + ((corner & 2) == 0 ? 0.0F : 1.0F),
-                at.z() + sight.dz() + ((corner & 4) == 0 ? 0.0F : 1.0F)
-            );
-            minX = Math.min(minX, point.x);
-            maxX = Math.max(maxX, point.x);
-            minY = Math.min(minY, point.y);
-            maxY = Math.max(maxY, point.y);
-        }
-        float depth = fit.depth(at.x() + 0.5F + sight.dx(), at.y() + 0.5F + sight.dy(), at.z() + 0.5F + sight.dz());
-        return new Box(
-            Math.round(minX),
-            Math.round(minY),
-            Math.round(maxX) - Math.round(minX),
-            Math.round(maxY) - Math.round(minY),
-            depth + 0.5F
-        );
-    }
-
-    private static void drawBox(GuiGraphics graphics, int left, int top, int width, int height, int color) {
-        outlineBox(graphics, left, top, width, height, color);
-    }
+    /** The six world faces in {@code Direction}'s declaration order, shaded as the panel installed them. */
+    public record Shading(float down, float up, float north, float south, float west, float east) {}
 
     private static void outlineBox(GuiGraphics graphics, int left, int top, int width, int height, int color) {
         int right = left + width;
@@ -986,6 +1039,7 @@ public final class PreviewScreen extends Screen {
         }
         placed = index(playback);
         ghostAt = ghosts(updated.cells());
+        popIn = PopIn.none();
         explode = explodeModel();
         if (!explode.separable()) {
             explodeT = 0.0F;
@@ -1121,6 +1175,12 @@ public final class PreviewScreen extends Screen {
         return scene;
     }
 
+    /** The camera one panel draws through, indexed main, front, side, top (design 17 §5.2). */
+    public @Nullable SceneCamera panelCamera(int panel) {
+        Panel[] panels = Panel.values();
+        return panel < 0 || panel >= panels.length ? null : cameraFor(currentCamera(), panels[panel]);
+    }
+
     /** The drawn cell count of the last frame, summed over the panels. */
     public int drawnCells() {
         return drawnCells;
@@ -1211,6 +1271,31 @@ public final class PreviewScreen extends Screen {
     /** The number of future-cell outline boxes drawn in the last frame (§7.2). */
     public int drawnFutureBoxes() {
         return drawnFutureBoxes;
+    }
+
+    /**
+     * The shading one panel installed in the last frame, or null before its first draw: the six world
+     * faces in {@code Direction}'s order. Panels are indexed main, front, side, top (design 17 §4.1).
+     */
+    public @Nullable Shading shading(int panel) {
+        Panel[] panels = Panel.values();
+        return panel < 0 || panel >= panels.length ? null : shading.get(panels[panel]);
+    }
+
+    /** The hovered cell's chrome outline as one panel drew it last frame, or null when it drew none. */
+    public @Nullable CellOutline hoverOutline(int panel) {
+        Panel[] panels = Panel.values();
+        return panel < 0 || panel >= panels.length ? null : outlines.get(panels[panel]);
+    }
+
+    /** The pop-in scale of one cell as of the last frame; 1.0 when it is not popping (§7.6). */
+    public float scaleOf(GhostCell ghost) {
+        return popIn.scale(ghost, clock.time(), popScaleLeg);
+    }
+
+    /** How many drawn cells were inside their pop-in in the last frame (§7.6). */
+    public int animatingCells() {
+        return animatingCells;
     }
 
     /** The rectangle one control-strip button occupies, or null when the label is not on the strip. */

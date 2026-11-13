@@ -2465,6 +2465,50 @@ catalogue test that all three ids reach the payload. A reviewer rejects a demo t
 identity orientation — it would be absent from every page — and one that declares a single bay for
 several parts, which would leave the exploded view with nothing to separate.
 
+### D-106 — The screen's scene is lit by the world, and a reveal pops in
+
+The preview screen's scene pass installs the level pass's two world diffuse directions, rotated into
+each panel's camera frame with the GUI's y-down mirror, and installs the camera's rotation as the
+pass's normal matrix ([design/17](17-preview-screen.md) §4.1). A face's brightness is therefore a
+property of the face — the same in all four viewports and under every orbit, zoom and projection
+switch — which is how the world's ghosts and a real build are read. Vanilla's GUI item lighting
+(`Lighting.setupFor3DItems`, a fixed inventory-item frame) is not used by the screen. The reveal
+animation is a pop-in: a cell grows from scale 0.55 to 1.0 about its centre and fades in over four
+ticks, sampled from the screen's clock, stamped at the tick its reveal happened (§7.6); the whole
+view pops nothing.
+
+**Why the world's light.** The screen's models orbit, and the GUI item frame is fixed: reusing it
+makes a face's brightness depend on the camera, which is the SC5 defect (all visible faces collapsing
+to the ambient floor, then some going black). The level pass's two directions are the pack's own
+rendering vocabulary (design 16 §9's ghosts read the same two), and an orbit that changes a face's
+brightness is a renderer telling the viewer something false about the block.
+
+**Why a normal matrix, not a pose change.** The pose also carries the pixel scale and the projection;
+its inverse-transpose rotates every face toward the view's depth axis. The pass owns the normal
+matrix for the same reason it owns the lights: both are statements about the picture, and neither is a
+property of the projection. A reviewer should reject a "fix" that makes the pose's z scale uniform
+just to please the normal matrix: that would deepen the GUI depth by the fit scale and force the
+chrome's depth layer to move with it.
+
+**Why the pop-in is the screen's, with its own constant.** The world's E2 pop-in grows 0.5 → 1.0 over
+six ticks in the level pass on a translucent copy (16 §9.2); a screen cell is the real model in the
+GUI pass, at 0.55 and four ticks, stamped by the reveal. Reusing E2's code would drag a world render
+channel into a screen, and reusing its constant would make a four-tick GUI reveal depend on a
+world-render tuning.
+
+**Rejected: a second clock for the pop-in.** The screen pauses the game, so the pop-in reads §4.6's
+accumulator; a per-animation tick counter is the two-time-sources defect D-103 already rejects.
+
+**Rejected: changing the JEI face with the screen.** The JEI face keeps its own yaw/pitch and its fixed
+frame lighting; its visible faces read "bright and flat" rather than broken, and the user did not
+report it. Moving it to the world law is a behaviour change the user has not asked for, so it is
+recorded as backlog ([docs/plan/screen-plan.md](../plan/screen-plan.md)) rather than ridden along.
+
+**Rejected: the perspective arm staying behind the panel.** The SC1 perspective arm put its models at
+`-5000 × ndc` in the GUI's depth, behind the panel's fill, so the alternate projection drew no model
+at all. SC5 gives both arms the same bounded band above the scene's floor (§4.1) and puts the chrome
+above it; the toggle is on the UI, so "exists but draws nothing" is not an acceptable reading of §4.1.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
@@ -2581,6 +2625,13 @@ several parts, which would leave the exploded view with nothing to separate.
 - The client command's `screen` literal shadows a server blueprint whose unqualified id is literally
   `screen` (D-101, design 17 §9.2): one id pays for a command with no packet and no permission model,
   and a reviewer should not "fix" it by moving the command to the server.
+- The screen's scene light is the world's (D-106): a reviewer should check that no screen pass calls
+  `Lighting.setupFor3DItems()`, that the normal matrix is the camera's rotation and mirror rather than
+  the pose's inverse transpose, and that a face's brightness is equal in all four panels — the two
+  defects SC5 fixed are both invisible to a single-angle screenshot.
+- The reveal pop-in is the screen's own stamp set (D-106, design 17 §7.6): a reviewer should reject a
+  pop that the payload carries, a pop that reads the game tick, and a whole view that animates on
+  open; the JEI face's fixed-frame lighting stays recorded as backlog, not as a reason to change it.
 
 > Numbering note: D-46's code landed with the baseline before its decision was written down; the entry
 > above records it, and the proposal that carried it is

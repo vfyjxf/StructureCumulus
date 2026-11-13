@@ -48,6 +48,11 @@ one git index). SC4 needs SC2's playback and explode to have something to demo.
 - **Localisation** of the screen's vocabulary (design 16 §16's C.5).
 - **A display mechanism for "a small entry looks empty"** — attributed to frame-all and to the demo
   content (design 17 §3.3, §14), not to a new layout rule.
+- **The JEI face's fixed-frame lighting** — the JEI arm keeps `Lighting.setupFor3DItems()` (vanilla's
+  GUI-item frame), so its visible faces read bright-and-flat and their brightness follows the camera;
+  SC5 fixed the screen arm to the world-fixed law (design 17 §4.1, D-106) and deliberately left the
+  JEI picture alone, because the user did not report it and changing it changes what the JEI page
+  looks like. Moving it to the same law is a behaviour change that waits for the user's word.
 - **The JEI page's legacy picking takes the farthest cell** — its pick ray resolves the maximum exit
   against a camera that sits on the opposite side (noted at SC1; the screen path takes the nearest,
   design 17 §5.3). Kept untouched at SC1 for zero regression; fixing it changes the JEI hover, so it

@@ -44,10 +44,10 @@ public final class PreviewScene {
     /** What one panel drew: its cell count and the Y layer it isolates or highlights. */
     public record Panel(int cells, int layer) {}
 
-    /** How one cell is drawn this frame: its alpha factor and its displacement (design 17 §7.2, §8.1). */
-    public record Sight(float alpha, float dx, float dy, float dz) {
+    /** How one cell is drawn this frame: its alpha factor, its pop scale and its displacement (§7.2, §8.1). */
+    public record Sight(float alpha, float scale, float dx, float dy, float dz) {
 
-        public static final Sight full = new Sight(1.0F, 0.0F, 0.0F, 0.0F);
+        public static final Sight full = new Sight(1.0F, 1.0F, 0.0F, 0.0F, 0.0F);
     }
 
     /** One frame's per-cell treatment; null means the stage hides the cell (design 17 §7.2). */
@@ -61,6 +61,10 @@ public final class PreviewScene {
 
     /** The GUI depth at which the whole scene sits, in front of every screen background (design 17 §5.1). */
     public static final int sceneDepth = 150;
+    /** The model pass's depth band above {@link #sceneDepth}: every drawn cell lands inside it. */
+    public static final int sceneSpan = 64;
+    /** The chrome depth above every model in both projections (design 17 §4.1). */
+    public static final int chromeDepth = sceneDepth + sceneSpan + 10;
     private static final int bandColor = 0x38FFFFFF;
     private static final int bandEdgeColor = 0x58FFFFFF;
 
@@ -332,34 +336,45 @@ public final class PreviewScene {
         pose.pushPose();
         pose.translate(0.0F, 0.0F, sceneDepth);
         pose.mulPose(fit.matrix());
-        Lighting.setupFor3DItems();
-        RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(true);
-        for (Drawable drawable : drawn) {
-            Cell cell = drawable.cell();
-            Sight sight = drawable.sight();
-            BlockState state = cell.state();
-            if (state == null) {
-                continue;
+        pose.last().normal().set(SceneLighting.normals(fit.camera()));
+        Vector3f[] lights = SceneLighting.forCamera(fit.camera());
+        try {
+            RenderSystem.setShaderLights(lights[0], lights[1]);
+            RenderSystem.enableDepthTest();
+            RenderSystem.depthMask(true);
+            for (Drawable drawable : drawn) {
+                Cell cell = drawable.cell();
+                Sight sight = drawable.sight();
+                BlockState state = cell.state();
+                if (state == null) {
+                    continue;
+                }
+                LatticePoint at = cell.ghost().cell();
+                pose.pushPose();
+                pose.translate(at.x() + sight.dx(), at.y() + sight.dy(), at.z() + sight.dz());
+                if (sight.scale() != 1.0F) {
+                    pose.translate(0.5F, 0.5F, 0.5F);
+                    pose.scale(sight.scale(), sight.scale(), sight.scale());
+                    pose.translate(-0.5F, -0.5F, -0.5F);
+                }
+                Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
+                    state,
+                    pose,
+                    sight.alpha() >= 1.0F
+                            ? graphics.bufferSource()
+                            : TintedBuffers.of(graphics.bufferSource(), sight.alpha()),
+                    LightTexture.FULL_BRIGHT,
+                    OverlayTexture.NO_OVERLAY,
+                    ModelData.EMPTY,
+                    null
+                );
+                pose.popPose();
             }
-            LatticePoint at = cell.ghost().cell();
-            pose.pushPose();
-            pose.translate(at.x() + sight.dx(), at.y() + sight.dy(), at.z() + sight.dz());
-            Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
-                state,
-                pose,
-                sight.alpha() >= 1.0F
-                        ? graphics.bufferSource()
-                        : TintedBuffers.of(graphics.bufferSource(), sight.alpha()),
-                LightTexture.FULL_BRIGHT,
-                OverlayTexture.NO_OVERLAY,
-                ModelData.EMPTY,
-                null
-            );
+            graphics.bufferSource().endBatch();
+        } finally {
+            Lighting.setupFor3DItems();
             pose.popPose();
         }
-        graphics.bufferSource().endBatch();
-        pose.popPose();
         return new Panel(drawn.size(), 0);
     }
 
