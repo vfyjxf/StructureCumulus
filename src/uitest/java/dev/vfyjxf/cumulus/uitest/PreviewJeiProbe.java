@@ -90,7 +90,24 @@ public final class PreviewJeiProbe implements IModPlugin {
                 }
             }
         }
+        // a set page is one more page; a blueprint that shares its id keeps the bare key (design 18 §7)
+        for (PreviewCatalogPayload.SetEntry set : PreviewCatalogClient.sets()) {
+            NamespacedId key = set.setId();
+            while (!pages.add(key)) {
+                key = NamespacedId.of(key.namespace(), key.path() + "/set");
+            }
+        }
         return List.copyOf(pages);
+    }
+
+    /** The catalogue's set entry for {@code setId}, or null when it carries none. */
+    static PreviewCatalogPayload.@Nullable SetEntry setEntry(NamespacedId setId) {
+        for (PreviewCatalogPayload.SetEntry set : PreviewCatalogClient.sets()) {
+            if (set.setId().equals(setId)) {
+                return set;
+            }
+        }
+        return null;
     }
 
     static @Nullable PreviewPresentation presentation(NamespacedId blueprintId) {

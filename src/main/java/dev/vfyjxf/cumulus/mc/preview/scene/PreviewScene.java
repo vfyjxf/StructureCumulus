@@ -92,8 +92,13 @@ public final class PreviewScene {
     }
 
     public static PreviewScene of(PreviewCatalogPayload.Entry entry) {
-        List<Cell> resolved = new ArrayList<>(entry.cells().size());
-        for (GhostCell ghost : entry.cells()) {
+        return ofCells(entry.cells());
+    }
+
+    /** One scene from already-composed cells: a set page's members are its stage indices (§4). */
+    public static PreviewScene ofCells(List<GhostCell> cells) {
+        List<Cell> resolved = new ArrayList<>(cells.size());
+        for (GhostCell ghost : cells) {
             resolved.add(new Cell(ghost, CellStates.of(ghost.block(), ghost.properties())));
         }
         return new PreviewScene(resolved);

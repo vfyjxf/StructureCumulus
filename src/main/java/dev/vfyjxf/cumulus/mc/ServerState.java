@@ -220,6 +220,13 @@ public final class ServerState {
         return List.copyOf(ids);
     }
 
+    /** Every structure-set id of the merged source, sorted; the catalogue composes them (design 18 §3). */
+    List<NamespacedId> setIds() {
+        TreeSet<NamespacedId> ids = new TreeSet<>(BuiltinDocuments.setIds());
+        ids.addAll(blueprints.structureSets().keySet());
+        return List.copyOf(ids);
+    }
+
     @Nullable
     StructureSetDocument structureSet(NamespacedId id) {
         return documents.findSet(id);

@@ -48,7 +48,8 @@ table defines who may emit each finding code.
     gate and the `demo_campus` structure set).
 19. [design/18-set-preview.md](design/18-set-preview.md) — the set preview (SC12): structure sets as
     catalogue entries composed server-side, the composite set page, the constraint overlay and the
-    member drill-down.
+    member drill-down (landed: the trailing-optional set block, the composite scene, the constraint
+    chrome and the drill-down's breadcrumb; `demo_campus` is the first exhibit).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -112,7 +113,12 @@ Then the module files, in dependency order:
   directions), and SC10 the flagship station content (the generated `demo_station` group — a
   13x11x13 relay station of ten stages whose four satellite pods are one module at four turns — its
   `tools/gen_demo_station.py` generator with the `--check` gate inside `check`, and the
-  `demo_campus` structure set) are on the tree.
+  `demo_campus` structure set), SC11 the viewer's two picks (the finished play's replay from the zero
+  state and the stage outline as an opt-in toggle off by default) and SC12 the set preview
+  ([18 set-preview](design/18-set-preview.md), D-112: the catalogue's composed set entries, the
+  composite page whose members are the stages and the explode's parts, the constraint overlay, the
+  member drill-down with its breadcrumb, the JEI set pages and the `<id>#set` command form) are on the
+  tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`

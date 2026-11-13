@@ -11,6 +11,9 @@ import dev.vfyjxf.cumulus.kernel.document.CompileResult;
 import dev.vfyjxf.cumulus.kernel.document.CompilerContext;
 import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.document.DocumentCompiler;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetCompileResult;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetCompiler;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
 import dev.vfyjxf.cumulus.kernel.engine.MatchEngine;
 import dev.vfyjxf.cumulus.kernel.engine.MatchRequest;
 import dev.vfyjxf.cumulus.kernel.engine.MatchResult;
@@ -85,14 +88,27 @@ public final class StructureKernel {
     }
 
     public CompileResult compile(Document document) {
-        CompilerContext context = new CompilerContext(
+        return DocumentCompiler.compile(document, context());
+    }
+
+    /** The structure-set document under this id, when the host's source loads both document kinds. */
+    public @Nullable StructureSetDocument structureSet(NamespacedId id) {
+        return host.documents().findSet(id);
+    }
+
+    /** The only structure-set lowering path, with the same catalogs and source {@link #compile} uses. */
+    public StructureSetCompileResult compileSet(StructureSetDocument document) {
+        return StructureSetCompiler.compile(document, context());
+    }
+
+    private CompilerContext context() {
+        return new CompilerContext(
             catalogs.focuses(),
             catalogs.expectations(),
             catalogs.computations(),
             host.types(),
             host.documents()
         );
-        return DocumentCompiler.compile(document, context);
     }
 
     public MatchResult check(MatchRequest request) {

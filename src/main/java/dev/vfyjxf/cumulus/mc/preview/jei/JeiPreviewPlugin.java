@@ -29,6 +29,7 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -73,8 +74,8 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
         List<BlueprintPreviewRecipe> seeded = new ArrayList<>();
-        for (Map.Entry<NamespacedId, List<PreviewCatalogPayload.Entry>> page : pages().entrySet()) {
-            BlueprintPreviewRecipe recipe = recipeFor(page.getKey(), page.getValue());
+        for (PageSpec page : pages()) {
+            BlueprintPreviewRecipe recipe = recipeFor(page);
             if (sent.add(recipe)) {
                 seeded.add(recipe);
             }
@@ -99,6 +100,13 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         sent.clear();
         hidden.clear();
     }
+
+    /** One page in the category: a blueprint group or one set entry (design 18 §7). */
+    private record PageSpec(
+        NamespacedId key,
+        @Nullable List<PreviewCatalogPayload.Entry> group,
+        PreviewCatalogPayload.@Nullable SetEntry set
+    ) {}
 
     static List<NamespacedId> listedIds() {
         return List.copyOf(recipes.keySet());
@@ -137,18 +145,20 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
     }
 
     /**
-     * The catalog reshaped into pages: a standalone entry is its own page, a group is one page keyed
-     * by the first member the catalog ships, holding every shipped member in declaration order. A
-     * member left out by a catalogue cap is not switchable; the catalogue log names it, as every cap
-     * does (design 15 §6.1, §12.3).
+     * The catalog reshaped into pages: a standalone blueprint is its own page, a group is one page
+     * keyed by the first member the catalog ships, and a set entry is one composite page. A set whose
+     * id a blueprint also carries keeps its own page under a derived key, so neither shadows the other
+     * (design 18 §7). A member left out by a catalogue cap is not switchable; the catalogue log names
+     * it, as every cap does (design 15 §6.1, §12.3).
      */
-    private static Map<NamespacedId, List<PreviewCatalogPayload.Entry>> pages() {
+    private static List<PageSpec> pages() {
         List<PreviewCatalogPayload.Entry> entries = PreviewCatalogClient.entries();
         Map<NamespacedId, PreviewCatalogPayload.Entry> byId = new LinkedHashMap<>();
         for (PreviewCatalogPayload.Entry entry : entries) {
             byId.put(entry.blueprintId(), entry);
         }
-        Map<NamespacedId, List<PreviewCatalogPayload.Entry>> pages = new LinkedHashMap<>();
+        List<PageSpec> pages = new ArrayList<>();
+        Set<NamespacedId> taken = new HashSet<>();
         for (PreviewCatalogPayload.Entry entry : entries) {
             VariantSummary summary = entry.variants();
             List<PreviewCatalogPayload.Entry> members = new ArrayList<>();
@@ -165,18 +175,32 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
             if (members.isEmpty()) {
                 members.add(entry);
             }
-            pages.putIfAbsent(members.get(0).blueprintId(), List.copyOf(members));
+            NamespacedId key = members.get(0).blueprintId();
+            if (taken.add(key)) {
+                pages.add(new PageSpec(key, List.copyOf(members), null));
+            }
         }
-        return pages;
+        for (PreviewCatalogPayload.SetEntry set : PreviewCatalogClient.sets()) {
+            NamespacedId key = set.setId();
+            while (!taken.add(key)) {
+                key = NamespacedId.of(key.namespace(), key.path() + "/set");
+            }
+            pages.add(new PageSpec(key, null, set));
+        }
+        return List.copyOf(pages);
     }
 
-    private static BlueprintPreviewRecipe recipeFor(NamespacedId pageId, List<PreviewCatalogPayload.Entry> group) {
-        BlueprintPreviewRecipe recipe = recipes.get(pageId);
+    private static BlueprintPreviewRecipe recipeFor(PageSpec page) {
+        BlueprintPreviewRecipe recipe = recipes.get(page.key());
         if (recipe == null) {
-            recipe = new BlueprintPreviewRecipe(group);
-            recipes.put(pageId, recipe);
+            recipe = page.set() != null
+                    ? new BlueprintPreviewRecipe(page.set(), page.key())
+                    : new BlueprintPreviewRecipe(Objects.requireNonNull(page.group(), "group"));
+            recipes.put(page.key(), recipe);
+        } else if (page.set() != null) {
+            recipe.updateSet(page.set());
         } else {
-            recipe.update(group);
+            recipe.update(Objects.requireNonNull(page.group(), "group"));
         }
         viewFor(recipe);
         return recipe;
@@ -192,9 +216,9 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         Set<NamespacedId> listed = new HashSet<>();
         List<BlueprintPreviewRecipe> added = new ArrayList<>();
         List<BlueprintPreviewRecipe> restored = new ArrayList<>();
-        for (Map.Entry<NamespacedId, List<PreviewCatalogPayload.Entry>> page : pages().entrySet()) {
-            listed.add(page.getKey());
-            BlueprintPreviewRecipe recipe = recipeFor(page.getKey(), page.getValue());
+        for (PageSpec page : pages()) {
+            listed.add(page.key());
+            BlueprintPreviewRecipe recipe = recipeFor(page);
             if (sent.add(recipe)) {
                 added.add(recipe);
             } else if (hidden.remove(recipe)) {

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "kind": "structure_set",
+  "id": "structurecumulus:preview_stages",
+  "root": "structurecumulus:preview_probe",
+  "satellites": []
+}

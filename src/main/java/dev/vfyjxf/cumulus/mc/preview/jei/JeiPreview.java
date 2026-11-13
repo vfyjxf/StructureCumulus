@@ -166,13 +166,23 @@ public final class JeiPreview {
     /** The page's "Ghost to world" button: the member the page shows is the blueprint it opens. */
     public static void openSelected(NamespacedId blueprintId) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        if (recipe != null && recipe.isSet()) {
+            // a set is a catalogue view: no session mechanism exists for it (design 18 §8)
+            return;
+        }
         openWorld(recipe == null ? blueprintId : recipe.selectedBlueprintId());
     }
 
     /** The page's "open in screen" button: the client screen opens on the member the page shows. */
     public static void openScreen(NamespacedId blueprintId) {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
-        PreviewScreen.open(recipe == null ? blueprintId : recipe.selectedBlueprintId());
+        if (recipe == null) {
+            PreviewScreen.open(blueprintId);
+        } else if (recipe.isSet()) {
+            PreviewScreen.openSet(recipe.screenId());
+        } else {
+            PreviewScreen.open(recipe.screenId());
+        }
     }
 
     /** Pages the category to one blueprint; false when JEI or the entry is not available. */

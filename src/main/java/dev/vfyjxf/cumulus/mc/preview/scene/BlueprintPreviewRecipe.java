@@ -34,6 +34,9 @@ public final class BlueprintPreviewRecipe {
     private final NamespacedId pageId;
     /** The shipped members of the page's group, in declaration order; a standalone page holds one. */
     private List<PreviewCatalogPayload.Entry> variants = List.of();
+    /** The set a set page shows, or null for a blueprint page (design 18 §7). */
+    private PreviewCatalogPayload.@Nullable SetEntry setEntry;
+    private @Nullable SetPage setPage;
     private int variantIndex;
     private PreviewScene scene;
     private PreviewPresentation presentation = new PreviewPresentation(null, List.of(), -1, List.of(), 0);
@@ -49,12 +52,19 @@ public final class BlueprintPreviewRecipe {
         applySelection();
     }
 
+    /** A set page in the same category: the composite scene and the member lines (design 18 §7). */
+    public BlueprintPreviewRecipe(PreviewCatalogPayload.SetEntry set, NamespacedId pageKey) {
+        this.pageId = pageKey;
+        this.setEntry = set;
+        applySet(set);
+    }
+
     /**
      * Applies a fresh catalog to this page: the group's entries are replaced, and the selected member
      * is kept by id when the reload still ships it (a reload never loses the user's variant).
      */
     public void update(List<PreviewCatalogPayload.Entry> group) {
-        if (group.isEmpty()) {
+        if (group.isEmpty() || setEntry != null) {
             return;
         }
         NamespacedId selected = variants.isEmpty() ? group.get(0).blueprintId() : selectedBlueprintId();
@@ -64,17 +74,36 @@ public final class BlueprintPreviewRecipe {
         applySelection();
     }
 
+    /** Applies a fresh catalog set entry to a set page; the page's JEI view state stays its own. */
+    public void updateSet(PreviewCatalogPayload.SetEntry set) {
+        if (setEntry == null) {
+            return;
+        }
+        this.setEntry = set;
+        applySet(set);
+    }
+
     /** The page's own id; the recipe identity JEI holds across reloads. */
     public NamespacedId blueprintId() {
         return pageId;
     }
 
-    /** The id the page currently shows: the member a "Ghost to world" opens (design 15 §12.4). */
-    public NamespacedId selectedBlueprintId() {
-        return variants.get(variantIndex).blueprintId();
+    /** True when the page is a structure set's composite scene, not a blueprint (design 18 §7). */
+    public boolean isSet() {
+        return setEntry != null;
     }
 
-    /** The shipped members of the group, in declaration order. */
+    /** The id the page currently shows: the member a "Ghost to world" opens (design 15 §12.4). */
+    public NamespacedId selectedBlueprintId() {
+        return setEntry != null ? setEntry.setId() : variants.get(variantIndex).blueprintId();
+    }
+
+    /** The id "open in screen" opens: a set page opens by its set id, a blueprint by its member. */
+    public NamespacedId screenId() {
+        return selectedBlueprintId();
+    }
+
+    /** The shipped members of the group, in declaration order; a set page has none. */
     public List<NamespacedId> variantIds() {
         List<NamespacedId> ids = new ArrayList<>(variants.size());
         for (PreviewCatalogPayload.Entry entry : variants) {
@@ -150,9 +179,27 @@ public final class BlueprintPreviewRecipe {
         this.materials = List.copyOf(resolved);
     }
 
+    /** The set page's scene, stage table and materials, all read from the composed entry (§3). */
+    private void applySet(PreviewCatalogPayload.SetEntry set) {
+        this.setPage = SetPage.of(set);
+        this.scene = PreviewScene.ofCells(setPage.cells());
+        this.presentation = setPage.presentation();
+        List<Material> resolved = new ArrayList<>(set.materials().size());
+        for (PreviewCatalogPayload.MaterialLine line : set.materials()) {
+            ItemStack stack = stack(line.item());
+            if (!stack.isEmpty()) {
+                resolved.add(new Material(stack, line.count()));
+            }
+        }
+        this.materials = List.copyOf(resolved);
+    }
+
     /** The page's own text: the selected member's root description, then one line per part. */
     public List<String> lines() {
         List<String> lines = new ArrayList<>();
+        if (setEntry != null) {
+            lines.add("structure set: " + setEntry.setId().text());
+        }
         String variant = variantLine();
         if (variant != null) {
             lines.add(variant);

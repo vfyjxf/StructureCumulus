@@ -1194,6 +1194,7 @@ public final class LevelAccess {
     public static @Nullable OwnerId owner();
     public static long blockRevision(ServerLevel level, Cuboid region);
     public static java.util.List<NamespacedId> documentIds();
+    public static java.util.List<NamespacedId> setIds();
 }
 
 public final class StructureSetHost {
@@ -1374,13 +1375,27 @@ public record PreviewPresentation(@Nullable String description, java.util.List<S
 
 public record MaterialStatus(NamespacedId item, int need, int have) { }
 
-public record PreviewCatalogPayload(java.util.List<Entry> entries) implements CustomPacketPayload {
+public record PreviewCatalogPayload(java.util.List<Entry> entries, java.util.List<SetEntry> sets)
+        implements CustomPacketPayload {
     public static final Type<PreviewCatalogPayload> type;
+    public PreviewCatalogPayload(java.util.List<Entry> entries);
     @Override public Type<? extends CustomPacketPayload> type();
 
     public record Entry(NamespacedId blueprintId, java.util.List<GhostCell> cells,
                         java.util.List<MaterialLine> materials, PreviewPresentation presentation,
                         @Nullable VariantSummary variants) { }
+
+    // One structure set, composed server-side into pure geometry and trailing-optional on the wire
+    // (design 18 §3): an older client reads the entries and never sees the sets.
+    public record SetEntry(NamespacedId setId, java.util.List<Member> members,
+                           java.util.List<MaterialLine> materials) { }
+
+    public record Member(NamespacedId blueprintId, String label, boolean required,
+                         java.util.List<GhostCell> cells, java.util.List<Cuboid> presence,
+                         java.util.List<Link> links) { }
+
+    public record Link(LinkMode mode, @Nullable LatticePoint parentCell, @Nullable LatticePoint satelliteCell,
+                       int maxDistance, DistanceMetric metric) { }
 
     public record MaterialLine(NamespacedId item, int count) { }
 }
@@ -1514,6 +1529,7 @@ public final class PreviewClientBridge {
 public final class PreviewCatalogClient {
     public static void accept(PreviewCatalogPayload payload);
     public static java.util.List<PreviewCatalogPayload.Entry> entries();
+    public static java.util.List<PreviewCatalogPayload.SetEntry> sets();
     public static void listen(Runnable listener);
     public static void unlisten(Runnable listener);
     public static void clear();
@@ -1552,6 +1568,7 @@ public final class PreviewScene {
     }
 
     public static PreviewScene of(PreviewCatalogPayload.Entry entry);
+    public static PreviewScene ofCells(java.util.List<GhostCell> cells);
     public Hull hull();
     public BasePlate plate();
     public int cellCount();
@@ -1568,6 +1585,35 @@ public final class PreviewScene {
     public Panel draw(GuiGraphics graphics, Fit fit, Treatment treatment);
     public Hull hull(int stage);
     public static boolean draws(Cell cell);
+}
+
+// A structure set's page derived on the client from the catalogue's composed entry: the members are
+// the stages, root first, and the member labels are the stage names (design 18 §4).
+public record SetPage(PreviewCatalogPayload.SetEntry entry, java.util.List<Stage> stages,
+                      java.util.List<GhostCell> cells, java.util.Map<NamespacedId, String> bayLabels) {
+    public static SetPage of(PreviewCatalogPayload.SetEntry entry);
+    public static NamespacedId bay(NamespacedId setId, int member);
+    public NamespacedId id();
+    public PreviewPresentation presentation();
+    public int memberOf(GhostCell ghost);
+    public @Nullable NamespacedId memberBlueprint(int member);
+}
+
+// The set page's constraint chrome as pure geometry (design 18 §5): links as segments between the two
+// cells' faces, presence probes as cells, optional members as dashed silhouettes.
+public final class ConstraintOverlay {
+    public record Segment(float ax, float ay, float az, float bx, float by, float bz) {
+        public boolean degenerate();
+    }
+    public record LinkLine(int member, LatticePoint parent, LatticePoint satellite, LinkMode mode,
+                           int actual, int maxDistance, DistanceMetric metric, Segment segment) {
+        public String caption();
+        public String tooltip();
+    }
+    public record Probe(int member, float x, float y, float z) { }
+    public static java.util.List<LinkLine> links(SetPage page, float t, ExplodeModel explode);
+    public static java.util.List<Probe> probes(SetPage page, float t, ExplodeModel explode);
+    public static java.util.List<Integer> optionalMembers(SetPage page);
 }
 
 // The scene's directional light of design 17 §4.1: the level pass's two world directions seen through
@@ -1622,7 +1668,11 @@ public final class BlueprintPreviewRecipe {
     public record Material(ItemStack stack, int count) { }
 
     public BlueprintPreviewRecipe(java.util.List<PreviewCatalogPayload.Entry> group);
+    public BlueprintPreviewRecipe(PreviewCatalogPayload.SetEntry set, NamespacedId pageKey);
     public void update(java.util.List<PreviewCatalogPayload.Entry> group);
+    public void updateSet(PreviewCatalogPayload.SetEntry set);
+    public boolean isSet();
+    public NamespacedId screenId();
     public NamespacedId blueprintId();
     public NamespacedId selectedBlueprintId();
     public java.util.List<NamespacedId> variantIds();
@@ -1787,8 +1837,11 @@ public record ExplodeModel(java.util.List<Group> groups, java.util.List<Namespac
     }
 
     public static ExplodeModel of(java.util.List<Stage> stages, java.util.List<GhostCell> drawnCells, Hull hull);
+    public static ExplodeModel of(java.util.List<Stage> stages, java.util.List<GhostCell> drawnCells, Hull hull,
+                                  java.util.Map<NamespacedId, String> texts);
     public boolean separable();
     public Offset offset(GhostCell ghost, float t);
+    public Offset offset(int stage, float t);
     public java.util.List<Label> labels(float t);
     public float[] structureCentroid();
 }
@@ -1823,7 +1876,8 @@ public record ScreenLayout(Rect title, Rect main, @Nullable Rect front, @Nullabl
 // The one screen of design 17 §5: the page looked up in the last catalogue, one shared camera and the
 // four derived viewports.
 public final class PreviewScreen extends Screen {
-    public static boolean open(NamespacedId blueprintId);
+    public static boolean open(NamespacedId pageId);
+    public static boolean openSet(NamespacedId setId);
     @Override public void added();
     @Override public void removed();
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick);
@@ -1833,6 +1887,7 @@ public final class PreviewScreen extends Screen {
     @Override public boolean mouseReleased(double mouseX, double mouseY, int button);
     @Override public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY);
     @Override public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY);
+    public NamespacedId pageId();
     public SceneCamera camera();
     public ScreenLayout layout();
     public PreviewScene scene();
@@ -1869,8 +1924,22 @@ public final class PreviewScreen extends Screen {
     public @Nullable String variantLine();
     public int variantCount();
     public int variantIndex();
+    public boolean isSetPage();
+    public @Nullable PreviewCatalogPayload.SetEntry setEntry();
+    public @Nullable SetPage setPage();
+    public @Nullable ReturnState returnState();
+    public boolean constraintsOn();
+    public int drawnLinkStrokes();
+    public int drawnProbes();
+    public @Nullable NamespacedId memberUnder(int panel, double mouseX, double mouseY);
+    public @Nullable Vector2f cellPoint(int panel, LatticePoint at);
+    public @Nullable String footerLine();
 
     public record Shading(float down, float up, float north, float south, float west, float east) { }
+
+    // The set page a drill-down came from: its id and the view state the breadcrumb restores (design 18 §6).
+    public record ReturnState(NamespacedId setId, SceneCamera camera, int stage, float explodeT,
+                              boolean constraints) { }
 }
 
 // The screen's own clock of design 17 §4.6: a fractional tick accumulator, fed by the frame's
@@ -2745,7 +2814,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC11)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC12)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -2825,7 +2894,23 @@ tooltip; and the cursor stage's set stroke is now the `stage outline` button's v
 every fresh screen and never remembered (`PreviewScreen.stageOutline` tells the harness the state, and
 `drawnStageOutlines` counts only what that toggle drew), while the hover's own stroke and outline
 mode's slot strokes are untouched. The button has no key, the delta treatments alone carry the stage
-by default, and the whole view strokes nothing either way. The milestone
+by default, and the whole view strokes nothing either way. SC12 has landed the set preview
+([design/18](../design/18-set-preview.md), D-112): the catalogue's payload gains the trailing-optional
+`sets` block (`SetEntry`/`Member`/`Link`) whose cells the server has already composed at each member's
+siting through the kernel's `Siting`/`Placement` compose and `OrientationMapping`, with the composite
+1024-cell cap, the 64 material lines and the unchanged 4096 whole-catalogue cap — an entry past a cap
+or one that fails compile/place/validate is absent with the WARNING line, never truncated;
+`StructureKernel.structureSet`/`compileSet` and `LevelAccess.setIds()` give the catalog its set
+documents, and a member whose own blueprint entry a cap left out still composes into its set. The set
+page is `SetPage` over the same `PreviewScene`: the members are the stages (root first, the member
+labels), `ExplodeModel.of(..., texts)` separates members and labels them by member, `ConstraintOverlay`
+is the chrome layer (links as face-meeting strokes captioned `actual ≤ max` with the metric in the
+tooltip, presence probes as crosses, optional members as dashed silhouettes; the mark palette is
+untouched), the `constraints` button is view state on by default, a member cell or explode label opens
+that member's page and the `‹ <set id>` breadcrumb returns through `PreviewScreen.ReturnState` with the
+camera and stage kept, and the JEI category lists set pages beside blueprint pages (with no
+`Ghost to world` there) and opens the set from `open in screen`. `PreviewClientCommand` parses the
+`<id>#set` qualifier, with a bare id resolving the blueprint first (design 18 §7). The milestone
 state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
@@ -2835,6 +2920,7 @@ record every surface shares.
 | --- | --- | --- | --- |
 | `net.Stage` | `NamespacedId bay`, the bay the stage derives from | S2C on both the session payload and every catalog entry | none of its own: a bay with a drawn cell owns at least one stage, and the table is capped at `maxStages` = 256, so the distinct bays cannot exceed the stages |
 | `net.PreviewOpenPayload` | `@Nullable Heading facing`, the direction the viewer faces | C2S, the existing open channel | an enum, never a list; the four horizons are accepted and `up`/`down` read as absent |
+| `net.PreviewCatalogPayload` | `List<SetEntry> sets`, the composed set entries | S2C catalog, trailing optional after the blueprint entries | per set: 1024 composed cells and 64 material lines; the unchanged 4096 whole-catalogue cap counts set entries |
 
 `PreviewService.open` keeps its two entry points: the player-facing one passes the player's own facing
 as today, and the ghost-to-world one passes the payload's heading where that facing goes, so the
@@ -2866,6 +2952,8 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `CellOutline` | one cell's projected silhouette (the convex hull of its eight projected corners), the outline geometry of design 17 §5.3 |
 | `preview.scene` | `ChromeStroke` | the stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded endpoints, drawn at `chromeDepth` with the depth test off |
 | `preview.scene` | `Reveal` (with `Direction`) | the staged playback's reveal of design 17 §7.6: per-cell stamps carrying their tick and their direction, the `outCubic` drop from 2.5 cells or the rise from the base plate's underside to the slot, and the fade that runs with it |
+| `preview.scene` | `SetPage` | the set page derived from one composed set entry: one stage per member (root first, the member labels), the flattened composed cells and the member-to-blueprint lookup of design 18 §4 |
+| `preview.scene` | `ConstraintOverlay` (with `LinkLine`, `Probe`, `Segment`) | the set page's chrome as pure geometry of design 18 §5: a link stroke between the two cells' faces with its `actual ≤ max` caption, the declared presence cells and the optional members' dashed silhouettes; no world read |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
 | `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
 | `preview.client.screen` | `ScreenClock` | the screen's own two-number clock of design 17 §4.6, advanced by the frame's real-time tick delta |

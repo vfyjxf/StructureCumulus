@@ -82,6 +82,8 @@ public final class StructureKernel {
     public StructureManager structures();
 
     public CompileResult compile(Document document);
+    public @Nullable StructureSetDocument structureSet(NamespacedId id);
+    public StructureSetCompileResult compileSet(StructureSetDocument document);
     public MatchResult check(MatchRequest request);
     public MatchResult settle(MatchRequest request, MatchResult.Admitted admitted,
                               StructureAttempt attempt);

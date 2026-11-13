@@ -90,7 +90,36 @@ final class DemoDocuments {
     static StructureKernel kernel() {
         return StructureKernel.create(
             Catalogs.builtin(),
-            new Host(DocumentSource.of(load()), null, StructureManager.create(), Map.of())
+            new Host(DocumentSource.of(load(), Map.of(campus, set(campus))), null, StructureManager.create(), Map.of())
+        );
+    }
+
+    /** A one-cell stone blueprint, the cap and link fixtures' smallest member. */
+    static Document cell(String id) {
+        String json = "{\"schemaVersion\":1,\"id\":\"" + id + "\",\"bounds\":[0,0,0,1,1,1],"
+                + "\"bays\":[{\"id\":\"b\",\"box\":[0,0,0,1,1,1],\"coverage\":\"every_cell\","
+                + "\"footprint\":\"none\",\"sharing\":\"shared\"}],"
+                + "\"checks\":[{\"id\":\"c\",\"bay\":\"b\",\"focus\":{\"kind\":\"bay\"},"
+                + "\"expect\":{\"kind\":\"each_cell\",\"element\":{\"kind\":\"block\",\"id\":\"minecraft:stone\"}}}]}";
+        List<Finding> errors = new ArrayList<>();
+        NamespacedId parsed = Objects.requireNonNull(NamespacedId.parse(id), id);
+        JsonDocument document = JsonDocument.read(parsed, json, errors);
+        assertTrue(errors.isEmpty(), () -> id + " parsed with " + errors);
+        return assertInstanceOf(JsonDocument.Blueprint.class, document, () -> id + " is a blueprint").document();
+    }
+
+    /** A kernel over the demo blueprints, the campus set and any extra documents and sets. */
+    static StructureKernel kernel(
+        Map<NamespacedId, Document> extraDocuments,
+        Map<NamespacedId, StructureSetDocument> extraSets
+    ) {
+        Map<NamespacedId, Document> documents = new LinkedHashMap<>(load());
+        documents.putAll(extraDocuments);
+        Map<NamespacedId, StructureSetDocument> sets = new LinkedHashMap<>(Map.of(campus, set(campus)));
+        sets.putAll(extraSets);
+        return StructureKernel.create(
+            Catalogs.builtin(),
+            new Host(DocumentSource.of(documents, sets), null, StructureManager.create(), Map.of())
         );
     }
 

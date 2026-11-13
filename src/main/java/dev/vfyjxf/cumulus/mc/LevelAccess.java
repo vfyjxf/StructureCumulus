@@ -38,6 +38,12 @@ public final class LevelAccess {
         return state == null ? List.of() : state.documentIds();
     }
 
+    /** Every structure-set id of the merged document source, sorted (design 18 §3). */
+    public static List<NamespacedId> setIds() {
+        ServerState state = ServerState.current();
+        return state == null ? List.of() : state.setIds();
+    }
+
     public static @Nullable LevelCapture capture(ServerLevel level) {
         ServerState state = ServerState.current();
         return state == null ? null : state.capture(level);

@@ -167,14 +167,15 @@ final class PreviewInputHandler implements IJeiInputHandler {
         )) {
             return Mode.view;
         }
-        if (BlueprintPreviewCategory.inside(
-            mouseX,
-            mouseY,
-            BlueprintPreviewCategory.buttonX,
-            BlueprintPreviewCategory.buttonY,
-            BlueprintPreviewCategory.buttonWidth,
-            BlueprintPreviewCategory.buttonHeight
-        )) {
+        if (!recipe.isSet()
+                && BlueprintPreviewCategory.inside(
+                    mouseX,
+                    mouseY,
+                    BlueprintPreviewCategory.buttonX,
+                    BlueprintPreviewCategory.buttonY,
+                    BlueprintPreviewCategory.buttonWidth,
+                    BlueprintPreviewCategory.buttonHeight
+                )) {
             return Mode.button;
         }
         if (BlueprintPreviewCategory.inside(

@@ -105,6 +105,11 @@ final class BuiltinDocuments {
         return List.of(airCell, setRoot, setWing);
     }
 
+    /** The built-in structure-set ids in listing order (design 18 §3). */
+    static List<NamespacedId> setIds() {
+        return List.of(setDemo);
+    }
+
     private static Document cellDocument(NamespacedId id, boolean claimable) {
         return new Document(
             Document.currentVersion,

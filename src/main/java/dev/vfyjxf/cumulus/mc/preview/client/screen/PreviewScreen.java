@@ -9,8 +9,8 @@ import dev.vfyjxf.cumulus.mc.preview.client.cine.Ease;
 import dev.vfyjxf.cumulus.mc.preview.client.cine.Tween;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout.Rect;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
-import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload.Entry;
+import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload.SetEntry;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewOpenPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.net.VariantSummary;
@@ -18,6 +18,7 @@ import dev.vfyjxf.cumulus.mc.preview.scene.AxisGizmo;
 import dev.vfyjxf.cumulus.mc.preview.scene.BasePlate;
 import dev.vfyjxf.cumulus.mc.preview.scene.CellOutline;
 import dev.vfyjxf.cumulus.mc.preview.scene.ChromeStroke;
+import dev.vfyjxf.cumulus.mc.preview.scene.ConstraintOverlay;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.Hull;
@@ -27,6 +28,7 @@ import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene.Cell;
 import dev.vfyjxf.cumulus.mc.preview.scene.Reveal;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneCamera;
 import dev.vfyjxf.cumulus.mc.preview.scene.SceneLighting;
+import dev.vfyjxf.cumulus.mc.preview.scene.SetPage;
 import dev.vfyjxf.cumulus.mc.preview.scene.StagePlayback;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -72,6 +74,10 @@ public final class PreviewScreen extends Screen {
     private static final int hoverOutlineColor = 0xFFE8E8E8;
     /** The cursor stage's outline: the chrome family's steel blue, a set rather than one cell (§5.3). */
     private static final int stageOutlineColor = 0xFF8FB4D9;
+    /** A constraint link's stroke: the same chrome family, never the mark palette (design 18 §5). */
+    private static final int constraintColor = 0xFF8FB4D9;
+    /** A presence probe's cross: document chrome, not a world finding (design 18 §5). */
+    private static final int probeColor = 0xFFC0C0C0;
     private static final int barColor = 0x60484848;
     private static final int barHoverColor = 0x906A6A6A;
     private static final int barCursorColor = 0xFFE8E8E8;
@@ -87,9 +93,13 @@ public final class PreviewScreen extends Screen {
     /** The declaration order is the wire's tie-breaker, not the compass's (north, south, west, east). */
     private static final Heading[] horizons = {Heading.north, Heading.south, Heading.west, Heading.east};
 
-    private NamespacedId blueprintId;
+    private NamespacedId pageId;
     private final Runnable onCatalog = this::reconcile;
-    private PreviewCatalogPayload.Entry entry;
+    private @Nullable Entry entry;
+    private @Nullable SetEntry setEntry;
+    private @Nullable SetPage setPage;
+    /** The set page a drill-down came from: one deep, view state, dies with the screen (design 18 §6). */
+    private @Nullable ReturnState returnState;
     private PreviewScene scene;
     private StagePlayback playback;
     private Map<GhostCell, StagePlayback.Placed> placed;
@@ -103,6 +113,8 @@ public final class PreviewScreen extends Screen {
     private int drawnLabels;
     private int drawnSlotOutlines;
     private int drawnStageOutlines;
+    private int drawnLinkStrokes;
+    private int drawnProbes;
     private boolean dragging;
     private boolean panning;
     private boolean draggedSinceClick;
@@ -118,6 +130,8 @@ public final class PreviewScreen extends Screen {
     private boolean outline;
     /** The cursor stage's set stroke, off until the viewer asks (design 17 §5.3). */
     private boolean stageOutline;
+    /** The set page's constraint overlay: on by default, it is the page's point (design 18 §5). */
+    private boolean constraints = true;
     private float explodeT;
     private float explodeTarget;
     private @Nullable Tween explodeTween;
@@ -129,34 +143,83 @@ public final class PreviewScreen extends Screen {
     private Reveal.Direction revealDirection = Reveal.Direction.drop;
     private int revealLegTicks;
     private int animatingCells;
+    private boolean restoredCamera;
     private final Map<Panel, Shading> shading = new EnumMap<>(Panel.class);
     private final Map<Panel, CellOutline> outlines = new EnumMap<>(Panel.class);
+    private final List<LabelHit> labelHits = new ArrayList<>();
+    private final List<LinkHit> linkHits = new ArrayList<>();
     private List<Cell> stageSet = List.of();
 
     private PreviewScreen(Entry entry) {
+        this(entry, null);
+    }
+
+    private PreviewScreen(Entry entry, @Nullable ReturnState returnState) {
         super(Component.literal(entry.blueprintId().text()));
-        this.blueprintId = entry.blueprintId();
+        this.pageId = entry.blueprintId();
         this.entry = entry;
+        this.returnState = returnState;
         this.scene = PreviewScene.of(entry);
-        this.playback = StagePlayback.whole(entry.presentation().stages(), entry.cells());
+        this.playback = StagePlayback.whole(stages(), cells());
         this.placed = index(playback);
-        this.ghostAt = ghosts(entry.cells());
+        this.ghostAt = ghosts(cells());
+        this.explode = explodeModel();
+        this.layout = ScreenLayout.of(320, 240);
+    }
+
+    private PreviewScreen(SetEntry set, @Nullable ReturnState returnState) {
+        super(Component.literal(set.setId().text()));
+        this.pageId = set.setId();
+        this.setEntry = set;
+        this.setPage = SetPage.of(set);
+        this.scene = PreviewScene.ofCells(setPage.cells());
+        this.playback = StagePlayback.whole(setPage.presentation().stages(), setPage.cells());
+        this.placed = index(playback);
+        this.ghostAt = ghosts(setPage.cells());
+        if (returnState != null) {
+            this.camera = returnState.camera();
+            this.explodeT = returnState.explodeT();
+            this.explodeTarget = returnState.explodeT() > 0.5F ? 1.0F : 0.0F;
+            this.constraints = returnState.constraints();
+            this.restoredCamera = true;
+            if (returnState.stage() >= 0) {
+                this.playback = this.playback.enter(returnState.stage());
+            }
+        }
         this.explode = explodeModel();
         this.layout = ScreenLayout.of(320, 240);
     }
 
     /**
      * Opens the page for {@code blueprintId}; an id the snapshot does not carry opens nothing and
-     * answers with the one client message (design 17 §3.4). True when a page opened.
+     * answers with the one client message (design 17 §3.4). A set id opens the set page unless a
+     * blueprint carries the same id, which wins (design 18 §7). True when a page opened.
      */
-    public static boolean open(NamespacedId blueprintId) {
+    public static boolean open(NamespacedId pageId) {
         Minecraft minecraft = Minecraft.getInstance();
-        Entry entry = find(blueprintId);
-        if (entry == null) {
-            say(minecraft, "no preview page for " + blueprintId.text());
+        Entry entry = find(pageId);
+        if (entry != null) {
+            minecraft.setScreen(new PreviewScreen(entry));
+            return true;
+        }
+        SetEntry set = findSet(pageId);
+        if (set != null) {
+            minecraft.setScreen(new PreviewScreen(set, null));
+            return true;
+        }
+        say(minecraft, "no preview page for " + pageId.text());
+        return false;
+    }
+
+    /** Opens the set page by its exact id: the {@code <id>#set} form, never shadowed by a blueprint. */
+    public static boolean openSet(NamespacedId setId) {
+        Minecraft minecraft = Minecraft.getInstance();
+        SetEntry set = findSet(setId);
+        if (set == null) {
+            say(minecraft, "no set preview page for " + setId.text());
             return false;
         }
-        minecraft.setScreen(new PreviewScreen(entry));
+        minecraft.setScreen(new PreviewScreen(set, null));
         return true;
     }
 
@@ -164,6 +227,16 @@ public final class PreviewScreen extends Screen {
     static @Nullable Entry find(NamespacedId blueprintId) {
         for (Entry candidate : PreviewCatalogClient.entries()) {
             if (candidate.blueprintId().equals(blueprintId)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** The last catalogue's set entry for {@code setId}, or null when it carries none. */
+    static @Nullable SetEntry findSet(NamespacedId setId) {
+        for (SetEntry candidate : PreviewCatalogClient.sets()) {
+            if (candidate.setId().equals(setId)) {
                 return candidate;
             }
         }
@@ -192,7 +265,9 @@ public final class PreviewScreen extends Screen {
     protected void init() {
         super.init();
         layout = ScreenLayout.of(width, height);
-        camera = camera.frame(scene.hull(), mainAspect());
+        if (!restoredCamera) {
+            camera = camera.frame(scene.hull(), mainAspect());
+        }
     }
 
     @Override
@@ -207,16 +282,20 @@ public final class PreviewScreen extends Screen {
         double cursorX = pointerX < 0.0D ? mouseX : pointerX;
         double cursorY = pointerY < 0.0D ? mouseY : pointerY;
         hovered = hoveredCell(cursorX, cursorY);
-        graphics.drawString(font, blueprintId.text(), 4, 6, titleColor, false);
+        graphics.drawString(font, pageId.text(), 4, 6, titleColor, false);
         String variant = variantLine();
         if (variant != null) {
-            graphics.drawString(font, variant, 8 + font.width(blueprintId.text()), 6, chromeColor, false);
+            graphics.drawString(font, variant, 8 + font.width(pageId.text()), 6, chromeColor, false);
         }
         drawnCells = 0;
         drawnPlateTiles = 0;
         drawnLabels = 0;
         drawnSlotOutlines = 0;
         drawnStageOutlines = 0;
+        drawnLinkStrokes = 0;
+        drawnProbes = 0;
+        labelHits.clear();
+        linkHits.clear();
         stageSet = stageOutline ? cursorStage() : List.of();
         drawPanel(graphics, layout.main(), Panel.main, false);
         drawPanel(graphics, layout.front(), Panel.front, true);
@@ -225,9 +304,15 @@ public final class PreviewScreen extends Screen {
         graphics.fill(0, layout.control().y(), width, layout.control().y() + layout.control().height(), panelColor);
         drawStageBar(graphics, (int) cursorX, (int) cursorY);
         drawSummary(graphics);
+        drawFooter(graphics);
         drawButtons(graphics, (int) cursorX, (int) cursorY);
         if (hovered != null) {
             drawCellTooltip(graphics, hovered, (int) cursorX, (int) cursorY);
+        } else {
+            String linkTooltip = linkTooltip(cursorX, cursorY);
+            if (linkTooltip != null) {
+                drawTooltip(graphics, linkTooltip, (int) cursorX, (int) cursorY);
+            }
         }
     }
 
@@ -301,6 +386,14 @@ public final class PreviewScreen extends Screen {
             playback = playback.enter(stage);
             return true;
         }
+        if (setEntry != null && button == 0) {
+            for (LabelHit label : labelHits) {
+                if (label.inside(mouseX, mouseY)) {
+                    drillDownMember(label.member());
+                    return true;
+                }
+            }
+        }
         if (button == 0 || button == 2) {
             if (!inside(layout.main(), mouseX, mouseY)) {
                 return false;
@@ -324,8 +417,18 @@ public final class PreviewScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        boolean click = dragging && !draggedSinceClick && button == 0;
+        boolean main = inside(layout.main(), mouseX, mouseY);
         dragging = false;
         panning = false;
+        if (click && main && setEntry != null) {
+            Cell cell = scene.hover(mouseX, mouseY, fitFor(Panel.main), this::sightOf);
+            NamespacedId member = cell == null ? null : memberBlueprint(cell);
+            if (member != null) {
+                drillDown(member);
+                return true;
+            }
+        }
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -519,8 +622,20 @@ public final class PreviewScreen extends Screen {
                 && mouseY < rect.y() + rect.height();
     }
 
+    /** The page's stage table: a blueprint's own, or the members of a set, root first (§4). */
     private List<Stage> stages() {
-        return entry.presentation().stages();
+        if (setPage != null) {
+            return setPage.stages();
+        }
+        return entry == null ? List.of() : entry.presentation().stages();
+    }
+
+    /** The page's cells: the blueprint's, or every member's composed cells (§3). */
+    private List<GhostCell> cells() {
+        if (setPage != null) {
+            return setPage.cells();
+        }
+        return entry == null ? List.of() : entry.cells();
     }
 
     private StagePlayback.Cadence cadence() {
@@ -561,6 +676,9 @@ public final class PreviewScreen extends Screen {
             if (PreviewScene.draws(cell)) {
                 drawn.add(cell.ghost());
             }
+        }
+        if (setPage != null) {
+            return ExplodeModel.of(stages(), drawn, scene.hull(), setPage.bayLabels());
         }
         return ExplodeModel.of(stages(), drawn, scene.hull());
     }
@@ -628,7 +746,28 @@ public final class PreviewScreen extends Screen {
     private List<ButtonSpec> buttonSpecs() {
         List<ButtonSpec> specs = new ArrayList<>();
         specs.add(new ButtonSpec("close", "close (Esc)", this::onClose));
-        specs.add(new ButtonSpec("ghost to world", "open the ordinary session on this page", this::ghostToWorld));
+        if (returnState != null) {
+            specs.add(
+                new ButtonSpec(
+                    "\u2039 " + returnState.setId().text(),
+                    "back to the set page, camera and stage kept",
+                    this::backToSet
+                )
+            );
+        }
+        // a set page has no session: it is a catalogue view, and its one world question is `set check`
+        if (setEntry == null) {
+            specs.add(new ButtonSpec("ghost to world", "open the ordinary session on this page", this::ghostToWorld));
+        }
+        if (setEntry != null) {
+            specs.add(
+                new ButtonSpec(
+                    "constraints",
+                    constraints ? "the set's links and probes: on" : "the set's links and probes: off",
+                    () -> constraints = !constraints
+                )
+            );
+        }
         if (variantCount() > 1) {
             specs.add(new ButtonSpec("\u2039 variant", "the group's previous member", () -> switchVariant(-1)));
             specs.add(new ButtonSpec("variant \u203A", "the group's next member", () -> switchVariant(1)));
@@ -778,6 +917,10 @@ public final class PreviewScreen extends Screen {
             return null;
         }
         Stage stage = stages().get(cursor);
+        if (setPage != null) {
+            // the set page narrates its member, not a placement: the count alone (design 18 §4)
+            return stage.name() + " \u00B7 " + stage.expectedCells() + " cells";
+        }
         return NextStepLine.render(
             playback.stageCells(cursor),
             stage.expectedCells(),
@@ -787,6 +930,31 @@ public final class PreviewScreen extends Screen {
             false,
             false
         );
+    }
+
+    /**
+     * The set page's footer: whether a built campus satisfies a link is `set check`'s question, and the
+     * page says so instead of pretending (design 18 §5).
+     */
+    private void drawFooter(GuiGraphics graphics) {
+        String footer = footerLine();
+        if (footer == null) {
+            return;
+        }
+        int textX = width - font.width(footer) - buttonGap;
+        int titleEnd = 4 + font.width(pageId.text()) + 8;
+        if (textX < titleEnd) {
+            return;
+        }
+        graphics.drawString(font, footer, textX, 6, chromeColor, false);
+    }
+
+    /** The one sentence a set page says about the world it is not reading (design 18 §5). */
+    public @Nullable String footerLine() {
+        if (setEntry == null) {
+            return null;
+        }
+        return "declared set \u00B7 /cumulus set check answers whether a built campus satisfies a link";
     }
 
     private void drawPanel(GuiGraphics graphics, @Nullable Rect rect, Panel panel, boolean label) {
@@ -804,6 +972,9 @@ public final class PreviewScreen extends Screen {
         List<ChromeStroke.Stroke> strokes = new ArrayList<>();
         stageStrokes(fit, strokes);
         slotStrokes(fit, strokes);
+        if (setEntry != null && constraints) {
+            constraintStrokes(fit, strokes);
+        }
         if (hovered != null) {
             PreviewScene.Sight sight = sightOf(hovered);
             if (sight != null) {
@@ -820,6 +991,9 @@ public final class PreviewScreen extends Screen {
         graphics.pose().pushPose();
         graphics.pose().translate(0.0F, 0.0F, PreviewScene.chromeDepth);
         drawLabels(graphics, fit);
+        if (setEntry != null && constraints) {
+            drawConstraintLabels(graphics, fit);
+        }
         graphics.pose().popPose();
         graphics.disableScissor();
         if (label) {
@@ -903,6 +1077,129 @@ public final class PreviewScreen extends Screen {
         }
     }
 
+    /**
+     * The set page's chrome (design 18 §5): links as strokes between the two cells' faces, presence
+     * probes as small crosses, optional members as dashed silhouettes. All of it is chrome — the mark
+     * palette of 15 §5 stays untouched, because these are document facts, not world findings.
+     */
+    private void constraintStrokes(Fit fit, List<ChromeStroke.Stroke> strokes) {
+        SetPage page = setPage;
+        if (page == null) {
+            return;
+        }
+        for (int member : ConstraintOverlay.optionalMembers(page)) {
+            for (Cell cell : scene.cells()) {
+                if (!PreviewScene.draws(cell) || cell.ghost().stageIndex() != member) {
+                    continue;
+                }
+                PreviewScene.Sight sight = sightOf(cell);
+                if (sight == null) {
+                    continue;
+                }
+                CellOutline outline = CellOutline
+                        .of(fit, cell.ghost().cell(), sight.dx(), sight.dy(), sight.dz(), sight.scale());
+                strokes.addAll(dashed(outline.points(), chromeColor));
+            }
+        }
+        for (ConstraintOverlay.LinkLine link : ConstraintOverlay.links(page, explodeT, explode)) {
+            Vector2f from = fit.project(link.segment().ax(), link.segment().ay(), link.segment().az());
+            Vector2f to = fit.project(link.segment().bx(), link.segment().by(), link.segment().bz());
+            if (link.segment().degenerate()) {
+                // the two faces are the same plane: a seam marker, not a zero-length line
+                strokes.add(
+                    new ChromeStroke.Stroke(
+                        List.of(new Vector2f(from.x - 3.0F, from.y), new Vector2f(from.x + 3.0F, from.y)),
+                        constraintColor
+                    )
+                );
+                strokes.add(
+                    new ChromeStroke.Stroke(
+                        List.of(new Vector2f(from.x, from.y - 3.0F), new Vector2f(from.x, from.y + 3.0F)),
+                        constraintColor
+                    )
+                );
+            } else {
+                strokes.add(new ChromeStroke.Stroke(List.of(from, to), constraintColor));
+            }
+            drawnLinkStrokes++;
+        }
+        for (ConstraintOverlay.Probe probe : ConstraintOverlay.probes(page, explodeT, explode)) {
+            Vector2f point = fit.project(probe.x(), probe.y(), probe.z());
+            strokes.add(
+                new ChromeStroke.Stroke(
+                    List.of(new Vector2f(point.x - 2.0F, point.y), new Vector2f(point.x + 2.0F, point.y)),
+                    probeColor
+                )
+            );
+            strokes.add(
+                new ChromeStroke.Stroke(
+                    List.of(new Vector2f(point.x, point.y - 2.0F), new Vector2f(point.x, point.y + 2.0F)),
+                    probeColor
+                )
+            );
+            drawnProbes++;
+        }
+    }
+
+    /** One closed chrome stroke as dashes: an optional member's silhouette (design 18 §5). */
+    private static List<ChromeStroke.Stroke> dashed(List<Vector2f> points, int color) {
+        List<ChromeStroke.Stroke> dashes = new ArrayList<>();
+        if (points.size() < 2) {
+            return dashes;
+        }
+        for (int index = 0; index < points.size(); index++) {
+            Vector2f from = points.get(index);
+            Vector2f to = points.get((index + 1) % points.size());
+            float length = (float) Math.hypot(to.x - from.x, to.y - from.y);
+            if (length < 1.0E-3F) {
+                continue;
+            }
+            float step = 3.0F;
+            int count = Math.max(1, (int) Math.ceil(length / (step * 2.0F)));
+            for (int dash = 0; dash < count; dash++) {
+                float start = dash * step * 2.0F;
+                float end = Math.min(length, start + step);
+                dashes.add(
+                    new ChromeStroke.Stroke(
+                        List.of(interpolate(from, to, start / length), interpolate(from, to, end / length)),
+                        color
+                    )
+                );
+            }
+        }
+        return dashes;
+    }
+
+    private static Vector2f interpolate(Vector2f from, Vector2f to, float t) {
+        return new Vector2f(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+    }
+
+    /** The link captions: {@code actual ≤ max} on the stroke, the metric in its tooltip (design 18 §5). */
+    private void drawConstraintLabels(GuiGraphics graphics, Fit fit) {
+        SetPage page = setPage;
+        if (page == null) {
+            return;
+        }
+        for (ConstraintOverlay.LinkLine link : ConstraintOverlay.links(page, explodeT, explode)) {
+            Vector2f from = fit.project(link.segment().ax(), link.segment().ay(), link.segment().az());
+            Vector2f to = fit.project(link.segment().bx(), link.segment().by(), link.segment().bz());
+            int textX = Math.round((from.x + to.x) * 0.5F) - font.width(link.caption()) / 2;
+            int textY = Math.round((from.y + to.y) * 0.5F) - 9;
+            graphics.drawString(font, link.caption(), textX, textY, constraintColor, false);
+            linkHits.add(new LinkHit(textX - 1, textY - 1, font.width(link.caption()) + 2, 10, link.tooltip()));
+        }
+    }
+
+    /** The one link tooltip of the frame, or null when the cursor is not on a caption (design 18 §5). */
+    private @Nullable String linkTooltip(double mouseX, double mouseY) {
+        for (LinkHit hit : linkHits) {
+            if (hit.inside(mouseX, mouseY)) {
+                return hit.tooltip();
+            }
+        }
+        return null;
+    }
+
     /** Every part's name on its moved centroid, faded with `t` (design 17 §8.2). */
     private void drawLabels(GuiGraphics graphics, Fit fit) {
         if (explodeT <= 0.0F) {
@@ -921,7 +1218,68 @@ public final class PreviewScreen extends Screen {
             int textY = Math.round(point.y) - 4;
             graphics.drawString(font, label.text(), textX, textY, alpha | 0x00C0C0C0, false);
             drawnLabels++;
+            if (setPage != null) {
+                int member = memberOfGroup(groups.get(index));
+                if (member >= 0) {
+                    labelHits.add(new LabelHit(textX - 1, textY - 1, font.width(label.text()) + 2, 10, member));
+                }
+            }
         }
+    }
+
+    /** The member one explode group stands for, or -1 when the group names no stage. */
+    private int memberOfGroup(ExplodeModel.Group group) {
+        for (int index = 0; index < stages().size(); index++) {
+            if (stages().get(index).bay().equals(group.bay())) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    /** The blueprint a member's cell opens, or null on a blueprint page (design 18 §6). */
+    private @Nullable NamespacedId memberBlueprint(Cell cell) {
+        if (setPage == null) {
+            return null;
+        }
+        return setPage.memberBlueprint(setPage.memberOf(cell.ghost()));
+    }
+
+    /** The drill-down of one member index: its blueprint page, never a set page (§6). */
+    private void drillDownMember(int member) {
+        NamespacedId blueprintId = setPage == null ? null : setPage.memberBlueprint(member);
+        if (blueprintId != null) {
+            drillDown(blueprintId);
+        }
+    }
+
+    /** A click on a member's cell or its label: that member's page, with this page's view kept (§6). */
+    private void drillDown(NamespacedId blueprintId) {
+        Entry target = find(blueprintId);
+        if (target == null) {
+            say(Minecraft.getInstance(), "no preview page for " + blueprintId.text());
+            return;
+        }
+        Minecraft.getInstance().setScreen(
+            new PreviewScreen(
+                target,
+                new ReturnState(pageId, currentCamera(), playback.cursor(), explodeT, constraints)
+            )
+        );
+    }
+
+    /** The breadcrumb: back to the set page the drill-down came from, camera and stage kept (§6). */
+    private void backToSet() {
+        ReturnState state = returnState;
+        if (state == null) {
+            return;
+        }
+        SetEntry set = findSet(state.setId());
+        if (set == null) {
+            say(Minecraft.getInstance(), "the set preview page for " + state.setId().text() + " is gone");
+            return;
+        }
+        Minecraft.getInstance().setScreen(new PreviewScreen(set, state));
     }
 
     /** A part with no drawn cell has no anchor, so it has no label (design 17 §8.2). */
@@ -996,7 +1354,7 @@ public final class PreviewScreen extends Screen {
         lines.add(cell.ghost().block().text());
         cell.ghost().properties().entrySet().stream().sorted(Map.Entry.comparingByKey())
                 .forEach(property -> lines.add(property.getKey() + ": " + property.getValue()));
-        List<Stage> stages = entry.presentation().stages();
+        List<Stage> stages = stages();
         int index = cell.ghost().stageIndex();
         if (index >= 0 && index < stages.size()) {
             lines.add("part: " + stages.get(index).name());
@@ -1066,15 +1424,56 @@ public final class PreviewScreen extends Screen {
 
     /** Rebuilds the page in place when the catalogue pushes; a vanished id closes the screen. */
     private void reconcile() {
-        Entry updated = find(blueprintId);
+        if (setEntry != null) {
+            SetEntry updated = findSet(pageId);
+            if (updated == null) {
+                Minecraft minecraft = Minecraft.getInstance();
+                say(minecraft, "the set preview page for " + pageId.text() + " is gone");
+                minecraft.setScreen(null);
+                return;
+            }
+            if (updated != setEntry) {
+                applySetEntry(updated);
+            }
+            return;
+        }
+        Entry updated = find(pageId);
         if (updated == null) {
             Minecraft minecraft = Minecraft.getInstance();
-            say(minecraft, "the preview page for " + blueprintId.text() + " is gone");
+            say(minecraft, "the preview page for " + pageId.text() + " is gone");
             minecraft.setScreen(null);
             return;
         }
         if (updated != entry) {
             applyEntry(updated);
+        }
+    }
+
+    /**
+     * Replaces the set page's entry in place: the scene and the explode model are rebuilt, while the
+     * camera, the explode's `t` and the stage cursor stay where the viewer left them (design 18 §4).
+     */
+    private void applySetEntry(SetEntry updated) {
+        camera = currentCamera();
+        framing = null;
+        framedCursor = -1;
+        setEntry = updated;
+        setPage = SetPage.of(updated);
+        pageId = updated.setId();
+        scene = PreviewScene.ofCells(setPage.cells());
+        int cursor = playback.cursor();
+        playback = StagePlayback.whole(setPage.presentation().stages(), setPage.cells());
+        if (cursor >= 0 && cursor < setPage.presentation().stages().size()) {
+            playback = playback.enter(cursor);
+        }
+        placed = index(playback);
+        ghostAt = ghosts(setPage.cells());
+        reveal = rebuiltReveal();
+        explode = explodeModel();
+        if (!explode.separable()) {
+            explodeT = 0.0F;
+            explodeTarget = 0.0F;
+            explodeTween = null;
         }
     }
 
@@ -1088,7 +1487,7 @@ public final class PreviewScreen extends Screen {
         framing = null;
         framedCursor = -1;
         entry = updated;
-        blueprintId = updated.blueprintId();
+        pageId = updated.blueprintId();
         scene = PreviewScene.of(updated);
         int cursor = playback.cursor();
         playback = StagePlayback.whole(updated.presentation().stages(), updated.cells());
@@ -1120,11 +1519,11 @@ public final class PreviewScreen extends Screen {
      * not switchable and answers with the one client message.
      */
     private void switchVariant(int step) {
-        VariantSummary group = entry.variants();
+        VariantSummary group = entry == null ? null : entry.variants();
         if (group == null || group.members().size() < 2) {
             return;
         }
-        int index = group.indexOf(blueprintId);
+        int index = group.indexOf(pageId);
         if (index < 0) {
             return;
         }
@@ -1140,11 +1539,11 @@ public final class PreviewScreen extends Screen {
 
     /** 15 §12.2's line for the page's member, or null for a standalone page (design 17 §9.5). */
     public @Nullable String variantLine() {
-        VariantSummary group = entry.variants();
+        VariantSummary group = entry == null ? null : entry.variants();
         if (group == null || group.members().size() < 2) {
             return null;
         }
-        int index = group.indexOf(blueprintId);
+        int index = group.indexOf(pageId);
         if (index < 0) {
             return null;
         }
@@ -1154,14 +1553,14 @@ public final class PreviewScreen extends Screen {
 
     /** The group's declared member count, one for a standalone page (design 17 §9.5). */
     public int variantCount() {
-        VariantSummary group = entry.variants();
+        VariantSummary group = entry == null ? null : entry.variants();
         return group == null ? 1 : group.members().size();
     }
 
     /** The page's member index in its group, or -1 for a standalone page. */
     public int variantIndex() {
-        VariantSummary group = entry.variants();
-        return group == null ? -1 : group.indexOf(blueprintId);
+        VariantSummary group = entry == null ? null : entry.variants();
+        return group == null ? -1 : group.indexOf(pageId);
     }
 
     private static void say(Minecraft minecraft, String line) {
@@ -1175,7 +1574,10 @@ public final class PreviewScreen extends Screen {
      * heading, and the screen closes on the click because the ghosts are what the click promised.
      */
     private void ghostToWorld() {
-        PacketDistributor.sendToServer(new PreviewOpenPayload(blueprintId, heading()));
+        if (setEntry != null) {
+            return;
+        }
+        PacketDistributor.sendToServer(new PreviewOpenPayload(pageId, heading()));
         Minecraft.getInstance().setScreen(null);
     }
 
@@ -1229,6 +1631,11 @@ public final class PreviewScreen extends Screen {
     /** The shared camera value, as the frame samples it; the four panels derive their own from it. */
     public SceneCamera camera() {
         return currentCamera();
+    }
+
+    /** The id this page was opened on: a blueprint id or a set id (design 18 §7). */
+    public NamespacedId pageId() {
+        return pageId;
     }
 
     /** The current layout; the four viewport rectangles are recomputed from the screen size. */
@@ -1384,6 +1791,66 @@ public final class PreviewScreen extends Screen {
         return animatingCells;
     }
 
+    /** True when the page is a structure set's composite scene (design 18 §4). */
+    public boolean isSetPage() {
+        return setEntry != null;
+    }
+
+    /** The set page's composed entry, or null on a blueprint page. */
+    public @Nullable SetEntry setEntry() {
+        return setEntry;
+    }
+
+    /** The set page's member stages, root first, or null on a blueprint page (design 18 §4). */
+    public @Nullable SetPage setPage() {
+        return setPage;
+    }
+
+    /** The set page a member page's breadcrumb returns to, or null when nothing drilled down (§6). */
+    public @Nullable ReturnState returnState() {
+        return returnState;
+    }
+
+    /** The constraint overlay's toggle: on by default on a set page, view state (design 18 §5). */
+    public boolean constraintsOn() {
+        return setEntry != null && constraints;
+    }
+
+    /** Link strokes drawn in the last frame, summed over the panels; the overlay's doc-fact chrome. */
+    public int drawnLinkStrokes() {
+        return drawnLinkStrokes;
+    }
+
+    /** Presence-probe crosses drawn in the last frame, summed over the panels (design 18 §5). */
+    public int drawnProbes() {
+        return drawnProbes;
+    }
+
+    /**
+     * The member a click at one panel's point would drill into, or null when no cell of a member is
+     * there: the click's own lookup, so the harness asks exactly what the screen answers (design 18 §6).
+     */
+    public @Nullable NamespacedId memberUnder(int panel, double mouseX, double mouseY) {
+        if (setEntry == null) {
+            return null;
+        }
+        Panel[] panels = Panel.values();
+        if (panel < 0 || panel >= panels.length) {
+            return null;
+        }
+        Cell cell = scene.hover(mouseX, mouseY, fitFor(panels[panel]), this::sightOf);
+        return cell == null ? null : memberBlueprint(cell);
+    }
+
+    /** Where one drawn cell's centre lands in one panel, or null when the panel does not draw it. */
+    public @Nullable Vector2f cellPoint(int panel, LatticePoint at) {
+        Panel[] panels = Panel.values();
+        if (panel < 0 || panel >= panels.length) {
+            return null;
+        }
+        return scene.point(fitFor(panels[panel]), at);
+    }
+
     /** The rectangle one control-strip button occupies, or null when the label is not on the strip. */
     public @Nullable Rect buttonRect(String label) {
         for (Button button : buttons()) {
@@ -1408,6 +1875,25 @@ public final class PreviewScreen extends Screen {
 
         boolean inside(double mouseX, double mouseY) {
             return PreviewScreen.inside(rect, mouseX, mouseY);
+        }
+    }
+
+    /** The set page a drill-down came from: its id and the view state the breadcrumb restores (§6). */
+    public record ReturnState(NamespacedId setId, SceneCamera camera, int stage, float explodeT, boolean constraints) {}
+
+    /** One explode label's screen box and the member it names, so a label click drills (§6). */
+    private record LabelHit(int x, int y, int width, int height, int member) {
+
+        boolean inside(double mouseX, double mouseY) {
+            return PreviewScreen.inside(new Rect(x, y, width, height), mouseX, mouseY);
+        }
+    }
+
+    /** One link caption's screen box and its tooltip, which names the metric (design 18 §5). */
+    private record LinkHit(int x, int y, int width, int height, String tooltip) {
+
+        boolean inside(double mouseX, double mouseY) {
+            return PreviewScreen.inside(new Rect(x, y, width, height), mouseX, mouseY);
         }
     }
 

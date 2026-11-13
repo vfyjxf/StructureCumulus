@@ -183,7 +183,10 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             );
         }
         drawSlider(graphics, recipe, page);
-        drawButton(graphics, mouseX, mouseY);
+        if (!recipe.isSet()) {
+            // a set page has no session to open; its one world question is `set check` (design 18 §5)
+            drawButton(graphics, mouseX, mouseY);
+        }
         drawModeButton(graphics, page, mouseX, mouseY);
         drawVariantRow(graphics, recipe, mouseX, mouseY);
         drawScreenButton(graphics, mouseX, mouseY);

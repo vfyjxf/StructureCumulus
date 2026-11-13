@@ -19,7 +19,7 @@ final class PreviewCatalogSync {
         if (kernel == null) {
             return;
         }
-        PreviewCatalogPayload payload = PreviewCatalog.build(kernel, LevelAccess.documentIds());
+        PreviewCatalogPayload payload = PreviewCatalog.build(kernel, LevelAccess.documentIds(), LevelAccess.setIds());
         players.forEach(player -> sendTo(player, payload));
     }
 

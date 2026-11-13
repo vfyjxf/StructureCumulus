@@ -1,6 +1,8 @@
 package dev.vfyjxf.cumulus.mc.preview.net;
 
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
+import dev.vfyjxf.cumulus.kernel.document.DistanceMetric;
+import dev.vfyjxf.cumulus.kernel.document.LinkMode;
 import dev.vfyjxf.cumulus.kernel.remedy.CellMark;
 import dev.vfyjxf.cumulus.kernel.remedy.Marker;
 import dev.vfyjxf.cumulus.kernel.remedy.MarkerKind;
@@ -124,18 +126,15 @@ final class PreviewCodecs {
     private static void encodeCatalog(RegistryFriendlyByteBuf buffer, PreviewCatalogPayload payload) {
         buffer.writeVarInt(payload.entries().size());
         for (PreviewCatalogPayload.Entry entry : payload.entries()) {
-            writeId(buffer, entry.blueprintId());
-            buffer.writeVarInt(entry.cells().size());
-            for (GhostCell ghost : entry.cells()) {
-                writeGhost(buffer, ghost);
-            }
-            buffer.writeVarInt(entry.materials().size());
-            for (PreviewCatalogPayload.MaterialLine line : entry.materials()) {
-                writeId(buffer, line.item());
-                buffer.writeVarInt(line.count());
-            }
-            writePresentation(buffer, entry.presentation());
-            writeVariants(buffer, entry.variants());
+            writeEntry(buffer, entry);
+        }
+        // trailing-optional: an older client stops after the entries and never sees the sets
+        if (payload.sets().isEmpty()) {
+            return;
+        }
+        buffer.writeVarInt(payload.sets().size());
+        for (PreviewCatalogPayload.SetEntry set : payload.sets()) {
+            writeSetEntry(buffer, set);
         }
     }
 
@@ -143,28 +142,138 @@ final class PreviewCodecs {
         int entryCount = buffer.readVarInt();
         List<PreviewCatalogPayload.Entry> entries = new ArrayList<>(entryCount);
         for (int entry = 0; entry < entryCount; entry++) {
+            entries.add(readEntry(buffer));
+        }
+        if (buffer.readableBytes() <= 0) {
+            return new PreviewCatalogPayload(entries);
+        }
+        int setCount = buffer.readVarInt();
+        List<PreviewCatalogPayload.SetEntry> sets = new ArrayList<>(setCount);
+        for (int set = 0; set < setCount; set++) {
+            sets.add(readSetEntry(buffer));
+        }
+        return new PreviewCatalogPayload(entries, sets);
+    }
+
+    private static void writeEntry(RegistryFriendlyByteBuf buffer, PreviewCatalogPayload.Entry entry) {
+        writeId(buffer, entry.blueprintId());
+        buffer.writeVarInt(entry.cells().size());
+        for (GhostCell ghost : entry.cells()) {
+            writeGhost(buffer, ghost);
+        }
+        writeMaterials(buffer, entry.materials());
+        writePresentation(buffer, entry.presentation());
+        writeVariants(buffer, entry.variants());
+    }
+
+    private static PreviewCatalogPayload.Entry readEntry(RegistryFriendlyByteBuf buffer) {
+        NamespacedId blueprintId = readId(buffer);
+        int cellCount = buffer.readVarInt();
+        List<GhostCell> cells = new ArrayList<>(cellCount);
+        for (int cell = 0; cell < cellCount; cell++) {
+            cells.add(readGhost(buffer));
+        }
+        List<PreviewCatalogPayload.MaterialLine> materials = readMaterials(buffer);
+        return new PreviewCatalogPayload.Entry(
+            blueprintId,
+            cells,
+            materials,
+            readPresentation(buffer),
+            readVariants(buffer)
+        );
+    }
+
+    /** A set entry's members carry composed cells, so the client never maps an orientation (§3). */
+    private static void writeSetEntry(RegistryFriendlyByteBuf buffer, PreviewCatalogPayload.SetEntry set) {
+        writeId(buffer, set.setId());
+        buffer.writeVarInt(set.members().size());
+        for (PreviewCatalogPayload.Member member : set.members()) {
+            writeId(buffer, member.blueprintId());
+            buffer.writeUtf(member.label());
+            buffer.writeBoolean(member.required());
+            buffer.writeVarInt(member.cells().size());
+            for (GhostCell ghost : member.cells()) {
+                writeGhost(buffer, ghost);
+            }
+            buffer.writeVarInt(member.presence().size());
+            for (Cuboid box : member.presence()) {
+                writeCuboid(buffer, box);
+            }
+            buffer.writeVarInt(member.links().size());
+            for (PreviewCatalogPayload.Link link : member.links()) {
+                writeLink(buffer, link);
+            }
+        }
+        writeMaterials(buffer, set.materials());
+    }
+
+    private static PreviewCatalogPayload.SetEntry readSetEntry(RegistryFriendlyByteBuf buffer) {
+        NamespacedId setId = readId(buffer);
+        int memberCount = buffer.readVarInt();
+        List<PreviewCatalogPayload.Member> members = new ArrayList<>(memberCount);
+        for (int index = 0; index < memberCount; index++) {
             NamespacedId blueprintId = readId(buffer);
+            String label = buffer.readUtf();
+            boolean required = buffer.readBoolean();
             int cellCount = buffer.readVarInt();
             List<GhostCell> cells = new ArrayList<>(cellCount);
             for (int cell = 0; cell < cellCount; cell++) {
                 cells.add(readGhost(buffer));
             }
-            int materialCount = buffer.readVarInt();
-            List<PreviewCatalogPayload.MaterialLine> materials = new ArrayList<>(materialCount);
-            for (int material = 0; material < materialCount; material++) {
-                materials.add(new PreviewCatalogPayload.MaterialLine(readId(buffer), buffer.readVarInt()));
+            int presenceCount = buffer.readVarInt();
+            List<Cuboid> presence = new ArrayList<>(presenceCount);
+            for (int box = 0; box < presenceCount; box++) {
+                presence.add(readCuboid(buffer));
             }
-            entries.add(
-                new PreviewCatalogPayload.Entry(
-                    blueprintId,
-                    cells,
-                    materials,
-                    readPresentation(buffer),
-                    readVariants(buffer)
-                )
-            );
+            int linkCount = buffer.readVarInt();
+            List<PreviewCatalogPayload.Link> links = new ArrayList<>(linkCount);
+            for (int link = 0; link < linkCount; link++) {
+                links.add(readLink(buffer));
+            }
+            members.add(new PreviewCatalogPayload.Member(blueprintId, label, required, cells, presence, links));
         }
-        return new PreviewCatalogPayload(entries);
+        return new PreviewCatalogPayload.SetEntry(setId, members, readMaterials(buffer));
+    }
+
+    private static void writeMaterials(RegistryFriendlyByteBuf buffer, List<PreviewCatalogPayload.MaterialLine> lines) {
+        buffer.writeVarInt(lines.size());
+        for (PreviewCatalogPayload.MaterialLine line : lines) {
+            writeId(buffer, line.item());
+            buffer.writeVarInt(line.count());
+        }
+    }
+
+    private static List<PreviewCatalogPayload.MaterialLine> readMaterials(RegistryFriendlyByteBuf buffer) {
+        int count = buffer.readVarInt();
+        List<PreviewCatalogPayload.MaterialLine> lines = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) {
+            lines.add(new PreviewCatalogPayload.MaterialLine(readId(buffer), buffer.readVarInt()));
+        }
+        return lines;
+    }
+
+    private static void writeLink(RegistryFriendlyByteBuf buffer, PreviewCatalogPayload.Link link) {
+        buffer.writeByte(link.mode().ordinal());
+        buffer.writeBoolean(link.parentCell() != null);
+        if (link.parentCell() != null) {
+            writePoint(buffer, link.parentCell());
+        }
+        buffer.writeBoolean(link.satelliteCell() != null);
+        if (link.satelliteCell() != null) {
+            writePoint(buffer, link.satelliteCell());
+        }
+        buffer.writeVarInt(link.maxDistance());
+        buffer.writeByte(link.metric().ordinal());
+    }
+
+    private static PreviewCatalogPayload.Link readLink(RegistryFriendlyByteBuf buffer) {
+        LinkMode[] modes = LinkMode.values();
+        LinkMode mode = modes[buffer.readUnsignedByte()];
+        LatticePoint parent = buffer.readBoolean() ? readPoint(buffer) : null;
+        LatticePoint satellite = buffer.readBoolean() ? readPoint(buffer) : null;
+        int maxDistance = buffer.readVarInt();
+        DistanceMetric[] metrics = DistanceMetric.values();
+        return new PreviewCatalogPayload.Link(mode, parent, satellite, maxDistance, metrics[buffer.readUnsignedByte()]);
     }
 
     /**

@@ -15,16 +15,23 @@ public final class PreviewCatalogClient {
     private static final Set<Runnable> listeners = new CopyOnWriteArraySet<>();
 
     private static volatile List<PreviewCatalogPayload.Entry> entries = List.of();
+    private static volatile List<PreviewCatalogPayload.SetEntry> sets = List.of();
 
     private PreviewCatalogClient() {}
 
     public static void accept(PreviewCatalogPayload payload) {
         entries = payload.entries();
+        sets = payload.sets();
         listeners.forEach(Runnable::run);
     }
 
     public static List<PreviewCatalogPayload.Entry> entries() {
         return entries;
+    }
+
+    /** The catalogue's composed set entries, in the server's order (design 18 §3). */
+    public static List<PreviewCatalogPayload.SetEntry> sets() {
+        return sets;
     }
 
     public static void listen(Runnable listener) {
@@ -37,6 +44,7 @@ public final class PreviewCatalogClient {
 
     public static void clear() {
         entries = List.of();
+        sets = List.of();
         listeners.clear();
     }
 }

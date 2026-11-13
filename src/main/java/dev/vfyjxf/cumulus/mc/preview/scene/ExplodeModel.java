@@ -57,6 +57,19 @@ public record ExplodeModel(
      * and {@code hull} is the box those cells occupy.
      */
     public static ExplodeModel of(List<Stage> stages, List<GhostCell> drawnCells, Hull hull) {
+        return of(stages, drawnCells, hull, Map.of());
+    }
+
+    /**
+     * The model with a display text per bay: a set page's parts are its members, and a label names the
+     * member rather than the page's synthetic grouping key (design 18 §4).
+     */
+    public static ExplodeModel of(
+        List<Stage> stages,
+        List<GhostCell> drawnCells,
+        Hull hull,
+        Map<NamespacedId, String> texts
+    ) {
         Map<NamespacedId, List<LatticePoint>> byBay = new LinkedHashMap<>();
         List<NamespacedId> bayOfStage = new ArrayList<>(stages.size());
         for (Stage stage : stages) {
@@ -94,9 +107,8 @@ public record ExplodeModel(
                 dy /= length;
                 dz /= length;
             }
-            groups.add(
-                new Group(part.getKey(), part.getKey().text(), cells, centre[0], centre[1], centre[2], dx, dy, dz)
-            );
+            String text = texts.getOrDefault(part.getKey(), part.getKey().text());
+            groups.add(new Group(part.getKey(), text, cells, centre[0], centre[1], centre[2], dx, dy, dz));
         }
         groups.sort(Comparator.comparing(Group::bay));
         return new ExplodeModel(groups, bayOfStage, distance, structure[0], structure[1], structure[2]);
@@ -109,7 +121,11 @@ public record ExplodeModel(
 
     /** The cell's displacement at {@code t}; a cell no group holds stays where it is. */
     public Offset offset(GhostCell ghost, float t) {
-        int stage = ghost.stageIndex();
+        return offset(ghost.stageIndex(), t);
+    }
+
+    /** The displacement of one stage's part at {@code t}; the overlay follows exploded members. */
+    public Offset offset(int stage, float t) {
         if (stage < 0 || stage >= bayOfStage.size() || !(t > 0.0F)) {
             return Offset.zero;
         }
