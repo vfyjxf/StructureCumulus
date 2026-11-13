@@ -1040,21 +1040,29 @@ The JEI package keeps exactly the mezz.jei half, plus one button:
 
 ## 11. The demo content (R1, D-105)
 
-R1 is content, not code: two themes of real blueprint documents, shipped in the mod's own resources so
-every player's catalogue carries them. Three documents, because the machine theme is a variant group
-and a group of one is not a group (D-98, `SC-DOC-0002`).
+R1 is content, not code: real blueprint documents and one structure set, shipped in the mod's own
+resources so every player's catalogue carries the blueprints and a world can build the set. Five
+blueprint documents across three themes, because the machine and the station themes are variant
+groups and a group of one is not a group (D-98, `SC-DOC-0002`).
 
 | Id | Theme | Role | Shape |
 | --- | --- | --- | --- |
 | `structurecumulus:demo_machine` | the machine | member 1 of its group (label `full`) | the 5×5×4-ish machine: four bays, four stages, a direction-sensitive part, a full material set |
 | `structurecumulus:demo_machine_compact` | the machine | member 2 (label `compact`) | the same group, a visibly different shape — a variant switch must change the picture, not only the item list |
 | `structurecumulus:demo_tower` | the tower | standalone | the three-bay tower: three stages, a shell, a doorway on the identity front |
+| `structurecumulus:demo_station` | the relay station | member 1 of its group (label `full`) | the 13×11×13 station (SC10, D-111): ten bays, ten stages — a plinth ring, a three-tier self-similar core, four arms in one batch, four satellite pods that are one module at four turns, and an antenna crown; ~480 expected cells against the catalogue's 512 cap |
+| `structurecumulus:demo_station_compact` | the relay station | member 2 (label `compact`) | two pods and two core tiers — the variant switch changes the silhouette, not only the item list |
 
 - **Where.** `src/main/resources/data/structurecumulus/cumulus/structure/demo_machine.json`,
-  `.../demo_machine_compact.json` and `.../demo_tower.json` — the builtin datapack the adapter's
-  `DatapackBlueprints` already scans (`data/<ns>/cumulus/structure/**`), so the documents load on a
-  normal install, appear in every player's catalogue and are previewable by the ordinary command. This
-  is the pack's **only** production-resource change (roadmap §2).
+  `.../demo_machine_compact.json`, `.../demo_tower.json`, `.../demo_station.json` and
+  `.../demo_station_compact.json` — the builtin datapack the adapter's `DatapackBlueprints` already
+  scans (`data/<ns>/cumulus/structure/**`), so the documents load on a normal install, appear in
+  every player's catalogue and are previewable by the ordinary command. The same directory holds
+  `demo_campus.json`, a structure **set** (its `kind` member distinguishes it at read time): it
+  names the station as its root and the machine and the tower as satellites, so one
+  `/cumulus set build` raises the whole demo garden in a world. A set is not a catalogue entry
+  (15 §6.1) — the campus is the in-world exhibit and never a screen page. These files are the
+  pack's **only** production-resource change (roadmap §2).
 - **The marking law.** The id carries the `demo_` segment, and each document's root `description`
   opens by saying it is a demonstration document. Nothing else marks them: no new schema member, no
   code, no filter, no hidden flag, no separate source. The marking is therefore visible exactly where
@@ -1073,11 +1081,34 @@ and a group of one is not a group (D-98, `SC-DOC-0002`).
   4. **The whole screen is exercised.** At least three stages, at least two bays, a non-trivial
      material set, and a group whose two members differ in shape — every screen feature has a document
      to be seen on.
-- **The test law (SC4's gate).** A document compile unit test over the three shipped files: each
-  compiles, its identity projection reports no filter, its bay and stage counts are the ones above, and
-  the group's two members repeat the group declaration identically (`SC-DOC-0017`); a catalogue test
-  that all three ids reach the built payload; and the uitest `demo` scene opens the screen on them.
-  Counts and documentation are refreshed in the landing commit.
+  5. **Generated, and the generator is the source of truth (SC10).** The two station documents are
+     emitted by `tools/gen_demo_station.py`, deterministically; the committed bytes ship, nothing
+     generates at runtime, and `--check` — wired into `check` — byte-compares a regeneration against
+     the committed files, so the repetition no human can audit by eye is audited by a gate. The
+     generator reads no registry: its block table is a hand-written constant list, and the documents
+     it emits obey every law above as if hand-written. The machine and the tower stay hand-authored.
+  6. **Near the cap on purpose.** The station's ~480 expected cells deliberately approach the
+     catalogue's 512 (15 §6.1): the flagship exercises the biggest entry the wire allows, and if a
+     change ever crosses the cap the entry vanishes with its WARNING line — the test law pins the
+     count from both sides, so the flagship can neither shrink into another machine nor overflow
+     into silence.
+- **The satellites are one module at four turns, and the recursion lives in the authoring model
+  (SC10, D-111).** A pod is declared once in the generator and instantiated at Turn 0/1/2/3, so the
+  four pods' local declarations are byte-identical before orientation mapping: the preview and the
+  build both prove the 48-orientation group on real content, not on fixtures, and the exploded view
+  flings the pods outward along their own arms. Documents have no include mechanism and get none —
+  the set is the model's composition answer (`demo_campus`, above), and a nested extent is a
+  capture-time host capability the adapter deliberately ships no provider for (adapter §14): no
+  document content can conjure one, so the demo does not try.
+- **The test law (SC4's gate, extended at SC10).** A document compile unit test over the five shipped
+  blueprints: each compiles, its identity projection reports no filter, its bay and stage counts are
+  the ones above, and each group's two members repeat the group declaration identically
+  (`SC-DOC-0017`); the station's expected-cell count is asserted inside its 450–512 band and its
+  four pods are asserted to be one module at four turns. The campus set gets a compile-and-validate
+  test (its members resolve, its sitings are unique, `SC-SET-0008` does not fire). A catalogue test
+  that every blueprint id reaches the built payload, and the uitest `demo` scene opens the screen on
+  them. The generator's `--check` runs inside `check`. Counts and documentation are refreshed in the
+  landing commit.
 
 ## 12. Codes
 
@@ -1217,6 +1248,7 @@ stays the one place a build is planned (15 §4, 16 §2).
 | SC7 | §4.7 the base plate, §7.5 the Ponder pace, §7.6 the reveal drop-in, §6 the compass as vector strokes |
 | SC8 | §4.1 the JEI face's world light (15 §6.2), §4.7 the slab-block platform |
 | SC9 | §7.1/§7.5 the play's zero state (the hold before the first batch), §7.6 the reveal's two directions and the stamp that carries them, §4.5 the drop/rise button |
+| SC10 | §11 the flagship station, the generator law and the campus set |
 
 SC0 is this file; the gates are the milestone table of
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md), and this file owns the contracts they test.

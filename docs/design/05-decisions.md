@@ -2607,6 +2607,41 @@ block structure belongs on, and a checker the eye parses as paving rather than s
 content — a cell the blueprint never declared — and would collide with the no-marks palette law;
 the plate stays unlit chrome grey.
 
+### D-111 — The flagship demo is generated, its satellites are orientations, and the campus is a set
+
+The viewer asked for something bigger and more complex — satellite structures, recursive
+sub-structures (2026-11-13, after SC9). The screen previews one blueprint at a time, so the flagship
+is one blueprint whose complexity is structural, not raw: `demo_station`, a 13×11×13 relay station
+of ~480 expected cells against the catalogue's 512 cap ([design/17](17-preview-screen.md) §11). Its
+four satellite pods are **one module instantiated at Turn 0/1/2/3** — the "satellite" reading that
+the screen, the exploded view and the 48-orientation group can all perform — and its "recursion" is
+**generative self-similarity**: one pod/tier function in `tools/gen_demo_station.py`, instantiated
+across turns, offsets and tiers, with the committed JSON as the ship artifact and `--check` in
+`check` byte-comparing a regeneration. The set model's own composition answer ships too:
+`demo_campus`, a structure set with the station as root and the machine and tower as satellites —
+the in-world exhibit for `/cumulus set build`, never a catalogue entry (design 15 §6.1).
+
+**Why generated.** A 480-cell hand-written JSON is unauditable repetition; a generator makes the
+repetition a function a reviewer reads, and the byte-compare gate makes the committed file a cache
+of it rather than a second source of truth. Runtime generation was never considered: documents load
+from datapacks, and a document that appears only when a tool ran is a build step wearing a
+document's clothes.
+
+**Why the satellites are not set members.** Four set members would be four catalogue pages; the
+screen's question — what does the station look like, stage by stage — wants one page. The set gets
+the cross-blueprint composition (`demo_campus`), which is what sets are for (design 09).
+
+**Rejected: raising the 512-cell catalogue cap for the flagship.** The cap is a network-frame and
+memory tradeoff (design 15 §6.1), not a content inconvenience; the flagship fits under it by design,
+and its nearness to the cap is a feature — it exercises the biggest entry the wire allows.
+**Rejected: a document include mechanism.** Includes are a public-shape change to the document
+module to serve demo content; the generator answers the same authoring pain without touching the
+schema. **Not attempted: demoing nested extents.** They are a capture-time host capability the
+adapter deliberately ships no provider for (adapter §14); no document can conjure one.
+
+(D-110 is reserved for the viewer's drop/rise reveal pick, which lands after SC9's comparison
+toggle is watched; it is recorded when the pick arrives.)
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
