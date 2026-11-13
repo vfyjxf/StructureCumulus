@@ -186,6 +186,73 @@ class StagePlaybackTest {
         assertEquals(2, playback.revealed(1));
     }
 
+    private static StagePlayback playedThrough() {
+        StagePlayback playback = page().togglePlay(normal);
+        for (int tick = 0; tick < 400 && playback.playing(); tick++) {
+            playback = playback.advance(1.0F, normal);
+        }
+        assertFalse(playback.playing(), "the play reaches the table's end");
+        return playback;
+    }
+
+    @Test
+    void theFinishedPlayIsStoppedWithEveryStageWhole() {
+        StagePlayback finished = playedThrough();
+        assertTrue(finished.finished());
+        assertEquals(1, finished.cursor());
+        assertEquals(3, finished.revealed(0));
+        assertEquals(2, finished.revealed(1));
+
+        assertFalse(page().finished(), "the whole view has no cursor to be finished on");
+        assertFalse(page().togglePlay(normal).finished(), "a running play is not finished");
+        assertFalse(page().enter(1).finished(), "a jump to the last stage leaves the earlier stages short");
+        assertFalse(
+            page().togglePlay(normal).advance(5.0F, normal).togglePlay(normal).finished(),
+            "a pause mid-story is not finished"
+        );
+    }
+
+    @Test
+    void aFinishedPlayReplaysFromTheZeroState() {
+        StagePlayback replay = playedThrough().togglePlay(normal);
+        assertTrue(replay.playing(), "a replay is a play, not a jump");
+        assertEquals(0, replay.cursor(), "a replay starts at the first stage, as a play from the whole view");
+        assertEquals(0, replay.revealed(0));
+        assertEquals(0, replay.revealed(1));
+        assertEquals(0.0F, replay.elapsed(), eps);
+        assertEquals(0.0F, replay.pause(), eps);
+        for (StagePlayback.Placed cell : replay.cells()) {
+            assertEquals(0.0F, replay.alpha(cell), eps, "the replay's opening frame is the empty page");
+        }
+
+        StagePlayback held = replay.advance(1.0F, normal);
+        assertEquals(0, held.revealed(0), "the opening hold runs before the first batch");
+        assertEquals(1.0F, held.pause(), eps);
+        StagePlayback landed = held.advance(4.0F, normal);
+        assertEquals(3, landed.revealed(0), "the hold's end lands the first stage's batch");
+        assertTrue(landed.playing());
+    }
+
+    @Test
+    void aPausedOrJumpedLastStageNeverReplays() {
+        StagePlayback jumped = page().enter(1);
+        assertFalse(jumped.finished());
+        StagePlayback resumed = jumped.togglePlay(normal);
+        assertEquals(1, resumed.cursor(), "a jump's play resumes on that stage instead of starting over");
+        assertEquals(2, resumed.revealed(1), "the jumped stage stays whole on the resume");
+        assertTrue(resumed.playing());
+
+        StagePlayback midStory = page().togglePlay(normal).advance(5.0F, normal).togglePlay(normal);
+        assertFalse(midStory.finished());
+        StagePlayback again = midStory.togglePlay(normal);
+        assertEquals(0, again.cursor());
+        assertEquals(3, again.revealed(0), "a pause mid-story resumes its own stage, never the zero state");
+
+        StagePlayback whole = page().togglePlay(normal);
+        assertEquals(0, whole.cursor(), "the whole view's play still opens on the first stage");
+        assertEquals(0, whole.revealed(0), "the whole view's play still opens empty");
+    }
+
     @Test
     void theDwellIsNotTheCellDrip() {
         StagePlayback playback = page().togglePlay(normal).advance(5.0F, normal).advance(4.0F, normal);
@@ -242,6 +309,10 @@ class StagePlaybackTest {
         assertEquals(0, playback.cursor());
         assertEquals(3, playback.revealed(0));
         assertEquals(2, playback.revealed(1));
+        assertTrue(playback.finished(), "an instant play lands on the finished state");
+        StagePlayback again = playback.togglePlay(StagePlayback.Cadence.of(1.0D, false));
+        assertEquals(3, again.revealed(0), "a replay with no animation never empties the page for a frame");
+        assertEquals(2, again.revealed(1));
     }
 
     @Test

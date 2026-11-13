@@ -1735,7 +1735,9 @@ public record Fit(Hull hull, SceneCamera camera, int x, int y, int width, int he
 // The staged playback of design 17 §7: no cursor is the whole view, a cursor is the staged view. Every
 // stage is hold, batch, dwell: a play holds the pause before a batch lands (the opening hold is the
 // empty page), reveals the stage as one batch, then dwells its span (§7.5); only a manual step drips
-// one cell. An unrevealed cell's alpha is zero: the reveal fills an empty slot (§7.2).
+// one cell. An unrevealed cell's alpha is zero: the reveal fills an empty slot (§7.2). A stopped
+// cursor with every count full is the finished play, and its play control replays from the zero state
+// (§7.3).
 public record StagePlayback(java.util.List<Stage> stages, java.util.List<Placed> cells, int cursor,
                             java.util.List<Integer> revealed, boolean playing, float elapsed, float pause) {
     public static final float doneAlpha;
@@ -1753,6 +1755,7 @@ public record StagePlayback(java.util.List<Stage> stages, java.util.List<Placed>
 
     public static StagePlayback whole(java.util.List<Stage> stages, java.util.List<GhostCell> pageCells);
     public boolean wholeView();
+    public boolean finished();
     public int stageCount();
     public int cellCount(int stage);
     public java.util.List<GhostCell> stageCells(int stage);
@@ -1847,6 +1850,7 @@ public final class PreviewScreen extends Screen {
     public float explodeT();
     public boolean canExplode();
     public boolean outlineMode();
+    public boolean stageOutline();
     public @Nullable String summaryLine();
     public StageBar stageBar();
     public boolean framingActive();
@@ -2741,7 +2745,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC10)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC11)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -2811,7 +2815,17 @@ shape moves: the milestone is documents, one Python tool and the gates around th
 five-blueprint compile law, the station's 450–512 expected-cell band and its four-turn pod
 isomorphism, the campus compile/place/validate law, the catalogue test naming the new ids, and the
 `demo` group's station page (four viewports, ten stages, the switch to the compact silhouette).
-The milestone
+SC11 has landed the viewer's two picks (design 17 §7.1, §7.3, §5.3): `StagePlayback.finished()` is the
+stopped cursor whose every stage's reveal count is full — a jump to the last stage and a pause
+mid-story both leave earlier counts short, so neither is finished and neither replays — and
+`togglePlay` on it starts the same zero-state play a whole-view start does (cursor 0, every count 0,
+`playing`, elapsed and pause zeroed, the opening hold then the first batch), which makes the player's
+third role: the strip's button reads `replay` there instead of `play` and names the restart in its
+tooltip; and the cursor stage's set stroke is now the `stage outline` button's view state, off on
+every fresh screen and never remembered (`PreviewScreen.stageOutline` tells the harness the state, and
+`drawnStageOutlines` counts only what that toggle drew), while the hover's own stroke and outline
+mode's slot strokes are untouched. The button has no key, the delta treatments alone carry the stage
+by default, and the whole view strokes nothing either way. The milestone
 state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
@@ -2845,7 +2859,7 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `BasePlate` | the page's floor of design 17 §4.7: a platform of two-cell slab blocks half a cell thick, snapped one tile past the drawn hull's footprint, two alternating chrome greys, unlit and never a cell |
 | `preview.scene` | `Fit` | the fit of design 17 §4.3: one hull into one viewport through one camera, the scale and the 2D projection the scene, the gizmo and the picking share |
 | `preview.scene` | `ExplodeModel` (with `Group`, `Label`, `Offset`) | the per-bay offset function of design 17 §8.1: the groups, the direction, the half-diagonal distance and the moved label anchors |
-| `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the delta treatments and the reveal counts of design 17 §7, as a pure state machine: every stage is hold, batch, dwell (the opening hold is the empty page), an unrevealed cell is not drawn |
+| `preview.scene` | `StagePlayback` (with `Placed`, `Cadence`) | the whole view, the staged view, the delta treatments and the reveal counts of design 17 §7, as a pure state machine: every stage is hold, batch, dwell (the opening hold is the empty page), an unrevealed cell is not drawn, and a finished play replays from the zero state |
 | `preview.scene` | `NextStepLine` | 16 §12.3's next-step line, the pack's one formatter: the world's HUD and the screen's summary line both read it |
 | `preview.scene` | `AxisGizmo` | the corner compass of design 17 §6: the fixed-pixel triad pinned to the main viewport's top-right corner, a pure function of (camera, rect) |
 | `preview.scene` | `SceneLighting` | the scene's world-fixed two-light law of design 17 §4.1, as a pure function of a camera or of a pass's world-to-view rotation, so the screen and the JEI face share it |

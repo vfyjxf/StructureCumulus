@@ -75,10 +75,12 @@ public final class PreviewScreenStagesScenario {
                     && segments.get(1).x() == segments.get(0).x() + segments.get(0).width() + 1;
         }, () -> String.valueOf(screen().stageBar().segments()))
                 .check(
-                    "the control strip carries the whole view, the player, the step, the arrows and the future toggle",
+                    "the control strip carries the whole view, the player, the step, the arrows and both toggles",
                     () -> {
                         var labels = screen().buttonLabels();
-                        return labels.containsAll(List.of("all", "explode", "play", "step", "<", ">", "hidden"));
+                        return labels.containsAll(
+                            List.of("all", "explode", "play", "step", "<", ">", "stage outline", "hidden")
+                        );
                     },
                     () -> String.valueOf(screen().buttonLabels())
                 ).action("click the stage bar's second segment", context -> {
@@ -123,9 +125,13 @@ public final class PreviewScreenStagesScenario {
                             && line.endsWith("lay the brick ring before the corners");
                 }, () -> String.valueOf(screen().summaryLine()))
                 .check(
-                    "the selected stage's whole set is outlined in every panel",
-                    () -> screen().drawnStageOutlines() == 36,
-                    () -> "stageOutlines=" + screen().drawnStageOutlines()
+                    "the stage outline is off by default: the delta treatments alone carry the cursor's stage",
+                    () -> !screen().stageOutline() && screen().drawnStageOutlines() == 0,
+                    () -> "stageOutline=" + screen().stageOutline() + " strokes=" + screen().drawnStageOutlines()
+                ).action("press the stage outline button", context -> click("stage outline", context)).frames(2).check(
+                    "the stage outline button strokes the cursor's whole set in every panel",
+                    () -> screen().stageOutline() && screen().drawnStageOutlines() == 36,
+                    () -> "stageOutline=" + screen().stageOutline() + " strokes=" + screen().drawnStageOutlines()
                 ).screenshot("screen-stages").frames(2).checkCaptured("screen-stages").check(
                     "hidden is the default and draws no box for the future cells",
                     () -> !screen().outlineMode() && screen().drawnSlotOutlines() == 0,
@@ -199,6 +205,46 @@ public final class PreviewScreenStagesScenario {
                             + screen().camera().targetZ() + " drag=" + targetXAfterDrag + "," + targetYAfterDrag + ","
                             + targetZAfterDrag + " drawnAtDrag=" + drawnAfterDrag
                 ).check(
+                    "the played-through page is the finished state, and the play button reads replay",
+                    () -> screen().playback().finished()
+                            && screen().buttonLabels().contains("replay")
+                            && !screen().buttonLabels().contains("play"),
+                    () -> "finished=" + screen().playback().finished() + " labels=" + screen().buttonLabels()
+                ).action("press Space on the finished play", context -> {
+                    var open = context.screenOrThrow();
+                    context.driver().keyDown(open, GLFW.GLFW_KEY_SPACE, 0, 0);
+                    context.driver().keyUp(open, GLFW.GLFW_KEY_SPACE, 0, 0);
+                }).frames(1)
+                .check(
+                    "a replay starts over at the zero state: the opening frame draws the base plate alone",
+                    () -> screen().playback().playing()
+                            && screen().playback().cursor() == 0
+                            && screen().playback().revealed(0) == 0
+                            && screen().playback().revealed(1) == 0
+                            && screen().playback().pause() > 0.0F
+                            && screen().drawnCells() == 0
+                            && screen().drawnPlateTiles() > 0
+                            && screen().buttonLabels().contains("pause"),
+                    () -> "playing=" + screen().playback().playing() + " cursor=" + screen().playback().cursor()
+                            + " revealed=" + screen().playback().revealed(0) + "/" + screen().playback().revealed(1)
+                            + " pause=" + screen().playback().pause() + " drawn=" + screen().drawnCells() + " labels="
+                            + screen().buttonLabels()
+                ).waitUntil(
+                    "the replay's opening hold runs out and the first batch lands",
+                    () -> screen().playback().revealed(0) == 9
+                ).check(
+                    "the replay's first batch is the first stage whole, as the first play's was",
+                    () -> screen().playback().cursor() == 0 && screen().drawnCells() == 36,
+                    () -> "revealed=" + screen().playback().revealed(0) + " drawn=" + screen().drawnCells()
+                ).waitUntil("the replay walks to the table's end", () -> screen().playback().finished()).check(
+                    "the replayed page ends where the first play did",
+                    () -> screen().playback().cursor() == 1
+                            && screen().playback().revealed(0) == 9
+                            && screen().playback().revealed(1) == 3
+                            && screen().drawnCells() == 48,
+                    () -> "cursor=" + screen().playback().cursor() + " revealed=" + screen().playback().revealed(0)
+                            + "/" + screen().playback().revealed(1) + " drawn=" + screen().drawnCells()
+                ).check(
                     "the exploded-view button is armed on a two-bay page",
                     () -> screen().canExplode() && screen().explodeT() == 0.0F && screen().drawnLabels() == 0
                 )
@@ -228,8 +274,7 @@ public final class PreviewScreenStagesScenario {
                     "arming the explode does not refit the camera",
                     () -> screen().camera().zoom() == zoomBeforeExplode,
                     () -> Float.toString(screen().camera().zoom()) + " vs " + zoomBeforeExplode
-                )
-                .check(
+                ).check(
                     "each part's name is drawn on its moved centroid in all four panels",
                     () -> screen().drawnLabels() == 8
                             && screen().explode().labels(1.0F).stream().map(ExplodeModel.Label::text).toList()
@@ -301,7 +346,31 @@ public final class PreviewScreenStagesScenario {
                     var open = context.screenOrThrow();
                     context.driver().keyDown(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
                     context.driver().keyUp(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
-                }).waitUntil("Esc closes the page", () -> Minecraft.getInstance().screen == null).frames(2);
+                }).waitUntil("Esc closes the page", () -> Minecraft.getInstance().screen == null).frames(2)
+                .action("open the staged page again", context -> PreviewScreen.open(staged)).frames(3)
+                .check(
+                    "a fresh screen opens in the whole view with the stage outline off again",
+                    () -> screen().playback().wholeView() && !screen().stageOutline(),
+                    () -> "whole=" + screen().playback().wholeView() + " stageOutline=" + screen().stageOutline()
+                ).action("click the stage bar's first segment on the fresh page", context -> {
+                    var open = context.screenOrThrow();
+                    var segment = screen().stageBar().segments().get(0);
+                    int y = screen().stageBar().y() + screen().stageBar().height() / 2;
+                    context.driver().mouseDown(open, segment.x() + segment.width() / 2, y, 0);
+                    context.driver().mouseUp(open, segment.x() + segment.width() / 2, y, 0);
+                }).frames(2)
+                .check(
+                    "the reopened page's staged view is bare: the toggle died with the screen",
+                    () -> screen().playback().cursor() == 0
+                            && screen().drawnCells() == 36
+                            && screen().drawnStageOutlines() == 0,
+                    () -> "cursor=" + screen().playback().cursor() + " drawn=" + screen().drawnCells() + " strokes="
+                            + screen().drawnStageOutlines()
+                ).action("Esc closes the reopened page", context -> {
+                    var open = context.screenOrThrow();
+                    context.driver().keyDown(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
+                    context.driver().keyUp(open, GLFW.GLFW_KEY_ESCAPE, 0, 0);
+                }).waitUntil("the reopened page closed", () -> Minecraft.getInstance().screen == null).frames(2);
 
         PreviewScenarioSupport.cleanup(build);
     }

@@ -116,6 +116,8 @@ public final class PreviewScreen extends Screen {
     private @Nullable String summary;
     private @Nullable String barHover;
     private boolean outline;
+    /** The cursor stage's set stroke, off until the viewer asks (design 17 §5.3). */
+    private boolean stageOutline;
     private float explodeT;
     private float explodeTarget;
     private @Nullable Tween explodeTween;
@@ -215,7 +217,7 @@ public final class PreviewScreen extends Screen {
         drawnLabels = 0;
         drawnSlotOutlines = 0;
         drawnStageOutlines = 0;
-        stageSet = cursorStage();
+        stageSet = stageOutline ? cursorStage() : List.of();
         drawPanel(graphics, layout.main(), Panel.main, false);
         drawPanel(graphics, layout.front(), Panel.front, true);
         drawPanel(graphics, layout.side(), Panel.side, true);
@@ -646,16 +648,29 @@ public final class PreviewScreen extends Screen {
                 this::toggleExplode
             )
         );
-        specs.add(
-            new ButtonSpec(
-                playback.playing() ? "pause" : "play",
-                playback.playing() ? "pause the play (Space)" : "play the stages (Space)",
-                this::togglePlay
-            )
-        );
+        String playLabel;
+        String playTooltip;
+        if (playback.playing()) {
+            playLabel = "pause";
+            playTooltip = "pause the play (Space)";
+        } else if (playback.finished()) {
+            playLabel = "replay";
+            playTooltip = "replay the stages from the empty page (Space)";
+        } else {
+            playLabel = "play";
+            playTooltip = "play the stages (Space)";
+        }
+        specs.add(new ButtonSpec(playLabel, playTooltip, this::togglePlay));
         specs.add(new ButtonSpec("step", "one cell step (B)", () -> playback = playback.step()));
         specs.add(new ButtonSpec("<", "previous stage (\u2191)", () -> playback = playback.previous()));
         specs.add(new ButtonSpec(">", "next stage (\u2193)", () -> playback = playback.next()));
+        specs.add(
+            new ButtonSpec(
+                "stage outline",
+                stageOutline ? "the cursor stage's stroke: on" : "the cursor stage's stroke: off, the delta alone",
+                () -> stageOutline = !stageOutline
+            )
+        );
         specs.add(
             new ButtonSpec(
                 outline ? "outline" : "hidden",
@@ -849,8 +864,14 @@ public final class PreviewScreen extends Screen {
         return List.copyOf(cells);
     }
 
-    /** The whole cursor stage stroked in the stage colour, so a stage click highlights its blocks (§5.3). */
+    /**
+     * The cursor stage's whole set stroked in the stage colour, only while the viewer asked for it: the
+     * default is bare, and the delta treatments alone carry the stage (design 17 §5.3).
+     */
     private void stageStrokes(Fit fit, List<ChromeStroke.Stroke> strokes) {
+        if (!stageOutline) {
+            return;
+        }
         for (Cell cell : stageSet) {
             PreviewScene.Sight sight = sightOf(cell);
             if (sight == null) {
@@ -1293,6 +1314,11 @@ public final class PreviewScreen extends Screen {
         return outline;
     }
 
+    /** The cursor stage's set stroke: off by default, on only after its button, never remembered (§5.3). */
+    public boolean stageOutline() {
+        return stageOutline;
+    }
+
     /** The next-step line under the stage bar, or null in the whole view (design 17 §7.4). */
     public @Nullable String summaryLine() {
         return summary;
@@ -1323,7 +1349,7 @@ public final class PreviewScreen extends Screen {
         return drawnSlotOutlines;
     }
 
-    /** The number of cursor-stage silhouettes stroked in the last frame, summed over the panels (§5.3). */
+    /** The number of cursor-stage silhouettes stroked in the last frame with the toggle on, over the panels. */
     public int drawnStageOutlines() {
         return drawnStageOutlines;
     }

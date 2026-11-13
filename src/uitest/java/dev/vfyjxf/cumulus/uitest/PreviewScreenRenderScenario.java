@@ -172,9 +172,13 @@ public final class PreviewScreenRenderScenario {
                 .key(GLFW.GLFW_KEY_HOME, 0).frames(2)
                 .action("open the staged page for the drop-in", context -> PreviewScreen.open(staged)).frames(3)
                 .check(
-                    "the staged page opens with nothing falling",
-                    () -> screen().animatingCells() == 0 && largestDrop() == 0.0F,
-                    () -> "animating=" + screen().animatingCells() + " highest=" + largestDrop()
+                    "the staged page opens with nothing falling, its stage bare by default",
+                    () -> screen().animatingCells() == 0
+                            && largestDrop() == 0.0F
+                            && !screen().stageOutline()
+                            && screen().drawnStageOutlines() == 0,
+                    () -> "animating=" + screen().animatingCells() + " highest=" + largestDrop() + " stageOutline="
+                            + screen().stageOutline() + " strokes=" + screen().drawnStageOutlines()
                 ).key(GLFW.GLFW_KEY_B, 0).frames(2)
                 .check(
                     "a stepped cell falls into an empty slot: it alone is drawn, in every panel",
@@ -185,6 +189,11 @@ public final class PreviewScreenRenderScenario {
                             && largestDrop() <= Reveal.dropCells,
                     () -> "drawn=" + screen().drawnCells() + " revealed=" + screen().playback().revealed(0)
                             + " animating=" + screen().animatingCells() + " highest=" + largestDrop()
+                )
+                .check(
+                    "the stepped stage stays bare: the set stroke is opt-in",
+                    () -> !screen().stageOutline() && screen().drawnStageOutlines() == 0,
+                    () -> "stageOutline=" + screen().stageOutline() + " strokes=" + screen().drawnStageOutlines()
                 ).frames(1)
                 .check(
                     "the falling cell hangs between the plate and its slot, never at either end",
@@ -197,10 +206,12 @@ public final class PreviewScreenRenderScenario {
                     () -> screen().animatingCells() == 8 && largestDrop() <= Reveal.dropCells,
                     () -> "animating=" + screen().animatingCells() + " highest=" + largestDrop()
                 ).frames(1)
+                .action("press the stage outline button during the play", context -> click("stage outline", context))
+                .frames(2)
                 .check(
-                    "the cursor's stage carries the outline on every drawn cell in every panel",
-                    () -> screen().drawnStageOutlines() == 36,
-                    () -> "stageOutlines=" + screen().drawnStageOutlines()
+                    "with the stage outline on, the cursor's stage carries the stroke on every drawn cell",
+                    () -> screen().stageOutline() && screen().drawnStageOutlines() == 36,
+                    () -> "stageOutline=" + screen().stageOutline() + " stageOutlines=" + screen().drawnStageOutlines()
                 ).screenshot("render-play").frames(2).checkCaptured("render-play")
                 .waitUntil("the batch lands five ticks after the reveal", () -> screen().animatingCells() == 0)
                 .check(
@@ -319,6 +330,16 @@ public final class PreviewScreenRenderScenario {
             highest = Math.max(highest, screen().revealOffsetOf(cell.ghost()));
         }
         return highest;
+    }
+
+    private static void click(String label, TestContext context) {
+        PreviewScreen open = screen();
+        ScreenLayout.Rect rect = open.buttonRect(label);
+        if (rect == null) {
+            throw new IllegalStateException("no " + label + " button in " + open.buttonLabels());
+        }
+        context.driver().mouseDown(open, rect.x() + rect.width() / 2, rect.y() + rect.height() / 2, 0);
+        context.driver().mouseUp(open, rect.x() + rect.width() / 2, rect.y() + rect.height() / 2, 0);
     }
 
     private static void hoverMain(TestContext context) {

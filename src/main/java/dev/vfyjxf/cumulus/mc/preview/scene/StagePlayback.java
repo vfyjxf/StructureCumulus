@@ -75,6 +75,23 @@ public record StagePlayback(
         return cursor < 0;
     }
 
+    /**
+     * The finished play of design 17 §7.3: stopped on a cursor with every stage's reveal count full.
+     * A pause mid-story and a jump to the last stage both leave earlier counts short, so neither is
+     * finished and neither replays.
+     */
+    public boolean finished() {
+        if (playing || cursor < 0) {
+            return false;
+        }
+        for (int stage = 0; stage < stages.size(); stage++) {
+            if (revealed(stage) < cellCount(stage)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public int stageCount() {
         return stages.size();
     }
@@ -169,7 +186,8 @@ public record StagePlayback(
 
     /**
      * `Space`: from the whole view the first stage and a play, whose first frames are the empty page
-     * (§7.1); otherwise the running play toggles.
+     * (§7.1); from the finished play the same play over from that same zero state (§7.3); otherwise
+     * the running play toggles.
      */
     public StagePlayback togglePlay(Cadence cadence) {
         if (stages.isEmpty()) {
@@ -181,8 +199,9 @@ public record StagePlayback(
         if (!cadence.enabled()) {
             return enter(cursor < 0 ? 0 : cursor).everythingRevealed();
         }
-        int stage = cursor < 0 ? 0 : cursor;
-        List<Integer> counts = cursor < 0 ? zeroCounts() : revealed;
+        boolean replay = finished();
+        int stage = cursor < 0 || replay ? 0 : cursor;
+        List<Integer> counts = cursor < 0 || replay ? zeroCounts() : revealed;
         return new StagePlayback(stages, cells, stage, counts, true, 0.0F, 0.0F);
     }
 
