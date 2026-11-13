@@ -42,8 +42,10 @@ table defines who may emit each finding code.
 18. [design/17-preview-screen.md](design/17-preview-screen.md) — the preview screen pack: the client
     catalogue view, the camera and its projections, four linked viewports, the axis gizmo, stage
     playback and its delta, the per-bay exploded view, the five entry links and the demo content
-    (specified at SC0 and landed through SC4 — SC1 the screen skeleton and the package migration, SC2
-    the playback and the per-bay exploded view, SC3 the five entry links and SC4 the demo content).
+    (specified at SC0 and landed through SC10 — SC1 the screen skeleton and the package migration, SC2
+    the playback and the per-bay exploded view, SC3 the five entry links, SC4 the demo content, and
+    SC10 the flagship station content: the generated `demo_station` variant group with its `--check`
+    gate and the `demo_campus` structure set).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 
@@ -100,9 +102,14 @@ Then the module files, in dependency order:
   per-bay exploded view, SC3 the five entry links (JEI's button, the client command, the `O` world key,
   ghost to world with the screen's heading, the in-screen variant switch) and SC4 the demo content
   (three demonstration documents in `src/main/resources`, their compile and catalogue tests, and the
-  tour's catalogue act), and SC5 the rendering fixes (the world-fixed scene light and its normal
+  tour's catalogue act), SC5 the rendering fixes (the world-fixed scene light and its normal
   matrix, the silhouette hover outline, the bounded depth band both projections share, and the staged
-  playback's reveal pop-in) are on the tree.
+  playback's reveal pop-in), SC6–SC9 the presentation passes (the batched reveal and its chrome, the
+  base plate and the drop, the JEI face's shared light, and the play's zero state with the two reveal
+  directions), and SC10 the flagship station content (the generated `demo_station` group — a
+  13x11x13 relay station of ten stages whose four satellite pods are one module at four turns — its
+  `tools/gen_demo_station.py` generator with the `--check` gate inside `check`, and the
+  `demo_campus` structure set) are on the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -163,8 +170,8 @@ Then the module files, in dependency order:
   renderers, the JEI category, the preference store and scorer, the structure-set build, and the
   plugin extension tables (`registerMaterializers`/`registerItemSources` over the loader's one
   ordering and failure policy, plus the command's `with <kind-id>` source form). The tree registers
-  657 kernel tests in 75 containers, 711 adapter unit tests in 82 containers and 173 `@GameTest`
-  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 711 adapter tests) and
+  657 kernel tests in 75 containers, 758 adapter unit tests in 87 containers and 173 `@GameTest`
+  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 758 adapter tests) and
   `runGameTestServer` passes 173/173. Pending only: acting on the measured kernel-side cost debts
   and the live-level review items (`07` §7), and fresh visual review screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
@@ -174,13 +181,13 @@ Then the module files, in dependency order:
   mod entry and the adapter. The adapter is the only place allowed to name Minecraft. The `@GameTest`
   classes and their GameTest structure templates live in `src/gametest`, folded into the mod for
   every run and kept out of the published jar (D-77).
-- Verification (2026-11-12): the kernel compiles with
+- Verification (2026-11-13): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 657 kernel JUnit 5 tests (75 test
-  containers), 711 adapter unit tests (82 containers) and 173 `@GameTest` methods; a full
-  `./gradlew check` passes at this revision (657 kernel tests, 711 adapter
+  containers), 758 adapter unit tests (87 containers) and 173 `@GameTest` methods; a full
+  `./gradlew check` passes at this revision (657 kernel tests, 758 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 173/173 GameTests.
-  `Codes.all` has 69 entries and the decision record has 104 decisions
-  (D-105; D-29 and D-36 superseded, D-78 withdrawn).
+  `Codes.all` has 69 entries and the decision record has 109 decisions
+  (D-111; D-29 and D-36 superseded, D-78 withdrawn, D-110 reserved).
 
 ## The one rule
 

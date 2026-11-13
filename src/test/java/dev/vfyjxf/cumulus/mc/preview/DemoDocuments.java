@@ -7,6 +7,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.document.CompileResult;
 import dev.vfyjxf.cumulus.kernel.document.Document;
 import dev.vfyjxf.cumulus.kernel.document.DocumentSource;
+import dev.vfyjxf.cumulus.kernel.document.StructureSetDocument;
 import dev.vfyjxf.cumulus.kernel.finding.Finding;
 import dev.vfyjxf.cumulus.kernel.spi.Catalogs;
 import dev.vfyjxf.cumulus.kernel.spi.Host;
@@ -28,13 +29,19 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The three shipped demonstration documents, read from the mod's own resources and compiled. */
+/**
+ * The five shipped demonstration blueprints and the campus set, read from the mod's own resources
+ * and compiled.
+ */
 final class DemoDocuments {
 
     static final NamespacedId machine = NamespacedId.of("structurecumulus", "demo_machine");
     static final NamespacedId compact = NamespacedId.of("structurecumulus", "demo_machine_compact");
     static final NamespacedId tower = NamespacedId.of("structurecumulus", "demo_tower");
-    static final List<NamespacedId> ids = List.of(machine, compact, tower);
+    static final NamespacedId station = NamespacedId.of("structurecumulus", "demo_station");
+    static final NamespacedId stationCompact = NamespacedId.of("structurecumulus", "demo_station_compact");
+    static final NamespacedId campus = NamespacedId.of("structurecumulus", "demo_campus");
+    static final List<NamespacedId> ids = List.of(machine, compact, tower, station, stationCompact);
 
     private DemoDocuments() {}
 
@@ -63,6 +70,14 @@ final class DemoDocuments {
         JsonDocument parsed = JsonDocument.read(id, text(id), errors);
         assertTrue(errors.isEmpty(), () -> id + " parsed with " + errors);
         return assertInstanceOf(JsonDocument.Blueprint.class, parsed, () -> id + " is a blueprint document").document();
+    }
+
+    /** The shipped campus structure set, read through the same document dispatcher. */
+    static StructureSetDocument set(NamespacedId id) {
+        List<Finding> errors = new ArrayList<>();
+        JsonDocument parsed = JsonDocument.read(id, text(id), errors);
+        assertTrue(errors.isEmpty(), () -> id + " parsed with " + errors);
+        return assertInstanceOf(JsonDocument.StructureSet.class, parsed, () -> id + " is a structure set").document();
     }
 
     /** The raw {@code variants} member, so the two members' declarations can be compared verbatim. */

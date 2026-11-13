@@ -344,6 +344,16 @@ tasks.register('kernelPurity') {
     }
 }
 
+tasks.register('demoStationCheck', Exec) {
+    group = 'verification'
+    description = 'Regenerates the two demo station documents and byte-compares them with the committed files.'
+    commandLine 'python3', 'tools/gen_demo_station.py', '--check'
+    inputs.files(
+        'tools/gen_demo_station.py',
+        'src/main/resources/data/structurecumulus/cumulus/structure/demo_station.json',
+        'src/main/resources/data/structurecumulus/cumulus/structure/demo_station_compact.json')
+}
+
 tasks.register('specCheck', Exec) {
     group = 'verification'
     description = 'Runs the name-level spec gate over the kernel modules and the adapter batches.'
@@ -403,7 +413,8 @@ tasks.named('check') {
 
 tasks.named('check') {
     dependsOn 'kernelTest', 'kernelPurity', 'determinismCheck', 'compileUitestJava', 'compileGametestJava',
-        'verifyRunIsolation', 'verifyHarnessIsolation', 'verifyGameTestIsolation', 'specCheck'
+        'verifyRunIsolation', 'verifyHarnessIsolation', 'verifyGameTestIsolation', 'specCheck',
+        'demoStationCheck'
 }
 
 // The harness runs are the only compositions that load structurecumulusuitest, and the harness is a

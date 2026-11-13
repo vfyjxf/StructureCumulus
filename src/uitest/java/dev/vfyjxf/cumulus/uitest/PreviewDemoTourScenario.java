@@ -38,6 +38,8 @@ public final class PreviewDemoTourScenario {
     private static final NamespacedId demoMachine = NamespacedId.of("structurecumulus", "demo_machine");
     private static final NamespacedId demoCompact = NamespacedId.of("structurecumulus", "demo_machine_compact");
     private static final NamespacedId demoTower = NamespacedId.of("structurecumulus", "demo_tower");
+    private static final NamespacedId demoStation = NamespacedId.of("structurecumulus", "demo_station");
+    private static final NamespacedId demoStationCompact = NamespacedId.of("structurecumulus", "demo_station_compact");
     private static final String floorDescription = "the brick floor";
     private static final String floorHint = "lay the brick ring before the corners";
     private static final String documentDescription = "the staged demo: a brick floor with a chimney above it";
@@ -194,8 +196,9 @@ public final class PreviewDemoTourScenario {
     private static ScenarioBuilder demoContentAct(ScenarioBuilder build) {
         float[] camera = new float[2];
         build = build.waitUntil(
-            "the catalogue carries the three demonstration documents",
-            () -> PreviewJeiProbe.catalogIds().containsAll(List.of(demoMachine, demoCompact, demoTower))
+            "the catalogue carries the five demonstration blueprints",
+            () -> PreviewJeiProbe.catalogIds()
+                    .containsAll(List.of(demoMachine, demoCompact, demoTower, demoStation, demoStationCompact))
         ).check("the tour left no preview session behind", () -> !PreviewProbe.hasSession()).openScreen(() -> {
             PreviewScreen.open(demoMachine);
             return Minecraft.getInstance().screen;

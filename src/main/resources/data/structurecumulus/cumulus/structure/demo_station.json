@@ -1,0 +1,2356 @@
+{
+  "schemaVersion": 1,
+  "id": "structurecumulus:demo_station",
+  "description": "a demonstration document: the relay station - a stepped plinth, a three-tier self-similar core, four cantilever arms, four satellite pods that are one module at four turns, and an antenna crown; ten bays, ten stages, 13x11x13",
+  "bounds": [0, 0, 0, 13, 11, 13],
+  "variants": {
+    "group": "demo_station",
+    "members": [
+      {
+        "id": "structurecumulus:demo_station",
+        "label": "full"
+      },
+      {
+        "id": "structurecumulus:demo_station_compact",
+        "label": "compact"
+      }
+    ]
+  },
+  "bays": [
+    {
+      "id": "plinth",
+      "boxes": [
+        [0, 0, 0, 13, 1, 1],
+        [0, 0, 12, 13, 1, 1],
+        [0, 0, 1, 1, 1, 11],
+        [12, 0, 1, 1, 1, 11],
+        [1, 0, 1, 11, 1, 1],
+        [1, 0, 11, 11, 1, 1],
+        [1, 0, 2, 1, 1, 9],
+        [11, 0, 2, 1, 1, 9],
+        [2, 1, 2, 9, 1, 1],
+        [2, 1, 10, 9, 1, 1],
+        [2, 1, 3, 1, 1, 7],
+        [10, 1, 3, 1, 1, 7],
+        [3, 1, 3, 7, 1, 1],
+        [3, 1, 9, 7, 1, 1],
+        [3, 1, 4, 1, 1, 5],
+        [9, 1, 4, 1, 1, 5]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the stepped stone plinth, two rings wide with a slab landing",
+      "hint": "lay the outer ring first, then the slab steps inside it"
+    },
+    {
+      "id": "core_low",
+      "boxes": [
+        [3, 2, 3, 7, 1, 7],
+        [3, 3, 3, 7, 1, 7],
+        [3, 4, 3, 7, 1, 7],
+        [3, 5, 3, 7, 1, 7]
+      ],
+      "minus": [
+        [4, 2, 4, 5, 4, 5]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the deepslate lower shaft with its lantern corners",
+      "hint": "raise the four lower walls, windows last"
+    },
+    {
+      "id": "core_mid",
+      "boxes": [
+        [4, 6, 4, 5, 1, 5],
+        [4, 7, 4, 5, 1, 5],
+        [4, 8, 4, 5, 1, 5]
+      ],
+      "minus": [
+        [5, 6, 5, 3, 3, 3]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the copper middle shaft",
+      "hint": "stack the copper ring above the deepslate tier"
+    },
+    {
+      "id": "core_high",
+      "box": [5, 9, 5, 3, 1, 3],
+      "minus": [
+        [6, 9, 6, 1, 1, 1]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the quartz upper shaft",
+      "hint": "cap the shaft with its lantern crown"
+    },
+    {
+      "id": "arms",
+      "boxes": [
+        [5, 5, 1, 3, 1, 2],
+        [10, 5, 5, 2, 1, 3],
+        [5, 5, 10, 3, 1, 2],
+        [1, 5, 5, 2, 1, 3]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the cantilever arms that carry the pods",
+      "hint": "run each arm outward in one batch, north and south first"
+    },
+    {
+      "id": "pod_north",
+      "boxes": [
+        [5, 6, 1, 3, 4, 2],
+        [7, 8, 3, 1, 2, 1],
+        [6, 7, 0, 1, 2, 1]
+      ],
+      "minus": [
+        [6, 6, 2, 1, 1, 1]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the north satellite pod",
+      "hint": "build the north pod on its arm, window row facing out"
+    },
+    {
+      "id": "pod_east",
+      "boxes": [
+        [10, 6, 5, 2, 4, 3],
+        [9, 8, 7, 1, 2, 1],
+        [12, 7, 6, 1, 2, 1]
+      ],
+      "minus": [
+        [10, 6, 6, 1, 1, 1]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the east satellite pod",
+      "hint": "build the east pod as the north pod turned once around the core"
+    },
+    {
+      "id": "pod_south",
+      "boxes": [
+        [5, 6, 10, 3, 4, 2],
+        [5, 8, 9, 1, 2, 1],
+        [6, 7, 12, 1, 2, 1]
+      ],
+      "minus": [
+        [6, 6, 10, 1, 1, 1]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the south satellite pod",
+      "hint": "build the south pod as the north pod turned twice around the core"
+    },
+    {
+      "id": "pod_west",
+      "boxes": [
+        [1, 6, 5, 2, 4, 3],
+        [3, 8, 5, 1, 2, 1],
+        [0, 7, 6, 1, 2, 1]
+      ],
+      "minus": [
+        [2, 6, 6, 1, 1, 1]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the west satellite pod",
+      "hint": "build the west pod as the north pod turned three times around the core"
+    },
+    {
+      "id": "crown",
+      "boxes": [
+        [2, 10, 2, 9, 1, 1],
+        [2, 10, 10, 9, 1, 1],
+        [2, 10, 3, 1, 1, 7],
+        [10, 10, 3, 1, 1, 7],
+        [3, 10, 6, 7, 1, 1],
+        [6, 10, 3, 1, 1, 7]
+      ],
+      "coverage": "every_cell",
+      "footprint": "none",
+      "sharing": "shared",
+      "description": "the antenna crown",
+      "hint": "close the ring, then stand the four masts"
+    }
+  ],
+  "checks": [
+    {
+      "id": "plinth_chiseled_stone_bricks_01",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [0, 0, 0]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "plinth_polished_andesite_01",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [0, 0, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:polished_andesite"
+      }
+    },
+    {
+      "id": "plinth_chiseled_stone_bricks_02",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [0, 0, 12]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_01",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_02",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_03",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_04",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_05",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_06",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_07",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_08",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_09",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_10",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_11",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_12",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_13",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_14",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_15",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_16",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_17",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_18",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_19",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_20",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_21",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_22",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_23",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_24",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_25",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_26",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_polished_andesite_02",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 0, 0]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:polished_andesite"
+      }
+    },
+    {
+      "id": "plinth_polished_andesite_03",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 0, 12]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:polished_andesite"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_27",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_28",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_29",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_30",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_31",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_32",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_33",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_34",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_35",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_36",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_37",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_38",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_39",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_40",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_41",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_42",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_43",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_44",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_45",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_46",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_47",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_48",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_49",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_50",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_51",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_52",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_53",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_54",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_55",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_stone_brick_slab_56",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 1, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_slab"
+      }
+    },
+    {
+      "id": "plinth_chiseled_stone_bricks_03",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [12, 0, 0]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "plinth_polished_andesite_04",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [12, 0, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:polished_andesite"
+      }
+    },
+    {
+      "id": "plinth_chiseled_stone_bricks_04",
+      "bay": "plinth",
+      "focus": {
+        "kind": "occupant",
+        "cell": [12, 0, 12]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "plinth_fill",
+      "bay": "plinth",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:stone_bricks"
+        }
+      }
+    },
+    {
+      "id": "core_low_sea_lantern_01",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 2, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_low_glass_01",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 2, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_sea_lantern_02",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 2, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_low_glass_02",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 3, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_glass_03",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 4, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_01",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 5, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_02",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 5, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_03",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 5, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_glass_04",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 2, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_glass_05",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 2, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_glass_06",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 3, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_glass_07",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 3, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_glass_08",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 4, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_glass_09",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 4, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_04",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 5, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_05",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 5, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_sea_lantern_03",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 2, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_low_glass_10",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 2, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_sea_lantern_04",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 2, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_low_glass_11",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 3, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_glass_12",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 4, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_06",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 5, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_07",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 5, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_chiseled_stone_bricks_08",
+      "bay": "core_low",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 5, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_stone_bricks"
+      }
+    },
+    {
+      "id": "core_low_fill",
+      "bay": "core_low",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:deepslate_tiles"
+        }
+      }
+    },
+    {
+      "id": "core_mid_sea_lantern_01",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 6, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_mid_glass_01",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 6, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_sea_lantern_02",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 6, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_mid_glass_02",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 7, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_cut_copper_01",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 8, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:cut_copper"
+      }
+    },
+    {
+      "id": "core_mid_lantern_01",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 8, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "core_mid_cut_copper_02",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 8, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:cut_copper"
+      }
+    },
+    {
+      "id": "core_mid_glass_03",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 6, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_glass_04",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 6, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_glass_05",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 7, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_glass_06",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 7, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_lantern_02",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 8, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "core_mid_lantern_03",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 8, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "core_mid_sea_lantern_03",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 6, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_mid_glass_07",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 6, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_sea_lantern_04",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 6, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_mid_glass_08",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 7, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "core_mid_cut_copper_03",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 8, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:cut_copper"
+      }
+    },
+    {
+      "id": "core_mid_lantern_04",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 8, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "core_mid_cut_copper_04",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 8, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:cut_copper"
+      }
+    },
+    {
+      "id": "core_mid_fill",
+      "bay": "core_mid",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:copper_block"
+        }
+      }
+    },
+    {
+      "id": "core_high_chiseled_quartz_block_01",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 9, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_quartz_block"
+      }
+    },
+    {
+      "id": "core_high_sea_lantern_01",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 9, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_high_chiseled_quartz_block_02",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 9, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_quartz_block"
+      }
+    },
+    {
+      "id": "core_high_sea_lantern_02",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 9, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_high_sea_lantern_03",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 9, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_high_chiseled_quartz_block_03",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 9, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_quartz_block"
+      }
+    },
+    {
+      "id": "core_high_sea_lantern_04",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 9, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "core_high_chiseled_quartz_block_04",
+      "bay": "core_high",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 9, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_quartz_block"
+      }
+    },
+    {
+      "id": "core_high_fill",
+      "bay": "core_high",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:quartz_block"
+        }
+      }
+    },
+    {
+      "id": "arms_fill",
+      "bay": "arms",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:cut_copper"
+        }
+      }
+    },
+    {
+      "id": "pod_north_glass_01",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 7, 1]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_north_end_rod_01",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 9, 1]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "pod_north_sea_lantern_01",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 9, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "pod_north_lightning_rod_01",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 7, 0]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_north_glass_02",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 7, 1]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_north_lightning_rod_02",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 8, 0]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_north_glass_03",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 8, 1]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_north_glass_04",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 7, 1]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_north_chiseled_copper_01",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 8, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_north_chiseled_copper_02",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 9, 3]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_north_fill",
+      "bay": "pod_north",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:smooth_stone"
+        }
+      }
+    },
+    {
+      "id": "pod_east_chiseled_copper_01",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 8, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_east_chiseled_copper_02",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [9, 9, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_east_sea_lantern_01",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 9, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "pod_east_glass_01",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [11, 7, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_east_glass_02",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [11, 7, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_east_glass_03",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [11, 7, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_east_glass_04",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [11, 8, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_east_end_rod_01",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [11, 9, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "pod_east_lightning_rod_01",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [12, 7, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_east_lightning_rod_02",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "occupant",
+        "cell": [12, 8, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_east_fill",
+      "bay": "pod_east",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:smooth_stone"
+        }
+      }
+    },
+    {
+      "id": "pod_south_glass_01",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 7, 11]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_south_chiseled_copper_01",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 8, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_south_chiseled_copper_02",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [5, 9, 9]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_south_glass_02",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 7, 11]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_south_lightning_rod_01",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 7, 12]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_south_glass_03",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 8, 11]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_south_lightning_rod_02",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 8, 12]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_south_glass_04",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 7, 11]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_south_sea_lantern_01",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 9, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "pod_south_end_rod_01",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "occupant",
+        "cell": [7, 9, 11]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "pod_south_fill",
+      "bay": "pod_south",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:smooth_stone"
+        }
+      }
+    },
+    {
+      "id": "pod_west_lightning_rod_01",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [0, 7, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_west_lightning_rod_02",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [0, 8, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lightning_rod"
+      }
+    },
+    {
+      "id": "pod_west_glass_01",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [1, 7, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_west_glass_02",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [1, 7, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_west_glass_03",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [1, 7, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_west_glass_04",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [1, 8, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:glass"
+      }
+    },
+    {
+      "id": "pod_west_end_rod_01",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [1, 9, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "pod_west_sea_lantern_01",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 9, 7]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "pod_west_chiseled_copper_01",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 8, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_west_chiseled_copper_02",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "occupant",
+        "cell": [3, 9, 5]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:chiseled_copper"
+      }
+    },
+    {
+      "id": "pod_west_fill",
+      "bay": "pod_west",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:smooth_stone"
+        }
+      }
+    },
+    {
+      "id": "crown_stone_brick_stairs_01",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 10, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_stairs"
+      }
+    },
+    {
+      "id": "crown_end_rod_01",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 10, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "crown_stone_brick_stairs_02",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [2, 10, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_stairs"
+      }
+    },
+    {
+      "id": "crown_lantern_01",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [4, 10, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "crown_end_rod_02",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 10, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "crown_lantern_02",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 10, 4]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "crown_sea_lantern_01",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 10, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:sea_lantern"
+      }
+    },
+    {
+      "id": "crown_lantern_03",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 10, 8]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "crown_end_rod_03",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [6, 10, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "crown_lantern_04",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [8, 10, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:lantern"
+      }
+    },
+    {
+      "id": "crown_stone_brick_stairs_03",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 10, 2]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_stairs"
+      }
+    },
+    {
+      "id": "crown_end_rod_04",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 10, 6]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:end_rod"
+      }
+    },
+    {
+      "id": "crown_stone_brick_stairs_04",
+      "bay": "crown",
+      "focus": {
+        "kind": "occupant",
+        "cell": [10, 10, 10]
+      },
+      "expect": {
+        "kind": "block",
+        "id": "minecraft:stone_brick_stairs"
+      }
+    },
+    {
+      "id": "crown_fill",
+      "bay": "crown",
+      "focus": {
+        "kind": "bay"
+      },
+      "expect": {
+        "kind": "each_cell",
+        "element": {
+          "kind": "block",
+          "id": "minecraft:polished_andesite"
+        }
+      }
+    }
+  ]
+}

@@ -2741,7 +2741,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC9)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC10)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -2800,7 +2800,18 @@ still carries its tick, now with the direction, the drop falls 2.5 cells and the
 plate's underside (the offset leg starts at `plateBottom − cellY`, so one batch's legs differ in
 length and share their span), and the screen's `drop`/`rise` button is view state with no key, no
 config and no memory (`PreviewScreen.revealDirection` and `revealOffsetOf` tell the harness which
-direction a new stamp takes and how far a cell still has to travel). The milestone
+direction a new stamp takes and how far a cell still has to travel). SC10 has landed the flagship demo content (D-111, design 17 §11): the `demo_station` variant group —
+a 13×11×13 relay station of ten bays and ten stages, its four satellite pods instantiating one
+generated pod at Turn 0/1/2/3 about the core, its compact member two pods and two core tiers —
+emitted by the deterministic `tools/gen_demo_station.py` (a hand-written block table, no registry
+read, no clock and no hash-ordered iteration) with `--check` byte-comparing a regeneration inside
+`check`, plus the hand-written `demo_campus` structure set (the station as root, the machine and the
+tower as satellites with face links back to the plinth) for `/cumulus set build`. No public Java
+shape moves: the milestone is documents, one Python tool and the gates around them — the
+five-blueprint compile law, the station's 450–512 expected-cell band and its four-turn pod
+isomorphism, the campus compile/place/validate law, the catalogue test naming the new ids, and the
+`demo` group's station page (four viewports, ten stages, the switch to the compact silhouette).
+The milestone
 state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell

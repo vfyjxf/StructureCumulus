@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * The catalogue half of design 17 §11's test law: the three shipped demonstration documents reach the
+ * The catalogue half of design 17 §11's test law: the five shipped demonstration blueprints reach the
  * built payload with their stages, their cells and their material lines.
  */
 class PreviewCatalogTest {
@@ -24,9 +24,9 @@ class PreviewCatalogTest {
     private static final StructureKernel kernel = DemoDocuments.kernel();
 
     @Test
-    void theThreeDemoIdsReachTheBuiltPayload() {
+    void theFiveDemoIdsReachTheBuiltPayload() {
         PreviewCatalogPayload catalog = PreviewCatalog.build(kernel, DemoDocuments.ids);
-        assertEquals(3, catalog.entries().size(), () -> catalog.entries().toString());
+        assertEquals(5, catalog.entries().size(), () -> catalog.entries().toString());
         assertEquals(
             DemoDocuments.ids,
             catalog.entries().stream().map(PreviewCatalogPayload.Entry::blueprintId).toList()
@@ -39,10 +39,24 @@ class PreviewCatalogTest {
         assertEntry(catalog.entries().get(0), DemoDocuments.machine, 100, List.of(25, 32, 18, 25), machineMaterials());
         assertEntry(catalog.entries().get(1), DemoDocuments.compact, 54, List.of(9, 32, 4, 9), compactMaterials());
         assertEntry(catalog.entries().get(2), DemoDocuments.tower, 128, List.of(25, 78, 25), towerMaterials());
+        assertEntry(
+            catalog.entries().get(3),
+            DemoDocuments.station,
+            473,
+            List.of(144, 96, 48, 8, 24, 27, 27, 27, 27, 45),
+            stationMaterials()
+        );
+        assertEntry(
+            catalog.entries().get(4),
+            DemoDocuments.stationCompact,
+            323,
+            List.of(120, 72, 32, 12, 21, 21, 45),
+            stationCompactMaterials()
+        );
     }
 
     @Test
-    void theMachinePairCarriesOneGroupAndTheTowerCarriesNone() {
+    void theTwoGroupsShipTheirSummariesAndTheTowerCarriesNone() {
         PreviewCatalogPayload catalog = PreviewCatalog.build(kernel, DemoDocuments.ids);
         VariantSummary machine = catalog.entries().get(0).variants();
         VariantSummary compact = catalog.entries().get(1).variants();
@@ -58,6 +72,20 @@ class PreviewCatalogTest {
         );
         assertEquals(List.of("full", "compact"), machine.members().stream().map(VariantSummary.Member::label).toList());
         assertNull(catalog.entries().get(2).variants(), "the tower is its own page");
+
+        VariantSummary station = catalog.entries().get(3).variants();
+        VariantSummary stationCompact = catalog.entries().get(4).variants();
+        assertNotNull(station, "the station page is a group member");
+        assertEquals(station, stationCompact, "both station members ship the same group summary");
+        assertEquals(NamespacedId.of("structurecumulus", "demo_station"), station.group());
+        assertEquals(
+            List.of(
+                NamespacedId.of("structurecumulus", "demo_station"),
+                NamespacedId.of("structurecumulus", "demo_station_compact")
+            ),
+            station.members().stream().map(VariantSummary.Member::id).toList()
+        );
+        assertEquals(List.of("full", "compact"), station.members().stream().map(VariantSummary.Member::label).toList());
     }
 
     private static void assertEntry(
@@ -150,4 +178,46 @@ class PreviewCatalogTest {
             25
         );
     }
+
+    private static Map<NamespacedId, Integer> stationMaterials() {
+        return Map.ofEntries(
+            Map.entry(NamespacedId.of("minecraft", "chiseled_copper"), 8),
+            Map.entry(NamespacedId.of("minecraft", "chiseled_quartz_block"), 4),
+            Map.entry(NamespacedId.of("minecraft", "chiseled_stone_bricks"), 12),
+            Map.entry(NamespacedId.of("minecraft", "copper_block"), 28),
+            Map.entry(NamespacedId.of("minecraft", "cut_copper"), 28),
+            Map.entry(NamespacedId.of("minecraft", "deepslate_tiles"), 72),
+            Map.entry(NamespacedId.of("minecraft", "end_rod"), 8),
+            Map.entry(NamespacedId.of("minecraft", "glass"), 36),
+            Map.entry(NamespacedId.of("minecraft", "lantern"), 8),
+            Map.entry(NamespacedId.of("minecraft", "lightning_rod"), 8),
+            Map.entry(NamespacedId.of("minecraft", "polished_andesite"), 36),
+            Map.entry(NamespacedId.of("minecraft", "sea_lantern"), 17),
+            Map.entry(NamespacedId.of("minecraft", "smooth_stone"), 68),
+            Map.entry(NamespacedId.of("minecraft", "stone_brick_slab"), 56),
+            Map.entry(NamespacedId.of("minecraft", "stone_brick_stairs"), 4),
+            Map.entry(NamespacedId.of("minecraft", "stone_bricks"), 80)
+        );
+    }
+
+    private static Map<NamespacedId, Integer> stationCompactMaterials() {
+        return Map.ofEntries(
+            Map.entry(NamespacedId.of("minecraft", "chiseled_copper"), 4),
+            Map.entry(NamespacedId.of("minecraft", "chiseled_stone_bricks"), 12),
+            Map.entry(NamespacedId.of("minecraft", "copper_block"), 16),
+            Map.entry(NamespacedId.of("minecraft", "cut_copper"), 16),
+            Map.entry(NamespacedId.of("minecraft", "deepslate_tiles"), 52),
+            Map.entry(NamespacedId.of("minecraft", "end_rod"), 6),
+            Map.entry(NamespacedId.of("minecraft", "glass"), 20),
+            Map.entry(NamespacedId.of("minecraft", "lantern"), 8),
+            Map.entry(NamespacedId.of("minecraft", "lightning_rod"), 4),
+            Map.entry(NamespacedId.of("minecraft", "polished_andesite"), 36),
+            Map.entry(NamespacedId.of("minecraft", "sea_lantern"), 11),
+            Map.entry(NamespacedId.of("minecraft", "smooth_stone"), 22),
+            Map.entry(NamespacedId.of("minecraft", "stone_brick_slab"), 32),
+            Map.entry(NamespacedId.of("minecraft", "stone_brick_stairs"), 4),
+            Map.entry(NamespacedId.of("minecraft", "stone_bricks"), 80)
+        );
+    }
+
 }
