@@ -4,8 +4,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The screen's rectangles (design 17 §5.1): the title strip, the main viewport, the three axis-locked
- * panels and the control strip. A pure function of the screen size; the small panels collapse to
- * nothing when their column has no room and come back when it does.
+ * panels and the control strip. A pure function of the screen size and the control strip's own height,
+ * which the timeline sets for the frame (design 19 §3); the small panels collapse to nothing when their
+ * column has no room and come back when it does.
  */
 public record ScreenLayout(
     Rect title,
@@ -32,17 +33,23 @@ public record ScreenLayout(
     }
 
     public static ScreenLayout of(int width, int height) {
+        return of(width, height, controlHeight);
+    }
+
+    /** The layout with the control strip's frame height: the timeline grows, the panels take the rest. */
+    public static ScreenLayout of(int width, int height, int controlHeight) {
+        int strip = Math.max(0, controlHeight);
         Rect title = new Rect(0, 0, Math.max(0, width), Math.min(titleHeight, Math.max(0, height)));
         Rect control = new Rect(
             0,
-            Math.max(0, height - controlHeight),
+            Math.max(0, height - strip),
             Math.max(0, width),
-            Math.min(controlHeight, Math.max(0, height))
+            Math.min(strip, Math.max(0, height))
         );
         int viewportX = panelGap;
         int viewportY = titleHeight + panelGap;
         int viewportWidth = width - 2 * panelGap;
-        int viewportHeight = height - titleHeight - controlHeight - 2 * panelGap;
+        int viewportHeight = height - titleHeight - strip - 2 * panelGap;
         if (viewportWidth <= 0 || viewportHeight <= 0) {
             return new ScreenLayout(title, Rect.empty, null, null, null, control);
         }

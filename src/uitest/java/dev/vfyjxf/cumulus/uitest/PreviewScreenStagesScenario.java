@@ -9,8 +9,10 @@ import dev.vfyjxf.cumulus.mc.ClientConfig;
 import dev.vfyjxf.cumulus.mc.preview.client.PreviewCatalogClient;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.StageTimeline;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.scene.ExplodeModel;
 import dev.vfyjxf.cumulus.mc.preview.scene.Fit;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewScene;
@@ -19,6 +21,7 @@ import net.minecraft.client.Minecraft;
 import org.joml.Vector2f;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,6 +39,7 @@ import java.util.List;
 public final class PreviewScreenStagesScenario {
 
     private static final NamespacedId staged = NamespacedId.of("structurecumulus", "preview_stages");
+    private static final NamespacedId timelineBay = NamespacedId.of("structurecumulus", "preview_stages/bay");
     private static final NamespacedId probe = NamespacedId.of("structurecumulus", "preview_probe");
     private static final String floorName = "structurecumulus:base";
     private static final String stackName = "structurecumulus:stack";
@@ -67,13 +71,20 @@ public final class PreviewScreenStagesScenario {
             () -> screen().playback().wholeView() && screen().drawnCells() == 48 && screen().summaryLine() == null,
             () -> "whole=" + screen().playback().wholeView() + " drawn=" + screen().drawnCells() + " summary="
                     + screen().summaryLine()
-        ).check("the stage bar is a table of contents: two proportional segments with a one-pixel gap", () -> {
-            var segments = screen().stageBar().segments();
-            return segments.size() == 2
-                    && segments.get(0).width() > segments.get(1).width()
-                    && segments.get(1).width() >= 1
-                    && segments.get(1).x() == segments.get(0).x() + segments.get(0).width() + 1;
-        }, () -> String.valueOf(screen().stageBar().segments()))
+        ).check("the timeline is a table of contents: one lane per bay, its stages as segments in order", () -> {
+            var timeline = screen().timeline();
+            var lanes = timeline.lanes();
+            var segments = timeline.segments();
+            return lanes.size() == 2
+                    && segments.size() == 2
+                    && "structurecumulus:base".equals(lanes.get(0).group())
+                    && "structurecumulus:stack".equals(lanes.get(1).group())
+                    && segments.get(0).index() == 0
+                    && segments.get(1).index() == 1
+                    && segments.get(1).y() > segments.get(0).y()
+                    && segments.get(0).width() >= StageTimeline.minSegmentWidth
+                    && segments.get(1).width() >= StageTimeline.minSegmentWidth;
+        }, () -> String.valueOf(screen().timeline()))
                 .check(
                     "the control strip carries the whole view, the player, the step, the arrows and both toggles",
                     () -> {
@@ -82,16 +93,18 @@ public final class PreviewScreenStagesScenario {
                             List.of("all", "explode", "play", "step", "<", ">", "stage outline", "hidden")
                         );
                     },
-                    () -> String.valueOf(screen().buttonLabels())
-                ).action("click the stage bar's second segment", context -> {
+                    () -> "labels=" + screen().buttonLabels() + " control=" + screen().layout().control() + " timeline="
+                            + screen().timeline().height() + " width=" + screen().width + " height=" + screen().height
+                ).action("click the timeline's second segment", context -> {
                     var open = context.screenOrThrow();
-                    var segment = screen().stageBar().segments().get(1);
-                    int y = screen().stageBar().y() + screen().stageBar().height() / 2;
-                    context.driver().mouseDown(open, segment.x() + segment.width() / 2, y, 0);
-                    context.driver().mouseUp(open, segment.x() + segment.width() / 2, y, 0);
+                    var segment = screen().segmentRect(1);
+                    float x = segment.x() + segment.width() / 2.0F;
+                    float y = segment.y() + segment.height() / 2.0F;
+                    context.driver().mouseDown(open, x, y, 0);
+                    context.driver().mouseUp(open, x, y, 0);
                 }).frames(2)
                 .check(
-                    "a bar click enters the staged view with that stage whole and paused",
+                    "a timeline click enters the staged view with that stage whole and paused",
                     () -> screen().playback().cursor() == 1
                             && screen().playback().revealed(1) == 3
                             && !screen().playback().playing(),
@@ -102,12 +115,38 @@ public final class PreviewScreenStagesScenario {
                             && line.startsWith("place 3\u00D7 minecraft:iron_bars (stage 2/2: " + stackName + ")")
                             && line.endsWith("place it after the floor is complete");
                 }, () -> String.valueOf(screen().summaryLine()))
-                .action("click the stage bar's first segment", context -> {
+                .action("hover the timeline's second segment", context -> {
+                    var segment = screen().segmentRect(1);
+                    float x = segment.x() + segment.width() / 2.0F;
+                    float y = segment.y() + segment.height() / 2.0F;
+                    context.driver().placeCursor(x, y);
+                    context.driver().moveTo(context.screenOrThrow(), x, y);
+                }).frames(2).check("a hovered segment names the stage and its cell count at the tooltip depth", () -> {
+                    var lines = screen().tooltipLines();
+                    return lines != null
+                            && lines.equals(List.of(stackName + " \u00B7 3 cells"))
+                            && screen().tooltipDepth() == PreviewScreen.tooltipZ;
+                }, () -> "lines=" + screen().tooltipLines() + " depth=" + screen().tooltipDepth())
+                .check("a narrow width wraps a lane instead of dropping or shrinking its stages", () -> {
+                    List<Stage> stages = new ArrayList<>();
+                    for (int index = 0; index < 8; index++) {
+                        stages.add(new Stage("stage " + index, 1, 0, null, null, timelineBay, "one part"));
+                    }
+                    StageTimeline narrow = StageTimeline
+                            .of(stages, 60, StageTimeline.Metrics.of(name -> name.length() * 6));
+                    return narrow.lanes().size() == 1
+                            && narrow.lanes().get(0).rows() > 1
+                            && narrow.segments().size() == 8
+                            && narrow.segments().stream()
+                                    .allMatch(segment -> segment.width() >= StageTimeline.minSegmentWidth);
+                }, () -> "narrow=" + StageTimeline.of(List.of(), 60, StageTimeline.Metrics.of(name -> 0)))
+                .action("click the timeline's first segment", context -> {
                     var open = context.screenOrThrow();
-                    var segment = screen().stageBar().segments().get(0);
-                    int y = screen().stageBar().y() + screen().stageBar().height() / 2;
-                    context.driver().mouseDown(open, segment.x() + segment.width() / 2, y, 0);
-                    context.driver().mouseUp(open, segment.x() + segment.width() / 2, y, 0);
+                    var segment = screen().segmentRect(0);
+                    float x = segment.x() + segment.width() / 2.0F;
+                    float y = segment.y() + segment.height() / 2.0F;
+                    context.driver().mouseDown(open, x, y, 0);
+                    context.driver().mouseUp(open, x, y, 0);
                 }).frames(2)
                 .check(
                     "the delta hides the future stage and draws the cursor's own at full alpha",
@@ -159,6 +198,7 @@ public final class PreviewScreenStagesScenario {
                     "a play enters the staged view at the first stage and starts the stage framing",
                     () -> screen().playback().playing()
                             && screen().playback().cursor() == 0
+                            && screen().playheadFraction() == 0.0F
                             && screen().framingActive()
                             && screen().framingArmed(),
                     () -> "playing=" + screen().playback().playing() + " cursor=" + screen().playback().cursor()
@@ -183,8 +223,15 @@ public final class PreviewScreenStagesScenario {
                     targetYAfterDrag = screen().camera().targetY();
                     targetZAfterDrag = screen().camera().targetZ();
                     drawnAfterDrag = screen().drawnCells();
-                }).waitUntil("the play stops at the table's end", () -> !screen().playback().playing()).frames(2)
-                .check(
+                })
+                .waitUntil(
+                    "the play's first batch lands while the play runs",
+                    () -> screen().playback().revealed(0) == 9 && screen().playback().playing()
+                ).check(
+                    "the playhead rides the revealed boundary to the segment's end",
+                    () -> screen().playheadFraction() == 1.0F,
+                    () -> "fraction=" + screen().playheadFraction() + " playing=" + screen().playback().playing()
+                ).waitUntil("the play stops at the table's end", () -> !screen().playback().playing()).frames(2).check(
                     "the whole play fits the new pace: its clock span stays inside the table's own dwells",
                     () -> screen().clock().time() - playStart <= paceTicks() + 5.0D,
                     () -> "ticks=" + (screen().clock().time() - playStart) + " dwells=" + paceTicks()
@@ -193,7 +240,8 @@ public final class PreviewScreenStagesScenario {
                     () -> screen().playback().cursor() == 1
                             && screen().playback().revealed(0) == 9
                             && screen().playback().revealed(1) == 3
-                            && screen().drawnCells() == 48,
+                            && screen().drawnCells() == 48
+                            && screen().playheadFraction() == 0.0F,
                     () -> "cursor=" + screen().playback().cursor() + " revealed=" + screen().playback().revealed(0)
                             + "/" + screen().playback().revealed(1)
                 ).check(
@@ -352,12 +400,13 @@ public final class PreviewScreenStagesScenario {
                     "a fresh screen opens in the whole view with the stage outline off again",
                     () -> screen().playback().wholeView() && !screen().stageOutline(),
                     () -> "whole=" + screen().playback().wholeView() + " stageOutline=" + screen().stageOutline()
-                ).action("click the stage bar's first segment on the fresh page", context -> {
+                ).action("click the timeline's first segment on the fresh page", context -> {
                     var open = context.screenOrThrow();
-                    var segment = screen().stageBar().segments().get(0);
-                    int y = screen().stageBar().y() + screen().stageBar().height() / 2;
-                    context.driver().mouseDown(open, segment.x() + segment.width() / 2, y, 0);
-                    context.driver().mouseUp(open, segment.x() + segment.width() / 2, y, 0);
+                    var segment = screen().segmentRect(0);
+                    float x = segment.x() + segment.width() / 2.0F;
+                    float y = segment.y() + segment.height() / 2.0F;
+                    context.driver().mouseDown(open, x, y, 0);
+                    context.driver().mouseUp(open, x, y, 0);
                 }).frames(2)
                 .check(
                     "the reopened page's staged view is bare: the toggle died with the screen",

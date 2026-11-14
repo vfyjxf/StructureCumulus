@@ -126,10 +126,20 @@ public record ExplodeModel(
 
     /** The displacement of one stage's part at {@code t}; the overlay follows exploded members. */
     public Offset offset(int stage, float t) {
-        if (stage < 0 || stage >= bayOfStage.size() || !(t > 0.0F)) {
+        if (stage < 0 || stage >= bayOfStage.size()) {
             return Offset.zero;
         }
-        NamespacedId bay = bayOfStage.get(stage);
+        return offset(bayOfStage.get(stage), t);
+    }
+
+    /**
+     * The displacement of one grouping key's part at {@code t}: a set page's key is its member, which
+     * several stages share once the server flattened the member's own table (design 19 §2).
+     */
+    public Offset offset(NamespacedId bay, float t) {
+        if (bay == null || !(t > 0.0F)) {
+            return Offset.zero;
+        }
         for (Group group : groups) {
             if (!group.bay().equals(bay)) {
                 continue;

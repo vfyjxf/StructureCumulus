@@ -77,6 +77,8 @@ public final class PreviewScene {
     private final BasePlate plate;
     private final int minY;
     private final int maxY;
+    /** True once a pass has put the GUI's depth state back: the tooltip law's read-back (design 19 §4). */
+    private boolean depthRestored;
 
     private PreviewScene(List<Cell> cells) {
         this.cells = List.copyOf(cells);
@@ -137,6 +139,11 @@ public final class PreviewScene {
     /** The floor the page stands on (§4.7): the drawn hull's own, so no fit, frame or explode sees it. */
     public BasePlate plate() {
         return plate;
+    }
+
+    /** True once a pass has restored the GUI's depth state in its finally (design 19 §4). */
+    public boolean depthRestored() {
+        return depthRestored;
     }
 
     /** The drawn hull of one stage's cells: the stage framing's fit box (design 17 §7.5). */
@@ -254,6 +261,11 @@ public final class PreviewScene {
             // GuiGraphics.flush() disables the depth test around the batch, which would drop this scene's occlusion.
             graphics.bufferSource().endBatch();
         } finally {
+            // the GUI's depth state comes back with the item lighting: a pass that left the test on made
+            // every later 2D draw fail against this scene, the reported "tooltip under everything" (§4)
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
+            depthRestored = true;
             // JEI draws its item icons after this face and needs its own fixed item frame back.
             Lighting.setupFor3DItems();
             pose.popPose();
@@ -416,6 +428,10 @@ public final class PreviewScene {
             }
             graphics.bufferSource().endBatch();
         } finally {
+            // both arms put the GUI back, or a tooltip drawn after them fails the depth comparison (§4)
+            RenderSystem.disableDepthTest();
+            RenderSystem.depthMask(false);
+            depthRestored = true;
             Lighting.setupFor3DItems();
             pose.popPose();
         }

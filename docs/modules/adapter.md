@@ -1367,8 +1367,14 @@ public record SitingCandidate(Siting siting, int score) { }
 public record GhostCell(LatticePoint cell, NamespacedId block, java.util.Map<String, String> properties,
                         int stageIndex) { }
 
+// The stage's `group` is trailing-optional in the stage table: a stage without one reads as null and a
+// payload that predates the field still names its bay (design 19 §2).
 public record Stage(String name, int expectedCells, int satisfiedCells,
-                    @Nullable String hint, @Nullable String description, NamespacedId bay) { }
+                    @Nullable String hint, @Nullable String description, NamespacedId bay,
+                    @Nullable String group) {
+    public Stage(String name, int expectedCells, int satisfiedCells, @Nullable String hint,
+                 @Nullable String description, NamespacedId bay);
+}
 
 public record PreviewPresentation(@Nullable String description, java.util.List<Stage> stages, int currentStage,
                                   java.util.List<MaterialStatus> materials, int moreMaterials) { }
@@ -1386,9 +1392,14 @@ public record PreviewCatalogPayload(java.util.List<Entry> entries, java.util.Lis
                         @Nullable VariantSummary variants) { }
 
     // One structure set, composed server-side into pure geometry and trailing-optional on the wire
-    // (design 18 §3): an older client reads the entries and never sees the sets.
+    // (design 18 §3): an older client reads the entries and never sees the sets. `stages` is the
+    // flattened (member x member-stage) table of design 19 §2, itself trailing-optional after the sets.
     public record SetEntry(NamespacedId setId, java.util.List<Member> members,
-                           java.util.List<MaterialLine> materials) { }
+                           java.util.List<MaterialLine> materials, java.util.List<Stage> stages) {
+        public SetEntry(NamespacedId setId, java.util.List<Member> members,
+                        java.util.List<MaterialLine> materials);
+        public static NamespacedId memberBay(NamespacedId setId, int member);
+    }
 
     public record Member(NamespacedId blueprintId, String label, boolean required,
                          java.util.List<GhostCell> cells, java.util.List<Cuboid> presence,
@@ -1584,11 +1595,13 @@ public final class PreviewScene {
     public Panel draw(GuiGraphics graphics, Fit fit);
     public Panel draw(GuiGraphics graphics, Fit fit, Treatment treatment);
     public Hull hull(int stage);
+    public boolean depthRestored();
     public static boolean draws(Cell cell);
 }
 
-// A structure set's page derived on the client from the catalogue's composed entry: the members are
-// the stages, root first, and the member labels are the stage names (design 18 §4).
+// A structure set's page read from the catalogue's composed entry: the stage table is the server's
+// flattened (member x member-stage) build, root first, and every stage carries its member's key and
+// label (design 19 §2). An older payload with no table falls back to one stage per member.
 public record SetPage(PreviewCatalogPayload.SetEntry entry, java.util.List<Stage> stages,
                       java.util.List<GhostCell> cells, java.util.Map<NamespacedId, String> bayLabels) {
     public static SetPage of(PreviewCatalogPayload.SetEntry entry);
@@ -1596,6 +1609,8 @@ public record SetPage(PreviewCatalogPayload.SetEntry entry, java.util.List<Stage
     public NamespacedId id();
     public PreviewPresentation presentation();
     public int memberOf(GhostCell ghost);
+    public int memberOfStage(int stage);
+    public int memberOfBay(NamespacedId bay);
     public @Nullable NamespacedId memberBlueprint(int member);
 }
 
@@ -1842,6 +1857,7 @@ public record ExplodeModel(java.util.List<Group> groups, java.util.List<Namespac
     public boolean separable();
     public Offset offset(GhostCell ghost, float t);
     public Offset offset(int stage, float t);
+    public Offset offset(NamespacedId bay, float t);
     public java.util.List<Label> labels(float t);
     public float[] structureCentroid();
 }
@@ -1871,11 +1887,13 @@ public record ScreenLayout(Rect title, Rect main, @Nullable Rect front, @Nullabl
     }
 
     public static ScreenLayout of(int width, int height);
+    public static ScreenLayout of(int width, int height, int controlHeight);
 }
 
 // The one screen of design 17 §5: the page looked up in the last catalogue, one shared camera and the
 // four derived viewports.
 public final class PreviewScreen extends Screen {
+    public static final int tooltipZ;
     public static boolean open(NamespacedId pageId);
     public static boolean openSet(NamespacedId setId);
     @Override public void added();
@@ -1907,7 +1925,14 @@ public final class PreviewScreen extends Screen {
     public boolean outlineMode();
     public boolean stageOutline();
     public @Nullable String summaryLine();
-    public StageBar stageBar();
+    public StageTimeline timeline();
+    public int timelineScroll();
+    public @Nullable Rect segmentRect(int index);
+    public float playheadFraction();
+    public float tooltipDepth();
+    public @Nullable java.util.List<String> tooltipLines();
+    public @Nullable Rect tooltipBox();
+    public boolean sceneDepthRestored();
     public boolean framingActive();
     public boolean framingArmed();
     public int drawnLabels();
@@ -1950,13 +1975,48 @@ public record ScreenClock(int ticks, float fraction) {
     public float time();
 }
 
-// The stage bar of design 17 §7.3: one segment per stage, wide in proportion to its expected cells
-// with a 1 px floor and a 1 px gap, left to right. A table of contents, never a progress bar.
-public record StageBar(java.util.List<Segment> segments, int x, int y, int width, int height) {
-    public record Segment(int index, int x, int width) { }
-    public static StageBar of(java.util.List<Stage> stages, int x, int y, int width, int height);
-    public int hit(double mouseX, double mouseY);
-    public boolean fits(int index, int textWidth);
+// The stage timeline of design 19 §3: one lane per group, its stages as segments in index order, a
+// lane wrapping when it overflows, the strip growing to the cap and then scrolling. A table of
+// contents, never a progress bar; the only marks are the cursor, the hover and the playhead.
+public record StageTimeline(java.util.List<Lane> lanes, java.util.List<Segment> segments,
+                            int width, int contentHeight, int height) {
+    public static final int laneHeight;
+    public static final int laneGap;
+    public static final int segmentGap;
+    public static final int minSegmentWidth;
+    public static final int headMinWidth;
+    public static final int headMaxWidth;
+    public static final int wrapIndent;
+    public static final int namePad;
+    public static final int timelineMaxHeight;
+    public static final int scrollStepPx;
+
+    public record Metrics(int laneHeight, int laneGap, int segmentGap, int minSegmentWidth,
+                          int headMinWidth, int headMaxWidth, int wrapIndent, int maxHeight,
+                          java.util.function.ToIntFunction<String> textWidth) {
+        public static Metrics of(java.util.function.ToIntFunction<String> textWidth);
+    }
+
+    public record Lane(String group, int y, int headWidth, int rows, int firstStage, int stageCount,
+                       int rowHeight) {
+        public int bottom();
+    }
+
+    public record Segment(int index, int x, int y, int width, boolean named, int height) { }
+
+    public static StageTimeline of(java.util.List<Stage> stages, int width, Metrics metrics);
+    public static String groupOf(Stage stage);
+    public static String hoverText(Stage stage);
+    public static float playheadFraction(boolean playing, int revealed, int cells);
+    public boolean scrollable();
+    public int maxScroll();
+    public int clampScroll(int scroll);
+    public @Nullable Segment segment(int index);
+    public @Nullable Lane lane(int index);
+    public int hit(int localX, int localY);
+    public @Nullable Lane headAt(int localX, int localY);
+    public int scrollForVisible(int scroll, int index);
+    public int playheadX(int index, boolean playing, int revealed, int cells);
 }
 
 // One stage-framing flight of design 17 §7.5: the eased 12-tick leg from the camera the play found to
@@ -2814,7 +2874,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC12)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC13)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -2828,7 +2888,8 @@ conditional plugin and its loader pass, `JeiPreview` and its client events. The 
 D-101…D-105. SC1 has landed the migration, the stage's `bay` on both payloads, `PreviewScreen`, the
 camera and projection, the four viewports, the axes, the screen's own clock, the hover and the
 drawn-hull fit (the JEI view takes the same hull change and keeps its own camera). SC2 has landed the
-staged playback and the delta treatments (`StagePlayback`, `StageBar`, `StageFraming`), the exploded
+staged playback and the delta treatments (`StagePlayback`, `StageBar` — rebuilt as `StageTimeline`
+at SC13 — and `StageFraming`), the exploded
 view (`ExplodeModel`) and the one next-step formatter both surfaces read (`NextStepLine`). SC3 has
 landed the links: the JEI face's `open in screen` button (`JeiPreview.openScreen`, on the selected
 member and with no packet), the client command (`/cumulus preview screen <id>` registered on
@@ -2910,17 +2971,32 @@ untouched), the `constraints` button is view state on by default, a member cell 
 that member's page and the `‹ <set id>` breadcrumb returns through `PreviewScreen.ReturnState` with the
 camera and stage kept, and the JEI category lists set pages beside blueprint pages (with no
 `Ghost to world` there) and opens the set from `open in screen`. `PreviewClientCommand` parses the
-`<id>#set` qualifier, with a bare id resolving the blueprint first (design 18 §7). The milestone
-state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
+`<id>#set` qualifier, with a bare id resolving the blueprint first (design 18 §7). SC13 has landed
+the grouped stage and its timeline ([design/19](../design/19-stage-timeline.md) §2–§4, D-113): every
+`net.Stage` carries a trailing-optional `group` (a bay's name on a blueprint page, the member's label
+on a set page), the set entry derives each member's own `StageModel` and flattens (member ×
+member-stage) into one table whose cells name the flattened index — the server composes it, the
+client derives nothing — with each member's stages sharing that member's grouping key so the explode
+still separates members, the summary line is the same `NextStepLine` on both page kinds, and the
+stage bar is `StageTimeline`: lanes in build order, inclusive-of-overflow wrapping, a legible segment
+floor, a strip capped at `timelineMaxHeight` with a chrome scrollbar and the cursor's segment kept in
+view, and a playhead on the cursor's segment. The scene pass now restores the GUI's depth state in
+both arms (`RenderSystem.disableDepthTest()` and `depthMask(false)` beside the lighting restore, with
+`PreviewScene.depthRestored()` telling the harness it ran), and every screen tooltip — cell, link,
+button and timeline — draws last at `PreviewScreen.tooltipZ` = 400, vanilla's own tooltip depth, with
+`tooltipDepth`, `tooltipLines` and `tooltipBox` as the read-back. The milestone state lives in
+[`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
-**Wire additions (SC1 and SC3).** The cell shape does not move: `GhostCell` stays the one expected-cell
-record every surface shares.
+**Wire additions (SC1, SC3 and SC13).** The cell shape does not move: `GhostCell` stays the one
+expected-cell record every surface shares.
 
 | Shape | Component | Direction | Cap |
 | --- | --- | --- | --- |
 | `net.Stage` | `NamespacedId bay`, the bay the stage derives from | S2C on both the session payload and every catalog entry | none of its own: a bay with a drawn cell owns at least one stage, and the table is capped at `maxStages` = 256, so the distinct bays cannot exceed the stages |
+| `net.Stage` | `@Nullable String group`, the part of the document the stage belongs to (SC13) | S2C on both payloads, trailing-optional as the stage table's last field per stage | none: the group is one of the table's own labels, so it can never exceed the stage count |
 | `net.PreviewOpenPayload` | `@Nullable Heading facing`, the direction the viewer faces | C2S, the existing open channel | an enum, never a list; the four horizons are accepted and `up`/`down` read as absent |
 | `net.PreviewCatalogPayload` | `List<SetEntry> sets`, the composed set entries | S2C catalog, trailing optional after the blueprint entries | per set: 1024 composed cells and 64 material lines; the unchanged 4096 whole-catalogue cap counts set entries |
+| `net.PreviewCatalogPayload.SetEntry` | `List<Stage> stages`, the flattened (member × member-stage) table (SC13) | S2C catalog, a trailing block after every set entry (set id plus its table), so an older reader stops after the members | the per-blueprint `maxStages` = 256 bounds each member's half; the set's table is the sum of its members and adds no cap of its own |
 
 `PreviewService.open` keeps its two entry points: the player-facing one passes the player's own facing
 as today, and the ghost-to-world one passes the payload's heading where that facing goes, so the
@@ -2952,13 +3028,13 @@ adds no public type; the two entry points it and the JEI button call — `Previe
 | `preview.scene` | `CellOutline` | one cell's projected silhouette (the convex hull of its eight projected corners), the outline geometry of design 17 §5.3 |
 | `preview.scene` | `ChromeStroke` | the stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded endpoints, drawn at `chromeDepth` with the depth test off |
 | `preview.scene` | `Reveal` (with `Direction`) | the staged playback's reveal of design 17 §7.6: per-cell stamps carrying their tick and their direction, the `outCubic` drop from 2.5 cells or the rise from the base plate's underside to the slot, and the fade that runs with it |
-| `preview.scene` | `SetPage` | the set page derived from one composed set entry: one stage per member (root first, the member labels), the flattened composed cells and the member-to-blueprint lookup of design 18 §4 |
+| `preview.scene` | `SetPage` | the set page read from one composed set entry: the server's flattened (member × member-stage) table of design 19 §2, each stage naming its member and grouping key, the composed cells and the member-to-blueprint lookup; an older payload with no table falls back to one stage per member |
 | `preview.scene` | `ConstraintOverlay` (with `LinkLine`, `Probe`, `Segment`) | the set page's chrome as pure geometry of design 18 §5: a link stroke between the two cells' faces with its `actual ≤ max` caption, the declared presence cells and the optional members' dashed silhouettes; no world read |
 | `preview.scene` | `CellStates`, `TintedBuffers` | the payload-to-`BlockState` resolution and the forced-alpha pass, moved from `preview.client`; `PreviewScene`'s private duplicate of the first is deleted |
-| `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size |
+| `preview.client.screen` | `ScreenLayout` (with its `Rect`) | the four viewport rectangles and the two strips of design 17 §5.1, a pure function of the screen size and the control strip's own frame height (design 19 §3) |
+| `preview.client.screen` | `StageTimeline` (with `Lane`, `Segment`, `Metrics`) | the stage timeline of design 19 §3: lanes in build order, proportional segments with a legible floor, wrapping, the height cap and the scroll, the hit test and the playhead, a pure function of the table, the width and the text metrics |
 | `preview.client.screen` | `ScreenClock` | the screen's own two-number clock of design 17 §4.6, advanced by the frame's real-time tick delta |
 | `preview.client.screen` | `PreviewScreen` | the one `Screen`: the layout, the four viewports, the input, the widgets, the stage player and the exploded view |
-| `preview.client.screen` | `StageBar` (with `Segment`) | the table-of-contents bar of design 17 §7.3: proportional segments, a 1 px floor, a 1 px gap and the hit test |
 | `preview.client.screen` | `StageFraming` | the 12-tick `inOutCubic` stage-framing leg of design 17 §7.5 and its hand-back |
 
 The screen's `SceneCamera` is a turntable — yaw about the world's vertical, pitch above the horizon —
@@ -2966,7 +3042,7 @@ so its default 45°/35.264° is the true isometric view. The JEI face keeps its 
 tilt (design 16 §11), so the migration changes no JEI picture: the two surfaces have two cameras.
 SC1 landed the viewports, the input table and the button row inside one `PreviewScreen` class rather
 than one class per widget, and SC2 keeps that shape: `StagePlayback` owns the player's state,
-`StageBar` its geometry and `StageFraming` its leg. SC3's one world action joins as a method of the
+`StageTimeline` its geometry (SC13 replaced SC2's `StageBar`) and `StageFraming` its leg. SC3's one world action joins as a method of the
 screen, not as a second class.
 
 **The stage framing's screen reading.** Design 17 §7.5 borrows 16 §6.7.2's `stageShot` and its 12-tick

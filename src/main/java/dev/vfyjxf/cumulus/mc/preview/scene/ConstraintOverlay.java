@@ -62,8 +62,8 @@ public final class ConstraintOverlay {
         List<LinkLine> lines = new ArrayList<>();
         for (int member = 0; member < page.entry().members().size(); member++) {
             PreviewCatalogPayload.Member spec = page.entry().members().get(member);
-            ExplodeModel.Offset satellite = explode.offset(member, t);
-            ExplodeModel.Offset parent = explode.offset(0, t);
+            ExplodeModel.Offset satellite = explode.offset(SetPage.bay(page.id(), member), t);
+            ExplodeModel.Offset parent = explode.offset(SetPage.bay(page.id(), 0), t);
             for (PreviewCatalogPayload.Link link : spec.links()) {
                 if (link.mode() == LinkMode.none || link.parentCell() == null || link.satelliteCell() == null) {
                     continue;
@@ -87,7 +87,7 @@ public final class ConstraintOverlay {
     public static List<Probe> probes(SetPage page, float t, ExplodeModel explode) {
         List<Probe> probes = new ArrayList<>();
         for (int member = 0; member < page.entry().members().size(); member++) {
-            ExplodeModel.Offset offset = explode.offset(member, t);
+            ExplodeModel.Offset offset = explode.offset(SetPage.bay(page.id(), member), t);
             for (Cuboid box : page.entry().members().get(member).presence()) {
                 for (int x = box.min().x(); x < box.max().x(); x++) {
                     for (int y = box.min().y(); y < box.max().y(); y++) {

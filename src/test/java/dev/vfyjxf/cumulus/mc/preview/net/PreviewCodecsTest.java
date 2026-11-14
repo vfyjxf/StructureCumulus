@@ -99,6 +99,97 @@ class PreviewCodecsTest {
         assertEquals(List.of(), decoded.sets());
     }
 
+    @Test
+    void aStageCarriesItsGroupAndAnAbsentGroupCostsOneByte() {
+        Stage grouped = new Stage("root \u00B7 hearth", 9, 0, null, null, hearth, "root");
+        Stage plain = new Stage("hearth", 9, 0, null, null, hearth);
+        PreviewPresentation withGroup = new PreviewPresentation(null, List.of(grouped), 0, List.of(), 0);
+        PreviewPresentation withoutGroup = new PreviewPresentation(null, List.of(plain), 0, List.of(), 0);
+        RegistryFriendlyByteBuf first = buffer();
+        PreviewCodecs.catalog.encode(
+            first,
+            new PreviewCatalogPayload(
+                List.of(new PreviewCatalogPayload.Entry(hearth, List.of(), List.of(), withGroup, null))
+            )
+        );
+        RegistryFriendlyByteBuf second = buffer();
+        PreviewCodecs.catalog.encode(
+            second,
+            new PreviewCatalogPayload(
+                List.of(new PreviewCatalogPayload.Entry(hearth, List.of(), List.of(), withoutGroup, null))
+            )
+        );
+        assertTrue(
+            first.writerIndex() > second.writerIndex(),
+            "a carried group writes its string; an absent one writes the marker alone"
+        );
+        PreviewCatalogPayload decoded = PreviewCodecs.catalog.decode(first);
+        assertEquals(grouped, decoded.entries().get(0).presentation().stages().get(0));
+    }
+
+    @Test
+    void aSetEntryRoundTripsItsFlattenedStageTable() {
+        PreviewCatalogPayload.SetEntry set = setEntryWithStages();
+        PreviewCatalogPayload decoded = roundTrip(new PreviewCatalogPayload(List.of(), List.of(set)));
+        assertEquals(set, decoded.sets().get(0));
+        assertEquals(2, decoded.sets().get(0).stages().size());
+        assertEquals("root \u00B7 hearth", decoded.sets().get(0).stages().get(0).name());
+        assertEquals("root", decoded.sets().get(0).stages().get(0).group());
+    }
+
+    @Test
+    void aSetWithoutAStageTableIsThePrefixOfOneWithIt() {
+        PreviewCatalogPayload.SetEntry plain = setEntry();
+        PreviewCatalogPayload.SetEntry staged = setEntryWithStages();
+        byte[] without = PreviewCodecProbe.encode(new PreviewCatalogPayload(List.of(), List.of(plain)));
+        byte[] with = PreviewCodecProbe.encode(new PreviewCatalogPayload(List.of(), List.of(staged)));
+        assertTrue(with.length > without.length, "the flattened table is a trailing addition");
+        assertEquals(
+            Arrays.toString(without),
+            Arrays.toString(Arrays.copyOf(with, without.length)),
+            "an older client reads the members and never sees the table"
+        );
+    }
+
+    @Test
+    void anOldSetPayloadReadsBackWithNoStageTable() {
+        PreviewCatalogPayload decoded = roundTrip(new PreviewCatalogPayload(List.of(), List.of(setEntry())));
+        assertEquals(List.of(), decoded.sets().get(0).stages());
+    }
+
+    private static PreviewCatalogPayload roundTrip(PreviewCatalogPayload payload) {
+        RegistryFriendlyByteBuf buffer = buffer();
+        PreviewCodecs.catalog.encode(buffer, payload);
+        PreviewCatalogPayload decoded = PreviewCodecs.catalog.decode(buffer);
+        assertEquals(0, buffer.readableBytes());
+        return decoded;
+    }
+
+    private static RegistryFriendlyByteBuf buffer() {
+        return new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY, ConnectionType.OTHER);
+    }
+
+    private static PreviewCatalogPayload.SetEntry setEntryWithStages() {
+        PreviewCatalogPayload.SetEntry base = setEntry();
+        return new PreviewCatalogPayload.SetEntry(
+            base.setId(),
+            base.members(),
+            base.materials(),
+            List.of(
+                new Stage("root \u00B7 hearth", 1, 0, null, null, hearth, "root"),
+                new Stage(
+                    "structurecumulus:satellite \u00B7 hearth",
+                    1,
+                    0,
+                    null,
+                    null,
+                    hearth,
+                    "structurecumulus:satellite"
+                )
+            )
+        );
+    }
+
     private static PreviewCatalogPayload.Entry entry() {
         Stage stage = new Stage("hearth", 9, 0, null, null, hearth);
         PreviewPresentation presentation = new PreviewPresentation("a furnace", List.of(stage), 0, List.of(), 0);

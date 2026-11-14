@@ -6,8 +6,8 @@ import dev.vfyjxf.cloudlib.uitest.api.TestContext;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
-import dev.vfyjxf.cumulus.mc.preview.client.screen.StageBar;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.client.ClientCommandHandler;
 import org.joml.Vector2f;
@@ -58,13 +58,15 @@ public final class PreviewCampusScenario {
                     return Minecraft.getInstance().screen;
                 }).awaitScreen(PreviewScreen.class).frames(3)
                 .check(
-                    "the campus opens as a set page with the three members as stages",
+                    "the campus opens as a set page with the three members as lanes",
                     () -> screen().isSetPage()
                             && screen().pageId().equals(campus)
-                            && screen().stageBar().segments().size() == 3
+                            && screen().timeline().lanes().size() == 3
+                            && screen().timeline().segments().size() == 17
                             && screen().explode().groups().size() == 3
                             && screen().canExplode(),
-                    () -> "set=" + screen().isSetPage() + " stages=" + screen().stageBar().segments().size()
+                    () -> "set=" + screen().isSetPage() + " lanes=" + screen().timeline().lanes().size() + " stages="
+                            + screen().timeline().segments().size()
                 ).check(
                     "the composite scene draws every composed cell in all four viewports",
                     () -> screen().drawnCells() == 4 * composedCells,
@@ -73,15 +75,19 @@ public final class PreviewCampusScenario {
                     "the constraints overlay is on by default and draws both links",
                     () -> screen().constraintsOn() && screen().drawnLinkStrokes() >= 8,
                     () -> "constraints=" + screen().constraintsOn() + " strokes=" + screen().drawnLinkStrokes()
-                )
-                .check(
+                ).check(
                     "the page says the world question is set check's",
                     () -> screen().footerLine() != null && screen().footerLine().contains("set check")
                 )
                 .check(
-                    "the stage bar names the members in build order",
-                    () -> screen().playback().stages().stream().map(stage -> stage.name()).toList()
+                    "the timeline's lanes are the members in build order, each holding its own stages",
+                    () -> screen().timeline().lanes().stream().map(lane -> lane.group()).toList()
                             .equals(List.of("root", "structurecumulus:campus_machine", "structurecumulus:campus_tower"))
+                            && screen().timeline().lanes().stream().map(lane -> lane.stageCount()).toList()
+                                    .equals(List.of(10, 4, 3))
+                            && screen().playback().stages().stream().map(stage -> stage.name()).toList().get(10)
+                                    .equals("structurecumulus:campus_machine \u00B7 structurecumulus:plinth"),
+                    () -> String.valueOf(screen().timeline())
                 ).screenshot("01-campus-set").checkCaptured("01-campus-set")
                 .action("click the constraints button off", context -> clickLabel(context, "constraints")).frames(2)
                 .check(
@@ -89,20 +95,26 @@ public final class PreviewCampusScenario {
                     () -> !screen().constraintsOn() && screen().drawnLinkStrokes() == 0
                 ).action("click the constraints button on", context -> clickLabel(context, "constraints")).frames(2)
                 .check("the overlay comes back on", () -> screen().constraintsOn() && screen().drawnLinkStrokes() >= 8)
-                .action("click the engine member's stage segment", context -> {
-                    StageBar.Segment segment = screen().stageBar().segments().get(1);
+                .action("click the engine member's first stage segment", context -> {
+                    int machineStage = machineStage();
+                    var segment = screen().segmentRect(machineStage);
                     PreviewScreen open = (PreviewScreen) context.screenOrThrow();
-                    int x = segment.x() + segment.width() / 2;
-                    int y = screen().stageBar().y() + screen().stageBar().height() / 2;
+                    float x = segment.x() + segment.width() / 2.0F;
+                    float y = segment.y() + segment.height() / 2.0F;
                     context.driver().mouseDown(open, x, y, 0);
                     context.driver().mouseUp(open, x, y, 0);
-                }).frames(2)
-                .check(
-                    "the cursor names the machine member and its cell count",
-                    () -> screen().playback().cursor() == 1
-                            && "structurecumulus:campus_machine \u00B7 100 cells".equals(screen().summaryLine()),
-                    () -> screen().summaryLine()
-                ).action("capture the camera and the stage before the drill", context -> {
+                }).frames(2).check("the cursor reads the stage's own next-step line, grouped under its member", () -> {
+                    int machineStage = machineStage();
+                    String line = screen().summaryLine();
+                    return screen().playback().cursor() == machineStage
+                            && line != null
+                            && line.startsWith("place ")
+                            && line.contains(
+                                "(stage " + (machineStage + 1) + "/17: "
+                                        + screen().playback().stages().get(machineStage).name() + ")"
+                            );
+                }, () -> screen().summaryLine())
+                .action("capture the camera and the stage before the drill", context -> {
                     camera[0] = screen().camera().yaw();
                     camera[1] = screen().camera().zoom();
                 }).frames(2)
@@ -132,7 +144,7 @@ public final class PreviewCampusScenario {
                             && screen().pageId().equals(campus)
                             && screen().camera().yaw() == camera[0]
                             && screen().camera().zoom() == camera[1]
-                            && screen().playback().cursor() == 1
+                            && screen().playback().cursor() == machineStage()
                             && screen().constraintsOn(),
                     () -> "set=" + screen().isSetPage() + " yaw=" + screen().camera().yaw() + "/" + camera[0]
                             + " cursor=" + screen().playback().cursor()
@@ -192,6 +204,17 @@ public final class PreviewCampusScenario {
         }
         context.driver().mouseDown(open, rect.x() + rect.width() / 2, rect.y() + rect.height() / 2, 0);
         context.driver().mouseUp(open, rect.x() + rect.width() / 2, rect.y() + rect.height() / 2, 0);
+    }
+
+    /** The engine member's first stage in the flattened table (the station's ten stages come first). */
+    private static int machineStage() {
+        List<Stage> stages = screen().playback().stages();
+        for (int index = 0; index < stages.size(); index++) {
+            if (stages.get(index).group() != null && stages.get(index).group().endsWith("campus_machine")) {
+                return index;
+            }
+        }
+        throw new IllegalStateException("the campus page lost the engine member's stages");
     }
 
     /** The first engine-member cell whose projection the main viewport answers with that member. */

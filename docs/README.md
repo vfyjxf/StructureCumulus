@@ -117,11 +117,14 @@ Then the module files, in dependency order:
   13x11x13 relay station of ten stages whose four satellite pods are one module at four turns — its
   `tools/gen_demo_station.py` generator with the `--check` gate inside `check`, and the
   `demo_campus` structure set), SC11 the viewer's two picks (the finished play's replay from the zero
-  state and the stage outline as an opt-in toggle off by default) and SC12 the set preview
+  state and the stage outline as an opt-in toggle off by default), SC12 the set preview
   ([18 set-preview](design/18-set-preview.md), D-112: the catalogue's composed set entries, the
   composite page whose members are the stages and the explode's parts, the constraint overlay, the
-  member drill-down with its breadcrumb, the JEI set pages and the `<id>#set` command form) are on the
-  tree.
+  member drill-down with its breadcrumb, the JEI set pages and the `<id>#set` command form) and SC13
+  the grouped stage and its timeline ([19 stage-timeline](design/19-stage-timeline.md), D-113: the
+  carried `group`, the server-side (member × member-stage) flattening, the lane/wrap/scroll timeline
+  with its playhead, and the scene pass's depth restore so every tooltip draws above the page) are on
+  the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`

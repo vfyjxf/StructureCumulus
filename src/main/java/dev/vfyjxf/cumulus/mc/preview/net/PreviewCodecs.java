@@ -22,6 +22,7 @@ import net.minecraft.network.codec.StreamCodec;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -136,6 +137,20 @@ final class PreviewCodecs {
         for (PreviewCatalogPayload.SetEntry set : payload.sets()) {
             writeSetEntry(buffer, set);
         }
+        // trailing-optional: the flattened stage tables ride after every member's composed facts, so a
+        // reader that predates them stops after the sets and never sees a byte of the table (design 19 §2)
+        boolean anyStages = false;
+        for (PreviewCatalogPayload.SetEntry set : payload.sets()) {
+            anyStages |= !set.stages().isEmpty();
+        }
+        if (!anyStages) {
+            return;
+        }
+        buffer.writeVarInt(payload.sets().size());
+        for (PreviewCatalogPayload.SetEntry set : payload.sets()) {
+            writeId(buffer, set.setId());
+            writeStages(buffer, set.stages());
+        }
     }
 
     private static PreviewCatalogPayload decodeCatalog(RegistryFriendlyByteBuf buffer) {
@@ -152,7 +167,20 @@ final class PreviewCodecs {
         for (int set = 0; set < setCount; set++) {
             sets.add(readSetEntry(buffer));
         }
-        return new PreviewCatalogPayload(entries, sets);
+        if (buffer.readableBytes() <= 0) {
+            return new PreviewCatalogPayload(entries, sets);
+        }
+        int tableCount = buffer.readVarInt();
+        Map<NamespacedId, List<Stage>> tables = new LinkedHashMap<>();
+        for (int table = 0; table < tableCount; table++) {
+            tables.put(readId(buffer), readStages(buffer));
+        }
+        List<PreviewCatalogPayload.SetEntry> staged = new ArrayList<>(sets.size());
+        for (PreviewCatalogPayload.SetEntry set : sets) {
+            List<Stage> stages = tables.getOrDefault(set.setId(), List.of());
+            staged.add(new PreviewCatalogPayload.SetEntry(set.setId(), set.members(), set.materials(), stages));
+        }
+        return new PreviewCatalogPayload(entries, staged);
     }
 
     private static void writeEntry(RegistryFriendlyByteBuf buffer, PreviewCatalogPayload.Entry entry) {
@@ -370,15 +398,7 @@ final class PreviewCodecs {
 
     private static void writePresentation(RegistryFriendlyByteBuf buffer, PreviewPresentation presentation) {
         writeOptional(buffer, presentation.description());
-        buffer.writeVarInt(presentation.stages().size());
-        for (Stage stage : presentation.stages()) {
-            buffer.writeUtf(stage.name());
-            buffer.writeVarInt(stage.expectedCells());
-            buffer.writeVarInt(stage.satisfiedCells());
-            writeOptional(buffer, stage.hint());
-            writeOptional(buffer, stage.description());
-            writeId(buffer, stage.bay());
-        }
+        writeStages(buffer, presentation.stages());
         buffer.writeVarInt(presentation.currentStage());
         buffer.writeVarInt(presentation.materials().size());
         for (MaterialStatus material : presentation.materials()) {
@@ -389,8 +409,24 @@ final class PreviewCodecs {
         buffer.writeVarInt(presentation.moreMaterials());
     }
 
-    private static PreviewPresentation readPresentation(RegistryFriendlyByteBuf buffer) {
-        String description = readOptional(buffer);
+    /**
+     * The stage table, its stages' {@code group} last: the optional marker is the field's own, so a stage
+     * that carries no part costs one absent byte, and a stage that does carries its label (design 19 §2).
+     */
+    private static void writeStages(RegistryFriendlyByteBuf buffer, List<Stage> stages) {
+        buffer.writeVarInt(stages.size());
+        for (Stage stage : stages) {
+            buffer.writeUtf(stage.name());
+            buffer.writeVarInt(stage.expectedCells());
+            buffer.writeVarInt(stage.satisfiedCells());
+            writeOptional(buffer, stage.hint());
+            writeOptional(buffer, stage.description());
+            writeId(buffer, stage.bay());
+            writeOptional(buffer, stage.group());
+        }
+    }
+
+    private static List<Stage> readStages(RegistryFriendlyByteBuf buffer) {
         int stageCount = buffer.readVarInt();
         List<Stage> stages = new ArrayList<>(stageCount);
         for (int index = 0; index < stageCount; index++) {
@@ -400,8 +436,15 @@ final class PreviewCodecs {
             String hint = readOptional(buffer);
             String stageDescription = readOptional(buffer);
             NamespacedId bay = readId(buffer);
-            stages.add(new Stage(name, expectedCells, satisfiedCells, hint, stageDescription, bay));
+            String group = readOptional(buffer);
+            stages.add(new Stage(name, expectedCells, satisfiedCells, hint, stageDescription, bay, group));
         }
+        return stages;
+    }
+
+    private static PreviewPresentation readPresentation(RegistryFriendlyByteBuf buffer) {
+        String description = readOptional(buffer);
+        List<Stage> stages = readStages(buffer);
         int currentStage = buffer.readVarInt();
         int materialCount = buffer.readVarInt();
         List<MaterialStatus> materials = new ArrayList<>(materialCount);

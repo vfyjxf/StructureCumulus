@@ -15,6 +15,8 @@ import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.List;
+
 /**
  * The catalogue page end to end (design 17 §3–§6): opening it on the probe, the four linked viewports
  * and their drawn cells, the orbit and the wheel, the axes, the screen's own key table and the world
@@ -136,7 +138,24 @@ public final class PreviewScreenScenario {
                     return "cursor=" + movedX + "," + movedY + " hovered="
                             + (hovered == null ? "none" : hovered.ghost().block().text()) + " cells="
                             + screen().scene().cellCount() + " main=" + screen().layout().main();
-                }).action("capture the camera before the gestures", context -> {
+                })
+                .check(
+                    "the cell tooltip is drawn last at vanilla's tooltip depth, above the scene and its chrome",
+                    () -> {
+                        PreviewScene.Cell hovered = screen().hovered();
+                        List<String> lines = screen().tooltipLines();
+                        return hovered != null
+                                && lines != null
+                                && lines.get(0).equals(hovered.ghost().block().text())
+                                && screen().tooltipBox() != null
+                                && screen().tooltipDepth() == PreviewScreen.tooltipZ
+                                && PreviewScreen.tooltipZ > PreviewScene.chromeDepth
+                                && screen().sceneDepthRestored();
+                    },
+                    () -> "hovered=" + (screen().hovered() == null ? "none" : screen().hovered().ghost().block().text())
+                            + " lines=" + screen().tooltipLines() + " depth=" + screen().tooltipDepth() + " box="
+                            + screen().tooltipBox() + " restored=" + screen().sceneDepthRestored()
+                ).action("capture the camera before the gestures", context -> {
                     yawBefore = screen().camera().yaw();
                     zoomBefore = screen().camera().zoom();
                 }).action("orbit with a left drag in the main viewport", context -> {

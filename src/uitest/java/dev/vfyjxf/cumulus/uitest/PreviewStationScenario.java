@@ -6,6 +6,7 @@ import dev.vfyjxf.cloudlib.uitest.api.TestContext;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.StageTimeline;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
@@ -55,10 +56,42 @@ public final class PreviewStationScenario {
                     () -> !screen().staged()
                             && screen().playback().wholeView()
                             && screen().summaryLine() == null
-                            && screen().stageBar().segments().size() == 10
+                            && screen().timeline().segments().size() == 10
                             && screen().drawnCells() == 4 * fullCells,
                     () -> "staged=" + screen().staged() + " summary=" + screen().summaryLine() + " stages="
-                            + screen().stageBar().segments().size() + " drawn=" + screen().drawnCells()
+                            + screen().timeline().segments().size() + " drawn=" + screen().drawnCells()
+                ).check("the ten bays stack ten lanes past the cap, so the strip scrolls", () -> {
+                    var timeline = screen().timeline();
+                    return timeline.lanes().size() == 10
+                            && timeline.scrollable()
+                            && timeline.height() == StageTimeline.timelineMaxHeight;
+                },
+                    () -> "lanes=" + screen().timeline().lanes().size() + " scrollable="
+                            + screen().timeline().scrollable() + " height=" + screen().timeline().height()
+                ).action("wheel down over the timeline", context -> {
+                    PreviewScreen open = (PreviewScreen) context.screenOrThrow();
+                    ScreenLayout.Rect control = open.layout().control();
+                    float x = 20.0F;
+                    float y = control.y() + 3.0F + StageTimeline.laneHeight;
+                    context.driver().placeCursor(x, y);
+                    context.driver().scroll(open, x, y, -1.0D);
+                }).frames(2)
+                .check(
+                    "the wheel scrolls the strip and the first lane rides out of the cap",
+                    () -> screen().timelineScroll() > 0,
+                    () -> Integer.toString(screen().timelineScroll())
+                ).action("wheel back up over the timeline", context -> {
+                    PreviewScreen open = (PreviewScreen) context.screenOrThrow();
+                    ScreenLayout.Rect control = open.layout().control();
+                    float x = 20.0F;
+                    float y = control.y() + 3.0F + StageTimeline.laneHeight;
+                    context.driver().placeCursor(x, y);
+                    context.driver().scroll(open, x, y, 1.0D);
+                }).frames(2)
+                .check(
+                    "the strip comes back to its top",
+                    () -> screen().timelineScroll() == 0,
+                    () -> Integer.toString(screen().timelineScroll())
                 )
                 .check(
                     "the page names its group member",
@@ -73,12 +106,12 @@ public final class PreviewStationScenario {
                     "the switch changes the silhouette to the compact member and keeps the camera",
                     () -> screen().variantIndex() == 1
                             && "variant 2/2: compact".equals(screen().variantLine())
-                            && screen().stageBar().segments().size() == 7
+                            && screen().timeline().segments().size() == 7
                             && screen().drawnCells() == 4 * compactCells
                             && screen().camera().yaw() == camera[0]
                             && screen().camera().zoom() == camera[1],
                     () -> "index=" + screen().variantIndex() + " line=" + screen().variantLine() + " stages="
-                            + screen().stageBar().segments().size() + " drawn=" + screen().drawnCells() + " yaw="
+                            + screen().timeline().segments().size() + " drawn=" + screen().drawnCells() + " yaw="
                             + screen().camera().yaw() + "/" + camera[0]
                 ).screenshot("02-station-compact").frames(2).checkCaptured("02-station-compact")
                 .action("Esc closes the station page", context -> {

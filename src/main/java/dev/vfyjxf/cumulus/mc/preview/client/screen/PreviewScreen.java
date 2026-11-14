@@ -81,12 +81,16 @@ public final class PreviewScreen extends Screen {
     private static final int barColor = 0x60484848;
     private static final int barHoverColor = 0x906A6A6A;
     private static final int barCursorColor = 0xFFE8E8E8;
+    /** The playhead's one-pixel line: the cursor's own chrome, never a fill (design 19 §3). */
+    private static final int playheadColor = 0xFFF0F0F0;
+    /** Vanilla's own tooltip depth: above every page element by construction (design 19 §4). */
+    public static final int tooltipZ = 400;
     private static final int buttonHeight = 14;
     private static final int buttonGap = 4;
     private static final int barTop = 3;
-    private static final int barHeight = 9;
-    private static final int summaryTop = 13;
-    private static final int buttonsTop = 25;
+    private static final int summaryBlock = 13;
+    /** The button area the strip always reserved under the bar (design 17 §4.5); the bar adds no more. */
+    private static final int buttonArea = 31;
     private static final float degreesPerPixel = 1.6F;
     private static final float scrollStep = 1.1F;
     private static final int explodeTicks = 12;
@@ -124,9 +128,14 @@ public final class PreviewScreen extends Screen {
     private ScreenClock clock = ScreenClock.start();
     private @Nullable Cell hovered;
     private @Nullable AxisGizmo gizmo;
-    private StageBar stageBar = new StageBar(List.of(), 0, 0, 0, 0);
+    private StageTimeline timeline = new StageTimeline(List.of(), List.of(), 0, 0, 0);
+    private int timelineScroll;
+    private int lastTimelineCursor = -2;
+    private @Nullable Tooltip pendingTooltip;
+    private float tooltipDepth = -1.0F;
+    private @Nullable List<String> tooltipLines;
+    private @Nullable Rect tooltipBox;
     private @Nullable String summary;
-    private @Nullable String barHover;
     private boolean outline;
     /** The cursor stage's set stroke, off until the viewer asks (design 17 §5.3). */
     private boolean stageOutline;
@@ -264,7 +273,8 @@ public final class PreviewScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        layout = ScreenLayout.of(width, height);
+        timeline = buildTimeline();
+        layout = layoutFor(timeline);
         if (!restoredCamera) {
             camera = camera.frame(scene.hull(), mainAspect());
         }
@@ -279,9 +289,21 @@ public final class PreviewScreen extends Screen {
         tickReveal();
         tickExplode();
         tickFraming();
+        // the strip's height is the timeline's own for this frame, capped and scrolled (design 19 §3)
+        timeline = buildTimeline();
+        timelineScroll = timeline.clampScroll(timelineScroll);
+        if (playback.cursor() != lastTimelineCursor) {
+            lastTimelineCursor = playback.cursor();
+            timelineScroll = timeline.scrollForVisible(timelineScroll, playback.cursor());
+        }
+        layout = layoutFor(timeline);
         double cursorX = pointerX < 0.0D ? mouseX : pointerX;
         double cursorY = pointerY < 0.0D ? mouseY : pointerY;
         hovered = hoveredCell(cursorX, cursorY);
+        pendingTooltip = null;
+        tooltipDepth = -1.0F;
+        tooltipLines = null;
+        tooltipBox = null;
         graphics.drawString(font, pageId.text(), 4, 6, titleColor, false);
         String variant = variantLine();
         if (variant != null) {
@@ -302,17 +324,22 @@ public final class PreviewScreen extends Screen {
         drawPanel(graphics, layout.side(), Panel.side, true);
         drawPanel(graphics, layout.top(), Panel.top, true);
         graphics.fill(0, layout.control().y(), width, layout.control().y() + layout.control().height(), panelColor);
-        drawStageBar(graphics, (int) cursorX, (int) cursorY);
+        drawTimeline(graphics, (int) cursorX, (int) cursorY);
         drawSummary(graphics);
         drawFooter(graphics);
         drawButtons(graphics, (int) cursorX, (int) cursorY);
+        // the hovered cell is the page's most specific answer; a link caption or a widget otherwise
         if (hovered != null) {
-            drawCellTooltip(graphics, hovered, (int) cursorX, (int) cursorY);
+            pendingTooltip = new Tooltip(cellLines(hovered), (int) cursorX, (int) cursorY);
         } else {
             String linkTooltip = linkTooltip(cursorX, cursorY);
             if (linkTooltip != null) {
-                drawTooltip(graphics, linkTooltip, (int) cursorX, (int) cursorY);
+                pendingTooltip = new Tooltip(List.of(linkTooltip), (int) cursorX, (int) cursorY);
             }
+        }
+        // tooltips are the last thing a frame draws, at vanilla's own tooltip depth (design 19 §4)
+        if (pendingTooltip != null) {
+            drawTooltip(graphics, pendingTooltip);
         }
     }
 
@@ -381,7 +408,7 @@ public final class PreviewScreen extends Screen {
                 return true;
             }
         }
-        int stage = stageBar.hit(mouseX, mouseY);
+        int stage = timelineHit(mouseX, mouseY);
         if (stage >= 0) {
             playback = playback.enter(stage);
             return true;
@@ -452,6 +479,11 @@ public final class PreviewScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (timeline.scrollable() && inside(timelineRect(), mouseX, mouseY) && scrollY != 0.0D) {
+            timelineScroll = timeline
+                    .clampScroll(timelineScroll - (int) Math.round(scrollY * StageTimeline.scrollStepPx));
+            return true;
+        }
         if (!inside(layout.main(), mouseX, mouseY) || scrollY == 0.0D) {
             return false;
         }
@@ -620,6 +652,37 @@ public final class PreviewScreen extends Screen {
                 && mouseX < rect.x() + rect.width()
                 && mouseY >= rect.y()
                 && mouseY < rect.y() + rect.height();
+    }
+
+    /** The timeline of this frame's width: the pure layout of design 19 §3 over the page's own table. */
+    private StageTimeline buildTimeline() {
+        return StageTimeline.of(stages(), Math.max(0, width - 2 * buttonGap), StageTimeline.Metrics.of(font::width));
+    }
+
+    /** The control strip's height is the timeline's, capped, plus the summary and the button area. */
+    private ScreenLayout layoutFor(StageTimeline timeline) {
+        return ScreenLayout.of(width, height, barTop + timeline.height() + summaryBlock + buttonArea);
+    }
+
+    private int summaryTop() {
+        return layout.control().y() + barTop + timeline.height() + 2;
+    }
+
+    private int buttonsTop() {
+        return summaryTop() + 11;
+    }
+
+    private Rect timelineRect() {
+        return new Rect(buttonGap, layout.control().y() + barTop, timeline.width(), timeline.height());
+    }
+
+    /** The timeline hit test: the strip's rectangle, the scroll taken out, then the segment. */
+    private int timelineHit(double mouseX, double mouseY) {
+        Rect strip = timelineRect();
+        if (strip.isEmpty() || !inside(strip, mouseX, mouseY)) {
+            return -1;
+        }
+        return timeline.hit((int) mouseX - strip.x(), (int) mouseY - strip.y() + timelineScroll);
     }
 
     /** The page's stage table: a blueprint's own, or the members of a set, root first (§4). */
@@ -825,7 +888,7 @@ public final class PreviewScreen extends Screen {
     private List<Button> buttons() {
         List<Button> built = new ArrayList<>();
         int x = buttonGap;
-        int y = layout.control().y() + buttonsTop;
+        int y = buttonsTop();
         int bottom = layout.control().y() + layout.control().height() - 1;
         for (ButtonSpec spec : buttonSpecs()) {
             int specWidth = font.width(spec.label()) + 10;
@@ -861,45 +924,155 @@ public final class PreviewScreen extends Screen {
                 false
             );
             if (hovered) {
-                drawTooltip(graphics, button.tooltip(), mouseX, mouseY);
+                pendingTooltip = new Tooltip(List.of(button.tooltip()), mouseX, mouseY);
             }
         }
     }
 
-    private void drawTooltip(GuiGraphics graphics, String text, int mouseX, int mouseY) {
-        int textWidth = font.width(text);
-        int textX = Math.max(2, (int) Math.min(mouseX + 8.0D, width - textWidth - 6));
-        int textY = Math.max(2, mouseY - 12);
-        graphics.fill(textX - 3, textY - 3, textX + textWidth + 3, textY + 10, tooltipColor);
-        graphics.drawString(font, text, textX, textY, tooltipTextColor, false);
+    /**
+     * The one tooltip of the frame, at vanilla's own tooltip depth so it is above every element by
+     * construction (design 19 §4); its pose's z is read back for the harness.
+     */
+    private void drawTooltip(GuiGraphics graphics, Tooltip tooltip) {
+        int textWidth = 0;
+        for (String line : tooltip.lines()) {
+            textWidth = Math.max(textWidth, font.width(line));
+        }
+        int textX = Math.max(2, (int) Math.min(tooltip.x() + 8.0D, width - textWidth - 6));
+        int textY = Math.max(2, tooltip.y() - 12);
+        int boxHeight = tooltip.lines().size() * 10 + 3;
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, tooltipZ);
+        graphics.fill(textX - 3, textY - 3, textX + textWidth + 3, textY + boxHeight, tooltipColor);
+        for (int index = 0; index < tooltip.lines().size(); index++) {
+            graphics.drawString(font, tooltip.lines().get(index), textX, textY + index * 10, tooltipTextColor, false);
+        }
+        tooltipDepth = graphics.pose().last().pose().getTranslation(new Vector3f()).z;
+        tooltipLines = tooltip.lines();
+        tooltipBox = new Rect(textX - 3, textY - 3, textWidth + 6, boxHeight);
+        graphics.pose().popPose();
     }
 
-    /** The stage bar as a table of contents: proportional segments, the cursor outlined (design 17 §7.3). */
-    private void drawStageBar(GuiGraphics graphics, int mouseX, int mouseY) {
-        stageBar = StageBar.of(stages(), buttonGap, layout.control().y() + barTop, width - 2 * buttonGap, barHeight);
-        int hoveredIndex = stageBar.hit(mouseX, mouseY);
-        String barHover = null;
-        for (StageBar.Segment segment : stageBar.segments()) {
-            Stage stage = stages().get(segment.index());
+    /**
+     * A lane head's label in its column: a group that does not fit keeps its tail, because every group
+     * here is a namespaced id whose distinguishing part is its suffix; the hover names the whole label.
+     */
+    private String headLabel(String group, int room) {
+        if (font.width(group) <= room) {
+            return group;
+        }
+        int budget = room - font.width("\u2026");
+        if (budget <= 0) {
+            return "";
+        }
+        int start = group.length();
+        int used = 0;
+        while (start > 0) {
+            int character = font.width(group.substring(start - 1, start));
+            if (used + character > budget) {
+                break;
+            }
+            used += character;
+            start--;
+        }
+        return "\u2026" + group.substring(start);
+    }
+
+    /**
+     * The timeline as a table of contents (design 19 §3): one lane per group, its stages as segments in
+     * index order, the cursor outlined and the playhead riding it. A wrapped lane is indented under its
+     * head; a strip taller than the cap scrolls, and its scrollbar is chrome on the right.
+     */
+    private void drawTimeline(GuiGraphics graphics, int mouseX, int mouseY) {
+        StageTimeline current = timeline;
+        int stripX = buttonGap;
+        int stripY = layout.control().y() + barTop;
+        if (current.height() <= 0 || current.width() <= 0) {
+            return;
+        }
+        int localX = mouseX - stripX;
+        int localY = mouseY - stripY + timelineScroll;
+        boolean over = inside(new Rect(stripX, stripY, current.width(), current.height()), mouseX, mouseY);
+        int hoveredIndex = over ? current.hit(localX, localY) : -1;
+        StageTimeline.Lane hoveredHead = over ? current.headAt(localX, localY) : null;
+        graphics.enableScissor(stripX, stripY, stripX + current.width(), stripY + current.height());
+        for (StageTimeline.Lane lane : current.lanes()) {
+            int laneY = stripY + lane.y() - timelineScroll;
+            if (laneY + lane.rowHeight() < stripY || laneY > stripY + current.height()) {
+                continue;
+            }
+            int labelRoom = Math.max(0, lane.headWidth() - 2 * StageTimeline.namePad);
+            String label = headLabel(lane.group(), labelRoom);
+            if (!label.isEmpty()) {
+                graphics.drawString(font, label, stripX + StageTimeline.namePad, laneY + 1, chromeColor, false);
+            }
+            if (lane == hoveredHead && label.length() < lane.group().length()) {
+                // a truncated head answers with its whole group, so a lane never loses its part
+                pendingTooltip = new Tooltip(List.of(lane.group()), mouseX, laneY - 2);
+            }
+        }
+        for (StageTimeline.Segment segment : current.segments()) {
+            int segmentY = stripY + segment.y() - timelineScroll;
+            if (segmentY + segment.height() < stripY || segmentY > stripY + current.height()) {
+                continue;
+            }
             graphics.fill(
-                segment.x(),
-                stageBar.y(),
-                segment.x() + segment.width(),
-                stageBar.y() + stageBar.height(),
+                stripX + segment.x(),
+                segmentY,
+                stripX + segment.x() + segment.width(),
+                segmentY + segment.height(),
                 segment.index() == hoveredIndex ? barHoverColor : barColor
             );
             if (segment.index() == playback.cursor()) {
-                outlineBox(graphics, segment.x(), stageBar.y(), segment.width(), stageBar.height(), barCursorColor);
+                outlineBox(graphics, stripX + segment.x(), segmentY, segment.width(), segment.height(), barCursorColor);
             }
-            if (stageBar.fits(segment.index(), font.width(stage.name()))) {
-                graphics.drawString(font, stage.name(), segment.x() + 1, stageBar.y() + 1, chromeColor, false);
-            }
-            if (segment.index() == hoveredIndex) {
-                barHover = stage.name() + " \u00B7 " + stage.expectedCells() + " cells";
+            if (segment.named()) {
+                graphics.drawString(
+                    font,
+                    stages().get(segment.index()).name(),
+                    stripX + segment.x() + 1,
+                    segmentY + 1,
+                    chromeColor,
+                    false
+                );
             }
         }
-        if (barHover != null) {
-            drawTooltip(graphics, barHover, mouseX, stageBar.y() - 2);
+        StageTimeline.Segment cursorSegment = current.segment(playback.cursor());
+        if (cursorSegment != null) {
+            int playheadY = stripY + cursorSegment.y() - timelineScroll;
+            if (playheadY + cursorSegment.height() >= stripY && playheadY <= stripY + current.height()) {
+                int playheadX = stripX
+                        + current.playheadX(
+                            playback.cursor(),
+                            playback.playing(),
+                            playback.revealed(playback.cursor()),
+                            playback.cellCount(playback.cursor())
+                        );
+                graphics.fill(
+                    playheadX,
+                    playheadY + 1,
+                    playheadX + 1,
+                    playheadY + cursorSegment.height() - 1,
+                    playheadColor
+                );
+            }
+        }
+        if (current.scrollable()) {
+            int barX = stripX + current.width() - 2;
+            graphics.fill(barX, stripY, barX + 2, stripY + current.height(), 0x60000000);
+            int thumb = Math
+                    .max(6, (int) Math.round((double) current.height() * current.height() / current.contentHeight()));
+            int travel = current.height() - thumb;
+            int thumbY = travel <= 0 ? 0 : (int) Math.round((double) travel * timelineScroll / current.maxScroll());
+            graphics.fill(barX, stripY + thumbY, barX + 2, stripY + thumbY + thumb, 0x60C0C0C0);
+        }
+        graphics.disableScissor();
+        if (hoveredIndex >= 0) {
+            pendingTooltip = new Tooltip(
+                List.of(StageTimeline.hoverText(stages().get(hoveredIndex))),
+                mouseX,
+                stripY - 2
+            );
         }
     }
 
@@ -907,7 +1080,7 @@ public final class PreviewScreen extends Screen {
     private void drawSummary(GuiGraphics graphics) {
         summary = summary();
         if (summary != null) {
-            graphics.drawString(font, summary, buttonGap, layout.control().y() + summaryTop, titleColor, false);
+            graphics.drawString(font, summary, buttonGap, summaryTop(), titleColor, false);
         }
     }
 
@@ -917,10 +1090,8 @@ public final class PreviewScreen extends Screen {
             return null;
         }
         Stage stage = stages().get(cursor);
-        if (setPage != null) {
-            // the set page narrates its member, not a placement: the count alone (design 18 §4)
-            return stage.name() + " \u00B7 " + stage.expectedCells() + " cells";
-        }
+        // a set page's table is flattened server-side, so its summary is the same next-step line a
+        // blueprint page's is (design 19 §2); the member rides in the stage's name
         return NextStepLine.render(
             playback.stageCells(cursor),
             stage.expectedCells(),
@@ -1089,7 +1260,7 @@ public final class PreviewScreen extends Screen {
         }
         for (int member : ConstraintOverlay.optionalMembers(page)) {
             for (Cell cell : scene.cells()) {
-                if (!PreviewScene.draws(cell) || cell.ghost().stageIndex() != member) {
+                if (!PreviewScene.draws(cell) || page.memberOf(cell.ghost()) != member) {
                     continue;
                 }
                 PreviewScene.Sight sight = sightOf(cell);
@@ -1227,14 +1398,9 @@ public final class PreviewScreen extends Screen {
         }
     }
 
-    /** The member one explode group stands for, or -1 when the group names no stage. */
+    /** The member one explode group stands for, or -1 when the group names no member. */
     private int memberOfGroup(ExplodeModel.Group group) {
-        for (int index = 0; index < stages().size(); index++) {
-            if (stages().get(index).bay().equals(group.bay())) {
-                return index;
-            }
-        }
-        return -1;
+        return setPage == null ? -1 : setPage.memberOfBay(group.bay());
     }
 
     /** The blueprint a member's cell opens, or null on a blueprint page (design 18 §6). */
@@ -1331,21 +1497,6 @@ public final class PreviewScreen extends Screen {
         graphics.fill(left, bottom - 1, right, bottom, color);
         graphics.fill(left, top, left + 1, bottom, color);
         graphics.fill(right - 1, top, right, bottom, color);
-    }
-
-    /** 15 §6.2's tooltip plus the owning stage's name (design 17 §5.3). */
-    private void drawCellTooltip(GuiGraphics graphics, Cell cell, int mouseX, int mouseY) {
-        List<String> lines = cellLines(cell);
-        int textWidth = 0;
-        for (String line : lines) {
-            textWidth = Math.max(textWidth, font.width(line));
-        }
-        int textX = Math.max(2, Math.min(mouseX + 10, width - textWidth - 6));
-        int textY = Math.max(2, Math.min(mouseY + 10, height - lines.size() * 10 - 6));
-        graphics.fill(textX - 3, textY - 3, textX + textWidth + 3, textY + lines.size() * 10, tooltipColor);
-        for (int index = 0; index < lines.size(); index++) {
-            graphics.drawString(font, lines.get(index), textX, textY + index * 10, tooltipTextColor, false);
-        }
     }
 
     /** The cell's block id, its properties in key order and the stage that owns it. */
@@ -1731,9 +1882,58 @@ public final class PreviewScreen extends Screen {
         return summary;
     }
 
-    /** The stage bar as last drawn (design 17 §7.3). */
-    public StageBar stageBar() {
-        return stageBar;
+    /** The stage timeline as last drawn (design 19 §3). */
+    public StageTimeline timeline() {
+        return timeline;
+    }
+
+    /** The move to the next lane page sent to the strip's wheel, 0 at the top (design 19 §3). */
+    public int timelineScroll() {
+        return timelineScroll;
+    }
+
+    /** One segment's screen rectangle, or null when the table has no such stage (design 19 §3). */
+    public @Nullable Rect segmentRect(int index) {
+        StageTimeline.Segment segment = timeline.segment(index);
+        if (segment == null) {
+            return null;
+        }
+        return new Rect(
+            buttonGap + segment.x(),
+            layout.control().y() + barTop + segment.y() - timelineScroll,
+            segment.width(),
+            segment.height()
+        );
+    }
+
+    /** The playhead's share of the cursor's segment: 0 stopped, the revealed share during a play. */
+    public float playheadFraction() {
+        int cursor = playback.cursor();
+        if (cursor < 0) {
+            return 0.0F;
+        }
+        return StageTimeline
+                .playheadFraction(playback.playing(), playback.revealed(cursor), playback.cellCount(cursor));
+    }
+
+    /** The depth the last tooltip's pose carried; vanilla's tooltip depth is 400 (design 19 §4). */
+    public float tooltipDepth() {
+        return tooltipDepth;
+    }
+
+    /** The last frame's tooltip lines, or null when it drew none (design 19 §4). */
+    public @Nullable List<String> tooltipLines() {
+        return tooltipLines;
+    }
+
+    /** The last frame's tooltip box in screen pixels, or null when it drew none (design 19 §4). */
+    public @Nullable Rect tooltipBox() {
+        return tooltipBox;
+    }
+
+    /** True once a scene pass has restored the GUI's depth state in its finally (design 19 §4). */
+    public boolean sceneDepthRestored() {
+        return scene.depthRestored();
     }
 
     /** True while a stage-framing leg is in flight (design 17 §7.5). */
@@ -1896,6 +2096,9 @@ public final class PreviewScreen extends Screen {
             return PreviewScreen.inside(new Rect(x, y, width, height), mouseX, mouseY);
         }
     }
+
+    /** One frame's tooltip: its lines and the anchor the box hangs from (design 19 §4). */
+    private record Tooltip(List<String> lines, int x, int y) {}
 
     private record ButtonSpec(String label, String tooltip, Runnable action) {}
 }

@@ -33,6 +33,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -151,8 +152,17 @@ final class PreviewCatalog {
         List<GhostCell> cells = new ArrayList<>(states.size());
         for (int index = 0; index < table.stages().size(); index++) {
             StageModel.Stage stage = table.stages().get(index);
+            // a blueprint's stages already are its bays: the bay's name is the group (design 19 §2)
             stages.add(
-                new Stage(stage.name(), stage.cells().size(), 0, stage.hint(), stage.description(), stage.bay())
+                new Stage(
+                    stage.name(),
+                    stage.cells().size(),
+                    0,
+                    stage.hint(),
+                    stage.description(),
+                    stage.bay(),
+                    stage.bay().text()
+                )
             );
             for (LatticePoint cell : stage.cells()) {
                 BlockState value = states.get(cell);
@@ -231,22 +241,14 @@ final class PreviewCatalog {
             return null;
         }
         List<PreviewCatalogPayload.Member> members = new ArrayList<>(set.satellites().size() + 1);
+        List<Stage> stages = new ArrayList<>();
         List<BlockState> states = new ArrayList<>();
-        PreviewCatalogPayload.Member root = member(
-            id,
-            set.root(),
-            "root",
-            true,
-            rootSiting,
-            rootSiting,
-            null,
-            0,
-            states
-        );
+        ComposedMember root = member(id, set.root(), "root", true, rootSiting, rootSiting, null, 0, 0, states);
         if (root == null) {
             return null;
         }
-        members.add(root);
+        members.add(root.member());
+        stages.addAll(root.stages());
         for (int index = 0; index < set.satellites().size(); index++) {
             CompiledSatellite candidate = set.satellites().get(index);
             SatelliteSpec spec = candidate.spec();
@@ -259,7 +261,7 @@ final class PreviewCatalog {
                 );
                 return null;
             }
-            PreviewCatalogPayload.Member member = member(
+            ComposedMember member = member(
                 id,
                 candidate.blueprint(),
                 spec.id().text(),
@@ -268,12 +270,14 @@ final class PreviewCatalog {
                 satellite.siting(),
                 spec,
                 index + 1,
+                stages.size(),
                 states
             );
             if (member == null) {
                 return null;
             }
-            members.add(member);
+            members.add(member.member());
+            stages.addAll(member.stages());
         }
         int composed = 0;
         for (PreviewCatalogPayload.Member member : members) {
@@ -306,14 +310,18 @@ final class PreviewCatalog {
             );
             return null;
         }
-        return new PreviewCatalogPayload.SetEntry(id, members, materials);
+        return new PreviewCatalogPayload.SetEntry(id, members, materials, stages);
     }
+
+    /** One member's composed facts beside the stages its own StageModel derived (design 19 §2). */
+    private record ComposedMember(PreviewCatalogPayload.Member member, List<Stage> stages) {}
 
     /**
      * One member at its composed siting: its identity states mapped through the placement's orientation,
-     * its cells placed in the set's frame. Null leaves the whole set out, never a partial scene.
+     * its cells placed in the set's frame, each carrying the flattened index of its own stage. Null
+     * leaves the whole set out, never a partial scene.
      */
-    private static PreviewCatalogPayload.@Nullable Member member(
+    private static @Nullable ComposedMember member(
         NamespacedId setId,
         Blueprint blueprint,
         String label,
@@ -321,7 +329,8 @@ final class PreviewCatalog {
         Siting rootSiting,
         Siting siting,
         @Nullable SatelliteSpec satellite,
-        int stageIndex,
+        int memberIndex,
+        int stageBase,
         List<BlockState> states
     ) {
         PreviewExpected.Outcome outcome = PreviewExpected.of(blueprint, Orientation.identity);
@@ -346,9 +355,46 @@ final class PreviewCatalog {
             );
             return null;
         }
+        // the member's own stage model, derived before the orientation mapping: the flattening is the
+        // server's and the cells carry the flattened index, so the client composes nothing (design 19 §2)
+        StageModel.Table table = StageModel.of(blueprint, outcome.states().keySet());
+        NamespacedId bay = PreviewCatalogPayload.SetEntry.memberBay(setId, memberIndex);
+        Map<LatticePoint, Integer> stageOf = new HashMap<>();
+        List<Stage> memberStages = new ArrayList<>(table.stages().size());
+        for (int local = 0; local < table.stages().size(); local++) {
+            StageModel.Stage stage = table.stages().get(local);
+            for (LatticePoint cell : stage.cells()) {
+                stageOf.put(cell, stageBase + local);
+            }
+            memberStages.add(
+                new Stage(
+                    label + " \u00B7 " + stage.name(),
+                    stage.cells().size(),
+                    0,
+                    stage.hint(),
+                    stage.description(),
+                    bay,
+                    label
+                )
+            );
+        }
+        if (memberStages.isEmpty()) {
+            StructureCumulus.logger
+                    .warn("preview catalog: the set {} left out, the member {} derives no stage", setId.text(), label);
+            return null;
+        }
         Orientation orientation = siting.placement().orientation();
         List<GhostCell> cells = new ArrayList<>(outcome.states().size());
         for (Map.Entry<LatticePoint, BlockState> declared : outcome.states().entrySet()) {
+            Integer stageIndex = stageOf.get(declared.getKey());
+            if (stageIndex == null) {
+                StructureCumulus.logger.warn(
+                    "preview catalog: the set {} left out, a cell of {} belongs to no stage",
+                    setId.text(),
+                    label
+                );
+                return null;
+            }
             OrientationMapping.MappingResult mapped = OrientationMapping.transform(orientation, declared.getValue());
             if (mapped instanceof OrientationMapping.MappingResult.Unrepresentable rejected) {
                 StructureCumulus.logger.warn(
@@ -426,7 +472,10 @@ final class PreviewCatalog {
                 );
             }
         }
-        return new PreviewCatalogPayload.Member(blueprint.id(), label, required, cells, presence, links);
+        return new ComposedMember(
+            new PreviewCatalogPayload.Member(blueprint.id(), label, required, cells, presence, links),
+            memberStages
+        );
     }
 
     /** The composite cell count: every member's composed cells, in member order (§3). */

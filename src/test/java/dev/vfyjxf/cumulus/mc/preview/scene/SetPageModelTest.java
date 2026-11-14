@@ -4,6 +4,7 @@ import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.kernel.space.LatticePoint;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -86,6 +87,80 @@ class SetPageModelTest {
         assertEquals(0.0F, dx, 0.0F);
         assertEquals(1.0F, dy, 0.0F);
         assertEquals(0.0F, dz, 0.0F);
+    }
+
+    @Test
+    void theFlattenedTableKeepsOnePartPerMemberAndItsOwnStageNames() {
+        PreviewCatalogPayload.SetEntry entry = flattenedSet();
+        SetPage page = SetPage.of(entry);
+        assertEquals(4, page.stages().size(), "the server's flattened table, not one row per member");
+        assertEquals(
+            List.of("root \u00B7 r", "a \u00B7 a1", "a \u00B7 a2", "b \u00B7 b1"),
+            page.stages().stream().map(stage -> stage.name()).toList()
+        );
+        assertEquals(List.of("root", "a", "a", "b"), page.stages().stream().map(stage -> stage.group()).toList());
+        assertEquals(
+            List.of(0, 1, 1, 2),
+            List.of(page.memberOfStage(0), page.memberOfStage(1), page.memberOfStage(2), page.memberOfStage(3))
+        );
+        for (GhostCell cell : page.cells()) {
+            assertEquals(
+                cell.stageIndex() < 3 ? (cell.stageIndex() == 0 ? 0 : 1) : 2,
+                page.memberOf(cell),
+                "a cell names the member whose own stage carries it"
+            );
+        }
+        ExplodeModel explode = ExplodeModel
+                .of(page.stages(), page.cells(), PreviewScene.ofCells(page.cells()).hull(), page.bayLabels());
+        assertEquals(3, explode.groups().size(), "one part per member, however many stages it has");
+        assertEquals(List.of("root", "a", "b"), explode.groups().stream().map(ExplodeModel.Group::text).toList());
+        ExplodeModel.Offset byBay = explode.offset(SetPage.bay(entry.setId(), 1), 1.0F);
+        assertEquals(byBay, explode.offset(1, 1.0F), "the member's stages share its displacement");
+        assertEquals(byBay, explode.offset(2, 1.0F), "the member's stages share its displacement");
+        assertEquals(ExplodeModel.Offset.zero, explode.offset(SetPage.bay(entry.setId(), 9), 1.0F));
+    }
+
+    private static PreviewCatalogPayload.SetEntry flattenedSet() {
+        NamespacedId setId = NamespacedId.of("structurecumulus", "flat");
+        NamespacedId rootBay = PreviewCatalogPayload.SetEntry.memberBay(setId, 0);
+        NamespacedId aBay = PreviewCatalogPayload.SetEntry.memberBay(setId, 1);
+        NamespacedId bBay = PreviewCatalogPayload.SetEntry.memberBay(setId, 2);
+        List<PreviewCatalogPayload.Member> members = List.of(
+            new PreviewCatalogPayload.Member(
+                rootBlueprint,
+                "root",
+                true,
+                List.of(new GhostCell(LatticePoint.of(0, 0, 0), NamespacedId.of("minecraft", "stone"), Map.of(), 0)),
+                List.of(),
+                List.of()
+            ),
+            new PreviewCatalogPayload.Member(
+                aBlueprint,
+                "a",
+                true,
+                List.of(
+                    new GhostCell(LatticePoint.of(2, 0, 0), NamespacedId.of("minecraft", "stone"), Map.of(), 1),
+                    new GhostCell(LatticePoint.of(2, 0, 1), NamespacedId.of("minecraft", "stone"), Map.of(), 2)
+                ),
+                List.of(),
+                List.of()
+            ),
+            new PreviewCatalogPayload.Member(
+                bBlueprint,
+                "b",
+                true,
+                List.of(new GhostCell(LatticePoint.of(4, 0, 0), NamespacedId.of("minecraft", "stone"), Map.of(), 3)),
+                List.of(),
+                List.of()
+            )
+        );
+        List<Stage> stages = List.of(
+            new Stage("root \u00B7 r", 1, 0, null, null, rootBay, "root"),
+            new Stage("a \u00B7 a1", 1, 0, null, null, aBay, "a"),
+            new Stage("a \u00B7 a2", 1, 0, null, null, aBay, "a"),
+            new Stage("b \u00B7 b1", 1, 0, null, null, bBay, "b")
+        );
+        return new PreviewCatalogPayload.SetEntry(setId, members, List.of(), stages);
     }
 
     private static PreviewCatalogPayload.SetEntry threeMemberSet() {

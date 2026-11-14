@@ -40,6 +40,16 @@ class ScreenLayoutTest {
     }
 
     @Test
+    void theTimelinesOwnHeightSetsTheControlStripAndThePanelsTakeTheRest() {
+        ScreenLayout tall = ScreenLayout.of(320, 240, 84);
+        assertEquals(new Rect(0, 156, 320, 84), tall.control());
+        assertEquals(new Rect(4, 24, 224, 128), tall.main());
+        assertEquals(new Rect(232, 24, 84, 40), tall.front());
+        assertEquals(152, tall.main().y() + tall.main().height());
+        assertTrue(tall.main().height() < ScreenLayout.of(320, 240).main().height());
+    }
+
+    @Test
     void aNarrowScreenDropsTheSideColumnAndTheMainKeepsItsShare() {
         ScreenLayout layout = ScreenLayout.of(20, 240);
         assertNull(layout.front());

@@ -208,10 +208,10 @@ public final class PreviewDemoTourScenario {
                     () -> !screen().staged()
                             && screen().playback().wholeView()
                             && screen().summaryLine() == null
-                            && screen().stageBar().segments().size() == 4
+                            && screen().timeline().segments().size() == 4
                             && screen().drawnCells() == 400,
                     () -> "staged=" + screen().staged() + " summary=" + screen().summaryLine() + " stages="
-                            + screen().stageBar().segments().size() + " drawn=" + screen().drawnCells()
+                            + screen().timeline().segments().size() + " drawn=" + screen().drawnCells()
                 )
                 .check(
                     "the page names its group member",
@@ -245,10 +245,10 @@ public final class PreviewDemoTourScenario {
                     "the standalone tower opens as its own three-stage page",
                     () -> screen().variantCount() == 1
                             && screen().variantLine() == null
-                            && screen().stageBar().segments().size() == 3
+                            && screen().timeline().segments().size() == 3
                             && screen().drawnCells() == 512,
                     () -> "variants=" + screen().variantCount() + " line=" + screen().variantLine() + " stages="
-                            + screen().stageBar().segments().size() + " drawn=" + screen().drawnCells()
+                            + screen().timeline().segments().size() + " drawn=" + screen().drawnCells()
                 ).screenshot("09-demo-tower").frames(2).checkCaptured("09-demo-tower")
                 .action("Esc closes the tower page", context -> {
                     PreviewScreen open = (PreviewScreen) context.screenOrThrow();

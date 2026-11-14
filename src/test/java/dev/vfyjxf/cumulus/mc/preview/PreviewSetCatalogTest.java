@@ -16,6 +16,7 @@ import dev.vfyjxf.cumulus.kernel.spi.StructureKernel;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCatalogPayload;
 import dev.vfyjxf.cumulus.mc.preview.net.PreviewCodecProbe;
+import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import dev.vfyjxf.cumulus.mc.preview.scene.SetPage;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -76,13 +77,84 @@ class PreviewSetCatalogTest {
         assertNotNull(assertCell(towerMember, LatticePoint.of(0, 0, 17)), "the clockwise corner");
         // the machine is at [13,0,0] unturned
         assertCell(set.members().get(1), LatticePoint.of(13, 0, 0));
+        // every composed cell names its own member's flattened stage, never the member index
         for (int member = 0; member < set.members().size(); member++) {
-            int stage = member;
+            NamespacedId bay = PreviewCatalogPayload.SetEntry.memberBay(set.setId(), member);
+            int index = member;
             assertTrue(
-                set.members().get(member).cells().stream().allMatch(cell -> cell.stageIndex() == stage),
-                () -> "member " + stage + " cells name their member stage"
+                set.members().get(member).cells().stream()
+                        .allMatch(cell -> set.stages().get(cell.stageIndex()).bay().equals(bay)),
+                () -> "member " + index + " cells name a stage of their own group"
             );
         }
+        assertEquals(10, groupStages(set, "root"), "the station's ten bays are ten stages in the root's lane");
+    }
+
+    @Test
+    void theSetPageNarratesEachMembersOwnStagesInBuildOrder() {
+        PreviewCatalogPayload.SetEntry set = catalog().sets().get(0);
+        SetPage page = SetPage.of(set);
+        assertEquals(17, page.stages().size(), "10 root + 4 machine + 3 tower stages");
+        assertEquals(17, set.stages().size(), "the flattened table is the wire's");
+        assertEquals(
+            List.of(10, 4, 3),
+            List.of(
+                groupStages(set, "root"),
+                groupStages(set, "structurecumulus:campus_machine"),
+                groupStages(set, "structurecumulus:campus_tower")
+            )
+        );
+        assertEquals(
+            List.of(
+                "root \u00B7 structurecumulus:plinth",
+                "root \u00B7 structurecumulus:core_low",
+                "structurecumulus:campus_machine \u00B7 structurecumulus:plinth",
+                "structurecumulus:campus_tower \u00B7 structurecumulus:plinth"
+            ),
+            List.of(
+                page.stages().get(0).name(),
+                page.stages().get(1).name(),
+                page.stages().get(10).name(),
+                page.stages().get(14).name()
+            )
+        );
+        assertEquals(
+            List.of(144, 96, 48, 8, 24, 27, 27, 27, 27, 45),
+            page.stages().subList(0, 10).stream().map(Stage::expectedCells).toList()
+        );
+        assertEquals(701, page.cells().size());
+        assertEquals(701, page.stages().stream().mapToInt(Stage::expectedCells).sum());
+        assertEquals(3, page.bayLabels().size());
+        assertEquals(0, page.presentation().currentStage());
+        for (int index = 0; index < page.stages().size(); index++) {
+            int stage = index;
+            Stage row = page.stages().get(stage);
+            int expectedMember = stage < 10 ? 0 : stage < 14 ? 1 : 2;
+            assertEquals(expectedMember, page.memberOfStage(stage), () -> "stage " + stage + " member");
+            assertEquals(
+                PreviewCatalogPayload.SetEntry.memberBay(set.setId(), expectedMember),
+                row.bay(),
+                () -> "stage " + stage + " grouping key"
+            );
+            String expectedGroup = expectedMember == 0
+                    ? "root"
+                    : expectedMember == 1 ? "structurecumulus:campus_machine" : "structurecumulus:campus_tower";
+            assertEquals(expectedGroup, row.group(), () -> "stage " + stage + " group");
+        }
+        for (GhostCell cell : page.cells()) {
+            int member = page.memberOf(cell);
+            assertTrue(member >= 0 && member < 3, "every composed cell names a member");
+        }
+    }
+
+    private static int groupStages(PreviewCatalogPayload.SetEntry set, String group) {
+        int count = 0;
+        for (Stage stage : set.stages()) {
+            if (group.equals(stage.group())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     @Test
@@ -144,17 +216,39 @@ class PreviewSetCatalogTest {
     }
 
     @Test
-    void theSetPageBuildsOneStagePerMemberWithTheMemberLabels() {
-        SetPage page = SetPage.of(catalog().sets().get(0));
-        assertEquals(3, page.stages().size());
+    void aSetEntryWithNoStageTableKeepsTheOlderOneStagePerMemberReading() {
+        // the pre-SC13 wire: one stage per member, so a member's cells name its member index
+        PreviewCatalogPayload.SetEntry legacy = new PreviewCatalogPayload.SetEntry(
+            NamespacedId.of("structurecumulus", "legacy"),
+            List.of(
+                new PreviewCatalogPayload.Member(
+                    machine,
+                    "root",
+                    true,
+                    List.of(new GhostCell(LatticePoint.of(0, 0, 0), stoneCell, Map.of(), 0)),
+                    List.of(),
+                    List.of()
+                ),
+                new PreviewCatalogPayload.Member(
+                    tower,
+                    "structurecumulus:tower",
+                    true,
+                    List.of(new GhostCell(LatticePoint.of(3, 0, 0), stoneCell, Map.of(), 1)),
+                    List.of(),
+                    List.of()
+                )
+            ),
+            List.of()
+        );
+        SetPage page = SetPage.of(legacy);
+        assertEquals(2, page.stages().size(), "an older payload's set block carries no member stages");
         assertEquals(
-            List.of("root", "structurecumulus:campus_machine", "structurecumulus:campus_tower"),
+            List.of("root", "structurecumulus:tower"),
             page.stages().stream().map(stage -> stage.name()).toList()
         );
-        assertEquals(List.of(473, 100, 128), page.stages().stream().map(stage -> stage.expectedCells()).toList());
-        assertEquals(0, page.presentation().currentStage());
-        assertEquals(701, page.cells().size());
-        assertEquals(3, page.bayLabels().size());
+        assertEquals(0, page.memberOf(page.cells().get(0)));
+        assertEquals(1, page.memberOf(page.cells().get(1)));
+        assertEquals(PreviewCatalogPayload.SetEntry.memberBay(legacy.setId(), 1), page.stages().get(1).bay());
     }
 
     @Test

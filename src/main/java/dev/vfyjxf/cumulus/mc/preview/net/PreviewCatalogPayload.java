@@ -60,16 +60,30 @@ public record PreviewCatalogPayload(List<Entry> entries, List<SetEntry> sets) im
     /**
      * One structure set, composed on the server into pure geometry: every member's cells are already
      * at their composed siting, so no client re-derives an orientation or an offset (design 18 §3).
+     * {@code stages} is the flattened (member × member-stage) table of design 19 §2, trailing-optional
+     * on the wire: an older payload carries no table and the page falls back to one stage per member.
      */
-    public record SetEntry(NamespacedId setId, List<Member> members, List<MaterialLine> materials) {
+    public record SetEntry(NamespacedId setId, List<Member> members, List<MaterialLine> materials, List<Stage> stages) {
 
         public SetEntry {
             Objects.requireNonNull(setId, "setId");
             members = List.copyOf(members);
             materials = List.copyOf(materials);
+            stages = List.copyOf(stages);
             if (members.isEmpty()) {
                 throw new IllegalArgumentException("a set entry carries at least its root member");
             }
+        }
+
+        /** A set entry from a payload that predates the flattened stage table (design 19 §2). */
+        public SetEntry(NamespacedId setId, List<Member> members, List<MaterialLine> materials) {
+            this(setId, members, materials, List.of());
+        }
+
+        /** The grouping key one member's stages share; never a document bay, only the page's part key. */
+        public static NamespacedId memberBay(NamespacedId setId, int member) {
+            Objects.requireNonNull(setId, "setId");
+            return NamespacedId.of(setId.namespace(), setId.path() + "/member/" + member);
         }
     }
 

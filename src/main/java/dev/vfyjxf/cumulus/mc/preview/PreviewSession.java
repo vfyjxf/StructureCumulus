@@ -770,7 +770,15 @@ final class PreviewSession {
                 frontier = index;
             }
             stages.add(
-                new Stage(stage.name(), stage.cells().size(), satisfied, stage.hint(), stage.description(), stage.bay())
+                new Stage(
+                    stage.name(),
+                    stage.cells().size(),
+                    satisfied,
+                    stage.hint(),
+                    stage.description(),
+                    stage.bay(),
+                    stage.bay().text()
+                )
             );
         }
         if (frontier < 0 && !stages.isEmpty()) {
