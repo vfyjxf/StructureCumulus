@@ -6,6 +6,7 @@ import dev.vfyjxf.cloudlib.uitest.api.TestContext;
 import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.PreviewScreen;
 import dev.vfyjxf.cumulus.mc.preview.client.screen.ScreenLayout;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.StageTimeline;
 import dev.vfyjxf.cumulus.mc.preview.net.GhostCell;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import net.minecraft.client.Minecraft;
@@ -78,17 +79,40 @@ public final class PreviewCampusScenario {
                 ).check(
                     "the page says the world question is set check's",
                     () -> screen().footerLine() != null && screen().footerLine().contains("set check")
-                )
-                .check(
+                ).check(
                     "the timeline's lanes are the members in build order, each holding its own stages",
                     () -> screen().timeline().lanes().stream().map(lane -> lane.group()).toList()
                             .equals(List.of("root", "structurecumulus:campus_machine", "structurecumulus:campus_tower"))
                             && screen().timeline().lanes().stream().map(lane -> lane.stageCount()).toList()
                                     .equals(List.of(10, 4, 3))
                             && screen().playback().stages().stream().map(stage -> stage.name()).toList().get(10)
-                                    .equals("structurecumulus:campus_machine \u00B7 structurecumulus:plinth"),
+                                    .equals("structurecumulus:plinth"),
                     () -> String.valueOf(screen().timeline())
-                ).screenshot("01-campus-set").checkCaptured("01-campus-set")
+                ).check(
+                    "a lane's head is its whole label and its first segment starts where the label ends",
+                    () -> screen().timeline().lanes().stream().allMatch(lane -> {
+                        StageTimeline.Lane.Head head = lane.head();
+                        return head != null
+                                && head.label().equals(head.group())
+                                && head.labelY() - lane.y() >= 1
+                                && screen().timeline().segments().get(lane.firstStage()).x() == lane.headWidth();
+                    }),
+                    () -> String.valueOf(screen().timeline())
+                ).check(
+                    "a set page's segment names never repeat their member's prefix",
+                    () -> screen().playback().stages().stream().noneMatch(
+                        stage -> stage.group() != null && stage.name().startsWith(stage.group() + " \u00B7 ")
+                    ),
+                    () -> screen().playback().stages().stream().map(Stage::name).toList().toString()
+                ).check("the strip's ground, a segment's fill and its name are three separable chrome tones", () -> {
+                    StageTimeline.Chrome chrome = screen().timelineChrome();
+                    return chrome.fill() != chrome.ground()
+                            && chrome.fill() != chrome.text()
+                            && chrome.fill() != chrome.cursor()
+                            && (chrome.fill() >>> 24) >= 0x90
+                            && (chrome.ground() >>> 24) >= 0xC0;
+                }, () -> String.valueOf(screen().timelineChrome())).screenshot("01-campus-set")
+                .checkCaptured("01-campus-set")
                 .action("click the constraints button off", context -> clickLabel(context, "constraints")).frames(2)
                 .check(
                     "the overlay's toggle clears every link stroke",

@@ -6,8 +6,9 @@ import org.jspecify.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * One stage of a blueprint's stage table: its bay, its name, its expected cells, the satisfied share, its
- * bay's text and, trailing-optional, the group (part) of the document it belongs to (design 19 §2).
+ * One stage of a blueprint's stage table: its name, its expected cells, the satisfied share, its bay's
+ * text and, trailing-optional, the group — the member whose own stage this is on a set page, and null on
+ * a page that does not nest (design 19 §2).
  */
 public record Stage(
     String name,

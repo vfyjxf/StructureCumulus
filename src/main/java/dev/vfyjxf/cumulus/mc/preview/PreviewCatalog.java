@@ -152,17 +152,9 @@ final class PreviewCatalog {
         List<GhostCell> cells = new ArrayList<>(states.size());
         for (int index = 0; index < table.stages().size(); index++) {
             StageModel.Stage stage = table.stages().get(index);
-            // a blueprint's stages already are its bays: the bay's name is the group (design 19 §2)
+            // a blueprint page does not nest: its stages are peers and carry no group (design 19 §2)
             stages.add(
-                new Stage(
-                    stage.name(),
-                    stage.cells().size(),
-                    0,
-                    stage.hint(),
-                    stage.description(),
-                    stage.bay(),
-                    stage.bay().text()
-                )
+                new Stage(stage.name(), stage.cells().size(), 0, stage.hint(), stage.description(), stage.bay())
             );
             for (LatticePoint cell : stage.cells()) {
                 BlockState value = states.get(cell);
@@ -366,16 +358,9 @@ final class PreviewCatalog {
             for (LatticePoint cell : stage.cells()) {
                 stageOf.put(cell, stageBase + local);
             }
+            // the head already names the member, so a segment carries the member's own stage name only
             memberStages.add(
-                new Stage(
-                    label + " \u00B7 " + stage.name(),
-                    stage.cells().size(),
-                    0,
-                    stage.hint(),
-                    stage.description(),
-                    bay,
-                    label
-                )
+                new Stage(stage.name(), stage.cells().size(), 0, stage.hint(), stage.description(), bay, label)
             );
         }
         if (memberStages.isEmpty()) {

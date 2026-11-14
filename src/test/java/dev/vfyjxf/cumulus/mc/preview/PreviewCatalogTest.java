@@ -111,7 +111,7 @@ class PreviewCatalogTest {
             Stage stage = entry.presentation().stages().get(at);
             assertEquals(stageCells.get(at), stage.expectedCells(), () -> id + " stage " + at + " count");
             assertEquals(stageCells.get(at), perStage.get(at), () -> id + " stage " + at + " ghosts");
-            assertEquals(stage.bay().text(), stage.group(), () -> id + " stage " + at + " groups by its bay");
+            assertNull(stage.group(), () -> id + " stage " + at + " carries no group: a blueprint page does not nest");
         }
     }
 

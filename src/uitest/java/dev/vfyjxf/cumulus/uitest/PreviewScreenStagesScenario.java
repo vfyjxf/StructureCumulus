@@ -71,17 +71,18 @@ public final class PreviewScreenStagesScenario {
             () -> screen().playback().wholeView() && screen().drawnCells() == 48 && screen().summaryLine() == null,
             () -> "whole=" + screen().playback().wholeView() + " drawn=" + screen().drawnCells() + " summary="
                     + screen().summaryLine()
-        ).check("the timeline is a table of contents: one lane per bay, its stages as segments in order", () -> {
+        ).check("the timeline is one headless lane: a blueprint page's stages side by side in build order", () -> {
             var timeline = screen().timeline();
             var lanes = timeline.lanes();
             var segments = timeline.segments();
-            return lanes.size() == 2
+            return lanes.size() == 1
+                    && lanes.get(0).head() == null
+                    && lanes.get(0).headWidth() == 0
                     && segments.size() == 2
-                    && "structurecumulus:base".equals(lanes.get(0).group())
-                    && "structurecumulus:stack".equals(lanes.get(1).group())
                     && segments.get(0).index() == 0
                     && segments.get(1).index() == 1
-                    && segments.get(1).y() > segments.get(0).y()
+                    && segments.get(1).y() == segments.get(0).y()
+                    && segments.get(0).x() == 0
                     && segments.get(0).width() >= StageTimeline.minSegmentWidth
                     && segments.get(1).width() >= StageTimeline.minSegmentWidth;
         }, () -> String.valueOf(screen().timeline()))

@@ -78,9 +78,8 @@ public final class PreviewScreen extends Screen {
     private static final int constraintColor = 0xFF8FB4D9;
     /** A presence probe's cross: document chrome, not a world finding (design 18 §5). */
     private static final int probeColor = 0xFFC0C0C0;
-    private static final int barColor = 0x60484848;
-    private static final int barHoverColor = 0x906A6A6A;
-    private static final int barCursorColor = 0xFFE8E8E8;
+    /** The timeline's chrome scale: the strip's ground, a segment's fill, the hover, the cursor and the text. */
+    private static final StageTimeline.Chrome chrome = StageTimeline.Chrome.screen;
     /** The playhead's one-pixel line: the cursor's own chrome, never a fill (design 19 §3). */
     private static final int playheadColor = 0xFFF0F0F0;
     /** Vanilla's own tooltip depth: above every page element by construction (design 19 §4). */
@@ -954,31 +953,6 @@ public final class PreviewScreen extends Screen {
     }
 
     /**
-     * A lane head's label in its column: a group that does not fit keeps its tail, because every group
-     * here is a namespaced id whose distinguishing part is its suffix; the hover names the whole label.
-     */
-    private String headLabel(String group, int room) {
-        if (font.width(group) <= room) {
-            return group;
-        }
-        int budget = room - font.width("\u2026");
-        if (budget <= 0) {
-            return "";
-        }
-        int start = group.length();
-        int used = 0;
-        while (start > 0) {
-            int character = font.width(group.substring(start - 1, start));
-            if (used + character > budget) {
-                break;
-            }
-            used += character;
-            start--;
-        }
-        return "\u2026" + group.substring(start);
-    }
-
-    /**
      * The timeline as a table of contents (design 19 §3): one lane per group, its stages as segments in
      * index order, the cursor outlined and the playhead riding it. A wrapped lane is indented under its
      * head; a strip taller than the cap scrolls, and its scrollbar is chrome on the right.
@@ -996,19 +970,24 @@ public final class PreviewScreen extends Screen {
         int hoveredIndex = over ? current.hit(localX, localY) : -1;
         StageTimeline.Lane hoveredHead = over ? current.headAt(localX, localY) : null;
         graphics.enableScissor(stripX, stripY, stripX + current.width(), stripY + current.height());
+        graphics.fill(stripX, stripY, stripX + current.width(), stripY + current.height(), chrome.ground());
         for (StageTimeline.Lane lane : current.lanes()) {
+            StageTimeline.Lane.Head head = lane.head();
             int laneY = stripY + lane.y() - timelineScroll;
-            if (laneY + lane.rowHeight() < stripY || laneY > stripY + current.height()) {
+            if (head == null || laneY + lane.rowHeight() < stripY || laneY > stripY + current.height()) {
                 continue;
             }
-            int labelRoom = Math.max(0, lane.headWidth() - 2 * StageTimeline.namePad);
-            String label = headLabel(lane.group(), labelRoom);
-            if (!label.isEmpty()) {
-                graphics.drawString(font, label, stripX + StageTimeline.namePad, laneY + 1, chromeColor, false);
-            }
-            if (lane == hoveredHead && label.length() < lane.group().length()) {
+            graphics.drawString(
+                font,
+                head.label(),
+                stripX + StageTimeline.namePad,
+                stripY + head.labelY() - timelineScroll,
+                chrome.text(),
+                false
+            );
+            if (lane == hoveredHead && head.label().length() < head.group().length()) {
                 // a truncated head answers with its whole group, so a lane never loses its part
-                pendingTooltip = new Tooltip(List.of(lane.group()), mouseX, laneY - 2);
+                pendingTooltip = new Tooltip(List.of(head.group()), mouseX, laneY - 2);
             }
         }
         for (StageTimeline.Segment segment : current.segments()) {
@@ -1021,18 +1000,25 @@ public final class PreviewScreen extends Screen {
                 segmentY,
                 stripX + segment.x() + segment.width(),
                 segmentY + segment.height(),
-                segment.index() == hoveredIndex ? barHoverColor : barColor
+                segment.index() == hoveredIndex ? chrome.hover() : chrome.fill()
             );
             if (segment.index() == playback.cursor()) {
-                outlineBox(graphics, stripX + segment.x(), segmentY, segment.width(), segment.height(), barCursorColor);
+                outlineBox(
+                    graphics,
+                    stripX + segment.x(),
+                    segmentY,
+                    segment.width(),
+                    segment.height(),
+                    chrome.cursor()
+                );
             }
             if (segment.named()) {
                 graphics.drawString(
                     font,
                     stages().get(segment.index()).name(),
                     stripX + segment.x() + 1,
-                    segmentY + 1,
-                    chromeColor,
+                    stripY + segment.nameY() - timelineScroll,
+                    chrome.text(),
                     false
                 );
             }
@@ -1059,12 +1045,17 @@ public final class PreviewScreen extends Screen {
         }
         if (current.scrollable()) {
             int barX = stripX + current.width() - 2;
-            graphics.fill(barX, stripY, barX + 2, stripY + current.height(), 0x60000000);
             int thumb = Math
                     .max(6, (int) Math.round((double) current.height() * current.height() / current.contentHeight()));
             int travel = current.height() - thumb;
             int thumbY = travel <= 0 ? 0 : (int) Math.round((double) travel * timelineScroll / current.maxScroll());
-            graphics.fill(barX, stripY + thumbY, barX + 2, stripY + thumbY + thumb, 0x60C0C0C0);
+            graphics.fill(
+                barX,
+                stripY + thumbY,
+                barX + 2,
+                stripY + thumbY + thumb,
+                (chrome.text() & 0x00FFFFFF) | 0xC0000000
+            );
         }
         graphics.disableScissor();
         if (hoveredIndex >= 0) {
@@ -1885,6 +1876,11 @@ public final class PreviewScreen extends Screen {
     /** The stage timeline as last drawn (design 19 §3). */
     public StageTimeline timeline() {
         return timeline;
+    }
+
+    /** The timeline's chrome scale as the strip draws it (design 19 §3): the ground, the fill, the hover, the cursor, the text. */
+    public StageTimeline.Chrome timelineChrome() {
+        return chrome;
     }
 
     /** The move to the next lane page sent to the strip's wheel, 0 at the top (design 19 §3). */

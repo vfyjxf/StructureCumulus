@@ -18,15 +18,19 @@ import java.util.function.ToIntFunction;
 public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width, int contentHeight, int height) {
 
     /** One row's height: the segment strip and the lane head share it. */
-    public static final int laneHeight = 11;
+    public static final int laneHeight = 13;
+    /** Vanilla's font line height, which a lane leaves room for above and below. */
+    public static final int textHeight = 9;
+    /** The air above a name, and above a lane's label; the rest of the row is the air below. */
+    public static final int nameInset = 2;
     /** The air between two lanes. */
     public static final int laneGap = 2;
     /** The air between two segments. */
     public static final int segmentGap = 1;
     /** The narrowest legible segment; a stage never shrinks below it. */
     public static final int minSegmentWidth = 8;
-    public static final int headMinWidth = 20;
-    public static final int headMaxWidth = 88;
+    /** The widest a lane's head may grow; past it the label keeps its tail and the hover the whole. */
+    public static final int headMaxWidth = 192;
     /** A wrapped row starts under the lane's label, indented by this much. */
     public static final int wrapIndent = 10;
     public static final int namePad = 2;
@@ -35,15 +39,26 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
     /** One wheel notch's scroll. */
     public static final int scrollStepPx = 12;
 
+    /**
+     * The timeline's chrome scale of design 19 §3: the strip's ground, a segment's fill, the hover, the
+     * cursor and the text, each a step lighter than the one before so a segment reads as a box on a
+     * strip that reads as a panel.
+     */
+    public record Chrome(int ground, int fill, int hover, int cursor, int text) {
+
+        /** The screen's own scale: a near-black ground, an opaque fill and the cursor as the brightest. */
+        public static final Chrome screen = new Chrome(0xE00E1114, 0xFF39434E, 0xFF586574, 0xFFE8E8E8, 0xFFD8DDE2);
+    }
+
     /** The text metrics the layout reads: one measured string width, nothing of the GUI. */
     public record Metrics(
         int laneHeight,
         int laneGap,
         int segmentGap,
         int minSegmentWidth,
-        int headMinWidth,
         int headMaxWidth,
         int wrapIndent,
+        int nameInset,
         int maxHeight,
         ToIntFunction<String> textWidth
     ) {
@@ -59,25 +74,41 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
                 StageTimeline.laneGap,
                 StageTimeline.segmentGap,
                 StageTimeline.minSegmentWidth,
-                StageTimeline.headMinWidth,
                 StageTimeline.headMaxWidth,
                 StageTimeline.wrapIndent,
+                StageTimeline.nameInset,
                 timelineMaxHeight,
                 textWidth
             );
         }
     }
 
-    /** One group's row block: its label, its first row's head width and how many rows it wraps to. */
-    public record Lane(String group, int y, int headWidth, int rows, int firstStage, int stageCount, int rowHeight) {
+    /**
+     * One group's row block: its head (absent on a page that does not nest), where the block starts and
+     * how many stages it carries over how many rows.
+     */
+    public record Lane(@Nullable Head head, int y, int rows, int firstStage, int stageCount, int rowHeight) {
+
+        /** The group's label as drawn, and the column it takes: the label's own width, plus the pads. */
+        public record Head(String group, String label, int width, int labelY) {}
+
+        /** The lane's group, or null when it has no head; a blueprint page is one headless lane (19 §2). */
+        public @Nullable String group() {
+            return head == null ? null : head.group();
+        }
+
+        /** The width of the label's column, 0 for a lane without a head. */
+        public int headWidth() {
+            return head == null ? 0 : head.width();
+        }
 
         public int bottom() {
             return y + rows * rowHeight;
         }
     }
 
-    /** One stage's segment: its row position in the strip, its width, its name's fit and its height. */
-    public record Segment(int index, int x, int y, int width, boolean named, int height) {}
+    /** One stage's segment: its row position, its width, its name's fit and where the name is drawn. */
+    public record Segment(int index, int x, int y, int width, boolean named, int nameY, int height) {}
 
     public StageTimeline {
         lanes = List.copyOf(lanes);
@@ -99,19 +130,20 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
         while (first < stages.size()) {
             String group = groupOf(stages.get(first));
             int last = first + 1;
-            while (last < stages.size() && groupOf(stages.get(last)).equals(group)) {
+            while (last < stages.size() && Objects.equals(groupOf(stages.get(last)), group)) {
                 last++;
             }
             int count = last - first;
-            int head = headWidth(group, width, metrics);
+            Lane.@Nullable Head head = head(group, y, width, metrics);
+            int headWidth = head == null ? 0 : head.width();
             int totalCells = 0;
             for (int index = first; index < last; index++) {
                 totalCells += Math.max(1, stages.get(index).expectedCells());
             }
-            int shareBudget = Math.max(0, width - head - metrics.segmentGap() * (count - 1));
+            int shareBudget = Math.max(0, width - headWidth - metrics.segmentGap() * (count - 1));
             int row = 0;
-            int x = head;
-            int rowStart = head;
+            int x = headWidth;
+            int rowStart = x;
             int cellsSoFar = 0;
             int boundary = 0;
             for (int index = first; index < last; index++) {
@@ -129,14 +161,23 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
                 if (x + segmentWidth > width) {
                     segmentWidth = Math.max(1, width - x);
                 }
+                int segmentY = y + row * metrics.laneHeight();
                 boolean named = metrics.textWidth().applyAsInt(stages.get(index).name()) + 2 * namePad <= segmentWidth;
                 segments.add(
-                    new Segment(index, x, y + row * metrics.laneHeight(), segmentWidth, named, metrics.laneHeight())
+                    new Segment(
+                        index,
+                        x,
+                        segmentY,
+                        segmentWidth,
+                        named,
+                        segmentY + metrics.nameInset(),
+                        metrics.laneHeight()
+                    )
                 );
                 x += segmentWidth + metrics.segmentGap();
             }
             int rows = row + 1;
-            lanes.add(new Lane(group, y, head, rows, first, count, metrics.laneHeight()));
+            lanes.add(new Lane(head, y, rows, first, count, metrics.laneHeight()));
             y += rows * metrics.laneHeight() + metrics.laneGap();
             first = last;
         }
@@ -144,17 +185,18 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
         return new StageTimeline(lanes, segments, width, content, Math.min(content, metrics.maxHeight()));
     }
 
-    /** The stage's group, or its bay when a payload predates the carried group (design 19 §2). */
-    public static String groupOf(Stage stage) {
-        String group = stage.group();
-        return group == null || group.isBlank() ? stage.bay().text() : group;
+    /** The stage's group, or null when the page does not nest: a blueprint page is one lane (design 19 §2). */
+    public static @Nullable String groupOf(Stage stage) {
+        return stage.group();
     }
 
     /** The hover's line: the stage, its group (unless the name already carries it) and its cells. */
     public static String hoverText(Stage stage) {
         String name = stage.name();
         String group = groupOf(stage);
-        String head = name.equals(group) || name.startsWith(group + " \u00B7 ") ? name : name + " \u00B7 " + group;
+        String head = group == null || name.equals(group) || name.startsWith(group + " \u00B7 ")
+                ? name
+                : name + " \u00B7 " + group;
         return head + " \u00B7 " + stage.expectedCells() + " cells";
     }
 
@@ -213,7 +255,10 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
             return null;
         }
         for (Lane lane : lanes) {
-            if (localX < lane.headWidth() && localY >= lane.y() && localY < lane.y() + lane.rowHeight()) {
+            if (lane.headWidth() > 0
+                    && localX < lane.headWidth()
+                    && localY >= lane.y()
+                    && localY < lane.y() + lane.rowHeight()) {
                 return lane;
             }
         }
@@ -246,9 +291,37 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
         return segment.x() + Math.min(segment.width() - 1, Math.max(0, offset));
     }
 
-    private static int headWidth(String group, int width, Metrics metrics) {
-        int wanted = metrics.textWidth().applyAsInt(group) + 2 * namePad;
-        int head = Math.max(metrics.headMinWidth(), Math.min(metrics.headMaxWidth(), wanted));
-        return Math.min(head, Math.max(0, width - metrics.minSegmentWidth() - metrics.segmentGap()));
+    /** A lane's head, or none; the column is the label's own width plus the pads, never wider than it. */
+    private static Lane.@Nullable Head head(@Nullable String group, int y, int width, Metrics metrics) {
+        if (group == null) {
+            return null;
+        }
+        int column = Math
+                .max(0, Math.min(metrics.headMaxWidth(), width - metrics.minSegmentWidth() - metrics.segmentGap()));
+        String label = fitHead(group, Math.max(0, column - 2 * namePad), metrics.textWidth());
+        int labelWidth = metrics.textWidth().applyAsInt(label) + 2 * namePad;
+        return new Lane.Head(group, label, Math.min(column, labelWidth), y + metrics.nameInset());
+    }
+
+    /** The whole label when it fits its column, else its tail behind an ellipsis because the hover has the whole. */
+    private static String fitHead(String group, int room, ToIntFunction<String> textWidth) {
+        if (textWidth.applyAsInt(group) <= room) {
+            return group;
+        }
+        int budget = room - textWidth.applyAsInt("\u2026");
+        if (budget <= 0) {
+            return "";
+        }
+        int start = group.length();
+        int used = 0;
+        while (start > 0) {
+            int character = textWidth.applyAsInt(group.substring(start - 1, start));
+            if (used + character > budget) {
+                break;
+            }
+            used += character;
+            start--;
+        }
+        return "\u2026" + group.substring(start);
     }
 }

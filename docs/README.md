@@ -120,11 +120,13 @@ Then the module files, in dependency order:
   state and the stage outline as an opt-in toggle off by default), SC12 the set preview
   ([18 set-preview](design/18-set-preview.md), D-112: the catalogue's composed set entries, the
   composite page whose members are the stages and the explode's parts, the constraint overlay, the
-  member drill-down with its breadcrumb, the JEI set pages and the `<id>#set` command form) and SC13
-  the grouped stage and its timeline ([19 stage-timeline](design/19-stage-timeline.md), D-113: the
-  carried `group`, the server-side (member × member-stage) flattening, the lane/wrap/scroll timeline
-  with its playhead, and the scene pass's depth restore so every tooltip draws above the page) are on
-  the tree.
+  member drill-down with its breadcrumb, the JEI set pages and the `<id>#set` command form), SC13 the
+  grouped stage and its timeline ([19 stage-timeline](design/19-stage-timeline.md), D-113: the carried
+  `group`, the server-side (member × member-stage) flattening, the lane/wrap/scroll timeline with its
+  playhead, and the scene pass's depth restore so every tooltip draws above the page) and SC13b the
+  timeline's read (a group only where the document nests, so a blueprint page is one headless lane,
+  member lanes whose segments carry their own stage names, a head measured from the label it draws,
+  and the chrome scale that makes a segment a box over the blurred world) are on the tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`
@@ -185,8 +187,8 @@ Then the module files, in dependency order:
   renderers, the JEI category, the preference store and scorer, the structure-set build, and the
   plugin extension tables (`registerMaterializers`/`registerItemSources` over the loader's one
   ordering and failure policy, plus the command's `with <kind-id>` source form). The tree registers
-  657 kernel tests in 75 containers, 758 adapter unit tests in 87 containers and 173 `@GameTest`
-  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 758 adapter tests) and
+  657 kernel tests in 75 containers, 800 adapter unit tests in 90 containers and 173 `@GameTest`
+  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 800 adapter tests) and
   `runGameTestServer` passes 173/173. Pending only: acting on the measured kernel-side cost debts
   and the live-level review items (`07` §7), and fresh visual review screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
@@ -198,8 +200,8 @@ Then the module files, in dependency order:
   every run and kept out of the published jar (D-77).
 - Verification (2026-11-13): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 657 kernel JUnit 5 tests (75 test
-  containers), 758 adapter unit tests (87 containers) and 173 `@GameTest` methods; a full
-  `./gradlew check` passes at this revision (657 kernel tests, 758 adapter
+  containers), 800 adapter unit tests (90 containers) and 173 `@GameTest` methods; a full
+  `./gradlew check` passes at this revision (657 kernel tests, 800 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 173/173 GameTests.
   `Codes.all` has 69 entries and the decision record has 109 decisions
   (D-111; D-29 and D-36 superseded, D-78 withdrawn, D-110 reserved).

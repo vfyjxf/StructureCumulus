@@ -101,7 +101,7 @@ class PreviewCodecsTest {
 
     @Test
     void aStageCarriesItsGroupAndAnAbsentGroupCostsOneByte() {
-        Stage grouped = new Stage("root \u00B7 hearth", 9, 0, null, null, hearth, "root");
+        Stage grouped = new Stage("hearth", 9, 0, null, null, hearth, "root");
         Stage plain = new Stage("hearth", 9, 0, null, null, hearth);
         PreviewPresentation withGroup = new PreviewPresentation(null, List.of(grouped), 0, List.of(), 0);
         PreviewPresentation withoutGroup = new PreviewPresentation(null, List.of(plain), 0, List.of(), 0);
@@ -133,7 +133,7 @@ class PreviewCodecsTest {
         PreviewCatalogPayload decoded = roundTrip(new PreviewCatalogPayload(List.of(), List.of(set)));
         assertEquals(set, decoded.sets().get(0));
         assertEquals(2, decoded.sets().get(0).stages().size());
-        assertEquals("root \u00B7 hearth", decoded.sets().get(0).stages().get(0).name());
+        assertEquals("hearth", decoded.sets().get(0).stages().get(0).name(), "a segment carries its own name");
         assertEquals("root", decoded.sets().get(0).stages().get(0).group());
     }
 
@@ -176,16 +176,8 @@ class PreviewCodecsTest {
             base.members(),
             base.materials(),
             List.of(
-                new Stage("root \u00B7 hearth", 1, 0, null, null, hearth, "root"),
-                new Stage(
-                    "structurecumulus:satellite \u00B7 hearth",
-                    1,
-                    0,
-                    null,
-                    null,
-                    hearth,
-                    "structurecumulus:satellite"
-                )
+                new Stage("hearth", 1, 0, null, null, hearth, "root"),
+                new Stage("hearth", 1, 0, null, null, hearth, "structurecumulus:satellite")
             )
         );
     }

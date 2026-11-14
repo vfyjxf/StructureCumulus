@@ -94,10 +94,7 @@ class SetPageModelTest {
         PreviewCatalogPayload.SetEntry entry = flattenedSet();
         SetPage page = SetPage.of(entry);
         assertEquals(4, page.stages().size(), "the server's flattened table, not one row per member");
-        assertEquals(
-            List.of("root \u00B7 r", "a \u00B7 a1", "a \u00B7 a2", "b \u00B7 b1"),
-            page.stages().stream().map(stage -> stage.name()).toList()
-        );
+        assertEquals(List.of("r", "a1", "a2", "b1"), page.stages().stream().map(stage -> stage.name()).toList());
         assertEquals(List.of("root", "a", "a", "b"), page.stages().stream().map(stage -> stage.group()).toList());
         assertEquals(
             List.of(0, 1, 1, 2),
@@ -155,10 +152,10 @@ class SetPageModelTest {
             )
         );
         List<Stage> stages = List.of(
-            new Stage("root \u00B7 r", 1, 0, null, null, rootBay, "root"),
-            new Stage("a \u00B7 a1", 1, 0, null, null, aBay, "a"),
-            new Stage("a \u00B7 a2", 1, 0, null, null, aBay, "a"),
-            new Stage("b \u00B7 b1", 1, 0, null, null, bBay, "b")
+            new Stage("r", 1, 0, null, null, rootBay, "root"),
+            new Stage("a1", 1, 0, null, null, aBay, "a"),
+            new Stage("a2", 1, 0, null, null, aBay, "a"),
+            new Stage("b1", 1, 0, null, null, bBay, "b")
         );
         return new PreviewCatalogPayload.SetEntry(setId, members, List.of(), stages);
     }

@@ -106,18 +106,22 @@ class PreviewSetCatalogTest {
         );
         assertEquals(
             List.of(
-                "root \u00B7 structurecumulus:plinth",
-                "root \u00B7 structurecumulus:core_low",
-                "structurecumulus:campus_machine \u00B7 structurecumulus:plinth",
-                "structurecumulus:campus_tower \u00B7 structurecumulus:plinth"
+                "structurecumulus:plinth",
+                "structurecumulus:core_low",
+                "structurecumulus:plinth",
+                "structurecumulus:plinth"
             ),
             List.of(
                 page.stages().get(0).name(),
                 page.stages().get(1).name(),
                 page.stages().get(10).name(),
                 page.stages().get(14).name()
-            )
+            ),
+            "a segment carries the member's own stage name, never its member's prefix"
         );
+        for (Stage row : page.stages()) {
+            assertFalse(row.name().contains(" \u00B7 "), "the head already names the member: " + row.name());
+        }
         assertEquals(
             List.of(144, 96, 48, 8, 24, 27, 27, 27, 27, 45),
             page.stages().subList(0, 10).stream().map(Stage::expectedCells).toList()

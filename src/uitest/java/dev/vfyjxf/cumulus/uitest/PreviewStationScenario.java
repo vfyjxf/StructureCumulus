@@ -60,15 +60,24 @@ public final class PreviewStationScenario {
                             && screen().drawnCells() == 4 * fullCells,
                     () -> "staged=" + screen().staged() + " summary=" + screen().summaryLine() + " stages="
                             + screen().timeline().segments().size() + " drawn=" + screen().drawnCells()
-                ).check("the ten bays stack ten lanes past the cap, so the strip scrolls", () -> {
+                ).check("the ten stages are one headless lane: ten segments on one row, not ten rows", () -> {
                     var timeline = screen().timeline();
-                    return timeline.lanes().size() == 10
-                            && timeline.scrollable()
-                            && timeline.height() == StageTimeline.timelineMaxHeight;
+                    var lanes = timeline.lanes();
+                    var segments = timeline.segments();
+                    return lanes.size() == 1
+                            && lanes.get(0).head() == null
+                            && lanes.get(0).headWidth() == 0
+                            && segments.size() == 10
+                            && segments.stream().allMatch(segment -> segment.y() == segments.get(0).y())
+                            && segments.get(0).x() == 0
+                            && segments.get(9).x() + segments.get(9).width() <= timeline.width()
+                            && !timeline.scrollable()
+                            && timeline.height() == StageTimeline.laneHeight;
                 },
                     () -> "lanes=" + screen().timeline().lanes().size() + " scrollable="
                             + screen().timeline().scrollable() + " height=" + screen().timeline().height()
-                ).action("wheel down over the timeline", context -> {
+                            + " timeline=" + screen().timeline()
+                ).action("wheel over the one-row timeline", context -> {
                     PreviewScreen open = (PreviewScreen) context.screenOrThrow();
                     ScreenLayout.Rect control = open.layout().control();
                     float x = 20.0F;
@@ -77,19 +86,7 @@ public final class PreviewStationScenario {
                     context.driver().scroll(open, x, y, -1.0D);
                 }).frames(2)
                 .check(
-                    "the wheel scrolls the strip and the first lane rides out of the cap",
-                    () -> screen().timelineScroll() > 0,
-                    () -> Integer.toString(screen().timelineScroll())
-                ).action("wheel back up over the timeline", context -> {
-                    PreviewScreen open = (PreviewScreen) context.screenOrThrow();
-                    ScreenLayout.Rect control = open.layout().control();
-                    float x = 20.0F;
-                    float y = control.y() + 3.0F + StageTimeline.laneHeight;
-                    context.driver().placeCursor(x, y);
-                    context.driver().scroll(open, x, y, 1.0D);
-                }).frames(2)
-                .check(
-                    "the strip comes back to its top",
+                    "a one-row strip has nowhere to scroll, so the wheel leaves it at the top",
                     () -> screen().timelineScroll() == 0,
                     () -> Integer.toString(screen().timelineScroll())
                 )
@@ -107,6 +104,7 @@ public final class PreviewStationScenario {
                     () -> screen().variantIndex() == 1
                             && "variant 2/2: compact".equals(screen().variantLine())
                             && screen().timeline().segments().size() == 7
+                            && screen().timeline().lanes().size() == 1
                             && screen().drawnCells() == 4 * compactCells
                             && screen().camera().yaw() == camera[0]
                             && screen().camera().zoom() == camera[1],
