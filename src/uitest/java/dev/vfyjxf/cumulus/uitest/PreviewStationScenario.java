@@ -77,6 +77,22 @@ public final class PreviewStationScenario {
                     () -> "lanes=" + screen().timeline().lanes().size() + " scrollable="
                             + screen().timeline().scrollable() + " height=" + screen().timeline().height()
                             + " timeline=" + screen().timeline()
+                )
+                .check(
+                    "the station's bays read as short names, not long ids: the 8-cell sliver alone stays unnamed",
+                    () -> screen().timeline().segments().stream().filter(StageTimeline.Segment::named).count() >= 8
+                            && screen().timeline().segments().get(0).label().equals("plinth")
+                            && screen().timeline().segments().stream()
+                                    .noneMatch(segment -> segment.label().startsWith("structurecumulus:"))
+                            && screen().timeline().segments().stream().filter(segment -> !segment.named())
+                                    .allMatch(segment -> segment.label().equals("core_high"))
+                            && screen().playback().stages().get(0).name().equals("structurecumulus:plinth"),
+                    () -> "named="
+                            + screen().timeline().segments().stream().filter(StageTimeline.Segment::named).count()
+                            + " labels="
+                            + screen().timeline().segments().stream().map(StageTimeline.Segment::label).toList()
+                            + " widths="
+                            + screen().timeline().segments().stream().map(StageTimeline.Segment::width).toList()
                 ).action("wheel over the one-row timeline", context -> {
                     PreviewScreen open = (PreviewScreen) context.screenOrThrow();
                     ScreenLayout.Rect control = open.layout().control();

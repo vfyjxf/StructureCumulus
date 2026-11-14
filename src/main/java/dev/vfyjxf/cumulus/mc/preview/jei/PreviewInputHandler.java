@@ -1,22 +1,25 @@
 package dev.vfyjxf.cumulus.mc.preview.jei;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import dev.vfyjxf.cumulus.mc.preview.client.screen.StageTimeline;
 import dev.vfyjxf.cumulus.mc.preview.jei.BlueprintPreviewCategory.PageView;
 import dev.vfyjxf.cumulus.mc.preview.scene.BlueprintPreviewRecipe;
 import dev.vfyjxf.cumulus.mc.preview.scene.PreviewViewMode;
 import mezz.jei.api.gui.inputs.IJeiInputHandler;
 import mezz.jei.api.gui.inputs.IJeiUserInput;
+import net.minecraft.Util;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 
 /**
- * The category's one input surface: drag rotates the isometric camera, the slider reveals a Y layer,
- * a click on the mode button cycles the view, a click on the lower button opens the session and a
- * click on the bottom one opens the screen. All coordinates are recipe-local.
+ * The category's one input surface: drag rotates the isometric camera, the wheel zooms it, a double
+ * click frames the hull, a click on a timeline segment selects that stage, the slider reveals a Y layer,
+ * the buttons cycle the view, toggle the set overlay and open the session or the screen. All
+ * coordinates are recipe-local (design 19 §5).
  */
 final class PreviewInputHandler implements IJeiInputHandler {
 
     private enum Mode {
-        none, rotate, slice, button, view, variantPrev, variantNext, screen
+        none, rotate, slice, button, view, variantPrev, variantNext, screen, timeline, constraints
     }
 
     private static final float degreesPerPixel = 1.6F;
@@ -25,6 +28,7 @@ final class PreviewInputHandler implements IJeiInputHandler {
     private final BlueprintPreviewRecipe recipe;
     private final PageView view;
     private Mode mode = Mode.none;
+    private boolean dragged;
 
     PreviewInputHandler(BlueprintPreviewRecipe recipe, PageView view) {
         this.recipe = recipe;
@@ -44,10 +48,28 @@ final class PreviewInputHandler implements IJeiInputHandler {
         Mode hit = modeAt(mouseX, mouseY);
         if (input.isSimulate()) {
             mode = hit;
+            dragged = false;
             return hit != Mode.none;
         }
         Mode pressed = mode;
         mode = Mode.none;
+        if (pressed == Mode.constraints && hit == Mode.constraints) {
+            view.toggleConstraints();
+            return true;
+        }
+        if (pressed == Mode.timeline && hit == Mode.timeline) {
+            view.selectTimeline(
+                view.timeline(recipe),
+                (int) mouseX - BlueprintPreviewCategory.timelineX,
+                (int) mouseY - BlueprintPreviewCategory.timelineY
+            );
+            return true;
+        }
+        if (pressed == Mode.rotate && hit == Mode.rotate && !dragged) {
+            // two clicks inside the threshold, with no drag between, are the screen's frame-all
+            view.clickScene(Util.getMillis());
+            return true;
+        }
         if (pressed == Mode.button && hit == Mode.button) {
             // the selected variant is the blueprint the session opens (design 15 §12.4)
             JeiPreview.openSelected(recipe.blueprintId());
@@ -90,6 +112,8 @@ final class PreviewInputHandler implements IJeiInputHandler {
         }
         return switch (mode) {
             case rotate -> {
+                dragged = true;
+                view.drag();
                 // the three-view and the grid fix their planes, so only the isometric view turns
                 if (view.mode() != PreviewViewMode.isometric) {
                     yield true;
@@ -99,6 +123,7 @@ final class PreviewInputHandler implements IJeiInputHandler {
                 yield true;
             }
             case slice -> {
+                dragged = true;
                 sliceAt(mouseY);
                 yield true;
             }
@@ -108,7 +133,36 @@ final class PreviewInputHandler implements IJeiInputHandler {
 
     @Override
     public boolean handleMouseScrolled(double mouseX, double mouseY, double scrollDeltaX, double scrollDeltaY) {
-        if (!BlueprintPreviewCategory.inside(
+        if (scrollDeltaY == 0.0D) {
+            return false;
+        }
+        if (insideTimeline(mouseX, mouseY)) {
+            // the strip scrolls under the wheel exactly as the screen's does (design 19 §3)
+            var timeline = view.timeline(recipe);
+            if (timeline.scrollable()) {
+                view.timelineScroll(
+                    timeline.clampScroll(
+                        view.timelineScroll() - (int) Math.round(scrollDeltaY * StageTimeline.scrollStepPx)
+                    )
+                );
+                return true;
+            }
+            return false;
+        }
+        if (inside(
+            mouseX,
+            mouseY,
+            BlueprintPreviewCategory.sliderX,
+            BlueprintPreviewCategory.sliderY,
+            BlueprintPreviewCategory.sliderWidth,
+            BlueprintPreviewCategory.sliderHeight
+        )) {
+            // the slice keeps the slider's own wheel; the viewport's wheel zooms (design 15 §6.2's amendment)
+            int target = view.slice() + (scrollDeltaY > 0.0D ? 1 : -1);
+            view.slice(Math.max(0, Math.min(recipe.scene().layers() - 1, target)));
+            return true;
+        }
+        if (inside(
             mouseX,
             mouseY,
             BlueprintPreviewCategory.sceneX,
@@ -116,17 +170,15 @@ final class PreviewInputHandler implements IJeiInputHandler {
             BlueprintPreviewCategory.sceneWidth,
             BlueprintPreviewCategory.sceneHeight
         )) {
-            return false;
+            view.zoomBy((float) scrollDeltaY);
+            return true;
         }
-        int layers = recipe.scene().layers();
-        int target = view.slice() + (scrollDeltaY > 0.0D ? 1 : -1);
-        view.slice(Math.max(0, Math.min(layers - 1, target)));
-        return true;
+        return false;
     }
 
     private Mode modeAt(double mouseX, double mouseY) {
         if (recipe.variantCount() > 1
-                && BlueprintPreviewCategory.inside(
+                && inside(
                     mouseX,
                     mouseY,
                     BlueprintPreviewCategory.variantX,
@@ -145,9 +197,9 @@ final class PreviewInputHandler implements IJeiInputHandler {
             if (right) {
                 return Mode.variantNext;
             }
-            return left ? Mode.variantPrev : Mode.none;
+            return Mode.none;
         }
-        if (BlueprintPreviewCategory.inside(
+        if (inside(
             mouseX,
             mouseY,
             BlueprintPreviewCategory.screenX,
@@ -157,7 +209,7 @@ final class PreviewInputHandler implements IJeiInputHandler {
         )) {
             return Mode.screen;
         }
-        if (BlueprintPreviewCategory.inside(
+        if (inside(
             mouseX,
             mouseY,
             BlueprintPreviewCategory.modeX,
@@ -167,8 +219,19 @@ final class PreviewInputHandler implements IJeiInputHandler {
         )) {
             return Mode.view;
         }
+        if (recipe.isSet()
+                && inside(
+                    mouseX,
+                    mouseY,
+                    BlueprintPreviewCategory.constraintsX,
+                    BlueprintPreviewCategory.constraintsY,
+                    BlueprintPreviewCategory.constraintsWidth,
+                    BlueprintPreviewCategory.constraintsHeight
+                )) {
+            return Mode.constraints;
+        }
         if (!recipe.isSet()
-                && BlueprintPreviewCategory.inside(
+                && inside(
                     mouseX,
                     mouseY,
                     BlueprintPreviewCategory.buttonX,
@@ -178,7 +241,7 @@ final class PreviewInputHandler implements IJeiInputHandler {
                 )) {
             return Mode.button;
         }
-        if (BlueprintPreviewCategory.inside(
+        if (inside(
             mouseX,
             mouseY,
             BlueprintPreviewCategory.sliderX,
@@ -188,7 +251,10 @@ final class PreviewInputHandler implements IJeiInputHandler {
         )) {
             return Mode.slice;
         }
-        if (BlueprintPreviewCategory.inside(
+        if (insideTimeline(mouseX, mouseY)) {
+            return Mode.timeline;
+        }
+        if (inside(
             mouseX,
             mouseY,
             BlueprintPreviewCategory.sceneX,
@@ -201,6 +267,19 @@ final class PreviewInputHandler implements IJeiInputHandler {
         return Mode.none;
     }
 
+    private boolean insideTimeline(double mouseX, double mouseY) {
+        var timeline = view.timeline(recipe);
+        return timeline.height() > 0
+                && inside(
+                    mouseX,
+                    mouseY,
+                    BlueprintPreviewCategory.timelineX,
+                    BlueprintPreviewCategory.timelineY,
+                    timeline.width(),
+                    timeline.height()
+                );
+    }
+
     private void sliceAt(double mouseY) {
         int layers = recipe.scene().layers();
         if (layers <= 1) {
@@ -211,6 +290,10 @@ final class PreviewInputHandler implements IJeiInputHandler {
                 - (float) ((mouseY - BlueprintPreviewCategory.sliderY) / BlueprintPreviewCategory.sliderHeight);
         int slice = Math.round(fraction * (layers - 1));
         view.slice(Math.max(0, Math.min(layers - 1, slice)));
+    }
+
+    private static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {
+        return BlueprintPreviewCategory.inside(mouseX, mouseY, x, y, width, height);
     }
 
     private static float clamp(float pitch) {

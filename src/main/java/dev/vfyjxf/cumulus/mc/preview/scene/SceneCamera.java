@@ -37,6 +37,8 @@ public record SceneCamera(
     public static final float minDistance = 1.0F;
     public static final float maxDistance = 512.0F;
     public static final float fovDegrees = 70.0F;
+    /** One wheel notch's zoom factor: the screen's wheel and the JEI face's one rule (design 17 §4.4). */
+    public static final float zoomStep = 1.1F;
     /** The steepest pitch: the orbit stops short of the pole, where yaw stops meaning anything. */
     public static final float maxPitch = 89.9F;
 

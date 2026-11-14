@@ -84,7 +84,10 @@ public final class PreviewScreenStagesScenario {
                     && segments.get(1).y() == segments.get(0).y()
                     && segments.get(0).x() == 0
                     && segments.get(0).width() >= StageTimeline.minSegmentWidth
-                    && segments.get(1).width() >= StageTimeline.minSegmentWidth;
+                    && segments.get(1).width() >= StageTimeline.minSegmentWidth
+                    && segments.get(0).label().equals("base")
+                    && segments.get(1).label().equals("stack")
+                    && screen().playback().stages().get(0).name().equals(floorName);
         }, () -> String.valueOf(screen().timeline()))
                 .check(
                     "the control strip carries the whole view, the player, the step, the arrows and both toggles",

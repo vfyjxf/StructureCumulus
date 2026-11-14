@@ -1,5 +1,6 @@
 package dev.vfyjxf.cumulus.mc.preview.client.screen;
 
+import dev.vfyjxf.cumulus.kernel.core.NamespacedId;
 import dev.vfyjxf.cumulus.mc.preview.net.Stage;
 import org.jspecify.annotations.Nullable;
 
@@ -12,8 +13,8 @@ import java.util.function.ToIntFunction;
  * The stage timeline of design 19 §3: consecutive stages of one group form a lane on its own row, the
  * lane's head carries the group's label, its stages are segments in index order, a lane wraps when it
  * overflows and the strip grows to a cap and then scrolls. A table of contents, never a progress bar:
- * the only marks are the cursor, the hover and the playhead. A pure function of the table, the width
- * and the text metrics.
+ * the only marks are the cursor, the hover and the playhead. A pure function of the table, the width,
+ * the text metrics and the page's display labels (19 §3).
  */
 public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width, int contentHeight, int height) {
 
@@ -48,6 +49,41 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
 
         /** The screen's own scale: a near-black ground, an opaque fill and the cursor as the brightest. */
         public static final Chrome screen = new Chrome(0xE00E1114, 0xFF39434E, 0xFF586574, 0xFFE8E8E8, 0xFFD8DDE2);
+    }
+
+    /**
+     * The display-label law of design 19 §3: a lane head and a segment name strip the page's own
+     * namespace, a set page's segment also drops the member prefix the head already carries, and a
+     * foreign namespace keeps its prefix because that prefix is the distinction. The full id is the
+     * hover's, never a drawn label's.
+     */
+    public record Labels(@Nullable String namespace) {
+
+        /** No page namespace to strip: the drawn labels are the wire's ids, the pure baseline. */
+        public static final Labels none = new Labels(null);
+
+        public static Labels of(NamespacedId pageId) {
+            return new Labels(Objects.requireNonNull(pageId, "pageId").namespace());
+        }
+
+        /** The id without the page's own namespace; an id from anywhere else is already short. */
+        public String strip(String id) {
+            if (namespace == null || namespace.isBlank()) {
+                return id;
+            }
+            String prefix = namespace + ":";
+            return id.startsWith(prefix) ? id.substring(prefix.length()) : id;
+        }
+
+        /** A segment's name: the stage's own name, without the member prefix a set page's head carries. */
+        public String stage(Stage stage) {
+            String name = stage.name();
+            String group = stage.group();
+            if (group != null && name.startsWith(group + " \u00B7 ")) {
+                return strip(name.substring(group.length() + 3));
+            }
+            return strip(name);
+        }
     }
 
     /** The text metrics the layout reads: one measured string width, nothing of the GUI. */
@@ -107,8 +143,8 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
         }
     }
 
-    /** One stage's segment: its row position, its width, its name's fit and where the name is drawn. */
-    public record Segment(int index, int x, int y, int width, boolean named, int nameY, int height) {}
+    /** One stage's segment: its row position, its width, its drawn label's fit and where it is drawn. */
+    public record Segment(int index, int x, int y, int width, boolean named, int nameY, int height, String label) {}
 
     public StageTimeline {
         lanes = List.copyOf(lanes);
@@ -120,6 +156,15 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
 
     /** The lanes, the segments and this frame's strip height; no GUI state beyond the text metrics. */
     public static StageTimeline of(List<Stage> stages, int width, Metrics metrics) {
+        return of(stages, width, metrics, Labels.none);
+    }
+
+    /**
+     * The timeline under the page's display-label law: the heads and segments are measured and named
+     * with their short forms, while the wire's full ids stay on the stages for the hover (19 §3).
+     */
+    public static StageTimeline of(List<Stage> stages, int width, Metrics metrics, Labels labels) {
+        Objects.requireNonNull(labels, "labels");
         if (stages.isEmpty() || width <= 0 || metrics.maxHeight() <= 0) {
             return new StageTimeline(List.of(), List.of(), Math.max(0, width), 0, 0);
         }
@@ -134,7 +179,7 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
                 last++;
             }
             int count = last - first;
-            Lane.@Nullable Head head = head(group, y, width, metrics);
+            Lane.@Nullable Head head = head(group, y, width, metrics, labels);
             int headWidth = head == null ? 0 : head.width();
             int totalCells = 0;
             for (int index = first; index < last; index++) {
@@ -162,7 +207,8 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
                     segmentWidth = Math.max(1, width - x);
                 }
                 int segmentY = y + row * metrics.laneHeight();
-                boolean named = metrics.textWidth().applyAsInt(stages.get(index).name()) + 2 * namePad <= segmentWidth;
+                String label = labels.stage(stages.get(index));
+                boolean named = metrics.textWidth().applyAsInt(label) + 2 * namePad <= segmentWidth;
                 segments.add(
                     new Segment(
                         index,
@@ -171,7 +217,8 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
                         segmentWidth,
                         named,
                         segmentY + metrics.nameInset(),
-                        metrics.laneHeight()
+                        metrics.laneHeight(),
+                        label
                     )
                 );
                 x += segmentWidth + metrics.segmentGap();
@@ -291,14 +338,14 @@ public record StageTimeline(List<Lane> lanes, List<Segment> segments, int width,
         return segment.x() + Math.min(segment.width() - 1, Math.max(0, offset));
     }
 
-    /** A lane's head, or none; the column is the label's own width plus the pads, never wider than it. */
-    private static Lane.@Nullable Head head(@Nullable String group, int y, int width, Metrics metrics) {
+    /** A lane's head, or none; the column is the short label's own width plus the pads, never wider than it. */
+    private static Lane.@Nullable Head head(@Nullable String group, int y, int width, Metrics metrics, Labels labels) {
         if (group == null) {
             return null;
         }
         int column = Math
                 .max(0, Math.min(metrics.headMaxWidth(), width - metrics.minSegmentWidth() - metrics.segmentGap()));
-        String label = fitHead(group, Math.max(0, column - 2 * namePad), metrics.textWidth());
+        String label = fitHead(labels.strip(group), Math.max(0, column - 2 * namePad), metrics.textWidth());
         int labelWidth = metrics.textWidth().applyAsInt(label) + 2 * namePad;
         return new Lane.Head(group, label, Math.min(column, labelWidth), y + metrics.nameInset());
     }

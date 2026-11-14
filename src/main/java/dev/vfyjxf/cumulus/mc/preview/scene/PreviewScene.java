@@ -39,8 +39,36 @@ public final class PreviewScene {
         all, upTo, exact
     }
 
-    /** One panel's rectangle and the camera its mode gives it; the fit is always the drawn hull. */
-    public record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) {}
+    /**
+     * One panel's rectangle and the camera its mode gives it; the fit is always the drawn hull. The
+     * last two components are the JEI face's reading controls (design 19 §5): a stage selection
+     * ({@code -1} for none, which shows the page under the layer rule) and the wheel's zoom over the
+     * fitted scale. The screen's four viewports keep the 7-argument form and its fitted picture.
+     */
+    public record View(
+        int x,
+        int y,
+        int width,
+        int height,
+        float yaw,
+        float pitch,
+        LayerRule rule,
+        int stage,
+        float zoom
+    ) {
+
+        public View {
+            if (stage < -1) {
+                throw new IllegalArgumentException("a stage selection is -1 or a stage index");
+            }
+            zoom = Float.isFinite(zoom) ? Math.max(SceneCamera.minZoom, Math.min(SceneCamera.maxZoom, zoom)) : 1.0F;
+        }
+
+        /** A panel with no stage selection and the fitted scale: every cell its layer rule draws. */
+        public View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) {
+            this(x, y, width, height, yaw, pitch, rule, -1, 1.0F);
+        }
+    }
 
     /** What one panel drew: its cell count, the Y layer it isolates or highlights and its plate tiles. */
     public record Panel(int cells, int layer, int plateTiles) {}
@@ -190,7 +218,7 @@ public final class PreviewScene {
         Cell nearest = null;
         float nearestExit = Float.NEGATIVE_INFINITY;
         for (Cell cell : cells) {
-            if (!draws(cell) || !visible(cell, view.rule(), layer)) {
+            if (!draws(cell) || !visible(cell, view, layer)) {
                 continue;
             }
             float exit = exit(origin, direction, cell.ghost().cell(), projection);
@@ -206,7 +234,7 @@ public final class PreviewScene {
     @Nullable
     public Vector2f point(View view, int layer, LatticePoint at) {
         for (Cell cell : cells) {
-            if (draws(cell) && cell.ghost().cell().equals(at) && visible(cell, view.rule(), layer)) {
+            if (draws(cell) && cell.ghost().cell().equals(at) && visible(cell, view, layer)) {
                 return projection(view).screenOf(at);
             }
         }
@@ -217,7 +245,7 @@ public final class PreviewScene {
     public Panel draw(GuiGraphics graphics, View view, int layer, boolean band) {
         List<Cell> drawn = new ArrayList<>(cells.size());
         for (Cell cell : cells) {
-            if (draws(cell) && visible(cell, view.rule(), layer)) {
+            if (draws(cell) && visible(cell, view, layer)) {
                 drawn.add(cell);
             }
         }
@@ -448,13 +476,40 @@ public final class PreviewScene {
         graphics.fill(view.x(), bottomY - 1, view.x() + view.width(), bottomY, bandEdgeColor);
     }
 
-    private boolean visible(Cell cell, LayerRule rule, int layer) {
+    /**
+     * The view's one visibility rule: a stage selection shows that stage alone (the JEI face's sibling
+     * of the slice slider, design 19 §5), and otherwise the Y rule picks the layers.
+     */
+    private boolean visible(Cell cell, View view, int layer) {
+        if (view.stage() >= 0) {
+            return cell.ghost().stageIndex() == view.stage();
+        }
         int offset = cell.ghost().cell().y() - minY;
-        return switch (rule) {
+        return switch (view.rule()) {
             case all -> true;
             case upTo -> offset <= layer;
             case exact -> offset == layer;
         };
+    }
+
+    /** True when this view draws the cell at all: the slice rule and the stage selection, one law. */
+    public boolean drawn(Cell cell, View view, int layer) {
+        return draws(cell) && visible(cell, view, layer);
+    }
+
+    /** The viewport point a world point projects to inside one view: the set overlay's links and labels. */
+    public Vector2f project(View view, float x, float y, float z) {
+        Projection projection = projection(view);
+        Vector3f rotated = projection.rotate(x, y, z);
+        return new Vector2f(
+            projection.screenX + rotated.x * projection.scale,
+            projection.screenY - rotated.y * projection.scale
+        );
+    }
+
+    /** The fit's scale in one view: the pure value the JEI face's zoom and frame read (design 19 §5). */
+    public float fitScale(View view) {
+        return projection(view).scale();
     }
 
     /** The cube-to-screen map of one camera pose: orthographic, one unit of the scene per {@code scale} pixels. */
@@ -506,7 +561,7 @@ public final class PreviewScene {
         int width = view.width();
         int height = view.height();
         Quaternionf rotation = rotation(view);
-        Hull box = hull.fitBox();
+        Hull box = fitBox(view);
         float shiftX = box.centreX();
         float shiftY = box.centreY();
         float shiftZ = box.centreZ();
@@ -527,7 +582,7 @@ public final class PreviewScene {
         float scale = Math.min(
             width * Fit.margin / Math.max(0.001F, maxU - minU),
             height * Fit.margin / Math.max(0.001F, maxV - minV)
-        );
+        ) * view.zoom();
         return new Projection(
             rotation,
             new Quaternionf(rotation).invert(),
@@ -538,6 +593,20 @@ public final class PreviewScene {
             view.x() + width * 0.5F,
             view.y() + height * 0.5F
         );
+    }
+
+    /**
+     * The box one view fits: the drawn hull of §3.3, narrowed to the selected stage when the face shows
+     * one stage at a time, so a pod fills the panel instead of sitting in the whole page's frame.
+     */
+    private Hull fitBox(View view) {
+        if (view.stage() >= 0) {
+            Hull selected = hull(view.stage());
+            if (!selected.isEmpty()) {
+                return selected.fitBox();
+            }
+        }
+        return hull.fitBox();
     }
 
     /** The world-to-view rotation of one panel's pose: yaw about the world's up, then the pitch. */

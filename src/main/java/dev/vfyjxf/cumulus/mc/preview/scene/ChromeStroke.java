@@ -21,6 +21,8 @@ public final class ChromeStroke {
 
     /** The stroke's width in GUI pixels: a vector line, not a row of GUI pixels (§5.3). */
     public static final float widthPx = 1.5F;
+    /** One dash's and one gap's length: an optional member's silhouette reads as dashed (§5.3). */
+    public static final float dashedStepPx = 3.0F;
 
     /** One stroke: a closed projected silhouette, or one open segment, and its chrome colour. */
     public record Stroke(List<Vector2f> points, int color) {
@@ -98,6 +100,39 @@ public final class ChromeStroke {
 
     private static void vertex(VertexConsumer consumer, Matrix4f matrix, Vector2f point, int color) {
         consumer.addVertex(matrix, point.x, point.y, 0.0F).setColor(color);
+    }
+
+    /** One closed stroke as dashes: an optional member's silhouette on both surfaces (design 18 §5). */
+    public static List<Stroke> dashed(List<Vector2f> points, int color) {
+        List<Stroke> dashes = new ArrayList<>();
+        if (points.size() < 2) {
+            return dashes;
+        }
+        for (int index = 0; index < points.size(); index++) {
+            Vector2f from = points.get(index);
+            Vector2f to = points.get((index + 1) % points.size());
+            float length = (float) Math.hypot(to.x - from.x, to.y - from.y);
+            if (length < 1.0E-3F) {
+                continue;
+            }
+            float step = dashedStepPx;
+            int count = Math.max(1, (int) Math.ceil(length / (step * 2.0F)));
+            for (int dash = 0; dash < count; dash++) {
+                float start = dash * step * 2.0F;
+                float end = Math.min(length, start + step);
+                dashes.add(
+                    new Stroke(
+                        List.of(interpolate(from, to, start / length), interpolate(from, to, end / length)),
+                        color
+                    )
+                );
+            }
+        }
+        return dashes;
+    }
+
+    private static Vector2f interpolate(Vector2f from, Vector2f to, float t) {
+        return new Vector2f(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
     }
 
     /** The shoelace area of the projected polygon: its sign is the winding the cull sees. */

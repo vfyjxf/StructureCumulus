@@ -93,6 +93,11 @@ public final class BlueprintPreviewRecipe {
         return setEntry != null;
     }
 
+    /** The set page's model, or null on a blueprint page: the constraint overlay reads its members. */
+    public @Nullable SetPage setPage() {
+        return setPage;
+    }
+
     /** The id the page currently shows: the member a "Ghost to world" opens (design 15 §12.4). */
     public NamespacedId selectedBlueprintId() {
         return setEntry != null ? setEntry.setId() : variants.get(variantIndex).blueprintId();

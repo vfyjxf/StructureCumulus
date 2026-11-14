@@ -126,7 +126,11 @@ Then the module files, in dependency order:
   playhead, and the scene pass's depth restore so every tooltip draws above the page) and SC13b the
   timeline's read (a group only where the document nests, so a blueprint page is one headless lane,
   member lanes whose segments carry their own stage names, a head measured from the label it draws,
-  and the chrome scale that makes a segment a box over the blurred world) are on the tree.
+  and the chrome scale that makes a segment a box over the blurred world), and SC14 the display labels
+  and the JEI face's parity (the page's own namespace stripped from lane heads and segment names with
+  the full id kept for the hover, the compact timeline with one-stage selection and no playhead, the
+  set page's constraint overlay, and the wheel's clamped zoom with the double-click frame) are on the
+  tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —
   `LevelCapture`, `LevelSnapshot`, `LevelLease`, block/block-entity descriptors, the `ServerState`

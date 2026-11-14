@@ -122,10 +122,11 @@ public final class JeiPreviewPlugin implements IModPlugin, ModPlugin {
         return recipe == null ? null : viewFor(recipe);
     }
 
-    /** The page's view state, clamped to the page's current layer count. */
+    /** The page's view state, clamped to the page's current layer count and stage table. */
     static PageView viewFor(BlueprintPreviewRecipe recipe) {
         PageView view = views.computeIfAbsent(recipe.blueprintId(), id -> new PageView());
         view.clamp(recipe.scene().layers());
+        view.clampStage(recipe.presentation().stages().size());
         return view;
     }
 

@@ -1564,7 +1564,12 @@ public final class PreviewScene {
         all, upTo, exact
     }
 
-    public record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule) { }
+    // The screen's seven components are the fitted picture; the JEI face adds a stage selection (-1 for
+    // none) and its wheel's zoom over the fitted scale (design 19 §5).
+    public record View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule,
+                       int stage, float zoom) {
+        public View(int x, int y, int width, int height, float yaw, float pitch, LayerRule rule);
+    }
 
     public record Panel(int cells, int layer, int plateTiles) { }
 
@@ -1588,6 +1593,9 @@ public final class PreviewScene {
     public @Nullable Cell hover(double mouseX, double mouseY, View view, int layer);
     public @Nullable Vector2f point(View view, int layer, LatticePoint at);
     public Panel draw(GuiGraphics graphics, View view, int layer, boolean band);
+    public boolean drawn(Cell cell, View view, int layer);
+    public Vector2f project(View view, float x, float y, float z);
+    public float fitScale(View view);
     public static Shading shading(View view);
     public @Nullable Cell hover(double mouseX, double mouseY, Fit fit);
     public @Nullable Cell hover(double mouseX, double mouseY, Fit fit, Treatment treatment);
@@ -1617,6 +1625,8 @@ public record SetPage(PreviewCatalogPayload.SetEntry entry, java.util.List<Stage
 // The set page's constraint chrome as pure geometry (design 18 §5): links as segments between the two
 // cells' faces, presence probes as cells, optional members as dashed silhouettes.
 public final class ConstraintOverlay {
+    public static final int linkColor;
+    public static final int probeColor;
     public record Segment(float ax, float ay, float az, float bx, float by, float bz) {
         public boolean degenerate();
     }
@@ -1649,6 +1659,7 @@ public final class SceneLighting {
 // by ChromeStroke above the models with the depth test off, so a highlight reads through.
 public record CellOutline(java.util.List<Vector2f> points) {
     public static CellOutline of(Fit fit, LatticePoint at, float dx, float dy, float dz, float scale);
+    public static CellOutline ofCorners(java.util.List<Vector2f> corners);
 }
 
 // The chrome stroke of design 17 §5.3: each silhouette edge as a 1.5-px quad strip between unrounded
@@ -1656,9 +1667,11 @@ public record CellOutline(java.util.List<Vector2f> points) {
 // one open segment, the compass's axis of design 17 §6.
 public final class ChromeStroke {
     public static final float widthPx;
+    public static final float dashedStepPx;
     public record Stroke(java.util.List<Vector2f> points, int color) { }
     public record Quad(Vector2f a, Vector2f b, Vector2f c, Vector2f d) { }
     public static java.util.List<Quad> quads(java.util.List<Vector2f> points);
+    public static java.util.List<Stroke> dashed(java.util.List<Vector2f> points, int color);
     public static void draw(GuiGraphics graphics, java.util.List<Stroke> strokes);
 }
 
@@ -1687,6 +1700,7 @@ public final class BlueprintPreviewRecipe {
     public void update(java.util.List<PreviewCatalogPayload.Entry> group);
     public void updateSet(PreviewCatalogPayload.SetEntry set);
     public boolean isSet();
+    public @Nullable SetPage setPage();
     public NamespacedId screenId();
     public NamespacedId blueprintId();
     public NamespacedId selectedBlueprintId();
@@ -1758,6 +1772,7 @@ public record SceneCamera(float targetX, float targetY, float targetZ, float yaw
     public static final float minDistance;
     public static final float maxDistance;
     public static final float fovDegrees;
+    public static final float zoomStep;
     public static final float maxPitch;
     public static SceneCamera isometric();
     public SceneCamera orbit(float deltaYaw, float deltaPitch);
@@ -2006,6 +2021,16 @@ public record StageTimeline(java.util.List<Lane> lanes, java.util.List<Segment> 
         public static Metrics of(java.util.function.ToIntFunction<String> textWidth);
     }
 
+    // The display-label law of design 19 §3: a head and a segment strip the page's own namespace, a
+    // set page's segment drops the member prefix its head carries, a foreign prefix stays, and the
+    // wire's full id is the hover's. Labels.none draws the ids unchanged.
+    public record Labels(@Nullable String namespace) {
+        public static final Labels none;
+        public static Labels of(NamespacedId pageId);
+        public String strip(String id);
+        public String stage(Stage stage);
+    }
+
     // A lane's head is its drawn label plus the pads and nothing more; it is null on a page that does
     // not nest, and a wrapped row is indented under the first row's head.
     public record Lane(@Nullable Head head, int y, int rows, int firstStage, int stageCount,
@@ -2016,9 +2041,11 @@ public record StageTimeline(java.util.List<Lane> lanes, java.util.List<Segment> 
         public int bottom();
     }
 
-    public record Segment(int index, int x, int y, int width, boolean named, int nameY, int height) { }
+    public record Segment(int index, int x, int y, int width, boolean named, int nameY, int height,
+                          String label) { }
 
     public static StageTimeline of(java.util.List<Stage> stages, int width, Metrics metrics);
+    public static StageTimeline of(java.util.List<Stage> stages, int width, Metrics metrics, Labels labels);
     public static @Nullable String groupOf(Stage stage);
     public static String hoverText(Stage stage);
     public static float playheadFraction(boolean playing, int revealed, int cells);
@@ -2045,17 +2072,33 @@ public record StageFraming(SceneCamera from, SceneCamera to, float start, int ti
 package dev.vfyjxf.cumulus.mc.preview.jei;
 
 public final class JeiPreview {
-    public record Panel(int cells, int layer, int x, int y, int width, int height) { }
+    public record Panel(int cells, int layer, int x, int y, int width, int height, float scale) { }
     public record CellPoint(double x, double y) { }
 
     public static java.util.List<NamespacedId> blueprintIds();
     public static int drawnFrames();
     public static int drawnCells();
     public static java.util.List<Panel> drawnPanels();
+    public static int drawnLinks();
+    public static int drawnProbes();
+    public static int drawnMemberLabels();
     public static java.util.List<String> lines(NamespacedId blueprintId);
     public static @Nullable PreviewScene.Shading shading(int panel);
     public static @Nullable PreviewViewMode viewMode(NamespacedId blueprintId);
     public static boolean cycleViewMode(NamespacedId blueprintId);
+    public static @Nullable StageTimeline timeline(NamespacedId blueprintId);
+    public static @Nullable String timelineHover(NamespacedId blueprintId, double mouseX, double mouseY);
+    public static @Nullable String linkHover(NamespacedId blueprintId, double mouseX, double mouseY);
+    public static int stage(NamespacedId blueprintId);
+    public static boolean selectStage(NamespacedId blueprintId, int stage);
+    public static boolean clickTimeline(NamespacedId blueprintId, int x, int y);
+    public static float zoom(NamespacedId blueprintId);
+    public static boolean zoomBy(NamespacedId blueprintId, float notches);
+    public static boolean frame(NamespacedId blueprintId);
+    public static boolean clickScene(NamespacedId blueprintId);
+    public static boolean scrollTimeline(NamespacedId blueprintId, double notches);
+    public static boolean constraints(NamespacedId blueprintId);
+    public static boolean toggleConstraints(NamespacedId blueprintId);
     public static int slice(NamespacedId blueprintId);
     public static boolean setSlice(NamespacedId blueprintId, int layer);
     public static float yaw(NamespacedId blueprintId);
@@ -2888,7 +2931,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC13b)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC14)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -3003,7 +3046,30 @@ whole label under `headMaxWidth`, its tail behind an ellipsis past it, never a c
 text it carries — and the strip draws `StageTimeline.Chrome`'s five steps (a near-opaque ground, an
 opaque fill, the hover, the text and the cursor, each lighter than the last) in 13-px lanes with the
 name inset two pixels, so a segment reads as a box over the blurred world and a name never touches
-its edge. The scene pass now restores the GUI's depth state in
+its edge. SC14 has landed the display labels and the JEI face's parity ([design/19](../design/19-stage-timeline.md)
+§3 and §5, D-113's second amendment): `StageTimeline.Labels` is the one display-label law — a lane
+head and a segment name strip the page's own namespace (the screen's `pageId`, the JEI page's own
+key), a set page's segment also drops the member prefix its head already carries, a foreign namespace
+keeps its prefix because that prefix is the distinction, and `Segment.label` is what draws while
+`StageTimeline.hoverText` keeps the full ids on every hover, head and segment alike. The station's ten
+bays now read as short names (`plinth`, `core_low`, …; the 8-cell `core_high` sliver is the one that
+cannot fit and stays unnamed by the existing law), and the campus's three lane heads are `root`,
+`campus_machine`, `campus_tower`. The JEI face is 176×234: its compact timeline sits in a fixed
+38-px block of 11-px lanes at 0.75-scale text (the same `StageTimeline`, wrapping, legible floor and
+cap), a segment click shows that stage alone — the slice slider's sibling: a stage selection overrides
+the layer rule, a slider move returns to the layer view, a second click returns to the whole page —
+with no playhead and no clock. `PreviewScene.View`'s `stage` and `zoom` components carry the selection
+and the wheel's zoom over the fitted scale (clamped to the camera's 0.25–8), a double click on the
+scene frames the drawn hull (the selected stage's own when one is selected), the wheel over the
+timeline scrolls it while the wheel over the slider keeps the Y slice, and the fit box follows the
+one-stage reading. A set page in JEI draws the screen's constraint overlay with the same
+`ConstraintOverlay` geometry and colours: links as face-meeting strokes captioned `actual ≤ max`,
+probes as crosses, optional members dashed through `ChromeStroke.dashed`, and the member labels in
+the short display form, clamped inside the scene; the `constraints` button beside the view button
+toggles it and is on by default because the face has room. `JeiPreview` exposes the timeline, the
+stage selection, the wheel's zoom and frame, the overlay toggle and the frame's link/probe/label
+counts for the harness. SC14's `jei.parity` uitest scenario pins them, and the display-label unit
+tests pin the namespace law. The scene pass restores the GUI's depth state in
 both arms (`RenderSystem.disableDepthTest()` and `depthMask(false)` beside the lighting restore, with
 `PreviewScene.depthRestored()` telling the harness it ran), and every screen tooltip — cell, link,
 button and timeline — draws last at `PreviewScreen.tooltipZ` = 400, vanilla's own tooltip depth, with

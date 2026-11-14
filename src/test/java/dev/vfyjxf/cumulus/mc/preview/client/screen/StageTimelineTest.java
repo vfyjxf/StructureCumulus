@@ -334,6 +334,95 @@ class StageTimelineTest {
     }
 
     @Test
+    void aPagesOwnNamespaceIsStrippedFromTheDrawnLabelsAndAForeignOneIsKept() {
+        StageTimeline.Labels labels = StageTimeline.Labels.of(NamespacedId.of("structurecumulus", "demo_station"));
+        assertEquals("core_low", labels.strip("structurecumulus:core_low"), "the page's own namespace is the page's");
+        assertEquals("minecraft:stone", labels.strip("minecraft:stone"), "a foreign prefix is the distinction");
+        assertEquals("layer 3", labels.strip("layer 3"), "a name with no namespace is already short");
+
+        Stage home = stage("structurecumulus:core_low", null, 9);
+        Stage foreign = stage("othermod:core_low", null, 9);
+        StageTimeline timeline = StageTimeline.of(List.of(home, foreign), 400, metrics(192, 52), labels);
+        assertEquals(
+            List.of("core_low", "othermod:core_low"),
+            timeline.segments().stream().map(StageTimeline.Segment::label).toList(),
+            "the segment draws the short form and keeps a foreign prefix"
+        );
+        assertEquals("structurecumulus:core_low", home.name(), "the wire's name never moves");
+        assertEquals(
+            "structurecumulus:core_low \u00B7 9 cells",
+            StageTimeline.hoverText(home),
+            "the hover still names the whole id"
+        );
+    }
+
+    @Test
+    void aSetsHeadAndSegmentCarryTheShortLabelsAndTheHoverKeepsTheFullId() {
+        StageTimeline.Labels labels = StageTimeline.Labels.of(NamespacedId.of("structurecumulus", "demo_campus"));
+        Stage root = stage("layer 1", "root", 9);
+        Stage machine = stage("structurecumulus:plinth", "structurecumulus:campus_machine", 25);
+        Stage foreign = stage("othermod:base", "othermod:campus_machine", 4);
+        StageTimeline timeline = StageTimeline.of(List.of(root, machine, foreign), 400, metrics(192, 52), labels);
+        assertEquals(
+            List.of("root", "campus_machine", "othermod:campus_machine"),
+            timeline.lanes().stream().map(lane -> Objects.requireNonNull(lane.head()).label()).toList(),
+            "the head is the group without the page's namespace"
+        );
+        assertEquals(
+            List.of("root", "structurecumulus:campus_machine", "othermod:campus_machine"),
+            timeline.lanes().stream().map(StageTimeline.Lane::group).toList(),
+            "the lane still answers with the wire's whole group"
+        );
+        assertEquals("plinth", timeline.segments().get(1).label(), "a segment never repeats its head's member");
+        assertEquals("othermod:base", timeline.segments().get(2).label(), "a foreign member keeps its prefix");
+        assertEquals(
+            "structurecumulus:plinth \u00B7 structurecumulus:campus_machine \u00B7 25 cells",
+            StageTimeline.hoverText(machine),
+            "the hover names the stage and its member in full"
+        );
+        assertEquals(
+            "plinth",
+            labels.stage(
+                stage(
+                    "structurecumulus:campus_machine \u00B7 structurecumulus:plinth",
+                    "structurecumulus:campus_machine",
+                    5
+                )
+            ),
+            "an older payload's member-prefixed name drops the prefix the head carries"
+        );
+    }
+
+    @Test
+    void aShortLabelThatStillDoesNotFitItsSegmentIsNotDrawn() {
+        StageTimeline.Labels labels = StageTimeline.Labels.of(NamespacedId.of("structurecumulus", "station"));
+        Stage stage = stage("structurecumulus:an_extremely_long_stage_name", null, 1);
+        StageTimeline timeline = StageTimeline.of(List.of(stage), 30, metrics(192, 52), labels);
+        StageTimeline.Segment segment = timeline.segments().get(0);
+        assertEquals("an_extremely_long_stage_name", segment.label(), "the label is short only by its namespace");
+        assertFalse(segment.named(), "a short label can still overflow, and then it is not drawn");
+        assertEquals(
+            "structurecumulus:an_extremely_long_stage_name \u00B7 1 cells",
+            StageTimeline.hoverText(stage),
+            "the hover carries the whole id the segment cannot draw"
+        );
+    }
+
+    @Test
+    void aHeadsShortLabelTakesLessRoomThanItsWholeGroup() {
+        List<Stage> stages = List.of(stage("structurecumulus:plinth", "structurecumulus:campus_machine", 9));
+        StageTimeline full = StageTimeline.of(stages, 400, metrics(192, 52));
+        StageTimeline shortLabels = StageTimeline
+                .of(stages, 400, metrics(192, 52), StageTimeline.Labels.of(NamespacedId.of("structurecumulus", "c")));
+        StageTimeline.Lane.Head before = Objects.requireNonNull(full.lanes().get(0).head());
+        StageTimeline.Lane.Head after = Objects.requireNonNull(shortLabels.lanes().get(0).head());
+        assertEquals("structurecumulus:campus_machine", before.label(), "no page namespace strips nothing");
+        assertEquals("campus_machine", after.label());
+        assertTrue(after.width() < before.width(), "the short head takes less of the lane");
+        assertEquals(after.width(), shortLabels.segments().get(0).x(), "the first segment follows the short head");
+    }
+
+    @Test
     void theChromeScaleIsALadderThatReadsOverTheBlurredWorld() {
         StageTimeline.Chrome chrome = StageTimeline.Chrome.screen;
         assertTrue((chrome.ground() >>> 24) >= 0xC0, "the strip's ground hides enough of the world to read on");

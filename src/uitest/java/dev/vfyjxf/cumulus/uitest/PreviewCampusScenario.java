@@ -89,15 +89,39 @@ public final class PreviewCampusScenario {
                                     .equals("structurecumulus:plinth"),
                     () -> String.valueOf(screen().timeline())
                 ).check(
-                    "a lane's head is its whole label and its first segment starts where the label ends",
-                    () -> screen().timeline().lanes().stream().allMatch(lane -> {
-                        StageTimeline.Lane.Head head = lane.head();
-                        return head != null
-                                && head.label().equals(head.group())
-                                && head.labelY() - lane.y() >= 1
-                                && screen().timeline().segments().get(lane.firstStage()).x() == lane.headWidth();
-                    }),
+                    "a lane's head is the member without the page's namespace, and its first segment follows it",
+                    () -> screen().timeline().lanes().stream()
+                            .map(lane -> lane.head() == null ? "" : lane.head().label()).toList()
+                            .equals(List.of("root", "campus_machine", "campus_tower"))
+                            && screen().timeline().lanes().stream().allMatch(lane -> {
+                                StageTimeline.Lane.Head head = lane.head();
+                                if (head == null) {
+                                    return false;
+                                }
+                                String shortGroup = head.group().startsWith("structurecumulus:")
+                                        ? head.group().substring("structurecumulus:".length())
+                                        : head.group();
+                                return head.label().equals(shortGroup)
+                                        && !head.label().startsWith("structurecumulus:")
+                                        && head.labelY() - lane.y() >= 1
+                                        && screen().timeline().segments().get(lane.firstStage()).x()
+                                                == lane.headWidth();
+                            }),
                     () -> String.valueOf(screen().timeline())
+                ).check(
+                    "a set page's segment names are short too: the head says the member, the segment its stage",
+                    () -> screen().timeline().segments().get(machineStage()).label().equals("plinth")
+                            && screen().timeline().segments().stream()
+                                    .noneMatch(segment -> segment.label().startsWith("structurecumulus:"))
+                            && screen().playback().stages().stream().map(Stage::name).toList().get(10)
+                                    .equals("structurecumulus:plinth"),
+                    () -> screen().timeline().segments().stream().map(StageTimeline.Segment::label).toList().toString()
+                ).check(
+                    "a lane hover answers with the member's whole id, never the short label",
+                    () -> screen().timeline().lanes().stream().map(StageTimeline.Lane::group).toList().equals(
+                        List.of("root", "structurecumulus:campus_machine", "structurecumulus:campus_tower")
+                    ),
+                    () -> screen().timeline().lanes().stream().map(StageTimeline.Lane::group).toList().toString()
                 ).check(
                     "a set page's segment names never repeat their member's prefix",
                     () -> screen().playback().stages().stream().noneMatch(
@@ -112,8 +136,19 @@ public final class PreviewCampusScenario {
                             && (chrome.fill() >>> 24) >= 0x90
                             && (chrome.ground() >>> 24) >= 0xC0;
                 }, () -> String.valueOf(screen().timelineChrome())).screenshot("01-campus-set")
-                .checkCaptured("01-campus-set")
-                .action("click the constraints button off", context -> clickLabel(context, "constraints")).frames(2)
+                .checkCaptured("01-campus-set").action("hover the machine lane's head", context -> {
+                    StageTimeline.Lane lane = screen().timeline().lanes().get(1);
+                    ScreenLayout.Rect segment = screen().segmentRect(lane.firstStage());
+                    float x = segment.x() - lane.headWidth() + lane.headWidth() / 2.0F;
+                    float y = segment.y() + segment.height() / 2.0F;
+                    context.driver().placeCursor(x, y);
+                    context.driver().moveTo(context.screenOrThrow(), x, y);
+                }).frames(2)
+                .check(
+                    "a lane head's hover names the member's whole id, never the short label it draws",
+                    () -> List.of("structurecumulus:campus_machine").equals(screen().tooltipLines()),
+                    () -> String.valueOf(screen().tooltipLines())
+                ).action("click the constraints button off", context -> clickLabel(context, "constraints")).frames(2)
                 .check(
                     "the overlay's toggle clears every link stroke",
                     () -> !screen().constraintsOn() && screen().drawnLinkStrokes() == 0

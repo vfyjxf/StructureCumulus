@@ -32,6 +32,11 @@ public record CellOutline(List<Vector2f> points) {
         return new CellOutline(hull(corners));
     }
 
+    /** The outline of already-projected corners: the JEI arm's own projector feeds this with its view. */
+    public static CellOutline ofCorners(List<Vector2f> corners) {
+        return new CellOutline(hull(corners));
+    }
+
     /** The convex hull of the projected corners, in drawing order (monotone chain). */
     private static List<Vector2f> hull(List<Vector2f> projected) {
         List<Vector2f> points = new ArrayList<>(projected.size());

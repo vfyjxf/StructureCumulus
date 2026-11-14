@@ -75,9 +75,9 @@ public final class PreviewScreen extends Screen {
     /** The cursor stage's outline: the chrome family's steel blue, a set rather than one cell (§5.3). */
     private static final int stageOutlineColor = 0xFF8FB4D9;
     /** A constraint link's stroke: the same chrome family, never the mark palette (design 18 §5). */
-    private static final int constraintColor = 0xFF8FB4D9;
+    private static final int constraintColor = ConstraintOverlay.linkColor;
     /** A presence probe's cross: document chrome, not a world finding (design 18 §5). */
-    private static final int probeColor = 0xFFC0C0C0;
+    private static final int probeColor = ConstraintOverlay.probeColor;
     /** The timeline's chrome scale: the strip's ground, a segment's fill, the hover, the cursor and the text. */
     private static final StageTimeline.Chrome chrome = StageTimeline.Chrome.screen;
     /** The playhead's one-pixel line: the cursor's own chrome, never a fill (design 19 §3). */
@@ -91,7 +91,7 @@ public final class PreviewScreen extends Screen {
     /** The button area the strip always reserved under the bar (design 17 §4.5); the bar adds no more. */
     private static final int buttonArea = 31;
     private static final float degreesPerPixel = 1.6F;
-    private static final float scrollStep = 1.1F;
+    private static final float scrollStep = SceneCamera.zoomStep;
     private static final int explodeTicks = 12;
     /** The declaration order is the wire's tie-breaker, not the compass's (north, south, west, east). */
     private static final Heading[] horizons = {Heading.north, Heading.south, Heading.west, Heading.east};
@@ -655,7 +655,12 @@ public final class PreviewScreen extends Screen {
 
     /** The timeline of this frame's width: the pure layout of design 19 §3 over the page's own table. */
     private StageTimeline buildTimeline() {
-        return StageTimeline.of(stages(), Math.max(0, width - 2 * buttonGap), StageTimeline.Metrics.of(font::width));
+        return StageTimeline.of(
+            stages(),
+            Math.max(0, width - 2 * buttonGap),
+            StageTimeline.Metrics.of(font::width),
+            StageTimeline.Labels.of(pageId)
+        );
     }
 
     /** The control strip's height is the timeline's, capped, plus the summary and the button area. */
@@ -985,8 +990,8 @@ public final class PreviewScreen extends Screen {
                 chrome.text(),
                 false
             );
-            if (lane == hoveredHead && head.label().length() < head.group().length()) {
-                // a truncated head answers with its whole group, so a lane never loses its part
+            if (lane == hoveredHead) {
+                // the drawn head is short; the hover carries the whole group id (design 19 §3, 17 §5.3)
                 pendingTooltip = new Tooltip(List.of(head.group()), mouseX, laneY - 2);
             }
         }
@@ -1015,7 +1020,7 @@ public final class PreviewScreen extends Screen {
             if (segment.named()) {
                 graphics.drawString(
                     font,
-                    stages().get(segment.index()).name(),
+                    segment.label(),
                     stripX + segment.x() + 1,
                     stripY + segment.nameY() - timelineScroll,
                     chrome.text(),
@@ -1260,7 +1265,7 @@ public final class PreviewScreen extends Screen {
                 }
                 CellOutline outline = CellOutline
                         .of(fit, cell.ghost().cell(), sight.dx(), sight.dy(), sight.dz(), sight.scale());
-                strokes.addAll(dashed(outline.points(), chromeColor));
+                strokes.addAll(ChromeStroke.dashed(outline.points(), chromeColor));
             }
         }
         for (ConstraintOverlay.LinkLine link : ConstraintOverlay.links(page, explodeT, explode)) {
@@ -1301,39 +1306,6 @@ public final class PreviewScreen extends Screen {
             );
             drawnProbes++;
         }
-    }
-
-    /** One closed chrome stroke as dashes: an optional member's silhouette (design 18 §5). */
-    private static List<ChromeStroke.Stroke> dashed(List<Vector2f> points, int color) {
-        List<ChromeStroke.Stroke> dashes = new ArrayList<>();
-        if (points.size() < 2) {
-            return dashes;
-        }
-        for (int index = 0; index < points.size(); index++) {
-            Vector2f from = points.get(index);
-            Vector2f to = points.get((index + 1) % points.size());
-            float length = (float) Math.hypot(to.x - from.x, to.y - from.y);
-            if (length < 1.0E-3F) {
-                continue;
-            }
-            float step = 3.0F;
-            int count = Math.max(1, (int) Math.ceil(length / (step * 2.0F)));
-            for (int dash = 0; dash < count; dash++) {
-                float start = dash * step * 2.0F;
-                float end = Math.min(length, start + step);
-                dashes.add(
-                    new ChromeStroke.Stroke(
-                        List.of(interpolate(from, to, start / length), interpolate(from, to, end / length)),
-                        color
-                    )
-                );
-            }
-        }
-        return dashes;
-    }
-
-    private static Vector2f interpolate(Vector2f from, Vector2f to, float t) {
-        return new Vector2f(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
     }
 
     /** The link captions: {@code actual ≤ max} on the stroke, the metric in its tooltip (design 18 §5). */

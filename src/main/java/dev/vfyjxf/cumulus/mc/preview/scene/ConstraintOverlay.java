@@ -17,6 +17,11 @@ import java.util.List;
  */
 public final class ConstraintOverlay {
 
+    /** A link's stroke: the chrome family's steel blue, never the mark palette (design 18 §5). */
+    public static final int linkColor = 0xFF8FB4D9;
+    /** A presence probe's cross: document chrome, not a world finding (design 18 §5). */
+    public static final int probeColor = 0xFFC0C0C0;
+
     /** A segment in the set's composed frame, exploded by {@code t} where a member moved. */
     public record Segment(float ax, float ay, float az, float bx, float by, float bz) {
 
