@@ -2705,6 +2705,10 @@ viewports: a static page narrates nothing, and the screen is one button away.
 scrubber would invent a time axis the document never declared. **Rejected: stages as members
 (D-112's first reading).** It was cheap and it lost the build.
 
+**Amendment (SC13b's screenshot).** A label strips the page's own namespace — the ten-bay lane
+showed two long ids and could show ten short ones (`core_low`); the hover keeps the full id, and a
+satellite from a foreign namespace keeps its prefix because the prefix is the distinction.
+
 **Amendment (SC13's screenshot).** The first reading grouped a blueprint page by its bay as well —
 which is one stage per lane, ten lanes of one segment on the station page, a vertical list that read
 worse than the flat bar. A group only exists where nesting does: a set page's member. A blueprint

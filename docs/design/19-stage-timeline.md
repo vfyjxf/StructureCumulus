@@ -45,6 +45,15 @@ The stage bar becomes a **timeline** of grouped lanes:
 - **Segments are stages.** Width is proportional to `expectedCells` with a legible minimum, 1 px
   gaps, the name drawn when it fits. The cursor's segment is outlined as today; a hover names the
   stage, its group and its cell count.
+- **A label is short, and the full id is one hover away.** A lane head and a segment name strip the
+  **page's own namespace**: a blueprint page's stage `structurecumulus:core_low` reads `core_low`, a
+  set page's member `structurecumulus:campus_machine` reads `campus_machine` and its stage
+  `structurecumulus:campus_machine · plinth` reads `plinth`. The rule is the page's namespace, not a
+  hard-coded one: a satellite whose blueprint lives in another namespace keeps its prefix, because
+  that prefix is the only thing distinguishing it. Every hover names the **full id** (design 17
+  §5.3's tooltip). A name that still does not fit its segment is not drawn — the hover carries it —
+  but the strip's names are the short forms, so a ten-bay page reads as ten names rather than two
+  (SC13b's report; the screenshot that decided it).
 - **A segment reads.** The strip's own ground, a segment's fill, the cursor's outline and the
   segment's text are four chrome tones that must separate from each other *and* from the blurred
   world the strip sits over (a screen is translucent): the fill is opaque enough that two adjacent
