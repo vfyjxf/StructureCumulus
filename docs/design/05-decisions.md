@@ -2720,6 +2720,25 @@ worse than the flat bar. A group only exists where nesting does: a set page's me
 page is one lane, and a lane's segments carry the stage's own name because the head already names
 the part.
 
+### D-114 — The pace is faster by default and its slider writes the one speed key
+
+The viewer watched the retuned pace and said it was still slow, then asked for a control (2026-11-14).
+Two answers in one: the screen's own spans drop again — a stage's dwell floor 6 → 4 ticks, its
+ceiling 40 → 20, the hold between beats 5 → 3 (`cellRevealTicks` stays 1) — and the player group
+gains a **speed slider** (`0.25×`–`4.0×`, step `0.25`) that reads and writes `animation.speed`, the
+one client key every span already divides by ([design/17](17-preview-screen.md) §7.5, 16 §13).
+
+**Why the config key and not a screen-local multiplier.** The viewer asked to tune a pace once, not
+per screen: a slider that dies with the screen would retune on every open, and a second multiplier
+would make `1.0×` mean the world's rate on one surface and something else here — two meanings for
+one symbol is exactly the defect 16 §13's single key exists to prevent. Writing the config also
+keeps the world's cinematics and the screen's playback on the same tempo when the viewer wants
+them so, and a viewer who wants them apart still has `cinematics.speed`.
+
+**Rejected: an unbounded slider.** The config's own `0.25–4.0` range is the clamp; a slider that
+can ask for `0.05×` or `20×` would make "the play finished" and "the play is a slideshow" the only
+outcomes.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is

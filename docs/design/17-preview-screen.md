@@ -386,6 +386,7 @@ one list read twice, and SC1's `screen` uitest counts them.
 | ortho / perspective | the projection toggle (§4.1) |
 | all · explode | the whole view / the exploded view (§7.1, §8) |
 | play / pause / replay · step · ‹ · › | the stage player (§7.3) |
+| speed slider | `animation.speed`, `0.25×`–`4.0×` (§7.5, D-114) |
 | stage outline | the cursor stage's set stroke, off by default (§5.3) |
 | hidden · outline | the future cells' treatment (§7.2) |
 | drop · rise | the reveal's direction (§7.6) |
@@ -722,9 +723,9 @@ the screen's own §4.6 accumulator.
 | Constant | Value | Meaning here |
 | --- | --- | --- |
 | `cellRevealTicks` | 1 | one cell's share of its stage's dwell at speed 1.0 |
-| `stageRevealMinTicks` | 6 | the floor of one stage's dwell |
-| `stageRevealMaxTicks` | 40 | the ceiling of one stage's dwell, so a 400-cell stage does not linger |
-| `stagePauseTicks` | 5 | the hold before a stage's batch — between beats, and the play's opening zero state (§7.1) |
+| `stageRevealMinTicks` | 4 | the floor of one stage's dwell |
+| `stageRevealMaxTicks` | 20 | the ceiling of one stage's dwell, so a big stage does not linger |
+| `stagePauseTicks` | 3 | the hold before a stage's batch — between beats, and the play's opening zero state (§7.1) |
 | `explodeTicks` | 12 | one full explode or collapse (§8.1) |
 | `stageFocusTicks` | 12 | the stage-framing leg below |
 | `revealTicks` | 5 | one cell's own reveal leg, either direction (§7.6) |
@@ -754,6 +755,11 @@ the screen's own §4.6 accumulator.
 - **`animation.speed` divides every span** (`ceil(span / speed)`), and `animation.enabled = false`
   reveals a stage, a step and a whole play at once with no fade. Neither key changes a cap, a count or
   an order (16 §13's law; the screen adds no config key of its own).
+- **The pace has a slider, and the slider is that key.** The player group carries a speed slider
+  (`0.25×`–`4.0×`, step `0.25`, label `1.5×`) which reads and **writes `animation.speed`** — the one
+  value every span already divides by, so a tuned pace survives the screen, the world and the
+  restart, and `1.0×` never means two different things on two surfaces (D-114). The slider itself is
+  §4.5 chrome, drag-or-click, and its label is the value.
 - **The stage framing is the cine core's, and it yields to the hand.** On a stage advance during a
   play, the main viewport flies to the current stage's framing — 16 §6.7.2's `stageShot` over the
   stage's own drawn cells, with 16 §6.7.3's 12-tick `inOutCubic` leg — while the viewer has not
