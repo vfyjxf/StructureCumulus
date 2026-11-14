@@ -18,16 +18,19 @@ a generation behind the screen: no stage bar, no constraint overlay, no wheel zo
 
 A stage gains a **group**: the part of the document it belongs to.
 
-- **Blueprint page.** The group is the stage's bay — a blueprint's stages already are its bays
-  (16 §4.1), so the group is the bay's name and every stage carries its own.
-- **Set page.** The group is the member (root first, satellites in declaration order), and the
-  stages inside a group are that **member's own stages**, flattened in build order. A set page
-  therefore narrates the station's plinth, core tiers, arms, pods and crown, then the machine's
-  bays, then the tower's — the composite's assembly, not three blocks switched on.
+- **Blueprint page: no group.** A document's stages are its own build order (16 §4.1's bays, or a
+  single bay's Y layers) and they are peers: one lane, every stage side by side. Grouping a
+  blueprint by bay would put one stage in each lane — a vertical list of single segments, which is
+  worse than the flat bar it replaced (the SC13 screenshot: ten lanes of one).
+- **Set page: the member is the group.** The stages inside a group are that **member's own stages**,
+  flattened in build order, so a set page narrates the station's plinth, core tiers, arms, pods and
+  crown, then the machine's bays, then the tower's — the composite's assembly, not three blocks
+  switched on. The lane head carries the member; the segment carries **the member's own stage name
+  only** — the head already says whose stages these are, so a segment never repeats it.
 - **The flattening is the server's.** The set entry composes each member's `StageModel` (16 §4.1)
   and emits one stage per (member, member-stage), its cells carrying the flattened index; the wire
-  carries a `group` label per stage (trailing-optional, the SC3 precedent), and the client derives
-  nothing (17 §2). A member's stage names read `member · bay` so a lane never loses its part.
+  carries a `group` label per stage (`null` on a blueprint page), and the client derives nothing
+  (17 §2).
 - **Playback is unchanged.** One flat stage list in build order, `hold → batch → dwell` per stage,
   the zero state, drop/rise and replay all as they are (17 §7.1/§7.3/§7.6). A set's play is simply
   longer and ordered like a build.
@@ -40,8 +43,13 @@ The stage bar becomes a **timeline** of grouped lanes:
   carries the group's label, then its stages as segments in order. Lanes stack top to bottom in
   build order (分层).
 - **Segments are stages.** Width is proportional to `expectedCells` with a legible minimum, 1 px
-  gaps, the name drawn when it fits (the `member · bay` form on a set page). The cursor's segment
-  is outlined as today; a hover names the stage, its group and its cell count.
+  gaps, the name drawn when it fits. The cursor's segment is outlined as today; a hover names the
+  stage, its group and its cell count.
+- **A segment reads.** The strip's own ground, a segment's fill, the cursor's outline and the
+  segment's text are four chrome tones that must separate from each other *and* from the blurred
+  world the strip sits over (a screen is translucent): the fill is opaque enough that two adjacent
+  segments differ, and the text keeps the chrome family's contrast. A bar whose fills vanish into
+  the panel is not a bar.
 - **A lane wraps when it overflows (换行).** The overflow continues on the lane's next row,
   indented under the label; a lane is never truncated and a segment never shrinks below the legible
   minimum.

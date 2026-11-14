@@ -2705,6 +2705,12 @@ viewports: a static page narrates nothing, and the screen is one button away.
 scrubber would invent a time axis the document never declared. **Rejected: stages as members
 (D-112's first reading).** It was cheap and it lost the build.
 
+**Amendment (SC13's screenshot).** The first reading grouped a blueprint page by its bay as well —
+which is one stage per lane, ten lanes of one segment on the station page, a vertical list that read
+worse than the flat bar. A group only exists where nesting does: a set page's member. A blueprint
+page is one lane, and a lane's segments carry the stage's own name because the head already names
+the part.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
