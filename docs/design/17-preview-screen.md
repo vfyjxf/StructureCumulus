@@ -669,9 +669,9 @@ hidden — a page must stay legible — and later ones are hidden, because the d
 | the whole view | — | all | drop the cursor, draw every stage, stop the play |
 
 - **The stage bar is a timeline of grouped lanes.** [19](19-stage-timeline.md) §3 rebuilds this
-  table of contents: one lane per group (a bay on a blueprint page, a member on a set page), its
-  stages as segments in index order, wrapped when a lane overflows and stacked in build order, with
-  the strip growing to a cap and scrolling past it. It is still a table of contents: a page
+  table of contents: one lane per group (a document is one lane; a set page gives each member its
+  own), its stages as segments in index order, wrapped when a lane overflows and stacked in build
+  order, with the strip growing to a cap and scrolling past it. It is still a table of contents: a page
   satisfies nothing, so no segment is ever filled inside; the marks are the cursor's outline, the
   hover and the playhead (§7.5's play).
 - **The play is a cursor walk, not a clock of its own.** A play advances the reveal counts at §7.5's
