@@ -2705,6 +2705,11 @@ viewports: a static page narrates nothing, and the screen is one button away.
 scrubber would invent a time axis the document never declared. **Rejected: stages as members
 (D-112's first reading).** It was cheap and it lost the build.
 
+**Amendment (the JEI wheel).** Design 15 §6.2 gave the wheel over the JEI viewport the Y slice and
+design 19 §5 gives it zoom; the wheel zooms on both surfaces (one gesture, one meaning) and the
+slice keeps the slider and the wheel over the slider. A reader who learned the screen must not
+re-learn the wheel one category over.
+
 **Amendment (SC13b's screenshot).** A label strips the page's own namespace — the ten-bay lane
 showed two long ids and could show ten short ones (`core_low`); the hover keeps the full id, and a
 satellite from a foreign namespace keeps its prefix because the prefix is the distinction.

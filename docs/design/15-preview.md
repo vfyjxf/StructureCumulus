@@ -241,9 +241,11 @@ and pitch below, never a payload field.
   opaque cubes; the batch is flushed with `BufferSource.endBatch()` and **not** `GuiGraphics.flush()`,
   whose contract temporarily disables the depth test around the batch and would drop the scene's
   occlusion.
-- **Y slice.** The slider (and the wheel over the viewport) chooses how many layers from the
-  blueprint's bottom are shown — the same mental model as the in-world slice (§5, 4.2). A one-layer
-  blueprint pins the slider; a hidden layer is not drawn and not picked.
+- **Y slice.** The slider (and the wheel while the cursor is over the slider) chooses how many
+  layers from the blueprint's bottom are shown — the same mental model as the in-world slice (§5,
+  4.2). The wheel over the *viewport* zooms, as the screen's does ([19](19-stage-timeline.md) §5,
+  D-113): one surface's gestures must mean one thing, and the slice keeps its own control. A
+  one-layer blueprint pins the slider; a hidden layer is not drawn and not picked.
 - **Tooltip.** The cursor is unprojected into the scene's orthographic view; the nearest visible cell
   whose box the ray crosses names its block id and each of its property values. The material list's
   icons answer with the item name and count.
