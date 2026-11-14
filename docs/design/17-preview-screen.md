@@ -668,11 +668,12 @@ hidden — a page must stay legible — and later ones are hidden, because the d
 | jump to a stage | — | the stage bar's segment | set the cursor to that stage, show it whole, pause |
 | the whole view | — | all | drop the cursor, draw every stage, stop the play |
 
-- **The stage bar is a table of contents.** One segment per stage, left to right in index order
-  (16 §7.2's layout), wide in proportion to that stage's `expectedCells` with a 1 px minimum and a
-  1 px gap, labelled with the stage name when it fits, and outlined at the cursor. It is not a
-  progress bar: a page satisfies nothing, so no segment is ever filled inside; the only fill is the
-  cursor's outline. Hovering a segment names the stage and its count.
+- **The stage bar is a timeline of grouped lanes.** [19](19-stage-timeline.md) §3 rebuilds this
+  table of contents: one lane per group (a bay on a blueprint page, a member on a set page), its
+  stages as segments in index order, wrapped when a lane overflows and stacked in build order, with
+  the strip growing to a cap and scrolling past it. It is still a table of contents: a page
+  satisfies nothing, so no segment is ever filled inside; the marks are the cursor's outline, the
+  hover and the playhead (§7.5's play).
 - **The play is a cursor walk, not a clock of its own.** A play advances the reveal counts at §7.5's
   cadence and moves the cursor when a stage ends; at the table's end it stops with everything
   revealed (16 §6.3's "playback never leaves the session" is about a session — here it stops on the
@@ -1261,6 +1262,8 @@ stays the one place a build is planned (15 §4, 16 §2).
 | SC10 | §11 the flagship station, the generator law and the campus set |
 | SC11 | §7.3/§7.1 the finished play's replay, §5.3 the stage outline as an opt-in toggle (off by default), §4.5 the button rows |
 | SC12 | [18](18-set-preview.md) — the set entries, the composite set page, the constraint overlay and the drill-down (D-112) |
+| SC13 | [19](19-stage-timeline.md) §2–§4 — the grouped stage, the timeline bar and the tooltip depth law (D-113) |
+| SC14 | [19](19-stage-timeline.md) §5 — the JEI face's parity (D-113) |
 
 SC0 is this file; the gates are the milestone table of
 [`docs/plan/screen-plan.md`](../plan/screen-plan.md), and this file owns the contracts they test.

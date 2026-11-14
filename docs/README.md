@@ -50,6 +50,9 @@ table defines who may emit each finding code.
     catalogue entries composed server-side, the composite set page, the constraint overlay and the
     member drill-down (landed: the trailing-optional set block, the composite scene, the constraint
     chrome and the drill-down's breadcrumb; `demo_campus` is the first exhibit).
+20. [design/19-stage-timeline.md](design/19-stage-timeline.md) — the stage timeline (SC13): grouped
+    stages, the lane/wrap/scroll bar, the playhead, the tooltip depth law, and the JEI face's parity
+    (SC14).
 
 There is also an interactive, adversarial review of this design set in [`../visual/`](../visual/README.md). It is a reading aid; this directory remains the source of truth. The visual data is regenerated separately and trails this set until its review screenshots are refreshed.
 

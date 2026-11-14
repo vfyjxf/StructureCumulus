@@ -51,10 +51,12 @@ page holds here — zero state, hold→batch→dwell, drop/rise, four viewports,
   member; nothing else distinguishes them.
 - **Members are the parts.** The explode separates *members* — direction = member centroid minus set
   centroid, §8.1's law with the member standing in for the bay — and the labels name the member ids.
-- **Stages are the members.** The stage table is root first, then satellites in declaration order —
-  the same order `set build` walks them — so a play narrates the set the way the host builds it, and
-  the summary line names the member and its cell count. A member's internal stages live on its own
-  page, one drill-down away.
+- **Stages are the members' own stages, grouped by member.** The stage table is the root's stages
+  first, then each satellite's, in declaration order — the same order `set build` walks them — and
+  every stage carries its member as its group ([19](19-stage-timeline.md) §2 supersedes this
+  section's first reading, "stages are the members"): one member's ten-bay build is ten stages in
+  that member's lane, so a play narrates the composite's real assembly instead of switching two
+  blocks on. The summary line names the member and its cell count.
 - **Everything else is unchanged.** The zero state, the reveal directions, the camera, the
   projection toggle, the hidden/outline treatment and the variant row (a member group's variants
   belong to the member's page, not the set's) all behave as on a blueprint page.

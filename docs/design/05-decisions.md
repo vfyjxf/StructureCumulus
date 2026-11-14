@@ -2678,6 +2678,33 @@ the constraint overlay keeps the facts (links, distances, required flags) on the
 constrain. **Rejected: presence checking on the page.** The page shows the set as declared; whether
 a built campus satisfies it is `/cumulus set check`'s question, in a world.
 
+### D-113 — The stage bar becomes a grouped timeline, sets narrate their members' stages, and JEI catches up
+
+Three readings from one playtest (2026-11-14): a set page's play switched three blocks on instead
+of showing how each part is built; the single-row stage bar said nothing about which part a stage
+belonged to; and the JEI face was a generation behind the screen. The answer is one stage contract
+([design/19](19-stage-timeline.md)): every stage carries a **group** — the bay on a blueprint page,
+the member on a set page — and a set page's stage table is its members' own stage models flattened
+in build order, so the station's ten bays are ten stages in the root's lane and the play narrates
+the composite's real assembly. The bar is rebuilt as a **timeline**: one lane per group, segments
+proportional to the stage's cells, lanes wrapped when they overflow and stacked in build order, the
+strip growing to a cap and scrolling past it, a playhead riding the cursor's segment during a play.
+
+**Why the group is a payload field.** The client derives nothing (17 §2), and a member's internal
+stage is not recoverable from a composed cell without the member's own stage model — so the server
+flattens and the wire says which group each stage belongs to (trailing-optional, the SC3
+precedent).
+
+**Why JEI catches up rather than being replaced.** The face is one small rectangle, and its job is
+"what is this and how is it built, then hand off to the screen" (17 §9.1). It gains the compact
+timeline, the constraint overlay for sets and the screen's camera verbs (wheel zoom, double-click
+frame) — the same `StageTimeline`, the same fit, the same light. It still gets no play and no four
+viewports: a static page narrates nothing, and the screen is one button away.
+
+**Rejected: a scrubbable playhead.** A play is not a video; 17 §7.5's pace is the document's, and a
+scrubber would invent a time axis the document never declared. **Rejected: stages as members
+(D-112's first reading).** It was cheap and it lost the build.
+
 ## 3. Consequences a reviewer should attack
 
 - The `CuboidSet` bay and per-cell claim rows make the claim planner enumerate cells. The bound is
