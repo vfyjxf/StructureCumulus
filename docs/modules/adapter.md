@@ -1171,6 +1171,8 @@ public final class ClientConfig {
     public static final ModConfigSpec spec;
     public static boolean animationEnabled();
     public static double animationSpeed();
+    public static void setAnimationSpeed(double speed);
+    public static void saveAnimationSpeed();
     public static boolean animationSound();
     public static boolean animationCelebrate();
     public static boolean hudProgress();
@@ -1961,6 +1963,9 @@ public final class PreviewScreen extends Screen {
     public int animatingCells();
     public @Nullable Rect buttonRect(String label);
     public java.util.List<String> buttonLabels();
+    public @Nullable Rect sliderRect();
+    public @Nullable Rect sliderTrack();
+    public String speedLabel();
     public Heading heading();
     public @Nullable String variantLine();
     public int variantCount();
@@ -2935,7 +2940,7 @@ stage-number billboard in the world; a second client config file; localisation o
 formatter vocabulary; exporting a view as an image. The pack allocates no finding code (design 16 §14): what it shows is a mark, a stage name or a
 document string, and an invalidation stays `SC-BLD-0008`.
 
-## 20. Preview screen (design 17, approved at SC0, landed SC1–SC14)
+## 20. Preview screen (design 17, approved at SC0, landed SC1–SC15)
 
 Two packages, both on the physical client: `dev.vfyjxf.cumulus.mc.preview.scene` — the JEI-free scene
 core, moved out of `...preview.jei` and extended with the camera, the hull, the exploded view and the
@@ -3081,8 +3086,24 @@ depth state in both arms (`RenderSystem.disableDepthTest()` and `depthMask(false
 lighting restore, with
 `PreviewScene.depthRestored()` telling the harness it ran), and every screen tooltip — cell, link,
 button and timeline — draws last at `PreviewScreen.tooltipZ` = 400, vanilla's own tooltip depth, with
-`tooltipDepth`, `tooltipLines` and `tooltipBox` as the read-back. The milestone state lives in
-[`docs/plan/screen-plan.md`](../plan/screen-plan.md).
+`tooltipDepth`, `tooltipLines` and `tooltipBox` as the read-back. SC15 has landed the viewer's pace
+(design 17 §4.5/§7.5, D-114): `StagePlayback`'s dwell floor, ceiling and hold retune to 4/20/3 ticks
+(6/40/5 before; `cellRevealTicks` stays 1), and the player group carries a speed slider whose value is
+`animation.speed` and nothing else — `SpeedSlider` is the pure law (the key's `0.25`–`4.0` range, a
+`0.25` step held as a step index so every value round trips, the thumb's `fraction` and the label
+`1.5×`/`0.25×`/`4.0×`), the screen draws it as one control-strip cell after the player group's
+next-stage arrow with the label's width reserved inside the cell, and a click on the track or a drag
+writes the key — `ClientConfig.setAnimationSpeed` in memory for the next frame (the screen's
+`cadence()` reads the key every frame), `ClientConfig.saveAnimationSpeed` on release, which is
+`ModConfigSpec#save` → `LoadedConfig#save` writing
+`config/structurecumulus-client.toml` and firing the reload. No key is added, no second multiplier
+appears and a button-style tooltip never covers the value: the label is the value. The write survives
+the screen and the restart, and `1.0×` means the same rate on the screen and the world.
+`PreviewScreen.sliderRect`, `sliderTrack` and `speedLabel` are the harness read-back; `SpeedSliderTest`
+pins the range, the snap, the round trip and the labels, `StagePlaybackTest` pins 4/20/3 and the 4.0×
+quarter law, and the `screen.speed` scenario clicks and drags the track (both ends clamped, the file
+receiving the write) and measures a 4.0× play against a 1.0× one on the screen's own clock. The
+milestone state lives in [`docs/plan/screen-plan.md`](../plan/screen-plan.md).
 
 **Wire additions (SC1, SC3 and SC13).** The cell shape does not move: `GhostCell` stays the one
 expected-cell record every surface shares.

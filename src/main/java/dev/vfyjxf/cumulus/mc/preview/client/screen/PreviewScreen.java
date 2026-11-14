@@ -86,6 +86,13 @@ public final class PreviewScreen extends Screen {
     public static final int tooltipZ = 400;
     private static final int buttonHeight = 14;
     private static final int buttonGap = 4;
+    /** The player group's speed slider: the track's width, its insets and the gap to the value label (§4.5). */
+    private static final int sliderTrackWidth = 40;
+    private static final int sliderInset = 5;
+    private static final int sliderGap = 5;
+    /** The speed slider's chrome: the track's ground, and the thumb's two states (§7.5). */
+    private static final int sliderGroundColor = 0xFF1A1A1A;
+    private static final int sliderThumbColor = 0xFFC0C0C0;
     private static final int barTop = 3;
     private static final int summaryBlock = 13;
     /** The button area the strip always reserved under the bar (design 17 §4.5); the bar adds no more. */
@@ -121,6 +128,8 @@ public final class PreviewScreen extends Screen {
     private boolean dragging;
     private boolean panning;
     private boolean draggedSinceClick;
+    private boolean draggingSlider;
+    private boolean speedDirty;
     private long lastClickMillis = -1L;
     private double pointerX = -1.0D;
     private double pointerY = -1.0D;
@@ -262,6 +271,7 @@ public final class PreviewScreen extends Screen {
 
     @Override
     public void removed() {
+        flushSpeed();
         if (listening) {
             PreviewCatalogClient.unlisten(onCatalog);
             listening = false;
@@ -327,6 +337,7 @@ public final class PreviewScreen extends Screen {
         drawSummary(graphics);
         drawFooter(graphics);
         drawButtons(graphics, (int) cursorX, (int) cursorY);
+        drawSlider(graphics, (int) cursorX, (int) cursorY);
         // the hovered cell is the page's most specific answer; a link caption or a widget otherwise
         if (hovered != null) {
             pendingTooltip = new Tooltip(cellLines(hovered), (int) cursorX, (int) cursorY);
@@ -401,6 +412,11 @@ public final class PreviewScreen extends Screen {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+        if (button == 0 && overSlider(mouseX, mouseY)) {
+            draggingSlider = true;
+            writeSpeed(mouseX);
+            return true;
+        }
         for (Button candidate : buttons()) {
             if (candidate.inside(mouseX, mouseY)) {
                 candidate.action().run();
@@ -443,6 +459,11 @@ public final class PreviewScreen extends Screen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (draggingSlider) {
+            draggingSlider = false;
+            flushSpeed();
+            return true;
+        }
         boolean click = dragging && !draggedSinceClick && button == 0;
         boolean main = inside(layout.main(), mouseX, mouseY);
         dragging = false;
@@ -460,6 +481,10 @@ public final class PreviewScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (draggingSlider) {
+            writeSpeed(mouseX);
+            return true;
+        }
         if (!dragging) {
             return false;
         }
@@ -891,10 +916,42 @@ public final class PreviewScreen extends Screen {
 
     private List<Button> buttons() {
         List<Button> built = new ArrayList<>();
+        for (Control control : controls()) {
+            ButtonSpec spec = control.button();
+            if (spec != null) {
+                built.add(new Button(control.rect(), spec.label(), spec.tooltip(), spec.action()));
+            }
+        }
+        return List.copyOf(built);
+    }
+
+    /**
+     * The control strip's cells in flow order: the §4.5 buttons, with the player group's speed slider
+     * after its next-stage arrow. The slider wraps and is dropped by the same rules as a button.
+     */
+    private List<Control> controls() {
+        List<ButtonSpec> specs = buttonSpecs();
+        int slot = sliderSlot(specs);
+        List<Control> built = new ArrayList<>(specs.size() + 1);
         int x = buttonGap;
         int y = buttonsTop();
         int bottom = layout.control().y() + layout.control().height() - 1;
-        for (ButtonSpec spec : buttonSpecs()) {
+        for (int index = 0; index <= specs.size(); index++) {
+            if (index == slot) {
+                int sliderWidth = speedSliderWidth();
+                if (x + sliderWidth > width - buttonGap) {
+                    x = buttonGap;
+                    y += buttonHeight + 2;
+                }
+                if (y + buttonHeight <= bottom) {
+                    built.add(new Control(new Rect(x, y, sliderWidth, buttonHeight), null));
+                    x += sliderWidth + buttonGap;
+                }
+            }
+            if (index == specs.size()) {
+                break;
+            }
+            ButtonSpec spec = specs.get(index);
             int specWidth = font.width(spec.label()) + 10;
             if (x + specWidth > width - buttonGap) {
                 x = buttonGap;
@@ -903,10 +960,92 @@ public final class PreviewScreen extends Screen {
             if (y + buttonHeight > bottom) {
                 break;
             }
-            built.add(new Button(new Rect(x, y, specWidth, buttonHeight), spec.label(), spec.tooltip(), spec.action()));
+            built.add(new Control(new Rect(x, y, specWidth, buttonHeight), spec));
             x += specWidth + buttonGap;
         }
         return List.copyOf(built);
+    }
+
+    /** The slider rides in the player group, between the next-stage arrow and the view toggles (§4.5). */
+    private static int sliderSlot(List<ButtonSpec> specs) {
+        for (int index = 0; index < specs.size(); index++) {
+            if (specs.get(index).label().equals(">")) {
+                return index + 1;
+            }
+        }
+        return specs.size();
+    }
+
+    private int speedSliderWidth() {
+        return sliderInset + sliderTrackWidth + sliderGap + speedLabelWidth() + sliderInset;
+    }
+
+    /** The widest label the slider can carry, so the track never moves under the value (§7.5). */
+    private int speedLabelWidth() {
+        return Math.max(font.width(SpeedSlider.at(0.0D).label()), font.width(SpeedSlider.at(1.0D).label()));
+    }
+
+    /** The player group's speed slider: its track, the filled share, its thumb and its value (§4.5, §7.5). */
+    private void drawSlider(GuiGraphics graphics, int mouseX, int mouseY) {
+        Rect slider = sliderRect();
+        Rect track = sliderTrack();
+        if (slider == null || track == null) {
+            return;
+        }
+        SpeedSlider speed = SpeedSlider.of(ClientConfig.animationSpeed());
+        boolean over = overSlider(mouseX, mouseY);
+        graphics.fill(track.x(), track.y(), track.x() + track.width(), track.y() + track.height(), sliderGroundColor);
+        int thumbX = track.x() + (int) Math.round(speed.fraction() * track.width());
+        graphics.fill(track.x(), track.y(), thumbX, track.y() + track.height(), buttonHoverColor);
+        graphics.fill(
+            thumbX - 1,
+            slider.y() + 2,
+            thumbX + 2,
+            slider.y() + buttonHeight - 2,
+            over ? sliderThumbColor : buttonTextColor
+        );
+        String label = speed.label();
+        graphics.drawString(
+            font,
+            label,
+            slider.x() + slider.width() - sliderInset - font.width(label),
+            slider.y() + 3,
+            buttonTextColor,
+            false
+        );
+    }
+
+    /** The track's span at the slider's row: the label beside it is read-only (design 17 §7.5). */
+    private boolean overSlider(double mouseX, double mouseY) {
+        Rect slider = sliderRect();
+        Rect track = sliderTrack();
+        return slider != null
+                && track != null
+                && mouseX >= track.x()
+                && mouseX <= track.x() + track.width()
+                && mouseY >= slider.y()
+                && mouseY < slider.y() + slider.height();
+    }
+
+    /** One pointer position on the track writes the quarter step it names, live for the next frame (§7.5). */
+    private void writeSpeed(double mouseX) {
+        Rect track = sliderTrack();
+        if (track == null) {
+            return;
+        }
+        SpeedSlider speed = SpeedSlider.at((mouseX - track.x()) / track.width());
+        if (speed.steps() != SpeedSlider.of(ClientConfig.animationSpeed()).steps()) {
+            ClientConfig.setAnimationSpeed(speed.value());
+            speedDirty = true;
+        }
+    }
+
+    /** The drag's one disk write: the value is already live, so the file catches up on release (§7.5). */
+    private void flushSpeed() {
+        if (speedDirty) {
+            ClientConfig.saveAnimationSpeed();
+            speedDirty = false;
+        }
     }
 
     private void drawButtons(GuiGraphics graphics, int mouseX, int mouseY) {
@@ -2029,6 +2168,27 @@ public final class PreviewScreen extends Screen {
         return null;
     }
 
+    /** The player group's speed slider, or null when the strip had no room for it (design 17 §4.5). */
+    public @Nullable Rect sliderRect() {
+        for (Control control : controls()) {
+            if (control.button() == null) {
+                return control.rect();
+            }
+        }
+        return null;
+    }
+
+    /** The speed slider's draggable track: a pointer's x maps to a quarter step along it (§7.5). */
+    public @Nullable Rect sliderTrack() {
+        Rect slider = sliderRect();
+        return slider == null ? null : new Rect(slider.x() + sliderInset, slider.y() + 6, sliderTrackWidth, 2);
+    }
+
+    /** The speed slider's label: the config key's value at the quarter step it snapped to (§7.5). */
+    public String speedLabel() {
+        return SpeedSlider.of(ClientConfig.animationSpeed()).label();
+    }
+
     /** The control strip's button labels in layout order, for the §4.5 one-list-read-twice check. */
     public List<String> buttonLabels() {
         List<String> labels = new ArrayList<>();
@@ -2069,4 +2229,7 @@ public final class PreviewScreen extends Screen {
     private record Tooltip(List<String> lines, int x, int y) {}
 
     private record ButtonSpec(String label, String tooltip, Runnable action) {}
+
+    /** One cell of the control strip: a button, or the player group's speed slider (design 17 §4.5). */
+    private record Control(Rect rect, @Nullable ButtonSpec button) {}
 }

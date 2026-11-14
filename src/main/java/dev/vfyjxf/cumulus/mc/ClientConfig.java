@@ -5,6 +5,10 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 /** {@code config/structurecumulus-client.toml}: the client's narration switches (design 16 §13). */
 public final class ClientConfig {
 
+    /** The one speed key's own range: the key's declared bounds and the slider's clamp (design 17 §7.5). */
+    private static final double minSpeed = 0.25D;
+    private static final double maxSpeed = 4.0D;
+
     private static final ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
 
     private static final ModConfigSpec.BooleanValue animationEnabled = builder
@@ -13,7 +17,7 @@ public final class ClientConfig {
 
     private static final ModConfigSpec.DoubleValue animationSpeed = builder
             .comment("Divides every animation cadence; it changes no cap, no count and no order.")
-            .defineInRange("animation.speed", 1.0D, 0.25D, 4.0D);
+            .defineInRange("animation.speed", 1.0D, minSpeed, maxSpeed);
 
     private static final ModConfigSpec.BooleanValue animationSound = builder
             .comment("The rate-limited place and break cues of a placement animation.").define("animation.sound", true);
@@ -55,6 +59,21 @@ public final class ClientConfig {
             return animationSpeed.get();
         } catch (IllegalStateException notLoaded) {
             return 1.0D;
+        }
+    }
+
+    /** Writes the one speed key in memory; the screen's next frame reads it (design 17 §7.5, D-114). */
+    public static void setAnimationSpeed(double speed) {
+        if (!spec.isLoaded()) {
+            return;
+        }
+        animationSpeed.set(Math.max(minSpeed, Math.min(maxSpeed, speed)));
+    }
+
+    /** Writes the one speed key to disk and fires the reload it owns (design 17 §7.5). */
+    public static void saveAnimationSpeed() {
+        if (spec.isLoaded()) {
+            spec.save();
         }
     }
 

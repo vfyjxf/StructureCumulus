@@ -129,7 +129,10 @@ Then the module files, in dependency order:
   and the chrome scale that makes a segment a box over the blurred world), and SC14 the display labels
   and the JEI face's parity (the page's own namespace stripped from lane heads and segment names with
   the full id kept for the hover, the compact timeline with one-stage selection and no playhead, the
-  set page's constraint overlay, and the wheel's clamped zoom with the double-click frame) are on the
+  set page's constraint overlay, and the wheel's clamped zoom with the double-click frame), and SC15
+  the viewer's pace (the screen's dwell floor, ceiling and hold retuned to 4/20/3 ticks, and the player
+  group's speed slider that reads and writes the one `animation.speed` key in quarter steps from
+  `0.25×` to `4.0×`, with the label as its value and the write saved to the client config) are on the
   tree.
 - Scope of the v1 round: **core kernel + document compiler + thin remedy SPI**. The NeoForge adapter
   was specified only in that round. Current status: M1 is the host + command + capture-check slice —

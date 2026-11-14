@@ -92,16 +92,40 @@ class StagePlaybackTest {
     }
 
     @Test
+    void theRetunedPaceIsTheDesignsFourTwentyThree() {
+        assertEquals(1, StagePlayback.cellRevealTicks);
+        assertEquals(4, StagePlayback.stageRevealMinTicks, "the dwell's floor is four ticks");
+        assertEquals(20, StagePlayback.stageRevealMaxTicks, "the dwell's ceiling is twenty ticks");
+        assertEquals(3, StagePlayback.stagePauseTicks, "the hold between beats is three ticks");
+    }
+
+    @Test
     void theSpanIsClampedFlooredAndSpeedDivided() {
-        assertEquals(6, pageOf(4).revealSpan(0, normal), "a four-cell stage takes the floor");
+        assertEquals(4, pageOf(4).revealSpan(0, normal), "a four-cell stage takes the floor");
         assertEquals(12, pageOf(12).revealSpan(0, normal), "twelve cells dwell twelve ticks");
-        assertEquals(40, pageOf(400).revealSpan(0, normal), "a huge stage takes the ceiling");
+        assertEquals(20, pageOf(400).revealSpan(0, normal), "a huge stage takes the ceiling");
         assertEquals(6, pageOf(12).revealSpan(0, StagePlayback.Cadence.of(2.0D, true)), "speed divides the span");
-        assertEquals(20, pageOf(400).revealSpan(0, StagePlayback.Cadence.of(2.0D, true)));
+        assertEquals(10, pageOf(400).revealSpan(0, StagePlayback.Cadence.of(2.0D, true)));
         assertEquals(0, pageOf(4).revealSpan(0, StagePlayback.Cadence.of(1.0D, false)), "no animation, no span");
-        assertEquals(5, pageOf(4).pauseSpan(normal), "the pause is the cadence's own");
-        assertEquals(3, pageOf(4).pauseSpan(StagePlayback.Cadence.of(2.0D, true)));
+        assertEquals(3, pageOf(4).pauseSpan(normal), "the pause is the cadence's own");
+        assertEquals(2, pageOf(4).pauseSpan(StagePlayback.Cadence.of(2.0D, true)));
         assertEquals(0, pageOf(4).pauseSpan(StagePlayback.Cadence.of(1.0D, false)));
+    }
+
+    @Test
+    void speedFourQuartersTheSameStagesDwell() {
+        StagePlayback.Cadence four = StagePlayback.Cadence.of(4.0D, true);
+        for (int cells : List.of(1, 4, 5, 12, 20, 400)) {
+            int one = pageOf(cells).revealSpan(0, normal);
+            int quarter = pageOf(cells).revealSpan(0, four);
+            assertEquals(
+                Math.max(1, (int) Math.ceil(one / 4.0D)),
+                quarter,
+                "the 4.0x dwell of " + cells + " cells is a quarter of the 1.0x dwell, rounded up"
+            );
+        }
+        assertEquals(1, pageOf(4).pauseSpan(four), "the hold divides too");
+        assertEquals(16, pageOf(4).revealSpan(0, StagePlayback.Cadence.of(0.25D, true)), "a quarter speed quadruples");
     }
 
     private static StagePlayback pageOf(int cells) {
@@ -120,8 +144,10 @@ class StagePlaybackTest {
         assertEquals(0, firstFrame.revealed(0), "nothing lands on the play's first frame");
         assertEquals(1.0F, firstFrame.pause(), eps, "the opening hold is the zero state");
         assertEquals(0.0F, firstFrame.elapsed(), eps);
-        assertEquals(4.0F, firstFrame.advance(3.0F, normal).pause(), eps);
-        StagePlayback landed = firstFrame.advance(4.0F, normal);
+        StagePlayback held = firstFrame.advance(1.0F, normal);
+        assertEquals(0, held.revealed(0), "the hold still runs");
+        assertEquals(2.0F, held.pause(), eps);
+        StagePlayback landed = held.advance(1.0F, normal);
         assertEquals(3, landed.revealed(0), "the hold's end lands the whole batch at one tick");
         assertEquals(0.0F, landed.pause(), eps, "the batch opens the dwell, not the pause");
         assertEquals(0.0F, landed.elapsed(), eps);
@@ -137,27 +163,27 @@ class StagePlaybackTest {
     @Test
     void aHoldThatOverrunsSpendsTheRestOfTheFrameInTheDwell() {
         StagePlayback firstFrame = page().togglePlay(normal).advance(1.0F, normal);
-        StagePlayback held = firstFrame.advance(6.0F, normal);
+        StagePlayback held = firstFrame.advance(4.0F, normal);
         assertEquals(3, held.revealed(0), "the batch is in");
         assertEquals(0.0F, held.pause(), eps);
-        assertEquals(2.0F, held.elapsed(), eps, "one tick of hold plus six is five held and two dwelt");
+        assertEquals(2.0F, held.elapsed(), eps, "one tick of hold plus four is three held and two dwelt");
     }
 
     @Test
     void everyStageIsHeldBeforeItsBatchAndTheLastDwellEndsThePlay() {
-        StagePlayback landed = page().togglePlay(normal).advance(5.0F, normal);
+        StagePlayback landed = page().togglePlay(normal).advance(3.0F, normal);
         assertEquals(3, landed.revealed(0));
-        StagePlayback dwell = landed.advance(5.0F, normal);
+        StagePlayback dwell = landed.advance(2.0F, normal);
         assertEquals(0, dwell.cursor(), "the stage still holds its dwell");
-        assertEquals(5.0F, dwell.elapsed(), eps);
-        StagePlayback empty = dwell.advance(2.0F, normal);
+        assertEquals(2.0F, dwell.elapsed(), eps);
+        StagePlayback empty = dwell.advance(3.0F, normal);
         assertEquals(1, empty.cursor(), "the dwell's end moves the cursor to the next stage");
         assertEquals(1.0F, empty.pause(), eps, "the dwell's overrun is the next stage's hold");
         assertEquals(0, empty.revealed(1), "the next stage begins empty, like the play's opening");
-        StagePlayback landedNext = empty.advance(4.0F, normal);
+        StagePlayback landedNext = empty.advance(2.0F, normal);
         assertEquals(2, landedNext.revealed(1), "the next stage's batch lands after its own hold");
-        assertEquals(0.0F, landedNext.advance(6.0F, normal).elapsed(), eps);
-        assertFalse(landedNext.advance(6.0F, normal).playing(), "the last dwell ends the play, no trailing hold");
+        assertEquals(0.0F, landedNext.elapsed(), eps);
+        assertFalse(landedNext.advance(4.0F, normal).playing(), "the last dwell ends the play, no trailing hold");
     }
 
     @Test
@@ -255,15 +281,16 @@ class StagePlaybackTest {
 
     @Test
     void theDwellIsNotTheCellDrip() {
-        StagePlayback playback = page().togglePlay(normal).advance(5.0F, normal).advance(4.0F, normal);
-        assertEquals(3, playback.revealed(0), "four ticks into the dwell the stage is still whole");
+        StagePlayback playback = page().togglePlay(normal).advance(3.0F, normal).advance(2.0F, normal);
+        assertEquals(3, playback.revealed(0), "mid-dwell the stage is still whole");
         assertEquals(0, playback.cursor());
-        assertEquals(4.0F, playback.elapsed(), eps);
+        assertEquals(2.0F, playback.elapsed(), eps);
+        assertEquals(4, page().revealSpan(0, normal), "the three-cell stage still takes the four-tick floor");
     }
 
     @Test
     void aResumedPlayDoesNotReRunAHoldThatHasPassed() {
-        StagePlayback landed = page().togglePlay(normal).advance(5.0F, normal);
+        StagePlayback landed = page().togglePlay(normal).advance(3.0F, normal);
         assertEquals(3, landed.revealed(0));
         StagePlayback paused = landed.togglePlay(normal);
         assertFalse(paused.playing());

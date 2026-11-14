@@ -26,9 +26,9 @@ public record StagePlayback(
     /** The cursor's revealed factor of design 17 §7.2. */
     public static final float currentAlpha = 1.0F;
     public static final int cellRevealTicks = 1;
-    public static final int stageRevealMinTicks = 6;
-    public static final int stageRevealMaxTicks = 40;
-    public static final int stagePauseTicks = 5;
+    public static final int stageRevealMinTicks = 4;
+    public static final int stageRevealMaxTicks = 20;
+    public static final int stagePauseTicks = 3;
 
     /** One page cell with the facts the treatments read: its stage and its position inside it. */
     public record Placed(GhostCell ghost, int stage, int position) {}
