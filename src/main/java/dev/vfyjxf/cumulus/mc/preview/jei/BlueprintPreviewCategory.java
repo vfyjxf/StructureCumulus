@@ -121,7 +121,8 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
     private static final int labelColor = 0xFFC0C0C0;
     private static final int chromeColor = 0xFFC0C0C0;
     private static final int captionColor = ConstraintOverlay.linkColor;
-    private static final int countColor = 0xFF303030;
+    /** Dark ink for the face's light surfaces: the material counts and the slider's layer readout. */
+    private static final int inkColor = 0xFF303030;
     private static final int overflowColor = 0xFFFF8080;
     private static final StageTimeline.Chrome chrome = StageTimeline.Chrome.screen;
     /** The 9-px font's line height at the face's 0.75 scale: a small label fits inside a row. */
@@ -670,12 +671,15 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         float fraction = layers <= 1 ? 1.0F : page.slice() / (float) (layers - 1);
         int thumbY = sliderY + Math.round((1.0F - fraction) * travel);
         graphics.fill(sliderX + 2, thumbY, sliderX + sliderWidth - 2, thumbY + 6, thumbColor);
+        // the layer readout sits in the rail's foot, clear of the compact timeline that starts below
+        String layer = Integer.toString(page.slice() + 1);
+        int width = Minecraft.getInstance().font.width(layer);
         graphics.drawString(
             Minecraft.getInstance().font,
-            Integer.toString(page.slice() + 1),
-            sliderX + 3,
-            sliderY + sliderHeight + 3,
-            0xFFC0C0C0,
+            layer,
+            sliderX + sliderWidth - 1 - width,
+            sliderY + sliderHeight - 10,
+            inkColor,
             false
         );
     }
@@ -768,11 +772,11 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             graphics.pose().pushPose();
             graphics.pose().translate(unit.x() + 1, y, 0.0F);
             graphics.pose().scale(timelineTextScale, timelineTextScale, 1.0F);
-            graphics.drawString(minecraft.font, count, 0, 0, countColor, false);
+            graphics.drawString(minecraft.font, count, 0, 0, inkColor, false);
             graphics.pose().popPose();
             return;
         }
-        graphics.drawString(minecraft.font, count, unit.x() + (unit.width() - width) / 2, y, countColor, false);
+        graphics.drawString(minecraft.font, count, unit.x() + (unit.width() - width) / 2, y, inkColor, false);
     }
 
     /** The red +N in the grid's last unit: how many materials this page does not draw. */
