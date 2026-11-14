@@ -42,7 +42,7 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             .create(Constants.modId, "multiblock_preview", BlueprintPreviewRecipe.class);
 
     static final int width = 176;
-    static final int height = 234;
+    static final int height = 246;
 
     static final int sceneX = 2;
     static final int sceneY = 2;
@@ -77,32 +77,33 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
     static final int buttonWidth = 88;
     static final int buttonHeight = 16;
 
+    /** The material summary's eight units: a 4×2 face of 20×25, its own metric (design 15 §6.2). */
     static final int materialsX = 94;
     static final int materialsY = 148;
-    static final int materialsWidth = 80;
-    static final int materialsHeight = 38;
+    static final int materialsWidth = MaterialGrid.columns * MaterialGrid.cellWidth;
+    static final int materialsHeight = MaterialGrid.rows * MaterialGrid.cellHeight;
 
     static final int modeX = 2;
-    static final int modeY = 188;
+    static final int modeY = 200;
     static final int modeWidth = 100;
     static final int modeHeight = 14;
 
     /** The set page's constraint toggle beside the mode button: the face has room, so it shows (§5). */
     static final int constraintsX = 104;
-    static final int constraintsY = 188;
+    static final int constraintsY = 200;
     static final int constraintsWidth = 70;
     static final int constraintsHeight = 14;
 
     /** The variant row: one page per group, the arrows switch the member in place (design 15 §12.3). */
     static final int variantX = 2;
-    static final int variantY = 204;
+    static final int variantY = 216;
     static final int variantWidth = 172;
     static final int variantHeight = 14;
     static final int variantArrowWidth = 18;
 
     /** The screen's entry: the page's selected member, opened as the client screen (design 17 §9.1). */
     static final int screenX = 2;
-    static final int screenY = 220;
+    static final int screenY = 232;
     static final int screenWidth = 172;
     static final int screenHeight = 14;
 
@@ -110,8 +111,6 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
     static final int panelWidth = 50;
     static final int panelGap = 3;
 
-    private static final int columns = 4;
-    private static final int tile = 18;
     private static final int panelColor = 0x40000000;
     private static final int panelBackColor = 0x28000000;
     private static final int trackColor = 0x30FFFFFF;
@@ -122,6 +121,8 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
     private static final int labelColor = 0xFFC0C0C0;
     private static final int chromeColor = 0xFFC0C0C0;
     private static final int captionColor = ConstraintOverlay.linkColor;
+    private static final int countColor = 0xFF303030;
+    private static final int overflowColor = 0xFFFF8080;
     private static final StageTimeline.Chrome chrome = StageTimeline.Chrome.screen;
     /** The 9-px font's line height at the face's 0.75 scale: a small label fits inside a row. */
     private static final int smallTextHeight = (int) Math.ceil(StageTimeline.textHeight * timelineTextScale);
@@ -641,6 +642,11 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
             tooltip.add(Component.literal("x " + line.count()));
             return;
         }
+        int hidden = MaterialGrid.overflowAt(recipe.materials().size(), materialsX, materialsY, mouseX, mouseY);
+        if (hidden > 0) {
+            tooltip.add(Component.literal(hidden + " more materials"));
+            return;
+        }
         if (recipe.isSet()) {
             String link = page.linkHover(recipe, mouseX, mouseY);
             if (link != null) {
@@ -738,45 +744,55 @@ final class BlueprintPreviewCategory implements IRecipeCategory<BlueprintPreview
         graphics.fill(x + width - 1, y, x + width, y + height, borderColor);
     }
 
+    /** The material summary: an icon over its count in every unit, the +N in the last on overflow. */
     private void drawMaterials(GuiGraphics graphics, BlueprintPreviewRecipe recipe, double mouseX, double mouseY) {
-        int shown = Math.min(recipe.materials().size(), columns * (materialsHeight / tile));
-        for (int index = 0; index < shown; index++) {
-            BlueprintPreviewRecipe.Material line = recipe.materials().get(index);
-            int x = materialsX + (index % columns) * tile;
-            int y = materialsY + (index / columns) * tile;
-            graphics.renderItem(line.stack(), x, y);
-            graphics.drawString(
-                Minecraft.getInstance().font,
-                Integer.toString(line.count()),
-                x + 10,
-                y + 9,
-                0xFFFFFFFF,
-                true
-            );
-        }
-        int overflow = recipe.materials().size() - shown;
-        if (overflow > 0) {
-            graphics.drawString(
-                Minecraft.getInstance().font,
-                "+" + overflow,
-                materialsX,
-                materialsY + (shown / columns) * tile - 8,
-                0xFFFF8080,
-                false
-            );
+        int materialCount = recipe.materials().size();
+        int overflow = MaterialGrid.overflow(materialCount);
+        for (MaterialGrid.Unit unit : MaterialGrid.units(materialCount, materialsX, materialsY)) {
+            if (unit.overflow()) {
+                drawOverflow(graphics, overflow, unit);
+                continue;
+            }
+            BlueprintPreviewRecipe.Material line = recipe.materials().get(unit.index());
+            graphics.renderItem(line.stack(), unit.x() + MaterialGrid.iconInset, unit.y());
+            drawMaterialCount(graphics, Integer.toString(line.count()), unit);
         }
     }
 
-    private int materialAt(BlueprintPreviewRecipe recipe, double mouseX, double mouseY) {
-        int shown = Math.min(recipe.materials().size(), columns * (materialsHeight / tile));
-        for (int index = 0; index < shown; index++) {
-            int x = materialsX + (index % columns) * tile;
-            int y = materialsY + (index / columns) * tile;
-            if (inside(mouseX, mouseY, x, y, 16, 16)) {
-                return index;
-            }
+    /** A count centred under its icon; a count wider than its unit shrinks to the face's 0.75 scale. */
+    private static void drawMaterialCount(GuiGraphics graphics, String count, MaterialGrid.Unit unit) {
+        Minecraft minecraft = Minecraft.getInstance();
+        int width = minecraft.font.width(count);
+        int y = unit.y() + MaterialGrid.iconSize;
+        if (width > unit.width()) {
+            graphics.pose().pushPose();
+            graphics.pose().translate(unit.x() + 1, y, 0.0F);
+            graphics.pose().scale(timelineTextScale, timelineTextScale, 1.0F);
+            graphics.drawString(minecraft.font, count, 0, 0, countColor, false);
+            graphics.pose().popPose();
+            return;
         }
-        return -1;
+        graphics.drawString(minecraft.font, count, unit.x() + (unit.width() - width) / 2, y, countColor, false);
+    }
+
+    /** The red +N in the grid's last unit: how many materials this page does not draw. */
+    private static void drawOverflow(GuiGraphics graphics, int overflow, MaterialGrid.Unit unit) {
+        String text = "+" + overflow;
+        Minecraft minecraft = Minecraft.getInstance();
+        int width = minecraft.font.width(text);
+        graphics.drawString(
+            minecraft.font,
+            text,
+            unit.x() + (unit.width() - width) / 2,
+            unit.y() + (unit.height() - MaterialGrid.textHeight) / 2,
+            overflowColor,
+            true
+        );
+    }
+
+    /** The material under a face-local point; the tooltip reads the same units the face draws. */
+    private int materialAt(BlueprintPreviewRecipe recipe, double mouseX, double mouseY) {
+        return MaterialGrid.materialAt(recipe.materials().size(), materialsX, materialsY, mouseX, mouseY);
     }
 
     static boolean inside(double mouseX, double mouseY, int x, int y, int width, int height) {

@@ -13,6 +13,7 @@ import net.minecraft.Util;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +32,9 @@ public final class JeiPreview {
 
     /** A point of the recipe's own face, in pixels from its top-left corner. */
     public record CellPoint(double x, double y) {}
+
+    /** One material unit of the face: the material at {@code index}, or the +N marker at -1. */
+    public record MaterialUnit(int index, int x, int y, int width, int height, boolean overflow) {}
 
     private static volatile int drawnFrames;
     private static volatile int drawnCells;
@@ -292,6 +296,51 @@ public final class JeiPreview {
         BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
         PageView view = JeiPreviewPlugin.view(blueprintId);
         return recipe == null || view == null ? List.of() : view.hoverLines(recipe, mouseX, mouseY);
+    }
+
+    /** The material summary's units in face pixels; the +N marker is the last one on overflow. */
+    public static List<MaterialUnit> materialUnits(NamespacedId blueprintId) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        if (recipe == null) {
+            return List.of();
+        }
+        List<MaterialUnit> units = new ArrayList<>(MaterialGrid.capacity);
+        for (MaterialGrid.Unit unit : MaterialGrid.units(
+            recipe.materials().size(),
+            BlueprintPreviewCategory.materialsX,
+            BlueprintPreviewCategory.materialsY
+        )) {
+            units.add(new MaterialUnit(unit.index(), unit.x(), unit.y(), unit.width(), unit.height(), unit.overflow()));
+        }
+        return List.copyOf(units);
+    }
+
+    /** The material index under a face-local point, or -1; the material summary's tooltip hit test. */
+    public static int materialAt(NamespacedId blueprintId, double mouseX, double mouseY) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null
+                ? -1
+                : MaterialGrid.materialAt(
+                    recipe.materials().size(),
+                    BlueprintPreviewCategory.materialsX,
+                    BlueprintPreviewCategory.materialsY,
+                    mouseX,
+                    mouseY
+                );
+    }
+
+    /** The hidden count under the +N marker, or 0; the marker's tooltip answers with it. */
+    public static int materialOverflowAt(NamespacedId blueprintId, double mouseX, double mouseY) {
+        BlueprintPreviewRecipe recipe = JeiPreviewPlugin.recipe(blueprintId);
+        return recipe == null
+                ? 0
+                : MaterialGrid.overflowAt(
+                    recipe.materials().size(),
+                    BlueprintPreviewCategory.materialsX,
+                    BlueprintPreviewCategory.materialsY,
+                    mouseX,
+                    mouseY
+                );
     }
 
     /** The "Ghost to world" action: the server opens the ordinary session at the crosshair. */

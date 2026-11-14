@@ -2074,6 +2074,7 @@ package dev.vfyjxf.cumulus.mc.preview.jei;
 public final class JeiPreview {
     public record Panel(int cells, int layer, int x, int y, int width, int height, float scale) { }
     public record CellPoint(double x, double y) { }
+    public record MaterialUnit(int index, int x, int y, int width, int height, boolean overflow) { }
 
     public static java.util.List<NamespacedId> blueprintIds();
     public static int drawnFrames();
@@ -2105,6 +2106,9 @@ public final class JeiPreview {
     public static boolean setYaw(NamespacedId blueprintId, float yaw);
     public static java.util.Optional<CellPoint> cellPoint(NamespacedId blueprintId, int panel, int cellIndex);
     public static java.util.List<String> hoverText(NamespacedId blueprintId, double mouseX, double mouseY);
+    public static java.util.List<MaterialUnit> materialUnits(NamespacedId blueprintId);
+    public static int materialAt(NamespacedId blueprintId, double mouseX, double mouseY);
+    public static int materialOverflowAt(NamespacedId blueprintId, double mouseX, double mouseY);
     public static void openWorld(NamespacedId blueprintId);
     public static boolean show(NamespacedId blueprintId);
     public static java.util.List<NamespacedId> variants(NamespacedId blueprintId);
@@ -3054,7 +3058,7 @@ keeps its prefix because that prefix is the distinction, and `Segment.label` is 
 `StageTimeline.hoverText` keeps the full ids on every hover, head and segment alike. The station's ten
 bays now read as short names (`plinth`, `core_low`, …; the 8-cell `core_high` sliver is the one that
 cannot fit and stays unnamed by the existing law), and the campus's three lane heads are `root`,
-`campus_machine`, `campus_tower`. The JEI face is 176×234: its compact timeline sits in a fixed
+`campus_machine`, `campus_tower`. The JEI face is 176×246: its compact timeline sits in a fixed
 38-px block of 11-px lanes at 0.75-scale text (the same `StageTimeline`, wrapping, legible floor and
 cap), a segment click shows that stage alone — the slice slider's sibling: a stage selection overrides
 the layer rule, a slider move returns to the layer view, a second click returns to the whole page —
@@ -3066,11 +3070,15 @@ one-stage reading. A set page in JEI draws the screen's constraint overlay with 
 `ConstraintOverlay` geometry and colours: links as face-meeting strokes captioned `actual ≤ max`,
 probes as crosses, optional members dashed through `ChromeStroke.dashed`, and the member labels in
 the short display form, clamped inside the scene; the `constraints` button beside the view button
-toggles it and is on by default because the face has room. `JeiPreview` exposes the timeline, the
-stage selection, the wheel's zoom and frame, the overlay toggle and the frame's link/probe/label
-counts for the harness. SC14's `jei.parity` uitest scenario pins them, and the display-label unit
-tests pin the namespace law. The scene pass restores the GUI's depth state in
-both arms (`RenderSystem.disableDepthTest()` and `depthMask(false)` beside the lighting restore, with
+toggles it and is on by default because the face has room. The material summary is a 4×2 face of
+20×25 units — a 16-px icon over its centred count — so eight units read without touching; a page
+over eight trades its last unit for the red `+N` (the station's sixteen draw seven and `+9`), and the
+tooltip reads the same rectangles, the marker included. `JeiPreview` exposes the timeline, the
+stage selection, the wheel's zoom and frame, the overlay toggle, the material units with their hit
+test and the frame's link/probe/label counts for the harness. SC14's `jei.parity` uitest scenario
+pins them, and the display-label unit tests pin the namespace law. The scene pass restores the GUI's
+depth state in both arms (`RenderSystem.disableDepthTest()` and `depthMask(false)` beside the
+lighting restore, with
 `PreviewScene.depthRestored()` telling the harness it ran), and every screen tooltip — cell, link,
 button and timeline — draws last at `PreviewScreen.tooltipZ` = 400, vanilla's own tooltip depth, with
 `tooltipDepth`, `tooltipLines` and `tooltipBox` as the read-back. The milestone state lives in

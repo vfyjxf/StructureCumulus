@@ -191,8 +191,8 @@ Then the module files, in dependency order:
   renderers, the JEI category, the preference store and scorer, the structure-set build, and the
   plugin extension tables (`registerMaterializers`/`registerItemSources` over the loader's one
   ordering and failure policy, plus the command's `with <kind-id>` source form). The tree registers
-  657 kernel tests in 75 containers, 800 adapter unit tests in 90 containers and 173 `@GameTest`
-  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 800 adapter tests) and
+  657 kernel tests in 75 containers, 809 adapter unit tests in 91 containers and 173 `@GameTest`
+  methods; a full `./gradlew check` is green on this tree (657 kernel tests, 809 adapter tests) and
   `runGameTestServer` passes 173/173. Pending only: acting on the measured kernel-side cost debts
   and the live-level review items (`07` §7), and fresh visual review screenshots.
   No regeneration milestone exists or is planned: the code is corrected against this set in place.
@@ -204,8 +204,8 @@ Then the module files, in dependency order:
   every run and kept out of the published jar (D-77).
 - Verification (2026-11-13): the kernel compiles with
   `javac --release 21` and JSpecify only. The tree registers 657 kernel JUnit 5 tests (75 test
-  containers), 800 adapter unit tests (90 containers) and 173 `@GameTest` methods; a full
-  `./gradlew check` passes at this revision (657 kernel tests, 800 adapter
+  containers), 809 adapter unit tests (91 containers) and 173 `@GameTest` methods; a full
+  `./gradlew check` passes at this revision (657 kernel tests, 809 adapter
   tests, 0 failures, 0 skipped), and `runGameTestServer` passes 173/173 GameTests.
   `Codes.all` has 69 entries and the decision record has 109 decisions
   (D-111; D-29 and D-36 superseded, D-78 withdrawn, D-110 reserved).

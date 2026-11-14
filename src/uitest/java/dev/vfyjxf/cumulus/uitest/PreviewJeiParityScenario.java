@@ -26,6 +26,7 @@ import java.util.List;
 public final class PreviewJeiParityScenario {
 
     private static final NamespacedId station = NamespacedId.of("structurecumulus", "demo_station");
+    private static final NamespacedId machine = NamespacedId.of("structurecumulus", "demo_machine");
     private static final NamespacedId campus = NamespacedId.of("structurecumulus", "demo_campus");
     private static final NamespacedId bay = NamespacedId.of("structurecumulus", "jei_parity/bay");
     private static final int stationCells = 473;
@@ -50,6 +51,17 @@ public final class PreviewJeiParityScenario {
                 .waitUntil("JEI's recipe screen owns the frame", PreviewJeiProbe::screenOpen)
                 .waitUntil("the category holds the synced entries", PreviewJeiProbe::categoryHasRecipes)
                 .action("page the category to the station", context -> JeiPreview.show(station)).frames(6)
+                .check("the station's sixteen materials trade the eighth unit for the +9 marker", () -> {
+                    List<JeiPreview.MaterialUnit> units = JeiPreview.materialUnits(station);
+                    List<JeiPreview.MaterialUnit> markers = units.stream().filter(JeiPreview.MaterialUnit::overflow)
+                            .toList();
+                    return units.size() == 8
+                            && disjoint(units)
+                            && markers.size() == 1
+                            && markers.get(0).index() == -1
+                            && JeiPreview.materialOverflowAt(station, markers.get(0).x() + 10, markers.get(0).y() + 12)
+                                    == 9;
+                }, () -> "materials=" + JeiPreview.materialUnits(station))
                 .check("the compact timeline is one headless lane of ten segments", () -> {
                     StageTimeline timeline = JeiPreview.timeline(station);
                     return timeline != null
@@ -189,7 +201,29 @@ public final class PreviewJeiParityScenario {
                             && compact.segments().stream()
                                     .allMatch(segment -> segment.width() >= StageTimeline.minSegmentWidth);
                 }, () -> "wrap=compact")
-                .action("page the category to the campus set", context -> JeiPreview.show(campus)).frames(8)
+                .action("page the category to the machine's eight materials", context -> JeiPreview.show(machine))
+                .frames(6).check("the machine's eight material units never overlap", () -> {
+                    List<JeiPreview.MaterialUnit> units = JeiPreview.materialUnits(machine);
+                    return units.size() == 8
+                            && units.stream().noneMatch(JeiPreview.MaterialUnit::overflow)
+                            && disjoint(units);
+                }, () -> "materials=" + JeiPreview.materialUnits(machine))
+                .check("the material tooltip answers the first and last units with their own index", () -> {
+                    List<JeiPreview.MaterialUnit> units = JeiPreview.materialUnits(machine);
+                    if (units.size() != 8) {
+                        return false;
+                    }
+                    JeiPreview.MaterialUnit first = units.get(0);
+                    JeiPreview.MaterialUnit last = units.get(7);
+                    // a unit owns its count line too, not only its icon
+                    return JeiPreview.materialAt(machine, first.x() + 8, first.y() + 8) == 0
+                            && JeiPreview.materialAt(machine, last.x() + 8, last.y() + 8) == 7
+                            && JeiPreview.materialAt(machine, last.x() + 10, last.y() + 20) == 7;
+                },
+                    () -> "materials=" + JeiPreview.materialUnits(machine) + " first="
+                            + JeiPreview.materialAt(machine, 94, 148) + " last="
+                            + JeiPreview.materialAt(machine, 94 + 3 * 20 + 8, 148 + 25 + 8)
+                ).action("page the category to the campus set", context -> JeiPreview.show(campus)).frames(8)
                 .check("the set page's timeline keeps its three member lanes, short heads and 17 segments", () -> {
                     StageTimeline timeline = JeiPreview.timeline(campus);
                     return timeline != null
@@ -199,6 +233,17 @@ public final class PreviewJeiParityScenario {
                                     .equals(List.of("root", "campus_machine", "campus_tower"))
                             && JeiPreview.stage(campus) == -1;
                 }, () -> String.valueOf(JeiPreview.timeline(campus)))
+                .check("the campus page keeps its eight-unit footprint and explains its overflow", () -> {
+                    List<JeiPreview.MaterialUnit> units = JeiPreview.materialUnits(campus);
+                    List<JeiPreview.MaterialUnit> markers = units.stream().filter(JeiPreview.MaterialUnit::overflow)
+                            .toList();
+                    return units.size() == 8
+                            && disjoint(units)
+                            && markers.size() == 1
+                            && markers.get(0).index() == -1
+                            && JeiPreview.materialOverflowAt(campus, markers.get(0).x() + 10, markers.get(0).y() + 12)
+                                    > 0;
+                }, () -> "materials=" + JeiPreview.materialUnits(campus))
                 .check("a lane head's hover still answers with the member's whole id", () -> {
                     StageTimeline timeline = JeiPreview.timeline(campus);
                     StageTimeline.Lane lane = timeline.lanes().get(1);
@@ -271,5 +316,22 @@ public final class PreviewJeiParityScenario {
                     .append(" scale=").append(panel.scale()).append("; ");
         }
         return text.toString();
+    }
+
+    /** True when no two material units share a pixel: the summary's own non-overlap claim. */
+    private static boolean disjoint(List<JeiPreview.MaterialUnit> units) {
+        for (int first = 0; first < units.size(); first++) {
+            for (int second = first + 1; second < units.size(); second++) {
+                JeiPreview.MaterialUnit a = units.get(first);
+                JeiPreview.MaterialUnit b = units.get(second);
+                if (a.x() < b.x() + b.width()
+                        && b.x() < a.x() + a.width()
+                        && a.y() < b.y() + b.height()
+                        && b.y() < a.y() + a.height()) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }
